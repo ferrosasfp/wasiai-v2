@@ -53,7 +53,7 @@ contract DeployMarketplace is Script {
             usdc = USDC_FUJI;
             console.log("Network: Avalanche Fuji (testnet)");
         } else {
-            revert("Unsupported chain — use Avalanche or Fuji");
+            revert("Unsupported chain - use Avalanche or Fuji");
         }
 
         console.log("Deployer:", deployer);
