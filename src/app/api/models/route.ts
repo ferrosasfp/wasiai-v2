@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { BazaarClient } from 'uvd-x402-sdk/backend'
 
 const createModelSchema = z.object({
   name: z.string().min(3),
@@ -46,6 +47,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Slug already taken' }, { status: 409 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // ── Register in Ultravioleta DAO Bazaar (x402 discovery network) ─────────
+  // Best-effort: don't fail publish if Bazaar is down
+  try {
+    const bazaar = new BazaarClient({ apiKey: process.env.ULTRAVIOLETA_BAZAAR_API_KEY })
+    await bazaar.register({
+      url: `https://wasiai.io/api/v1/models/${result.data.slug}/invoke`,
+      name: result.data.name,
+      description: result.data.description ?? `${result.data.name} on WasiAI`,
+      category: 'ai',
+      networks: ['avalanche'],
+      tokens: ['USDC'],
+      price: String(result.data.price_per_call),
+      priceCurrency: 'USDC',
+      payTo: process.env.WASIAI_TREASURY_ADDRESS ?? '',
+      mimeType: 'application/json',
+      tags: [result.data.category, 'wasiai', 'agent'],
+    })
+  } catch {
+    // Bazaar registration is best-effort
   }
 
   return NextResponse.json(data, { status: 201 })

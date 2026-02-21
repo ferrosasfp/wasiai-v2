@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
+import {
+  FacilitatorClient,
+  extractPaymentFromHeaders,
+  buildErc8004PaymentRequirements,
+  create402Response,
+  X402_CORS_HEADERS,
+} from 'uvd-x402-sdk/backend'
+
+const TREASURY = process.env.WASIAI_TREASURY_ADDRESS ?? ''
+const CHAIN    = 'avalanche'
+const FACILITATOR_URL = 'https://facilitator.ultravioletadao.xyz'
 
 /**
- * Agent-to-Agent invocation endpoint.
- * Supports x402 payment flow on Avalanche + Agent Key budget-based access.
- *
  * POST /api/v1/models/:slug/invoke
- * Headers:
- *   x-payment:   <x402-tx-hash>   (for direct on-chain payment)
- *   x-agent-key: <wasi_xxx...>    (for budget-based key access)
+ *
+ * Two auth paths:
+ *   A) x-agent-key  → budget-based, no on-chain payment per call
+ *   B) X-PAYMENT    → real x402 via Ultravioleta DAO facilitator (Avalanche)
  */
 export async function POST(
   request: NextRequest,
@@ -18,7 +27,7 @@ export async function POST(
   const { slug } = await params
   const supabase = await createClient()
 
-  // ── 1. Look up the model ──────────────────────────────────────────────────
+  // ── 1. Lookup model ───────────────────────────────────────────────────────
   const { data: model, error: modelError } = await supabase
     .from('models')
     .select('*')
@@ -30,17 +39,14 @@ export async function POST(
     return NextResponse.json({ error: 'Model not found' }, { status: 404 })
   }
 
-  // ── 2. Auth: x-agent-key or x-payment ────────────────────────────────────
-  const rawAgentKey = request.headers.get('x-agent-key')
-  const paymentHeader = request.headers.get('x-payment')
+  const priceStr = String(model.price_per_call)    // e.g. "0.02"
+  const resourceUrl = `https://wasiai.io/api/v1/models/${slug}/invoke`
 
-  let validatedKeyId: string | null = null
-  let callerType: 'agent' | 'human' = 'human'
+  // ── 2. Route A: Agent Key (budget-based) ─────────────────────────────────
+  const rawAgentKey = request.headers.get('x-agent-key')
 
   if (rawAgentKey) {
-    // Validate key against DB + enforce budget
     const hash = createHash('sha256').update(rawAgentKey).digest('hex')
-
     const { data: keyRow } = await supabase
       .from('agent_keys')
       .select('id, is_active, budget_usdc, spent_usdc')
@@ -70,119 +76,79 @@ export async function POST(
       )
     }
 
-    validatedKeyId = keyRow.id
-    callerType = 'agent'
+    const result = await callUpstream(model, request)
 
-  } else if (!paymentHeader) {
-    // No auth at all → return 402 with pricing info for x402 flow
+    if (result.status === 'success') {
+      await supabase.rpc('increment_agent_key_spend', {
+        p_key_id: keyRow.id,
+        p_amount: model.price_per_call,
+      })
+    }
+
+    await logCall(supabase, model, 'agent', rawAgentKey.substring(0, 16), null, result)
+    return buildResponse(model, result)
+  }
+
+  // ── 3. Route B: x402 Payment (Ultravioleta DAO / Avalanche) ──────────────
+  const headers = Object.fromEntries(request.headers.entries())
+  const paymentHeader = extractPaymentFromHeaders(headers)
+
+  if (!paymentHeader) {
+    // No payment — return 402 with proper x402 payment instructions
+    const { status, headers: h402, body } = create402Response({
+      amount: priceStr,
+      recipient: TREASURY,
+      resource: resourceUrl,
+      chainName: CHAIN,
+      description: `Access to ${model.name} on WasiAI`,
+      mimeType: 'application/json',
+    })
+
     return NextResponse.json(
       {
-        error: 'Payment required',
-        code: 'payment_required',
-        price: model.price_per_call,
-        currency: model.currency,
-        chain: model.chain,
-        chain_id: 43114,
-        accepts: ['x402/usdc-avalanche'],
-        recipient: process.env.WASIAI_TREASURY_ADDRESS ?? '0x0000000000000000000000000000000000000000',
-        model: { slug: model.slug, name: model.name },
+        ...body,
+        model: { slug: model.slug, name: model.name, category: model.category },
         docs: 'https://wasiai.io/docs/agents#x402',
       },
       {
-        status: 402,
-        headers: {
-          'x-price': model.price_per_call.toString(),
-          'x-currency': model.currency,
-          'x-chain': model.chain,
-          'x-chain-id': '43114',
-          'x-accepts': 'x402/usdc-avalanche',
-        },
+        status,
+        headers: { ...h402, ...X402_CORS_HEADERS },
       },
     )
   }
 
-  // ── 3. Parse request body ─────────────────────────────────────────────────
-  let body: Record<string, unknown> = {}
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
-  // ── 4. Forward to model endpoint ─────────────────────────────────────────
-  if (!model.endpoint_url) {
-    return NextResponse.json({ error: 'Model endpoint not configured' }, { status: 503 })
-  }
-
-  const startMs = Date.now()
-  let result: unknown
-  let callStatus = 'success'
-
-  try {
-    const upstream = await fetch(model.endpoint_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (!upstream.ok) {
-      callStatus = 'error'
-      result = { error: `Upstream returned ${upstream.status}` }
-    } else {
-      result = await upstream.json()
-    }
-  } catch (err) {
-    callStatus = 'error'
-    result = { error: 'Upstream model unreachable', detail: String(err) }
-  }
-
-  const latencyMs = Date.now() - startMs
-
-  // ── 5. Deduct from agent key budget (if key-based) ───────────────────────
-  if (validatedKeyId && callStatus === 'success') {
-    await supabase.rpc('increment_agent_key_spend', {
-      p_key_id: validatedKeyId,
-      p_amount: model.price_per_call,
-    })
-  }
-
-  // ── 6. Log the call ───────────────────────────────────────────────────────
-  await supabase.from('model_calls').insert({
-    model_id: model.id,
-    caller_type: callerType,
-    agent_id: validatedKeyId ? rawAgentKey!.substring(0, 16) : null,
-    amount_paid: model.price_per_call,
-    tx_hash: paymentHeader ?? null,
-    status: callStatus,
-    latency_ms: latencyMs,
+  // ── 4. Verify + Settle via Ultravioleta DAO facilitator ───────────────────
+  const requirements = buildErc8004PaymentRequirements({
+    amount: priceStr,
+    recipient: TREASURY,
+    resource: resourceUrl,
+    chainName: CHAIN,
+    description: `Access to ${model.name} on WasiAI`,
+    mimeType: 'application/json',
   })
 
-  // ── 7. Update model stats ─────────────────────────────────────────────────
-  if (callStatus === 'success') {
-    await supabase
-      .from('models')
-      .update({
-        total_calls: model.total_calls + 1,
-        total_revenue: Number(model.total_revenue) + model.price_per_call,
-      })
-      .eq('id', model.id)
+  const facilitator = new FacilitatorClient({ baseUrl: FACILITATOR_URL })
+  const settlement = await facilitator.verifyAndSettle(paymentHeader, requirements)
+
+  if (!settlement.verified) {
+    return NextResponse.json(
+      {
+        error: 'Payment verification failed',
+        code: 'payment_invalid',
+        reason: settlement.error,
+      },
+      { status: 402 },
+    )
   }
 
-  return NextResponse.json({
-    result,
-    meta: {
-      model: model.slug,
-      latency_ms: latencyMs,
-      charged: model.price_per_call,
-      currency: model.currency,
-      status: callStatus,
-    },
-  })
+  // ── 5. Payment valid — call the upstream model ────────────────────────────
+  const result = await callUpstream(model, request)
+  await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result)
+
+  return buildResponse(model, result, settlement.transactionHash)
 }
 
-/**
- * GET /api/v1/models/:slug/invoke
- * Machine-readable model spec — for agent discovery.
- */
+// ── GET: machine-readable spec ────────────────────────────────────────────
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
@@ -205,11 +171,91 @@ export async function GET(
     invoke_url: `https://wasiai.io/api/v1/models/${slug}/invoke`,
     payment: {
       price: model.price_per_call,
-      currency: model.currency,
-      chain: model.chain,
+      currency: 'USDC',
+      chain: 'avalanche',
       chain_id: 43114,
       protocol: 'x402',
-      treasury: process.env.WASIAI_TREASURY_ADDRESS ?? null,
+      facilitator: FACILITATOR_URL,
+      usdc_contract: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
+      treasury: TREASURY,
     },
   })
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+async function callUpstream(model: Record<string, unknown>, request: NextRequest) {
+  let body: Record<string, unknown> = {}
+  try { body = await request.json() } catch { /* empty body ok */ }
+
+  const startMs = Date.now()
+  let data: unknown
+  let status: 'success' | 'error' = 'success'
+
+  try {
+    const upstream = await fetch(model.endpoint_url as string, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
+    if (!upstream.ok) status = 'error'
+  } catch (err) {
+    data = { error: 'Upstream unreachable', detail: String(err) }
+    status = 'error'
+  }
+
+  return { data, status, latencyMs: Date.now() - startMs }
+}
+
+async function logCall(
+  supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never,
+  model: Record<string, unknown>,
+  callerType: 'human' | 'agent',
+  agentId: string | null,
+  txHash: string | null,
+  result: { status: string; latencyMs: number },
+) {
+  await Promise.all([
+    (await supabase).from('model_calls').insert({
+      model_id: model.id,
+      caller_type: callerType,
+      agent_id: agentId,
+      amount_paid: model.price_per_call,
+      tx_hash: txHash,
+      status: result.status,
+      latency_ms: result.latencyMs,
+    }),
+    result.status === 'success'
+      ? (await supabase)
+          .from('models')
+          .update({
+            total_calls: (model.total_calls as number) + 1,
+            total_revenue: Number(model.total_revenue) + Number(model.price_per_call),
+          })
+          .eq('id', model.id)
+      : Promise.resolve(),
+  ])
+}
+
+function buildResponse(
+  model: Record<string, unknown>,
+  result: { data: unknown; status: string; latencyMs: number },
+  txHash?: string,
+) {
+  return NextResponse.json(
+    {
+      result: result.data,
+      meta: {
+        model: model.slug,
+        latency_ms: result.latencyMs,
+        charged: model.price_per_call,
+        currency: 'USDC',
+        chain: 'avalanche',
+        tx_hash: txHash ?? null,
+        status: result.status,
+      },
+    },
+    { headers: X402_CORS_HEADERS },
+  )
 }
