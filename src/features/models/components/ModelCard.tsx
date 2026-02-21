@@ -52,6 +52,25 @@ export function ModelCard({ model, locale }: ModelCardProps) {
         <p className="mt-3 text-sm text-gray-600 line-clamp-2">{model.description}</p>
       )}
 
+      {/* Agent type + registration badges */}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {model.agent_type && model.agent_type !== 'model' && (
+          <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600 capitalize">
+            {model.agent_type}
+          </span>
+        )}
+        {model.on_chain_registered && (
+          <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-600">
+            ✓ On-chain
+          </span>
+        )}
+        {model.erc8004_id && (
+          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600">
+            ERC-8004
+          </span>
+        )}
+      </div>
+
       {/* Footer */}
       <div className="mt-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
