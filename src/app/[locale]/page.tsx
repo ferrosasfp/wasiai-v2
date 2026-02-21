@@ -29,14 +29,14 @@ export default async function HomePage({ params, searchParams }: Props) {
         <div className="mx-auto max-w-4xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm backdrop-blur">
             <span>⚡</span>
-            <span>Agents pay agents. No humans needed.</span>
+            <span>The marketplace for the agentic economy</span>
           </div>
           <h1 className="text-5xl font-extrabold tracking-tight">
             WasiAI
           </h1>
           <p className="mt-4 text-xl text-white/80">
-            The AI marketplace built for agents.<br />
-            Pay per call in USDC. No subscriptions. No friction.
+            AI agents discover, pay, and call models autonomously.<br />
+            x402 native payments on Avalanche. No subscriptions. No friction.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
@@ -45,19 +45,19 @@ export default async function HomePage({ params, searchParams }: Props) {
             >
               Publish a Model →
             </Link>
-            <a
-              href="#models"
+            <Link
+              href={`/${locale}/agent-keys`}
               className="rounded-full border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10 transition"
             >
-              Browse Models
-            </a>
+              Get Agent Key →
+            </Link>
           </div>
           {/* Stats */}
           <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-white/70">
-            <div><span className="block text-3xl font-bold text-white">50+</span>Models</div>
-            <div><span className="block text-3xl font-bold text-white">$0.02</span>Min. price</div>
-            <div><span className="block text-3xl font-bold text-white">80%</span>To creators</div>
             <div><span className="block text-3xl font-bold text-white">x402</span>Native payments</div>
+            <div><span className="block text-3xl font-bold text-white">$0.02</span>Min. per call</div>
+            <div><span className="block text-3xl font-bold text-white">80%</span>To creators</div>
+            <div><span className="block text-3xl font-bold text-white">ERC-8004</span>Agent identity</div>
           </div>
         </div>
       </section>
@@ -94,27 +94,62 @@ export default async function HomePage({ params, searchParams }: Props) {
 
       {/* Agent CTA */}
       <section className="bg-gray-900 px-6 py-16 text-white">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold">Built for Agents 🤖</h2>
-          <p className="mt-3 text-gray-400">
-            Your AI agent can discover and call any model on WasiAI autonomously.
-            One HTTP request, x402 payment, instant access.
-          </p>
-          <div className="mt-6 overflow-auto rounded-xl bg-gray-800 p-4 text-left text-sm">
-            <pre className="text-green-400">{`# Discover models
-GET https://wasiai.io/api/v1/models?category=nlp
-
-# Call a model (agent pays via x402)
-POST https://wasiai.io/api/v1/models/my-model/invoke
-x-payment: <x402-payment-header>
-{ "input": "Translate this to Spanish" }`}</pre>
+        <div className="mx-auto max-w-4xl">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-4 py-1.5 text-sm text-indigo-300 mb-4">
+              <span>🤖</span><span>Coinbase AgentKit compatible</span>
+            </div>
+            <h2 className="text-3xl font-bold">Built for the Agentic Economy</h2>
+            <p className="mt-3 text-gray-400 max-w-xl mx-auto">
+              Any AI agent — AgentKit, LangChain, custom — can discover, pay, and call models on WasiAI autonomously. x402 native. ERC-8004 identity support.
+            </p>
           </div>
-          <Link
-            href={`/${locale}/docs/agents`}
-            className="mt-6 inline-block rounded-full bg-indigo-500 px-6 py-2.5 font-semibold hover:bg-indigo-400 transition"
-          >
-            Agent API Docs →
-          </Link>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+            <div className="rounded-xl bg-gray-800 p-4">
+              <p className="text-xs font-semibold text-gray-400 mb-2">1. Check your budget</p>
+              <pre className="text-green-400 text-xs overflow-auto">{`GET /api/v1/agent-keys/me
+x-agent-key: wasi_xxx
+
+← { remaining_usdc: 4.80,
+    status: "ok" }`}</pre>
+            </div>
+            <div className="rounded-xl bg-gray-800 p-4">
+              <p className="text-xs font-semibold text-gray-400 mb-2">2. Discover models</p>
+              <pre className="text-green-400 text-xs overflow-auto">{`GET /api/v1/models
+  ?category=vision
+  &max_price=0.05
+
+← [{ slug, price,
+     invoke_url }]`}</pre>
+            </div>
+            <div className="rounded-xl bg-gray-800 p-4">
+              <p className="text-xs font-semibold text-gray-400 mb-2">3. Invoke &amp; pay</p>
+              <pre className="text-green-400 text-xs overflow-auto">{`POST /api/v1/models/
+  flux-pro/invoke
+x-agent-key: wasi_xxx
+
+← { result, meta:
+  { charged: 0.02 }}`}</pre>
+            </div>
+          </div>
+
+          <div className="text-center flex flex-wrap justify-center gap-4">
+            <Link
+              href={`/${locale}/agent-keys`}
+              className="rounded-full bg-indigo-500 px-6 py-2.5 font-semibold hover:bg-indigo-400 transition"
+            >
+              Get Agent Key →
+            </Link>
+            <a
+              href="https://github.com/coinbase/agentkit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-gray-600 px-6 py-2.5 font-semibold text-gray-300 hover:border-gray-400 transition"
+            >
+              AgentKit Docs ↗
+            </a>
+          </div>
         </div>
       </section>
     </main>
