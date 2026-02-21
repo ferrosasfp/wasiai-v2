@@ -23,7 +23,7 @@ import "../src/WasiAIMarketplace.sol";
  *     --broadcast --verify -vvv
  *
  * Required env vars:
- *   PRIVATE_KEY           → deployer wallet private key (also becomes initial owner)
+ *   PRIVATE_KEY           → deployer wallet private key WITH 0x prefix, e.g. 0xabc123...
  *   WASIAI_TREASURY       → wallet that receives the 10% platform fee
  *   OPERATOR_ADDRESS      → backend server wallet that can call recordInvocation
  *
