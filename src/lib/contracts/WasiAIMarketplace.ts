@@ -1,0 +1,146 @@
+/**
+ * WasiAIMarketplace contract ABI + helpers
+ * Chain: Avalanche C-Chain (43114) / Fuji testnet (43113)
+ */
+
+export const WASIAI_MARKETPLACE_ABI = [
+  // ── Registry ──────────────────────────────────────────────────────────────
+  {
+    name: 'registerAgent',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'slug',         type: 'string'  },
+      { name: 'pricePerCall', type: 'uint256' },
+      { name: 'creator',      type: 'address' },
+      { name: 'erc8004Id',    type: 'uint64'  },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'updateAgent',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'slug',     type: 'string'  },
+      { name: 'newPrice', type: 'uint256' },
+      { name: 'active',   type: 'bool'    },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'getAgent',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'slug', type: 'string' }],
+    outputs: [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'creator',       type: 'address' },
+          { name: 'pricePerCall',  type: 'uint256' },
+          { name: 'erc8004Id',     type: 'uint64'  },
+          { name: 'creatorFeeBps', type: 'uint16'  },
+          { name: 'active',        type: 'bool'    },
+        ],
+      },
+    ],
+  },
+  // ── Invocation ────────────────────────────────────────────────────────────
+  {
+    name: 'recordInvocation',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'slug',   type: 'string'  },
+      { name: 'payer',  type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  // ── Withdrawal ────────────────────────────────────────────────────────────
+  {
+    name: 'withdraw',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'getPendingEarnings',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'creator', type: 'address' }],
+    outputs: [{ type: 'uint256' }],
+  },
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  {
+    name: 'getStats',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      { name: 'volume',      type: 'uint256' },
+      { name: 'invocations', type: 'uint256' },
+      { name: 'feeBps',      type: 'uint16'  },
+    ],
+  },
+  {
+    name: 'platformFeeBps',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint16' }],
+  },
+  // ── Events ────────────────────────────────────────────────────────────────
+  {
+    name: 'AgentRegistered',
+    type: 'event',
+    inputs: [
+      { name: 'slug',         type: 'string',  indexed: true  },
+      { name: 'creator',      type: 'address', indexed: true  },
+      { name: 'pricePerCall', type: 'uint256', indexed: false },
+      { name: 'erc8004Id',    type: 'uint64',  indexed: false },
+    ],
+  },
+  {
+    name: 'AgentInvoked',
+    type: 'event',
+    inputs: [
+      { name: 'slug',          type: 'string',  indexed: true  },
+      { name: 'payer',         type: 'address', indexed: true  },
+      { name: 'amount',        type: 'uint256', indexed: false },
+      { name: 'creatorShare',  type: 'uint256', indexed: false },
+      { name: 'platformShare', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    name: 'Withdrawn',
+    type: 'event',
+    inputs: [
+      { name: 'creator', type: 'address', indexed: true  },
+      { name: 'amount',  type: 'uint256', indexed: false },
+    ],
+  },
+] as const
+
+// ── Contract address helper ────────────────────────────────────────────────
+
+export const MARKETPLACE_ADDRESSES: Record<number, `0x${string}`> = {
+  43114: (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET ?? '0x0000000000000000000000000000000000000000') as `0x${string}`,
+  43113: (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI    ?? '0x0000000000000000000000000000000000000000') as `0x${string}`,
+}
+
+export function getMarketplaceAddress(chainId: number): `0x${string}` {
+  return MARKETPLACE_ADDRESSES[chainId] ?? '0x0000000000000000000000000000000000000000'
+}
+
+/** Convert USDC dollar amount to atomic units (6 decimals) */
+export function toUSDCAtomics(dollars: number): bigint {
+  return BigInt(Math.round(dollars * 1_000_000))
+}
+
+/** Convert USDC atomic units back to dollars */
+export function fromUSDCAtomics(atomics: bigint): number {
+  return Number(atomics) / 1_000_000
+}

@@ -2,6 +2,8 @@ export type ModelCategory = 'nlp' | 'vision' | 'audio' | 'code' | 'multimodal' |
 
 export type ModelStatus = 'active' | 'paused' | 'reviewing'
 
+export type AgentType = 'model' | 'agent' | 'workflow'
+
 export interface ModelCapability {
   name: string
   description: string
@@ -32,9 +34,24 @@ export interface Model {
   total_revenue: number
   created_at: string
   updated_at: string
+
+  // Agent-specific fields (migration 006)
+  agent_type: AgentType          // 'model' | 'agent' | 'workflow'
+  dependencies: string[]         // slugs of other agents this agent calls
+  creator_wallet: string | null  // creator's wallet for on-chain payouts
+  on_chain_registered: boolean   // registered in WasiAIMarketplace.sol
+  erc8004_id: number | null      // ERC-8004 identity token ID
+  reputation_score: number | null
+  reputation_count: number
+  mcp_tool_name: string | null
+  mcp_description: string | null
+
   // joined
   creator?: CreatorProfile
 }
+
+/** Alias for semantic clarity in agent-focused code */
+export type Agent = Model
 
 export interface CreatorProfile {
   id: string

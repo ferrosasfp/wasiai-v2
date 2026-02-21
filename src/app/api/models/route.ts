@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { BazaarClient } from 'uvd-x402-sdk/backend'
+import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 
 const createModelSchema = z.object({
   name: z.string().min(3),
@@ -47,6 +48,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Slug already taken' }, { status: 409 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // ── Register agent on WasiAIMarketplace.sol (on-chain) ──────────────────
+  // Best-effort: requires MARKETPLACE_CONTRACT_ADDRESS + OPERATOR_PRIVATE_KEY
+  try {
+    const { data: profile } = await supabase
+      .from('creator_profiles')
+      .select('wallet_address')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.wallet_address) {
+      registerAgentOnChain({
+        slug:             result.data.slug,
+        pricePerCallUSDC: result.data.price_per_call,
+        creatorWallet:    profile.wallet_address,
+      }).catch(err => console.error('[publish] on-chain register failed:', err))
+    }
+  } catch {
+    // Non-fatal
   }
 
   // ── Register in Ultravioleta DAO Bazaar (x402 discovery network) ─────────

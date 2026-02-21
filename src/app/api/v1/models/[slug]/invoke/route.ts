@@ -8,6 +8,7 @@ import {
   create402Response,
   X402_CORS_HEADERS,
 } from 'uvd-x402-sdk/backend'
+import { recordInvocationOnChain } from '@/lib/contracts/marketplaceClient'
 
 const TREASURY = process.env.WASIAI_TREASURY_ADDRESS ?? ''
 const CHAIN    = 'avalanche'
@@ -144,6 +145,17 @@ export async function POST(
   // ── 5. Payment valid — call the upstream model ────────────────────────────
   const result = await callUpstream(model, request)
   await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result)
+
+  // ── 6. Record invocation on-chain (non-blocking) ──────────────────────────
+  // The USDC is already in WasiAIMarketplace.sol (paid via x402).
+  // recordInvocation() splits earnings: 90% creator, 10% treasury.
+  if (result.status === 'success') {
+    recordInvocationOnChain({
+      slug:         slug,
+      payerAddress: '0x0000000000000000000000000000000000000000', // extracted from payment header ideally
+      amountUSDC:   model.price_per_call as number,
+    }).catch(err => console.error('[invoke] on-chain recording failed silently:', err))
+  }
 
   return buildResponse(model, result, settlement.transactionHash)
 }
