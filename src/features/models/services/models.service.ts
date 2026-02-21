@@ -22,7 +22,10 @@ export async function getModels({
     .range(offset, offset + limit - 1)
 
   if (category) query = query.eq('category', category)
-  if (search) query = query.ilike('name', `%${search}%`)
+  if (search) {
+    // Search across name and description
+    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+  }
 
   const { data, error } = await query
   if (error) throw error

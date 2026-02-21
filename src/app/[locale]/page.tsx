@@ -71,9 +71,9 @@ export default async function HomePage({ params, searchParams }: Props) {
             <h2 className="text-2xl font-bold text-gray-900">Available Models</h2>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {/* Search */}
+              {/* Search — preserves active category */}
               <Suspense>
-                <SearchInput defaultValue={search} />
+                <SearchInput defaultValue={search} category={category} />
               </Suspense>
               {/* Category filter */}
               <Suspense>
@@ -175,10 +175,12 @@ x-agent-key: wasi_xxx
   )
 }
 
-// ── Search input (client-compatible via form GET) ─────────────────────────────
-function SearchInput({ defaultValue }: { defaultValue?: string }) {
+// ── Search input — preserves ?category param via hidden input ─────────────────
+function SearchInput({ defaultValue, category }: { defaultValue?: string; category?: string }) {
   return (
-    <form method="GET" className="flex items-center">
+    <form method="GET" className="flex items-center gap-2">
+      {/* Preserve active category when searching */}
+      {category && <input type="hidden" name="category" value={category} />}
       <input
         type="search"
         name="search"
