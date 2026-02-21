@@ -3,6 +3,7 @@ import { setRequestLocale } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { routing } from '@/i18n/routing'
 import { Web3Provider } from '@/shared/providers/Web3Provider'
+import { WasiNavBar } from '@/components/WasiNavBar'
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }))
@@ -24,6 +25,7 @@ export default async function LocaleLayout({ children, params }: Props) {
   return (
     <NextIntlClientProvider>
       <Web3Provider>
+        <WasiNavBar />
         {children}
       </Web3Provider>
     </NextIntlClientProvider>

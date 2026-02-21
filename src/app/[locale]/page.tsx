@@ -24,34 +24,36 @@ export default async function HomePage({ params, searchParams }: Props) {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Hero */}
+
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 px-6 py-20 text-white">
         <div className="mx-auto max-w-4xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm backdrop-blur">
             <span>⚡</span>
             <span>The marketplace for the agentic economy</span>
           </div>
-          <h1 className="text-5xl font-extrabold tracking-tight">
-            WasiAI
-          </h1>
+          <h1 className="text-5xl font-extrabold tracking-tight">WasiAI</h1>
           <p className="mt-4 text-xl text-white/80">
             AI agents discover, pay, and call models autonomously.<br />
             x402 native payments on Avalanche. No subscriptions. No friction.
           </p>
+
+          {/* CTAs — browse first, publish second */}
           <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <a
+              href="#models"
+              className="rounded-full bg-white px-6 py-3 font-semibold text-indigo-600 shadow hover:bg-indigo-50 transition"
+            >
+              Browse Models
+            </a>
             <Link
               href={`/${locale}/publish`}
-              className="rounded-full bg-white px-6 py-3 font-semibold text-indigo-600 shadow hover:bg-indigo-50 transition"
+              className="rounded-full border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10 transition"
             >
               Publish a Model →
             </Link>
-            <Link
-              href={`/${locale}/agent-keys`}
-              className="rounded-full border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10 transition"
-            >
-              Get Agent Key →
-            </Link>
           </div>
+
           {/* Stats */}
           <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-white/70">
             <div><span className="block text-3xl font-bold text-white">x402</span>Native payments</div>
@@ -62,25 +64,41 @@ export default async function HomePage({ params, searchParams }: Props) {
         </div>
       </section>
 
-      {/* Models */}
+      {/* ── Models ───────────────────────────────────────────────────────── */}
       <section id="models" className="px-6 py-12">
         <div className="mx-auto max-w-6xl">
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-2xl font-bold text-gray-900">Available Models</h2>
-            <Suspense>
-              <CategoryFilter />
-            </Suspense>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              {/* Search */}
+              <Suspense>
+                <SearchInput defaultValue={search} />
+              </Suspense>
+              {/* Category filter */}
+              <Suspense>
+                <CategoryFilter />
+              </Suspense>
+            </div>
           </div>
 
           {models.length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-gray-200 py-20 text-center">
-              <p className="text-gray-500">No models yet.</p>
-              <Link
-                href={`/${locale}/publish`}
-                className="mt-4 inline-block rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-              >
-                Be the first to publish →
-              </Link>
+              <p className="text-gray-400 text-lg">
+                {search || category ? 'No models match your filters.' : 'No models yet.'}
+              </p>
+              {search || category ? (
+                <a href={`/${locale}`} className="mt-4 inline-block text-sm text-indigo-500 hover:underline">
+                  Clear filters
+                </a>
+              ) : (
+                <Link
+                  href={`/${locale}/publish`}
+                  className="mt-4 inline-block rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                >
+                  Be the first to publish →
+                </Link>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -92,31 +110,32 @@ export default async function HomePage({ params, searchParams }: Props) {
         </div>
       </section>
 
-      {/* Agent CTA */}
+      {/* ── Agent API ────────────────────────────────────────────────────── */}
       <section className="bg-gray-900 px-6 py-16 text-white">
         <div className="mx-auto max-w-4xl">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-4 py-1.5 text-sm text-indigo-300 mb-4">
+          <div className="mb-10 text-center">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-4 py-1.5 text-sm text-indigo-300">
               <span>🤖</span><span>Coinbase AgentKit compatible</span>
             </div>
             <h2 className="text-3xl font-bold">Built for the Agentic Economy</h2>
-            <p className="mt-3 text-gray-400 max-w-xl mx-auto">
-              Any AI agent — AgentKit, LangChain, custom — can discover, pay, and call models on WasiAI autonomously. x402 native. ERC-8004 identity support.
+            <p className="mt-3 max-w-xl mx-auto text-gray-400">
+              Any AI agent can discover, pay, and call models on WasiAI autonomously.
+              x402 native. ERC-8004 identity. Gasless via Ultravioleta DAO.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
             <div className="rounded-xl bg-gray-800 p-4">
-              <p className="text-xs font-semibold text-gray-400 mb-2">1. Check your budget</p>
-              <pre className="text-green-400 text-xs overflow-auto">{`GET /api/v1/agent-keys/me
+              <p className="mb-2 text-xs font-semibold text-gray-400">1. Check budget</p>
+              <pre className="overflow-auto text-xs text-green-400">{`GET /api/v1/agent-keys/me
 x-agent-key: wasi_xxx
 
-← { remaining_usdc: 4.80,
+← { remaining: 4.80,
     status: "ok" }`}</pre>
             </div>
             <div className="rounded-xl bg-gray-800 p-4">
-              <p className="text-xs font-semibold text-gray-400 mb-2">2. Discover models</p>
-              <pre className="text-green-400 text-xs overflow-auto">{`GET /api/v1/models
+              <p className="mb-2 text-xs font-semibold text-gray-400">2. Discover models</p>
+              <pre className="overflow-auto text-xs text-green-400">{`GET /api/v1/models
   ?category=vision
   &max_price=0.05
 
@@ -124,19 +143,19 @@ x-agent-key: wasi_xxx
      invoke_url }]`}</pre>
             </div>
             <div className="rounded-xl bg-gray-800 p-4">
-              <p className="text-xs font-semibold text-gray-400 mb-2">3. Invoke &amp; pay</p>
-              <pre className="text-green-400 text-xs overflow-auto">{`POST /api/v1/models/
+              <p className="mb-2 text-xs font-semibold text-gray-400">3. Invoke & pay</p>
+              <pre className="overflow-auto text-xs text-green-400">{`POST /api/v1/models/
   flux-pro/invoke
 x-agent-key: wasi_xxx
 
-← { result, meta:
-  { charged: 0.02 }}`}</pre>
+← { result,
+  charged: 0.02 }`}</pre>
             </div>
           </div>
 
-          <div className="text-center flex flex-wrap justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-4">
             <Link
-              href={`/${locale}/agent-keys`}
+              href="/en/agent-keys"
               className="rounded-full bg-indigo-500 px-6 py-2.5 font-semibold hover:bg-indigo-400 transition"
             >
               Get Agent Key →
@@ -153,5 +172,20 @@ x-agent-key: wasi_xxx
         </div>
       </section>
     </main>
+  )
+}
+
+// ── Search input (client-compatible via form GET) ─────────────────────────────
+function SearchInput({ defaultValue }: { defaultValue?: string }) {
+  return (
+    <form method="GET" className="flex items-center">
+      <input
+        type="search"
+        name="search"
+        defaultValue={defaultValue}
+        placeholder="Search models..."
+        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm focus:border-indigo-400 focus:outline-none sm:w-52"
+      />
+    </form>
   )
 }

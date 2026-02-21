@@ -25,10 +25,11 @@ interface CallRow {
   model: { name: string; slug: string } | null
 }
 
-export default async function CreatorDashboardPage() {
+export default async function CreatorDashboardPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect(`/${locale ?? 'en'}/login`)
 
   // Fetch creator's models
   const { data: models } = await supabase
@@ -85,7 +86,7 @@ export default async function CreatorDashboardPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Your Models</h2>
             <Link
-              href="/publish"
+              href={`/${locale}/publish`}
               className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
             >
               + Publish Model
@@ -219,7 +220,7 @@ x-payment: <usdc-tx-hash>
 Content-Type: application/json
 { "input": "..." }`}</pre>
           <Link
-            href="/agent-keys"
+            href={`/${locale}/agent-keys`}
             className="mt-4 inline-block rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
           >
             Manage Agent Keys →

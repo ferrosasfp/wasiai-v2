@@ -2,16 +2,16 @@ import Link from 'next/link'
 import type { Model } from '../types/models.types'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  nlp: 'bg-blue-100 text-blue-700',
-  vision: 'bg-purple-100 text-purple-700',
-  audio: 'bg-green-100 text-green-700',
-  code: 'bg-orange-100 text-orange-700',
+  nlp:        'bg-blue-100 text-blue-700',
+  vision:     'bg-purple-100 text-purple-700',
+  audio:      'bg-green-100 text-green-700',
+  code:       'bg-orange-100 text-orange-700',
   multimodal: 'bg-pink-100 text-pink-700',
-  data: 'bg-yellow-100 text-yellow-700',
+  data:       'bg-yellow-100 text-yellow-700',
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
-  nlp: '💬', vision: '👁', audio: '🎵', code: '💻', multimodal: '🤖', data: '📊',
+  nlp: '💬', vision: '👁️', audio: '🎵', code: '💻', multimodal: '🤖', data: '📊',
 }
 
 interface ModelCardProps {
@@ -20,6 +20,8 @@ interface ModelCardProps {
 }
 
 export function ModelCard({ model, locale }: ModelCardProps) {
+  const remaining = Math.max(0, model.total_calls)
+
   return (
     <Link
       href={`/${locale}/models/${model.slug}`}
@@ -27,16 +29,16 @@ export function ModelCard({ model, locale }: ModelCardProps) {
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg shrink-0">
             {CATEGORY_ICONS[model.category] ?? '🤖'}
           </div>
-          <div>
-            <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors truncate">
               {model.name}
             </h3>
             {model.creator && (
-              <p className="text-xs text-gray-500">@{model.creator.username}</p>
+              <p className="text-xs text-gray-500 truncate">@{model.creator.username}</p>
             )}
           </div>
         </div>
@@ -51,19 +53,28 @@ export function ModelCard({ model, locale }: ModelCardProps) {
       )}
 
       {/* Footer */}
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-3 text-xs text-gray-500">
-          <span>⚡ {model.total_calls.toLocaleString()} calls</span>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
+          <span className="shrink-0">⚡ {remaining.toLocaleString()} calls</span>
           {model.is_featured && (
-            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-600 font-medium">Featured</span>
+            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-600 font-medium shrink-0">Featured</span>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-bold text-gray-900">
-            ${model.price_per_call}
-          </span>
-          <span className="text-xs text-gray-400">/ call</span>
+        <div className="flex items-baseline gap-1 shrink-0">
+          <span className="text-sm font-bold text-gray-900">${model.price_per_call}</span>
+          <span className="text-xs text-gray-400">USDC</span>
         </div>
+      </div>
+
+      {/* Chain indicator */}
+      <div className="mt-3 flex items-center justify-between border-t border-gray-50 pt-3 text-xs text-gray-400">
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400" />
+          Avalanche · x402
+        </span>
+        <span className="text-indigo-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+          Call →
+        </span>
       </div>
     </Link>
   )

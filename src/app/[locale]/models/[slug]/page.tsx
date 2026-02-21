@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { setRequestLocale } from 'next-intl/server'
 import { getModelBySlug } from '@/features/models/services/models.service'
+import { ModelCallSection } from '@/features/models/components/ModelCallSection'
 import Link from 'next/link'
 
 interface Props {
@@ -14,17 +15,25 @@ export default async function ModelDetailPage({ params }: Props) {
   const model = await getModelBySlug(slug)
   if (!model) notFound()
 
+  const invokeUrl = `https://wasiai.io/api/v1/models/${model.slug}/invoke`
+
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-5xl px-6 py-12">
+      <div className="mx-auto max-w-5xl px-6 py-10">
+
         {/* Back */}
-        <Link href={`/${locale}`} className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+        <Link
+          href={`/${locale}`}
+          className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition"
+        >
           ← Back to marketplace
         </Link>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* Main */}
+
+          {/* ── Main column ─────────────────────────────────────────────── */}
           <div className="lg:col-span-2 space-y-6">
+
             {/* Header */}
             <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
               <div className="flex items-start gap-4">
@@ -32,12 +41,14 @@ export default async function ModelDetailPage({ params }: Props) {
                   🤖
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-bold text-gray-900">{model.name}</h1>
                     {model.is_featured && (
                       <span className="rounded-full bg-indigo-50 px-3 py-0.5 text-xs font-semibold text-indigo-600">Featured</span>
                     )}
-                    <span className="rounded-full bg-gray-100 px-3 py-0.5 text-xs font-medium text-gray-600 capitalize">{model.category}</span>
+                    <span className="rounded-full bg-gray-100 px-3 py-0.5 text-xs font-medium text-gray-600 capitalize">
+                      {model.category}
+                    </span>
                   </div>
                   {model.creator && (
                     <p className="mt-1 text-sm text-gray-500">
@@ -53,85 +64,110 @@ export default async function ModelDetailPage({ params }: Props) {
             </div>
 
             {/* Capabilities */}
-            {model.capabilities && model.capabilities.length > 0 && (
-              <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-                <h2 className="mb-4 font-semibold text-gray-900">Capabilities</h2>
+            <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
+              <h2 className="mb-4 font-semibold text-gray-900">Capabilities & Schema</h2>
+
+              {model.capabilities && model.capabilities.length > 0 ? (
                 <div className="space-y-3">
                   {model.capabilities.map((cap, i) => (
                     <div key={i} className="rounded-xl bg-gray-50 p-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-gray-800">{cap.name}</span>
-                        <span className="text-xs text-gray-400">{cap.inputType} → {cap.outputType}</span>
+                        <span className="rounded-full bg-white border border-gray-200 px-2 py-0.5 text-xs text-gray-500 font-mono">
+                          {cap.inputType} → {cap.outputType}
+                        </span>
                       </div>
-                      {cap.description && <p className="mt-1 text-sm text-gray-500">{cap.description}</p>}
+                      {cap.description && (
+                        <p className="mt-1 text-sm text-gray-500">{cap.description}</p>
+                      )}
                       {cap.example && (
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                           <div className="rounded-lg bg-gray-100 p-2">
-                            <p className="font-medium text-gray-500 mb-1">Input</p>
-                            <p className="text-gray-700 font-mono">{cap.example.input}</p>
+                            <p className="mb-1 font-medium text-gray-500">Input</p>
+                            <p className="font-mono text-gray-700">{cap.example.input}</p>
                           </div>
                           <div className="rounded-lg bg-indigo-50 p-2">
-                            <p className="font-medium text-indigo-500 mb-1">Output</p>
-                            <p className="text-indigo-700 font-mono">{cap.example.output}</p>
+                            <p className="mb-1 font-medium text-indigo-500">Output</p>
+                            <p className="font-mono text-indigo-700">{cap.example.output}</p>
                           </div>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 py-6 px-4 text-center">
+                  <p className="text-sm text-gray-500">No capabilities defined.</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Input: <code className="font-mono">{"{ \"input\": \"string\" }"}</code> ·
+                    Output: model-specific JSON
+                  </p>
+                </div>
+              )}
+            </div>
 
-            {/* Agent API */}
+            {/* Agent API — both auth methods */}
             <div className="rounded-2xl bg-gray-900 p-6 text-white">
-              <h2 className="mb-3 font-semibold">🤖 Call via Agent API</h2>
-              <pre className="overflow-auto rounded-lg bg-gray-800 p-4 text-sm text-green-400">{`POST /api/v1/models/${model.slug}/invoke
-x-payment: <x402-usdc-payment>
+              <h2 className="mb-4 font-semibold text-gray-100">🤖 Agent API</h2>
+
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Option A — Agent Key (budget-based)
+              </p>
+              <pre className="mb-4 overflow-auto rounded-xl bg-black/30 p-4 text-sm text-green-400">{`POST ${invokeUrl}
+x-agent-key: wasi_your_key_here
 Content-Type: application/json
 
-{
-  "input": "your input here"
-}`}</pre>
-              <p className="mt-3 text-xs text-gray-400">
-                Any AI agent can call this model autonomously using x402 payments on Avalanche.
+{ "input": "your input" }`}</pre>
+
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Option B — x402 Direct Payment (Avalanche USDC)
               </p>
+              <pre className="overflow-auto rounded-xl bg-black/30 p-4 text-sm text-green-400">{`# 1. Probe — receive 402 with payment instructions
+POST ${invokeUrl}
+{ "input": "your input" }
+
+# 2. Pay + retry
+POST ${invokeUrl}
+X-PAYMENT: <x402-eip712-signed-payload>
+{ "input": "your input" }`}</pre>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={`/${  'en'}/agent-keys`}
+                  className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold hover:bg-indigo-400 transition"
+                >
+                  Get Agent Key →
+                </Link>
+                <a
+                  href={`https://wasiai.io/api/v1/models/${model.slug}/invoke`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-300 hover:border-gray-400 transition"
+                >
+                  Model Spec (JSON) ↗
+                </a>
+              </div>
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* ── Sidebar ──────────────────────────────────────────────────── */}
           <div className="space-y-4">
-            {/* Pricing */}
-            <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-              <div className="text-center">
-                <p className="text-4xl font-extrabold text-gray-900">${model.price_per_call}</p>
-                <p className="text-sm text-gray-500">per call · {model.currency}</p>
-              </div>
-              <div className="mt-4 space-y-2 text-sm text-gray-600">
-                <div className="flex justify-between">
-                  <span>Chain</span>
-                  <span className="font-medium capitalize">{model.chain}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total calls</span>
-                  <span className="font-medium">{model.total_calls.toLocaleString()}</span>
-                </div>
-              </div>
-              <button className="mt-5 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white hover:bg-indigo-700 transition">
-                Connect Wallet & Call
-              </button>
-              <p className="mt-2 text-center text-xs text-gray-400">Powered by x402 · Avalanche</p>
-            </div>
+
+            {/* Pay & Call — real component */}
+            <ModelCallSection model={model} />
 
             {/* Creator */}
             {model.creator && (
               <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
-                <h3 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wide">Creator</h3>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Creator
+                </h3>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-lg font-bold text-indigo-600">
-                    {model.creator.display_name?.[0] ?? model.creator.username[0].toUpperCase()}
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-base font-bold text-indigo-600 shrink-0">
+                    {(model.creator.display_name ?? model.creator.username)[0].toUpperCase()}
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-800">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 truncate">
                       {model.creator.display_name ?? model.creator.username}
                       {model.creator.verified && <span className="ml-1 text-indigo-500">✓</span>}
                     </p>
@@ -139,10 +175,34 @@ Content-Type: application/json
                   </div>
                 </div>
                 {model.creator.bio && (
-                  <p className="mt-3 text-sm text-gray-600">{model.creator.bio}</p>
+                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">{model.creator.bio}</p>
                 )}
               </div>
             )}
+
+            {/* Quick stats */}
+            <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100 space-y-2 text-sm">
+              <div className="flex justify-between text-gray-500">
+                <span>Protocol</span>
+                <span className="font-medium text-gray-800">x402</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>Network</span>
+                <span className="font-medium text-gray-800 capitalize">{model.chain}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>Currency</span>
+                <span className="font-medium text-gray-800">{model.currency}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>Total calls</span>
+                <span className="font-medium text-gray-800">{model.total_calls.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>Creator earns</span>
+                <span className="font-medium text-green-600">80%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
