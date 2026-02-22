@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { BazaarClient } from 'uvd-x402-sdk/backend'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 
 const createModelSchema = z.object({

@@ -17,7 +17,7 @@ import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
 const CHAIN            = 'avalanche'
 const FACILITATOR_URL  = 'https://facilitator.ultravioletadao.xyz'
-const SITE_URL         = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
+const SITE_URL         = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
 /**
  * POST /api/v1/models/:slug/invoke

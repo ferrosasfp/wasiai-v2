@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { callGroq } from '@/lib/agents/groq'
 import { getDemoAgent } from '@/lib/agents/demoAgents'
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
 export async function POST(
   request: NextRequest,

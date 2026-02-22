@@ -31,7 +31,7 @@ import { BazaarClient } from 'uvd-x402-sdk/backend'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
 const RegisterAgentSchema = z.object({
   // Required
