@@ -5,6 +5,7 @@ import { useWalletClient, useAccount, useConnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { createPaymentFromWalletClient } from 'uvd-x402-sdk/wagmi'
 import type { Model } from '@/features/models/types/models.types'
+import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 
 interface PayToCallButtonProps {
   model: Model
@@ -61,9 +62,9 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
       // 2. Build x402 payment header via Ultravioleta DAO facilitator (Avalanche)
       //    createPaymentFromWalletClient signs EIP-712 typed data — no gas needed
       const paymentHeader = await createPaymentFromWalletClient(walletClient, {
-        recipient: process.env.NEXT_PUBLIC_WASIAI_TREASURY ?? '',
+        recipient: getMarketplaceAddress(AVALANCHE_CHAIN_ID),
         amount: String(model.price_per_call),
-        chainName: 'avalanche',
+        chainName: AVALANCHE_CHAIN_ID === 43114 ? 'avalanche' : 'avalanche-fuji',
         x402Version: 1,
       })
 
