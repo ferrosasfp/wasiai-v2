@@ -12,7 +12,11 @@ const NAV_PATHS = [
   { path: '/agent-keys',        label: 'Agent Keys'  },
 ]
 
-export function WasiNavBar() {
+interface WasiNavBarProps {
+  initialEmail?: string | null
+}
+
+export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   const pathname = usePathname()
   // Extract locale from pathname (e.g. /en/publish → 'en')
   const locale = pathname.split('/')[1] || 'en'
@@ -21,20 +25,15 @@ export function WasiNavBar() {
     label,
   }))
   const [menuOpen,  setMenuOpen]  = useState(false)
-  const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [loading,   setLoading]   = useState(true)
+  const [userEmail, setUserEmail] = useState<string | null>(initialEmail)
+  // No loading state if we already have the email from the server
+  const [loading,   setLoading]   = useState(initialEmail === null)
 
   useEffect(() => {
     const supabase = createClient()
 
-    // getSession() reads from local cache — instant, no HTTP round-trip
-    // Safe for navbar display; middleware handles server-side auth protection
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserEmail(session?.user?.email ?? null)
-      setLoading(false)
-    })
-
-    // React to login / logout / token refresh in real time
+    // Only subscribe to future auth changes (login/logout/token refresh)
+    // Initial state already comes from the server via initialEmail prop
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user?.email ?? null)
       setLoading(false)
