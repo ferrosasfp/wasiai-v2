@@ -33,12 +33,15 @@ CREATE TABLE IF NOT EXISTS agent_identities (
 
 ALTER TABLE agent_identities ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "identities_public_read" ON agent_identities;
 CREATE POLICY "identities_public_read" ON agent_identities
   FOR SELECT USING (verified = true);
 
+DROP POLICY IF EXISTS "identities_owner_manage" ON agent_identities;
 CREATE POLICY "identities_owner_manage" ON agent_identities
   FOR ALL USING (owner_id = auth.uid());
 
+DROP TRIGGER IF EXISTS agent_identities_updated_at ON agent_identities;
 CREATE TRIGGER agent_identities_updated_at
   BEFORE UPDATE ON agent_identities
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
