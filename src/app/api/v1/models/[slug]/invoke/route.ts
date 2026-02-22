@@ -12,9 +12,11 @@ import { recordInvocationOnChain } from '@/lib/contracts/marketplaceClient'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
-const TREASURY = process.env.WASIAI_TREASURY_ADDRESS ?? ''
-const CHAIN    = 'avalanche'
-const FACILITATOR_URL = 'https://facilitator.ultravioletadao.xyz'
+// x402 recipient = the marketplace contract (it splits 90/10 internally)
+// The contract receives USDC, accumulates 90% in earnings[creator], sends 10% to treasury
+const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
+const CHAIN            = 'avalanche'
+const FACILITATOR_URL  = 'https://facilitator.ultravioletadao.xyz'
 
 /**
  * POST /api/v1/models/:slug/invoke
@@ -109,7 +111,7 @@ export async function POST(
     // No payment — return 402 with proper x402 payment instructions
     const { status, headers: h402, body } = create402Response({
       amount: priceStr,
-      recipient: TREASURY,
+      recipient: CONTRACT_ADDRESS,
       resource: resourceUrl,
       chainName: CHAIN,
       description: `Access to ${model.name} on WasiAI`,
@@ -132,7 +134,7 @@ export async function POST(
   // ── 4. Verify + Settle via Ultravioleta DAO facilitator ───────────────────
   const requirements = buildErc8004PaymentRequirements({
     amount: priceStr,
-    recipient: TREASURY,
+    recipient: CONTRACT_ADDRESS,
     resource: resourceUrl,
     chainName: CHAIN,
     description: `Access to ${model.name} on WasiAI`,
@@ -191,6 +193,8 @@ export async function GET(
 
   if (!model) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+
   return NextResponse.json({
     schema: 'wasiai/model-spec/v1',
     ...model,
@@ -198,12 +202,16 @@ export async function GET(
     payment: {
       price: model.price_per_call,
       currency: 'USDC',
-      chain: 'avalanche',
-      chain_id: 43114,
+      chain: chainId === 43114 ? 'avalanche' : 'avalanche-fuji',
+      chain_id: chainId,
       protocol: 'x402',
       facilitator: FACILITATOR_URL,
-      usdc_contract: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
-      treasury: TREASURY,
+      // USDC: native (mainnet) or Circle test token (Fuji)
+      usdc_contract: chainId === 43114
+        ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
+        : '0x5425890298aed601595a70AB815c96711a31Bc65',
+      marketplace_contract: CONTRACT_ADDRESS,
+      treasury: process.env.WASIAI_TREASURY_ADDRESS ?? '',
     },
   })
 }
