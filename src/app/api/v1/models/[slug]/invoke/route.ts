@@ -9,6 +9,7 @@ import {
   X402_CORS_HEADERS,
 } from 'uvd-x402-sdk/backend'
 import { recordInvocationOnChain } from '@/lib/contracts/marketplaceClient'
+import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 
 const TREASURY = process.env.WASIAI_TREASURY_ADDRESS ?? ''
 const CHAIN    = 'avalanche'
@@ -200,6 +201,13 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   let body: Record<string, unknown> = {}
   try { body = await request.json() } catch { /* empty body ok */ }
 
+  // SEC-01: Validate endpoint URL to prevent SSRF
+  try {
+    validateEndpointUrl(model.endpoint_url as string)
+  } catch (err) {
+    return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error' as const, latencyMs: 0 }
+  }
+
   const startMs = Date.now()
   let data: unknown
   let status: 'success' | 'error' = 'success'
@@ -209,6 +217,7 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000), // PERF-02: 10s max, no infinite hangs
     })
     data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
     if (!upstream.ok) status = 'error'
@@ -239,13 +248,10 @@ async function logCall(
       latency_ms: result.latencyMs,
     }),
     result.status === 'success'
-      ? (await supabase)
-          .from('agents')
-          .update({
-            total_calls: (model.total_calls as number) + 1,
-            total_revenue: Number(model.total_revenue) + Number(model.price_per_call),
-          })
-          .eq('id', model.id)
+      ? (await supabase).rpc('increment_agent_stats', {
+          p_agent_id: model.id,
+          p_amount:   model.price_per_call,
+        })
       : Promise.resolve(),
   ])
 }

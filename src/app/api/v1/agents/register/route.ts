@@ -28,6 +28,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { BazaarClient } from 'uvd-x402-sdk/backend'
+import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 
 const RegisterAgentSchema = z.object({
   // Required
@@ -110,6 +111,13 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data
 
+  // SEC-01: Block SSRF via endpoint_url
+  try {
+    validateEndpointUrl(data.endpoint_url)
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 422 })
+  }
+
   // ── Check slug availability ───────────────────────────────────────────────
   const { data: existing } = await supabase
     .from('agents')
@@ -140,7 +148,8 @@ export async function POST(request: NextRequest) {
     creator_wallet: data.creator_wallet ?? null,
     mcp_tool_name:  data.mcp_tool_name  ?? data.slug.replace(/-/g, '_'),
     mcp_description: data.mcp_description ?? data.description,
-    status:         'active',
+    // JWT-authenticated devs go active immediately; open/agent-key registrations go to review
+    status:         authMethod === 'jwt' ? 'active' : 'reviewing',
     is_featured:    false,
     creator_id:     creatorId ?? (
       // For open registration, use WasiAI's system account

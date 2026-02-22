@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { BazaarClient } from 'uvd-x402-sdk/backend'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
+import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 
 const createModelSchema = z.object({
   name: z.string().min(3),
@@ -35,6 +36,13 @@ export async function POST(request: NextRequest) {
       { error: 'Validation failed', details: result.error.issues },
       { status: 422 },
     )
+  }
+
+  // SEC-01: Block SSRF via endpoint_url
+  try {
+    validateEndpointUrl(result.data.endpoint_url)
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 422 })
   }
 
   const { data, error } = await supabase

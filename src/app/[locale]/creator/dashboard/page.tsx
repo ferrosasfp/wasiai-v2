@@ -22,7 +22,7 @@ interface CallRow {
   status: string
   latency_ms: number | null
   created_at: string
-  model: { name: string; slug: string } | null
+  agent: { name: string; slug: string } | null
 }
 
 export default async function CreatorDashboardPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -51,8 +51,8 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
   if (modelIds.length > 0) {
     const { data: calls } = await supabase
       .from('agent_calls')
-      .select('id, model_id, caller_type, amount_paid, status, latency_ms, created_at, model:models(name, slug)')
-      .in('model_id', modelIds)
+      .select('id, agent_id, caller_type, amount_paid, status, latency_ms, created_at, agent:agents(name, slug)')
+      .in('agent_id', modelIds)
       .order('created_at', { ascending: false })
       .limit(20)
     recentCalls = (calls as unknown as CallRow[]) ?? []
@@ -175,7 +175,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                   {recentCalls.map((call) => (
                     <tr key={call.id} className="hover:bg-gray-50/50 transition">
                       <td className="px-6 py-3 font-medium text-gray-800">
-                        {call.model?.name ?? '—'}
+                        {call.agent?.name ?? '—'}
                       </td>
                       <td className="px-6 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${

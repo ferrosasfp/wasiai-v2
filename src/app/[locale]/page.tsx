@@ -1,5 +1,8 @@
 import { Suspense } from 'react'
 import { setRequestLocale } from 'next-intl/server'
+
+// PERF-03: Revalidate homepage every 60 seconds (ISR)
+export const revalidate = 60
 import { getModels } from '@/features/models/services/models.service'
 import { ModelCard } from '@/features/models/components/ModelCard'
 import { CategoryFilter } from '@/features/models/components/CategoryFilter'

@@ -62,6 +62,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  const CORS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, x-agent-key',
+    'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+  }
+
   const contractAddress = getMarketplaceAddress(CHAIN_ID)
 
   return NextResponse.json({
@@ -82,7 +89,7 @@ export async function GET(request: NextRequest) {
       currency:       'USDC',
       chain:          'avalanche',
       chain_id:       43114,
-      invoke_url:     `https://wasiai.io/api/v1/agents/${agent.slug}/invoke`,
+      invoke_url:     `https://wasiai.io/api/v1/models/${agent.slug}/invoke`,
 
       // Payment info for x402 clients
       payment: {
@@ -125,5 +132,17 @@ export async function GET(request: NextRequest) {
         return c ? { username: c.username, display_name: c.display_name, verified: c.verified } : null
       })(),
     })),
+  }, { headers: CORS })
+}
+
+// OPTIONS for CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, x-agent-key',
+    },
   })
 }
