@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAgentKey, getAgentKeys, revokeAgentKey } from '@/features/agent-api/services/agent-keys.service'
 import { z } from 'zod'
+import { getKeysLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 const createSchema = z.object({
   name: z.string().min(1).max(64),
@@ -18,6 +19,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const rlHit = await checkRateLimit(getKeysLimit(), getIdentifier(request))
+  if (rlHit) return rlHit
   try {
     const body = await request.json()
     const { name, budget_usdc } = createSchema.parse(body)

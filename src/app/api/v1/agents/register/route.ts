@@ -29,6 +29,7 @@ import { createClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { BazaarClient } from 'uvd-x402-sdk/backend'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 const RegisterAgentSchema = z.object({
   // Required
@@ -62,6 +63,10 @@ const RegisterAgentSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  // ── Rate limiting ─────────────────────────────────────────────────────────
+  const rlHit = await checkRateLimit(getRegisterLimit(), getIdentifier(request))
+  if (rlHit) return rlHit
+
   const supabase = await createClient()
 
   // ── Auth ─────────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import {
 } from 'uvd-x402-sdk/backend'
 import { recordInvocationOnChain } from '@/lib/contracts/marketplaceClient'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 const TREASURY = process.env.WASIAI_TREASURY_ADDRESS ?? ''
 const CHAIN    = 'avalanche'
@@ -28,6 +29,11 @@ export async function POST(
 ) {
   const { slug } = await params
   const supabase = await createClient()
+
+  // ── 0. Rate limiting ──────────────────────────────────────────────────────
+  const rlId  = getIdentifier(request)
+  const rlHit = await checkRateLimit(getInvokeLimit(), rlId)
+  if (rlHit) return rlHit
 
   // ── 1. Lookup model ───────────────────────────────────────────────────────
   const { data: model, error: modelError } = await supabase
@@ -73,8 +79,12 @@ export async function POST(
           spent: keyRow.spent_usdc,
           remaining,
           needed: model.price_per_call,
+          action: 'Top up your agent key budget at /en/agent-keys',
         },
-        { status: 402 },
+        {
+          status: 402,
+          headers: { 'Retry-After': '0' }, // A2A-10: refill and retry immediately
+        },
       )
     }
 
