@@ -97,7 +97,7 @@ export async function POST(
       })
     }
 
-    await logCall(supabase, model, 'agent', rawAgentKey.substring(0, 16), null, result)
+    await logCall(supabase, model, 'agent', null, null, result) // SEC-06: don't log key prefix
     return buildResponse(model, result)
   }
 
@@ -239,16 +239,19 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   return { data, status, latencyMs: Date.now() - startMs }
 }
 
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+
 async function logCall(
-  supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never,
+  supabase: SupabaseClient,
   model: Record<string, unknown>,
   callerType: 'human' | 'agent',
   agentId: string | null,
   txHash: string | null,
   result: { status: string; latencyMs: number },
 ) {
+  // PERF-06: supabase is already resolved — no redundant await
   await Promise.all([
-    (await supabase).from('agent_calls').insert({
+    supabase.from('agent_calls').insert({
       agent_id: model.id,
       caller_type: callerType,
       caller_agent_id: agentId,
@@ -258,7 +261,7 @@ async function logCall(
       latency_ms: result.latencyMs,
     }),
     result.status === 'success'
-      ? (await supabase).rpc('increment_agent_stats', {
+      ? supabase.rpc('increment_agent_stats', {
           p_agent_id: model.id,
           p_amount:   model.price_per_call,
         })

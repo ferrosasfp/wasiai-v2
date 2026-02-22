@@ -107,21 +107,28 @@ export default async function HomePage({ params, searchParams }: Props) {
           </div>
 
           {models.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-gray-200 py-20 text-center">
-              <p className="text-gray-400 text-lg">
-                {search || category ? 'No models match your filters.' : 'No models yet.'}
+            <div className="rounded-2xl border-2 border-dashed border-gray-200 py-16 text-center">
+              <p className="text-4xl mb-4">🔍</p>
+              <p className="text-gray-600 font-medium text-lg">
+                {search ? `No results for "${search}"` : category ? `No models in "${category}" yet` : 'No models yet.'}
               </p>
-              {search || category ? (
-                <Link href={`/${locale}`} className="mt-4 inline-block text-sm text-indigo-500 hover:underline">
-                  Clear filters
-                </Link>
+              {(search || category) ? (
+                <div className="mt-4 flex flex-wrap justify-center gap-3">
+                  <Link href={`/${locale}`} className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition">
+                    Clear filters
+                  </Link>
+                  {!search && category && (
+                    <Link href={`/${locale}`} className="rounded-full bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-100 transition">
+                      Browse all categories
+                    </Link>
+                  )}
+                </div>
               ) : (
-                <Link
-                  href={`/${locale}/publish`}
-                  className="mt-4 inline-block rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-                >
-                  Be the first to publish →
-                </Link>
+                <div className="mt-4 flex flex-wrap justify-center gap-3">
+                  <Link href={`/${locale}/publish`} className="rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                    Be the first to publish →
+                  </Link>
+                </div>
               )}
             </div>
           ) : (

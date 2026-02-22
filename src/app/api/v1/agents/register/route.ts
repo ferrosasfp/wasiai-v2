@@ -222,6 +222,9 @@ export async function POST(request: NextRequest) {
     })
   } catch { /* best effort */ }
 
+  // A2A-11: if key insert failed, still return agent but warn about missing key
+  const managementKey = keyData?.raw_key ?? null
+
   return NextResponse.json({
     message:    'Agent registered successfully',
     verified:   false,  // verified after WasiAI review
@@ -232,12 +235,13 @@ export async function POST(request: NextRequest) {
       category:       agent.category,
       agent_type:     agent.agent_type,
       price_per_call: agent.price_per_call,
-      invoke_url:     `https://wasiai.io/api/v1/agents/${agent.slug}/invoke`,
-      marketplace_url: `https://wasiai.io/agents/${agent.slug}`,
-      status:         'active',
+      invoke_url:     `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'}/api/v1/models/${agent.slug}/invoke`,
+      marketplace_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'}/en/models/${agent.slug}`,
+      status:         agent.status,
       on_chain_registered: !!data.creator_wallet,
     },
-    management_key: keyData?.raw_key ?? null,
+    management_key: managementKey,
+    management_key_warning: managementKey ? null : 'Management key could not be issued. Contact support@wasiai.io',
     verification: {
       status:  'pending',
       message: 'Your agent is live. WasiAI will verify the endpoint within 24h for the Verified badge.',

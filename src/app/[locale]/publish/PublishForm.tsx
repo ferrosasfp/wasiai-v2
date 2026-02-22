@@ -34,6 +34,19 @@ export default function PublishForm() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  type Capability = { name: string; description: string; inputType: string; outputType: string }
+  const [capabilities, setCapabilities] = useState<Capability[]>([])
+
+  function addCapability() {
+    setCapabilities(prev => [...prev, { name: '', description: '', inputType: 'text', outputType: 'text' }])
+  }
+  function removeCapability(i: number) {
+    setCapabilities(prev => prev.filter((_, idx) => idx !== i))
+  }
+  function updateCapability(i: number, field: keyof Capability, value: string) {
+    setCapabilities(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c))
+  }
+
   async function handleImageUpload(file: File) {
     setUploadingImage(true)
     try {
@@ -74,7 +87,7 @@ export default function PublishForm() {
       const res = await fetch('/api/models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...result.data, cover_image: coverImage }),
+        body: JSON.stringify({ ...result.data, cover_image: coverImage, capabilities }),
       })
       if (!res.ok) throw new Error(await res.text())
       setSuccess(true)
@@ -228,6 +241,52 @@ export default function PublishForm() {
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
             {errors.description && <p className="mt-1 text-xs text-red-500">{errors.description}</p>}
+          </div>
+
+          {/* Capabilities — UX-11 */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">Capabilities <span className="text-gray-400 font-normal">(optional)</span></label>
+              <button type="button" onClick={addCapability} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition">
+                + Add Capability
+              </button>
+            </div>
+            {capabilities.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 py-4 text-center text-sm text-gray-400">
+                Define what your model can do — inputs, outputs, examples
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {capabilities.map((cap, i) => (
+                  <div key={i} className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-500">Capability {i + 1}</span>
+                      <button type="button" onClick={() => removeCapability(i)} className="text-xs text-red-400 hover:text-red-600">✕ Remove</button>
+                    </div>
+                    <input
+                      placeholder="Name (e.g. summarize)"
+                      value={cap.name}
+                      onChange={e => updateCapability(i, 'name', e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                    <input
+                      placeholder="Description"
+                      value={cap.description}
+                      onChange={e => updateCapability(i, 'description', e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <select value={cap.inputType} onChange={e => updateCapability(i, 'inputType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none">
+                        {['text','image','audio','json'].map(t => <option key={t} value={t}>Input: {t}</option>)}
+                      </select>
+                      <select value={cap.outputType} onChange={e => updateCapability(i, 'outputType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none">
+                        {['text','image','audio','json'].map(t => <option key={t} value={t}>Output: {t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Revenue info */}
