@@ -3,9 +3,7 @@
 import { useState } from 'react'
 import { useWalletClient, useAccount, useConnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
-import { createPaymentFromWalletClient } from 'uvd-x402-sdk/wagmi'
 import type { Model } from '@/features/models/types/models.types'
-import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 
 interface PayToCallButtonProps {
   model: Model
@@ -15,6 +13,27 @@ interface PayToCallButtonProps {
 type CallState = 'idle' | 'connecting' | 'signing' | 'calling' | 'success' | 'error'
 
 const AVALANCHE_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+
+// USDC EIP-712 config per chain — supports both Avalanche mainnet and Fuji testnet.
+// The SDK wagmi adapter doesn't know 'avalanche-testnet', so we sign manually.
+const USDC_CONFIG: Record<number, { name: string; version: string; address: string }> = {
+  43114: { name: 'USD Coin', version: '2', address: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E' },
+  43113: { name: 'USD Coin', version: '2', address: '0x5425890298aed601595a70AB815c96711a31Bc65' },
+}
+
+function generateNonce(): `0x${string}` {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return ('0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`
+}
+
+interface X402Requirements {
+  network: string
+  asset: string
+  payTo: string
+  maxAmountRequired: string
+  x402Version?: number
+}
 
 export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const { data: walletClient } = useWalletClient({ chainId: AVALANCHE_CHAIN_ID })
@@ -59,14 +78,78 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
         return
       }
 
-      // 2. Build x402 payment header via Ultravioleta DAO facilitator (Avalanche)
-      //    createPaymentFromWalletClient signs EIP-712 typed data — no gas needed
-      const paymentHeader = await createPaymentFromWalletClient(walletClient, {
-        recipient: getMarketplaceAddress(AVALANCHE_CHAIN_ID),
-        amount: String(model.price_per_call),
-        chainName: 'avalanche', // UVD SDK only supports 'avalanche' for x402 (handles both mainnet & Fuji)
-        x402Version: 1,
+      // 2. Read 402 body to get payment requirements from server
+      const probeBody = await probe.json() as X402Requirements
+
+      if (!walletClient) {
+        throw new Error('Wallet client not ready. Make sure your wallet is connected to Avalanche.')
+      }
+
+      // 3. Sign EIP-712 TransferWithAuthorization manually.
+      //    We read asset/payTo/amount from the server 402 body, so this works for
+      //    both mainnet and Fuji without depending on the SDK wagmi adapter.
+      const usdcCfg = USDC_CONFIG[AVALANCHE_CHAIN_ID]
+      if (!usdcCfg) throw new Error(`Unsupported chain: ${AVALANCHE_CHAIN_ID}`)
+
+      const nonce = generateNonce()
+      const validBefore = Math.floor(Date.now() / 1000) + 300
+      const amountWei = BigInt(probeBody.maxAmountRequired)
+
+      const domain = {
+        name:              usdcCfg.name,
+        version:           usdcCfg.version,
+        chainId:           AVALANCHE_CHAIN_ID,
+        verifyingContract: probeBody.asset as `0x${string}`,
+      } as const
+
+      const types = {
+        TransferWithAuthorization: [
+          { name: 'from',        type: 'address' },
+          { name: 'to',          type: 'address' },
+          { name: 'value',       type: 'uint256' },
+          { name: 'validAfter',  type: 'uint256' },
+          { name: 'validBefore', type: 'uint256' },
+          { name: 'nonce',       type: 'bytes32' },
+        ],
+      } as const
+
+      const typedMessage = {
+        from:        address as `0x${string}`,
+        to:          probeBody.payTo as `0x${string}`,
+        value:       amountWei,
+        validAfter:  BigInt(0),
+        validBefore: BigInt(validBefore),
+        nonce,
+      }
+
+      const signature = await walletClient.signTypedData({
+        domain,
+        types,
+        primaryType: 'TransferWithAuthorization',
+        message: typedMessage,
       })
+
+      // 4. Build the x402 header (base64-encoded JSON) — same format as SDK
+      const payloadData = {
+        signature,
+        authorization: {
+          from:        address,
+          to:          probeBody.payTo,
+          value:       amountWei.toString(),
+          validAfter:  '0',
+          validBefore: validBefore.toString(),
+          nonce,
+        },
+      }
+
+      const x402Header = {
+        x402Version: 1,
+        scheme:      'exact',
+        network:     probeBody.network,
+        payload:     payloadData,
+      }
+
+      const paymentHeader = btoa(JSON.stringify(x402Header))
 
       // 3. Retry with payment
       setState('calling')

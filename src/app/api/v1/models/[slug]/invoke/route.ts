@@ -4,8 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import {
   FacilitatorClient,
   extractPaymentFromHeaders,
-  buildErc8004PaymentRequirements,
-  create402Response,
   X402_CORS_HEADERS,
 } from 'uvd-x402-sdk/backend'
 import { recordInvocationOnChain } from '@/lib/contracts/marketplaceClient'
@@ -13,14 +11,44 @@ import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 // x402 recipient = the marketplace contract (it splits 90/10 internally)
-// The contract receives USDC, accumulates 90% in earnings[creator], sends 10% to treasury
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
 const CHAIN_ID_NUM     = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-// UVD SDK only accepts 'avalanche' for x402 payments (both mainnet & Fuji)
-// The facilitator differentiates networks via contract/USDC addresses, not chain name
-const CHAIN            = 'avalanche'
+
+// The facilitator (facilitator.ultravioletadao.xyz) uses 'avalanche' for mainnet
+// and 'avalanche-testnet' for Fuji. The SDK wagmi adapter only has 'avalanche',
+// so we build payment requirements manually to support both environments.
+const CHAIN      = CHAIN_ID_NUM === 43114 ? 'avalanche' : 'avalanche-testnet'
+const USDC_ADDR  = CHAIN_ID_NUM === 43114
+  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'   // Avalanche mainnet USDC
+  : '0x5425890298aed601595a70AB815c96711a31Bc65'   // Avalanche Fuji USDC (Circle test token)
+
 const FACILITATOR_URL  = 'https://facilitator.ultravioletadao.xyz'
 const SITE_URL         = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
+
+/**
+ * Build x402 payment requirements manually.
+ * Bypasses SDK's getChainByName() which doesn't know 'avalanche-testnet'.
+ */
+function buildRequirements(options: {
+  amount: string
+  recipient: string
+  resource: string
+  description: string
+  mimeType: string
+}) {
+  const atomicAmount = Math.round(parseFloat(options.amount) * 1_000_000).toString()
+  return {
+    scheme: 'exact' as const,
+    network: CHAIN,
+    maxAmountRequired: atomicAmount,
+    resource: options.resource,
+    description: options.description,
+    mimeType: options.mimeType,
+    payTo: options.recipient,
+    maxTimeoutSeconds: 300,
+    asset: USDC_ADDR,
+  }
+}
 
 /**
  * POST /api/v1/models/:slug/invoke
@@ -113,35 +141,34 @@ export async function POST(
   const paymentHeader = extractPaymentFromHeaders(headers)
 
   if (!paymentHeader) {
-    // No payment — return 402 with proper x402 payment instructions
-    const { status, headers: h402, body } = create402Response({
+    // No payment — return 402 with x402 payment instructions
+    const requirements = buildRequirements({
       amount: priceStr,
       recipient: CONTRACT_ADDRESS,
       resource: resourceUrl,
-      chainName: CHAIN,
       description: `Access to ${model.name} on WasiAI`,
       mimeType: 'application/json',
     })
 
     return NextResponse.json(
       {
-        ...body,
+        x402Version: 1,
+        ...requirements,
         model: { slug: model.slug, name: model.name, category: model.category },
         docs: 'https://wasiai.io/docs/agents#x402',
       },
       {
-        status,
-        headers: { ...h402, ...X402_CORS_HEADERS },
+        status: 402,
+        headers: { 'Content-Type': 'application/json', ...X402_CORS_HEADERS },
       },
     )
   }
 
   // ── 4. Verify + Settle via Ultravioleta DAO facilitator ───────────────────
-  const requirements = buildErc8004PaymentRequirements({
+  const requirements = buildRequirements({
     amount: priceStr,
     recipient: CONTRACT_ADDRESS,
     resource: resourceUrl,
-    chainName: CHAIN,
     description: `Access to ${model.name} on WasiAI`,
     mimeType: 'application/json',
   })
