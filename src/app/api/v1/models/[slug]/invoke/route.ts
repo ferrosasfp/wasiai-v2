@@ -16,7 +16,9 @@ import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 // The contract receives USDC, accumulates 90% in earnings[creator], sends 10% to treasury
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
 const CHAIN_ID_NUM     = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-const CHAIN            = CHAIN_ID_NUM === 43114 ? 'avalanche' : 'avalanche-fuji'
+// UVD SDK only accepts 'avalanche' for x402 payments (both mainnet & Fuji)
+// The facilitator differentiates networks via contract/USDC addresses, not chain name
+const CHAIN            = 'avalanche'
 const FACILITATOR_URL  = 'https://facilitator.ultravioletadao.xyz'
 const SITE_URL         = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 

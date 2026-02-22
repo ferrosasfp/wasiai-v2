@@ -64,7 +64,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
       const paymentHeader = await createPaymentFromWalletClient(walletClient, {
         recipient: getMarketplaceAddress(AVALANCHE_CHAIN_ID),
         amount: String(model.price_per_call),
-        chainName: AVALANCHE_CHAIN_ID === 43114 ? 'avalanche' : 'avalanche-fuji',
+        chainName: 'avalanche', // UVD SDK only supports 'avalanche' for x402 (handles both mainnet & Fuji)
         x402Version: 1,
       })
 
