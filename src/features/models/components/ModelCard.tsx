@@ -85,14 +85,14 @@ export function ModelCard({ model, locale }: ModelCardProps) {
         </div>
       </div>
 
-      {/* Chain indicator */}
+      {/* Chain indicator + CTA */}
       <div className="mt-3 flex items-center justify-between border-t border-gray-50 pt-3 text-xs text-gray-400">
         <span className="flex items-center gap-1">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400" />
           Avalanche · x402
         </span>
-        <span className="text-indigo-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-          Call →
+        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+          Try →
         </span>
       </div>
     </Link>

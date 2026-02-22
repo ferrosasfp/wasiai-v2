@@ -4,6 +4,11 @@ import { getModelBySlug } from '@/features/models/services/models.service'
 import { ModelCallSection } from '@/features/models/components/ModelCallSection'
 import Link from 'next/link'
 
+// PERF-04: ISR — revalidate detail pages every 5 minutes
+export const revalidate = 300
+
+const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'
+
 interface Props {
   params: Promise<{ locale: string; slug: string }>
 }
@@ -15,7 +20,7 @@ export default async function ModelDetailPage({ params }: Props) {
   const model = await getModelBySlug(slug)
   if (!model) notFound()
 
-  const invokeUrl = `https://wasiai.io/api/v1/models/${model.slug}/invoke`
+  const invokeUrl = `${APP_URL}/api/v1/models/${model.slug}/invoke`
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -139,7 +144,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
                   Get Agent Key →
                 </Link>
                 <a
-                  href={`https://wasiai.io/api/v1/models/${model.slug}/invoke`}
+                  href={`${APP_URL}/api/v1/models/${model.slug}/invoke`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-xl border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-300 hover:border-gray-400 transition"

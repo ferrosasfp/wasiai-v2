@@ -1,29 +1,49 @@
 import { Suspense } from 'react'
 import { setRequestLocale } from 'next-intl/server'
+import Link from 'next/link'
 
-// PERF-03: Revalidate homepage every 60 seconds (ISR)
+// PERF-03: ISR — revalidate every 60 seconds
 export const revalidate = 60
+
 import { getModels } from '@/features/models/services/models.service'
 import { ModelCard } from '@/features/models/components/ModelCard'
 import { CategoryFilter } from '@/features/models/components/CategoryFilter'
 import type { ModelCategory } from '@/features/models/types/models.types'
-import Link from 'next/link'
+
+const PAGE_SIZE = 12
 
 interface Props {
   params: Promise<{ locale: string }>
-  searchParams: Promise<{ category?: string; search?: string }>
+  searchParams: Promise<{ category?: string; search?: string; page?: string }>
 }
 
 export default async function HomePage({ params, searchParams }: Props) {
   const { locale } = await params
-  const { category, search } = await searchParams
+  const { category, search, page: pageStr } = await searchParams
   setRequestLocale(locale)
 
-  const models = await getModels({
+  const page   = Math.max(1, parseInt(pageStr ?? '1', 10))
+  const offset = (page - 1) * PAGE_SIZE
+
+  const { models, total } = await getModels({
     category: category as ModelCategory | undefined,
     search,
-    limit: 12,
+    limit: PAGE_SIZE,
+    offset,
   })
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const hasNext    = page < totalPages
+  const hasPrev    = page > 1
+
+  function pageHref(p: number) {
+    const q = new URLSearchParams()
+    if (category) q.set('category', category)
+    if (search)   q.set('search', search)
+    if (p > 1)    q.set('page', String(p))
+    const qs = q.toString()
+    return `/${locale}${qs ? `?${qs}` : ''}`
+  }
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -41,7 +61,6 @@ export default async function HomePage({ params, searchParams }: Props) {
             x402 native payments on Avalanche. No subscriptions. No friction.
           </p>
 
-          {/* CTAs — browse first, publish second */}
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a
               href="#models"
@@ -57,7 +76,6 @@ export default async function HomePage({ params, searchParams }: Props) {
             </Link>
           </div>
 
-          {/* Stats */}
           <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-white/70">
             <div><span className="block text-3xl font-bold text-white">x402</span>Native payments</div>
             <div><span className="block text-3xl font-bold text-white">$0.02</span>Min. per call</div>
@@ -71,14 +89,17 @@ export default async function HomePage({ params, searchParams }: Props) {
       <section id="models" className="px-6 py-12">
         <div className="mx-auto max-w-6xl">
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Available Models</h2>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Available Models</h2>
+              {total > 0 && (
+                <p className="mt-0.5 text-sm text-gray-400">{total} models · page {page} of {totalPages}</p>
+              )}
+            </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {/* Search — preserves active category */}
               <Suspense>
                 <SearchInput defaultValue={search} category={category} />
               </Suspense>
-              {/* Category filter */}
               <Suspense>
                 <CategoryFilter />
               </Suspense>
@@ -91,9 +112,9 @@ export default async function HomePage({ params, searchParams }: Props) {
                 {search || category ? 'No models match your filters.' : 'No models yet.'}
               </p>
               {search || category ? (
-                <a href={`/${locale}`} className="mt-4 inline-block text-sm text-indigo-500 hover:underline">
+                <Link href={`/${locale}`} className="mt-4 inline-block text-sm text-indigo-500 hover:underline">
                   Clear filters
-                </a>
+                </Link>
               ) : (
                 <Link
                   href={`/${locale}/publish`}
@@ -104,11 +125,48 @@ export default async function HomePage({ params, searchParams }: Props) {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {models.map((model) => (
-                <ModelCard key={model.id} model={model} locale={locale} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {models.map((model) => (
+                  <ModelCard key={model.id} model={model} locale={locale} />
+                ))}
+              </div>
+
+              {/* UX-09: Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-10 flex items-center justify-center gap-3">
+                  {hasPrev ? (
+                    <Link
+                      href={pageHref(page - 1)}
+                      className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition"
+                    >
+                      ← Previous
+                    </Link>
+                  ) : (
+                    <span className="rounded-xl border border-gray-100 bg-gray-50 px-5 py-2.5 text-sm text-gray-300 cursor-default">
+                      ← Previous
+                    </span>
+                  )}
+
+                  <span className="text-sm text-gray-500">
+                    {page} / {totalPages}
+                  </span>
+
+                  {hasNext ? (
+                    <Link
+                      href={pageHref(page + 1)}
+                      className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition"
+                    >
+                      Next →
+                    </Link>
+                  ) : (
+                    <span className="rounded-xl border border-gray-100 bg-gray-50 px-5 py-2.5 text-sm text-gray-300 cursor-default">
+                      Next →
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -148,7 +206,7 @@ x-agent-key: wasi_xxx
             <div className="rounded-xl bg-gray-800 p-4">
               <p className="mb-2 text-xs font-semibold text-gray-400">3. Invoke & pay</p>
               <pre className="overflow-auto text-xs text-green-400">{`POST /api/v1/models/
-  flux-pro/invoke
+  {slug}/invoke
 x-agent-key: wasi_xxx
 
 ← { result,
@@ -158,7 +216,7 @@ x-agent-key: wasi_xxx
 
           <div className="flex flex-wrap justify-center gap-4">
             <Link
-              href="/en/agent-keys"
+              href={`/${locale}/agent-keys`}
               className="rounded-full bg-indigo-500 px-6 py-2.5 font-semibold hover:bg-indigo-400 transition"
             >
               Get Agent Key →
@@ -178,11 +236,10 @@ x-agent-key: wasi_xxx
   )
 }
 
-// ── Search input — preserves ?category param via hidden input ─────────────────
+// ── Search input ──────────────────────────────────────────────────────────────
 function SearchInput({ defaultValue, category }: { defaultValue?: string; category?: string }) {
   return (
     <form method="GET" className="flex items-center gap-2">
-      {/* Preserve active category when searching */}
       {category && <input type="hidden" name="category" value={category} />}
       <input
         type="search"

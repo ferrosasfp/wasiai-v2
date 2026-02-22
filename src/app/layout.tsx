@@ -1,14 +1,20 @@
 import type { Metadata } from 'next'
 import './globals.css'
 
+const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'
+
 export const metadata: Metadata = {
   title: 'WasiAI — The marketplace for the agentic economy',
   description: 'AI agents discover, pay, and call models autonomously. x402 native payments on Avalanche. No subscriptions. No friction.',
   keywords: ['AI marketplace', 'agents', 'x402', 'Avalanche', 'USDC', 'ERC-8004', 'AgentKit'],
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+  },
   openGraph: {
     title: 'WasiAI',
     description: 'The marketplace for the agentic economy',
-    url: 'https://wasiai.io',
+    url: APP_URL,
     siteName: 'WasiAI',
     type: 'website',
   },

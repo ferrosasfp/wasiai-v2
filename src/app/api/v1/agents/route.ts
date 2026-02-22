@@ -62,18 +62,37 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  const baseUrl = `${request.nextUrl.origin}/api/v1/agents`
+  const buildLink = (o: number, rel: string) => {
+    const p = new URLSearchParams()
+    if (category)  p.set('category',   category)
+    if (agentType) p.set('agent_type', agentType)
+    if (q)         p.set('q',          q)
+    if (maxPrice)  p.set('max_price',  maxPrice)
+    p.set('limit',  String(limit))
+    p.set('offset', String(o))
+    return `<${baseUrl}?${p}>; rel="${rel}"`
+  }
+
+  const total = count ?? (data?.length ?? 0)
+  const linkParts: string[] = []
+  if (offset > 0) linkParts.push(buildLink(Math.max(0, offset - limit), 'prev'))
+  if (offset + limit < total) linkParts.push(buildLink(offset + limit, 'next'))
+
   const CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-agent-key',
     'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+    'X-Total-Count': String(total),
+    ...(linkParts.length > 0 ? { 'Link': linkParts.join(', ') } : {}),
   }
 
   const contractAddress = getMarketplaceAddress(CHAIN_ID)
 
   return NextResponse.json({
     schema:  'wasiai/agents/v1',
-    total:   count ?? (data?.length ?? 0),
+    total,
     limit,
     offset,
     agents: (data ?? []).map(agent => ({

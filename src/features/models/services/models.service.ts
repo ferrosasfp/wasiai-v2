@@ -11,11 +11,11 @@ export async function getModels({
   search?: string
   limit?: number
   offset?: number
-} = {}): Promise<Model[]> {
+} = {}): Promise<{ models: Model[]; total: number }> {
   const supabase = await createClient()
   let query = supabase
     .from('agents')
-    .select('*, creator:creator_profiles(id, username, display_name, avatar_url, verified)')
+    .select('*, creator:creator_profiles(id, username, display_name, avatar_url, verified)', { count: 'exact' })
     .eq('status', 'active')
     .order('is_featured', { ascending: false })
     .order('total_calls', { ascending: false })
@@ -23,13 +23,12 @@ export async function getModels({
 
   if (category) query = query.eq('category', category)
   if (search) {
-    // Search across name and description
     query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
   }
 
-  const { data, error } = await query
+  const { data, error, count } = await query
   if (error) throw error
-  return (data as Model[]) ?? []
+  return { models: (data as Model[]) ?? [], total: count ?? 0 }
 }
 
 export async function getModelBySlug(slug: string): Promise<Model | null> {
