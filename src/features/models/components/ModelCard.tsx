@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import type { Model } from '../types/models.types'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -30,8 +31,12 @@ export function ModelCard({ model, locale }: ModelCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg shrink-0">
-            {CATEGORY_ICONS[model.category] ?? '🤖'}
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg shrink-0 overflow-hidden">
+            {model.cover_image ? (
+              <Image src={model.cover_image} alt={model.name} fill className="object-cover" />
+            ) : (
+              CATEGORY_ICONS[model.category] ?? '🤖'
+            )}
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors truncate">

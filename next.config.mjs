@@ -14,7 +14,7 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval needed for Next.js dev
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
+      "img-src 'self' data: https: blob:",
       "font-src 'self'",
       "connect-src 'self' https://*.supabase.co https://api.avax.network https://api.avax-test.network https://api.pimlico.io https://facilitator.ultravioletadao.xyz wss://*.supabase.co",
       "frame-ancestors 'none'",
@@ -26,6 +26,13 @@ const securityHeaders = [
 const nextConfig = {
   experimental: {
     mcpServer: true,
+  },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.mypinata.cloud' },
+      { protocol: 'https', hostname: 'gateway.pinata.cloud' },
+      { protocol: 'https', hostname: '*.ipfs.dweb.link' },
+    ],
   },
   async headers() {
     return [

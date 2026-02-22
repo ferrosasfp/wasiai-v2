@@ -45,6 +45,7 @@ export interface Model {
   reputation_count: number
   mcp_tool_name: string | null
   mcp_description: string | null
+  cover_image: string | null  // IPFS URL via Pinata
 
   // joined
   creator?: CreatorProfile

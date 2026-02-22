@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
 import { z } from 'zod'
 
 const MODEL_CATEGORIES = ['nlp', 'vision', 'audio', 'code', 'multimodal', 'data'] as const
@@ -29,6 +30,25 @@ export default function PublishForm() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [coverImage, setCoverImage] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleImageUpload(file: File) {
+    setUploadingImage(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/storage/upload', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      setCoverImage(data.url)
+    } catch (err) {
+      setErrors(prev => ({ ...prev, cover_image: err instanceof Error ? err.message : 'Upload error' }))
+    } finally {
+      setUploadingImage(false)
+    }
+  }
 
   function handleChange(field: keyof PublishForm, value: string | number) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -54,7 +74,7 @@ export default function PublishForm() {
       const res = await fetch('/api/models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result.data),
+        body: JSON.stringify({ ...result.data, cover_image: coverImage }),
       })
       if (!res.ok) throw new Error(await res.text())
       setSuccess(true)
@@ -85,6 +105,47 @@ export default function PublishForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+
+          {/* Cover Image */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">Cover Image <span className="text-gray-400 font-normal">(optional · max 5MB)</span></label>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageUpload(f) }}
+              className="relative flex h-36 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50/30 transition"
+            >
+              {coverImage ? (
+                <>
+                  <Image src={coverImage} alt="Cover" fill className="object-cover rounded-xl" />
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setCoverImage(null) }}
+                    className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white hover:bg-black/70"
+                  >
+                    ✕
+                  </button>
+                </>
+              ) : uploadingImage ? (
+                <p className="text-sm text-indigo-500 animate-pulse">Uploading to IPFS…</p>
+              ) : (
+                <div className="text-center">
+                  <p className="text-2xl">🖼️</p>
+                  <p className="mt-1 text-sm text-gray-500">Click or drag & drop</p>
+                  <p className="text-xs text-gray-400">PNG, JPG, WebP, GIF</p>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f) }}
+            />
+            {errors.cover_image && <p className="mt-1 text-xs text-red-500">{errors.cover_image}</p>}
+          </div>
+
           {/* Name */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Model Name</label>

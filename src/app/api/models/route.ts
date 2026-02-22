@@ -18,6 +18,7 @@ const createModelSchema = z.object({
     inputType: z.string(),
     outputType: z.string(),
   })).optional().default([]),
+  cover_image: z.string().url().optional().nullable(),
 })
 
 export async function POST(request: NextRequest) {
