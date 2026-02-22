@@ -15,7 +15,8 @@ import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 // x402 recipient = the marketplace contract (it splits 90/10 internally)
 // The contract receives USDC, accumulates 90% in earnings[creator], sends 10% to treasury
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
-const CHAIN            = 'avalanche'
+const CHAIN_ID_NUM     = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+const CHAIN            = CHAIN_ID_NUM === 43114 ? 'avalanche' : 'avalanche-fuji'
 const FACILITATOR_URL  = 'https://facilitator.ultravioletadao.xyz'
 const SITE_URL         = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
@@ -202,8 +203,6 @@ export async function GET(
 
   if (!model) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-
   return NextResponse.json({
     schema: 'wasiai/model-spec/v1',
     ...model,
@@ -211,12 +210,12 @@ export async function GET(
     payment: {
       price: model.price_per_call,
       currency: 'USDC',
-      chain: chainId === 43114 ? 'avalanche' : 'avalanche-fuji',
-      chain_id: chainId,
+      chain: CHAIN_ID_NUM === 43114 ? 'avalanche' : 'avalanche-fuji',
+      chain_id: CHAIN_ID_NUM,
       protocol: 'x402',
       facilitator: FACILITATOR_URL,
       // USDC: native (mainnet) or Circle test token (Fuji)
-      usdc_contract: chainId === 43114
+      usdc_contract: CHAIN_ID_NUM === 43114
         ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
         : '0x5425890298aed601595a70AB815c96711a31Bc65',
       marketplace_contract: CONTRACT_ADDRESS,
