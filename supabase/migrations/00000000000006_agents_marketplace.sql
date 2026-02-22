@@ -113,6 +113,10 @@ GROUP BY a.id;
 
 -- ── 7. RLS: agents (renamed from models) ─────────────────────────────────────
 -- Re-apply policies (renamed table loses them)
+-- Drop old policies (from migration 003, renamed with table)
+DROP POLICY IF EXISTS "models_public_read"       ON agents;
+DROP POLICY IF EXISTS "models_creator_manage"    ON agents;
+-- Drop new policies if re-running
 DROP POLICY IF EXISTS "agents_public_read"       ON agents;
 DROP POLICY IF EXISTS "agents_creator_manage"    ON agents;
 DROP POLICY IF EXISTS "agents_service_all"       ON agents;
@@ -127,7 +131,10 @@ CREATE POLICY "agents_service_all" ON agents
   FOR ALL USING (auth.role() = 'service_role');
 
 -- ── 8. RLS: agent_calls ───────────────────────────────────────────────────────
-DROP POLICY IF EXISTS "agent_calls_service_all" ON agent_calls;
+-- Drop old policy (from migration 003, renamed with table)
+DROP POLICY IF EXISTS "calls_creator_read"       ON agent_calls;
+-- Drop new policies if re-running
+DROP POLICY IF EXISTS "agent_calls_service_all"  ON agent_calls;
 DROP POLICY IF EXISTS "agent_calls_creator_read" ON agent_calls;
 
 CREATE POLICY "agent_calls_service_all" ON agent_calls
