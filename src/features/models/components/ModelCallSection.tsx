@@ -33,7 +33,7 @@ export function ModelCallSection({ model }: Props) {
       {/* Stats */}
       <div className="mb-5 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-xl bg-gray-50 px-3 py-2 text-center">
-          <p className="font-semibold text-gray-900">{model.total_calls.toLocaleString()}</p>
+          <p className="font-semibold text-gray-900">{model.total_calls.toLocaleString('en-US')}</p>
           <p className="text-xs text-gray-400">Total calls</p>
         </div>
         <div className="rounded-xl bg-gray-50 px-3 py-2 text-center">

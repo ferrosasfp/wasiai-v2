@@ -87,7 +87,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard label="Total Models" value={safeModels.length.toString()} icon="📦" />
           <StatCard label="Active" value={activeModels.toString()} icon="✅" />
-          <StatCard label="Total Calls" value={totalCalls.toLocaleString()} icon="⚡" />
+          <StatCard label="Total Calls" value={totalCalls.toLocaleString('en-US')} icon="⚡" />
           <StatCard
             label="Revenue"
             value={`$${totalRevenue.toFixed(2)}`}
@@ -180,7 +180,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                         ${model.price_per_call.toFixed(3)}
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-gray-900">
-                        {(model.total_calls ?? 0).toLocaleString()}
+                        {(model.total_calls ?? 0).toLocaleString('en-US')}
                       </td>
                       <td className="px-6 py-4 text-right font-semibold text-green-600">
                         ${Number(model.total_revenue ?? 0).toFixed(2)}
@@ -244,7 +244,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                         <StatusBadge status={call.status} />
                       </td>
                       <td className="px-6 py-3 text-right text-xs text-gray-400">
-                        {new Date(call.created_at).toLocaleString()}
+                        {new Date(call.created_at).toLocaleString('en-US')}
                       </td>
                     </tr>
                   ))}

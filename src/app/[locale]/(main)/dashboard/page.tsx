@@ -59,7 +59,7 @@ export default async function DashboardPage({ params }: Props) {
         <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             { label: 'Total Earnings', value: `$${totalEarnings.toFixed(2)}`, icon: '💰', color: 'text-green-600' },
-            { label: 'Total Calls', value: totalCalls.toLocaleString(), icon: '⚡', color: 'text-indigo-600' },
+            { label: 'Total Calls', value: totalCalls.toLocaleString('en-US'), icon: '⚡', color: 'text-indigo-600' },
             { label: 'Active Models', value: activeModels, icon: '🤖', color: 'text-purple-600' },
             { label: 'All Models', value: models.length, icon: '📦', color: 'text-gray-600' },
           ].map(stat => (

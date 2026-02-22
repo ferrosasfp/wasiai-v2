@@ -79,7 +79,7 @@ export function ModelCard({ model, locale }: ModelCardProps) {
       {/* Footer */}
       <div className="mt-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
-          <span className="shrink-0">⚡ {remaining.toLocaleString()} calls</span>
+          <span className="shrink-0">⚡ {remaining.toLocaleString('en-US')} calls</span>
           {model.is_featured && (
             <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-600 font-medium shrink-0">Featured</span>
           )}
