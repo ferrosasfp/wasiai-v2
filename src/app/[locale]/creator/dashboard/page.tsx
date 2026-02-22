@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getPendingEarnings } from '@/lib/contracts/marketplaceClient'
 import { WithdrawButton } from './WithdrawButton'
+import { WalletSetup } from './WalletSetup'
 
 interface ModelRow {
   id: string
@@ -111,11 +112,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                   WasiAIMarketplace.sol
                 </a>
               </p>
-              {profile?.wallet_address ? (
-                <p className="mt-1 text-xs text-gray-400 font-mono">{profile.wallet_address}</p>
-              ) : (
-                <p className="mt-1 text-xs text-amber-600">⚠️ No wallet configured — set it in your profile to receive payouts</p>
-              )}
+              <WalletSetup initialWallet={profile?.wallet_address ?? null} />
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
