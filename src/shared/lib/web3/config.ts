@@ -4,6 +4,7 @@ import { supportedChains, defaultChain } from './chains'
 
 export const wagmiConfig = createConfig({
   chains: supportedChains,
+  ssr: true, // Prevents wagmi hydration mismatches in Next.js App Router
   connectors: [
     injected(), // MetaMask, Core, etc.
   ],

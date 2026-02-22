@@ -187,7 +187,7 @@ export default function AgentKeysPage() {
                       <span>Budget: <strong className="text-gray-600">${key.budget_usdc} USDC</strong></span>
                       <span>Spent: <strong className="text-gray-600">${key.spent_usdc.toFixed(3)}</strong></span>
                       {key.last_used_at && (
-                        <span>Last used: {new Date(key.last_used_at).toLocaleDateString()}</span>
+                        <span>Last used: {new Date(key.last_used_at).toLocaleDateString('en-US')}</span>
                       )}
                     </div>
                     {/* Budget bar */}
