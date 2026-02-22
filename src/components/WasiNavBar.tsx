@@ -5,15 +5,21 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-const NAV_LINKS = [
-  { href: '/',                  label: 'Marketplace' },
-  { href: '/publish',           label: 'Publish'     },
-  { href: '/creator/dashboard', label: 'Dashboard'   },
-  { href: '/agent-keys',        label: 'Agent Keys'  },
+const NAV_PATHS = [
+  { path: '',                   label: 'Marketplace' },
+  { path: '/publish',           label: 'Publish'     },
+  { path: '/creator/dashboard', label: 'Dashboard'   },
+  { path: '/agent-keys',        label: 'Agent Keys'  },
 ]
 
 export function WasiNavBar() {
   const pathname = usePathname()
+  // Extract locale from pathname (e.g. /en/publish → 'en')
+  const locale = pathname.split('/')[1] || 'en'
+  const NAV_LINKS = NAV_PATHS.map(({ path, label }) => ({
+    href: `/${locale}${path}`,
+    label,
+  }))
   const [menuOpen,  setMenuOpen]  = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [loading,   setLoading]   = useState(true)
@@ -33,8 +39,8 @@ export function WasiNavBar() {
   }
 
   function isActive(href: string) {
-    if (href === '/') return pathname === '/en' || pathname === '/es' || pathname === '/en/' || pathname === '/es/'
-    return pathname.includes(href)
+    if (href === `/${locale}`) return pathname === `/${locale}` || pathname === `/${locale}/`
+    return pathname.startsWith(href)
   }
 
   return (

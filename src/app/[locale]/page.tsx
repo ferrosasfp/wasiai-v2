@@ -58,7 +58,7 @@ export default async function HomePage({ params, searchParams }: Props) {
           <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-white/70">
             <div><span className="block text-3xl font-bold text-white">x402</span>Native payments</div>
             <div><span className="block text-3xl font-bold text-white">$0.02</span>Min. per call</div>
-            <div><span className="block text-3xl font-bold text-white">80%</span>To creators</div>
+            <div><span className="block text-3xl font-bold text-white">90%</span>To creators</div>
             <div><span className="block text-3xl font-bold text-white">ERC-8004</span>Agent identity</div>
           </div>
         </div>
