@@ -27,9 +27,10 @@ export function WasiNavBar() {
   useEffect(() => {
     const supabase = createClient()
 
-    // Get initial session
-    supabase.auth.getUser().then(({ data }) => {
-      setUserEmail(data.user?.email ?? null)
+    // getSession() reads from local cache — instant, no HTTP round-trip
+    // Safe for navbar display; middleware handles server-side auth protection
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email ?? null)
       setLoading(false)
     })
 
