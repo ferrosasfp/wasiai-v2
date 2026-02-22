@@ -17,7 +17,9 @@ import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 
 const FACILITATOR_URL = 'https://facilitator.ultravioletadao.xyz'
-const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+const CHAIN_ID  = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+const CHAIN_NAME = CHAIN_ID === 43114 ? 'avalanche' : 'avalanche-fuji'
+const SITE_URL  = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
         category:       a.category,
         agent_type:     a.agent_type ?? 'model',
         price_per_call: a.price_per_call,
-        invoke_url:     `https://wasiai.io/api/v1/models/${a.slug}/invoke`,
+        invoke_url:     `${SITE_URL}/api/v1/models/${a.slug}/invoke`,
         mcp_tool_name:  a.mcp_tool_name ?? a.slug.replace(/-/g, '_'),
         featured:       a.is_featured,
       })),
@@ -145,9 +147,9 @@ export async function GET(request: NextRequest) {
       // Pricing & payment
       price_per_call: agent.price_per_call,
       currency:       'USDC',
-      chain:          'avalanche',
-      chain_id:       43114,
-      invoke_url:     `https://wasiai.io/api/v1/models/${agent.slug}/invoke`,
+      chain:          CHAIN_NAME,
+      chain_id:       CHAIN_ID,
+      invoke_url:     `${SITE_URL}/api/v1/models/${agent.slug}/invoke`,
 
       // Payment info for x402 clients
       payment: {
@@ -162,7 +164,7 @@ export async function GET(request: NextRequest) {
       mcp: {
         tool_name:   agent.mcp_tool_name ?? agent.slug.replace(/-/g, '_'),
         description: agent.mcp_description ?? agent.description,
-        endpoint:    `https://wasiai.io/api/v1/mcp`,
+        endpoint:    `${SITE_URL}/api/v1/mcp`,
       },
 
       // On-chain identity

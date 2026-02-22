@@ -176,7 +176,7 @@ export default function PublishForm() {
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Slug (URL)</label>
             <div className="flex items-center rounded-xl border border-gray-200 overflow-hidden">
-              <span className="bg-gray-50 px-3 py-2.5 text-sm text-gray-400 border-r border-gray-200">wasiai.io/models/</span>
+              <span className="bg-gray-50 px-3 py-2.5 text-sm text-gray-400 border-r border-gray-200">{(process.env.NEXT_PUBLIC_SITE_URL ?? 'wasiai-v2.vercel.app').replace(/https?:\/\//, '')}/models/</span>
               <input
                 type="text"
                 value={form.slug ?? ''}

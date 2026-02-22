@@ -14,6 +14,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { callGroq } from '@/lib/agents/groq'
 import { getDemoAgent } from '@/lib/agents/demoAgents'
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
@@ -100,8 +102,8 @@ export async function GET(
     category: agent.category,
     price:    agent.price_per_call,
     currency: 'USDC',
-    invoke_url: `https://wasiai.io/api/v1/agents/${agent.slug}/invoke`,
-    endpoint_url: `https://wasiai.io/api/demo/agents/${agent.slug}`,
+    invoke_url:   `${SITE_URL}/api/v1/agents/${agent.slug}/invoke`,
+    endpoint_url: `${SITE_URL}/api/demo/agents/${agent.slug}`,
     powered_by: 'groq/llama-3.1',
     input: {
       type: 'object',

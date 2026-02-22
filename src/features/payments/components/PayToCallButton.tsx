@@ -13,7 +13,7 @@ interface PayToCallButtonProps {
 
 type CallState = 'idle' | 'connecting' | 'signing' | 'calling' | 'success' | 'error'
 
-const AVALANCHE_CHAIN_ID = 43114
+const AVALANCHE_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
 
 export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const { data: walletClient } = useWalletClient({ chainId: AVALANCHE_CHAIN_ID })

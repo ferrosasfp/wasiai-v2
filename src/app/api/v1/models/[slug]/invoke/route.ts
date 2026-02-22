@@ -17,6 +17,7 @@ import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
 const CHAIN            = 'avalanche'
 const FACILITATOR_URL  = 'https://facilitator.ultravioletadao.xyz'
+const SITE_URL         = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
 
 /**
  * POST /api/v1/models/:slug/invoke
@@ -50,7 +51,7 @@ export async function POST(
   }
 
   const priceStr = String(model.price_per_call)    // e.g. "0.02"
-  const resourceUrl = `https://wasiai.io/api/v1/models/${slug}/invoke`
+  const resourceUrl = `${SITE_URL}/api/v1/models/${slug}/invoke`
 
   // ── 2. Route A: Agent Key (budget-based) ─────────────────────────────────
   const rawAgentKey = request.headers.get('x-agent-key')
@@ -198,7 +199,7 @@ export async function GET(
   return NextResponse.json({
     schema: 'wasiai/model-spec/v1',
     ...model,
-    invoke_url: `https://wasiai.io/api/v1/models/${slug}/invoke`,
+    invoke_url: `${SITE_URL}/api/v1/models/${slug}/invoke`,
     payment: {
       price: model.price_per_call,
       currency: 'USDC',

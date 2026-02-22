@@ -31,6 +31,8 @@ import { BazaarClient } from 'uvd-x402-sdk/backend'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
+
 const RegisterAgentSchema = z.object({
   // Required
   name:           z.string().min(3).max(100),
@@ -208,7 +210,7 @@ export async function POST(request: NextRequest) {
   try {
     const bazaar = new BazaarClient({ apiKey: process.env.ULTRAVIOLETA_BAZAAR_API_KEY })
     await bazaar.register({
-      url:          `https://wasiai.io/api/v1/agents/${data.slug}/invoke`,
+      url:          `${SITE_URL}/api/v1/agents/${data.slug}/invoke`,
       name:         data.name,
       description:  data.description ?? data.name,
       category:     'ai',
@@ -235,8 +237,8 @@ export async function POST(request: NextRequest) {
       category:       agent.category,
       agent_type:     agent.agent_type,
       price_per_call: agent.price_per_call,
-      invoke_url:     `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'}/api/v1/models/${agent.slug}/invoke`,
-      marketplace_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'}/en/models/${agent.slug}`,
+      invoke_url:     `${SITE_URL}/api/v1/models/${agent.slug}/invoke`,
+      marketplace_url: `${SITE_URL}/en/models/${agent.slug}`,
       status:         agent.status,
       on_chain_registered: !!data.creator_wallet,
     },

@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { BazaarClient } from 'uvd-x402-sdk/backend'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
+
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').replace(/\/$/, '')
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 
 const createModelSchema = z.object({
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
   try {
     const bazaar = new BazaarClient({ apiKey: process.env.ULTRAVIOLETA_BAZAAR_API_KEY })
     await bazaar.register({
-      url: `https://wasiai.io/api/v1/models/${result.data.slug}/invoke`,
+      url: `${SITE_URL}/api/v1/models/${result.data.slug}/invoke`,
       name: result.data.name,
       description: result.data.description ?? `${result.data.name} on WasiAI`,
       category: 'ai',
