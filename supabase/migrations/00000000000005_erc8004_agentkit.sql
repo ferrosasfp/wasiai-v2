@@ -44,7 +44,7 @@ CREATE TRIGGER agent_identities_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ── 3. Add created_at index to model_calls for analytics ─────────────────
-CREATE INDEX IF NOT EXISTS model_calls_created_at_idx ON model_calls (created_at DESC);
+CREATE INDEX IF NOT EXISTS model_calls_called_at_idx ON model_calls (called_at DESC);
 CREATE INDEX IF NOT EXISTS model_calls_model_id_idx ON model_calls (model_id);
 
 -- ── 4. Function: increment agent key spend (atomic) ───────────────────────

@@ -8,7 +8,9 @@
 ALTER TABLE models        RENAME TO agents;
 ALTER TABLE model_calls   RENAME TO agent_calls;
 
--- Update FK column name in agent_calls
+-- Rename existing agent_id (TEXT, A2A caller) to avoid conflict
+ALTER TABLE agent_calls RENAME COLUMN agent_id TO caller_agent_id;
+-- Rename FK column model_id → agent_id (UUID FK to agents table)
 ALTER TABLE agent_calls RENAME COLUMN model_id TO agent_id;
 
 -- ── 2. New agent fields ───────────────────────────────────────────────────────
