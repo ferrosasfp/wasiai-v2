@@ -200,7 +200,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
               </div>
               <div className="flex justify-between text-gray-500">
                 <span>Creator earns</span>
-                <span className="font-medium text-green-600">80%</span>
+                <span className="font-medium text-green-600">90%</span>
               </div>
             </div>
           </div>

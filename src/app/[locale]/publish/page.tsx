@@ -171,7 +171,7 @@ export default function PublishPage() {
 
           {/* Revenue info */}
           <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-700">
-            💰 You earn <strong>80%</strong> of every call · WasiAI takes 20% · Paid instantly in USDC
+            💰 You earn <strong>90%</strong> of every call · WasiAI takes 10% · Paid instantly in USDC
           </div>
 
           {errors.form && <p className="text-sm text-red-500">{errors.form}</p>}
