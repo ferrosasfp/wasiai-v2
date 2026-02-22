@@ -30,6 +30,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
+  try {
   const { slug } = await params
   const supabase = await createClient()
 
@@ -175,6 +176,13 @@ export async function POST(
   }
 
   return buildResponse(model, result, settlement.transactionHash)
+  } catch (err) {
+    console.error('[invoke] unhandled error:', err)
+    return NextResponse.json(
+      { error: 'Internal server error', detail: String(err) },
+      { status: 500 }
+    )
+  }
 }
 
 // ── GET: machine-readable spec ────────────────────────────────────────────
