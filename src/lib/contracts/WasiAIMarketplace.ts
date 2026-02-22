@@ -67,6 +67,13 @@ export const WASIAI_MARKETPLACE_ABI = [
     outputs: [],
   },
   {
+    name: 'withdrawFor',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'creator', type: 'address' }],
+    outputs: [],
+  },
+  {
     name: 'getPendingEarnings',
     type: 'function',
     stateMutability: 'view',

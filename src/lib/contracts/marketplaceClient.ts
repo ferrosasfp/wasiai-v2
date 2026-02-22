@@ -150,6 +150,34 @@ export async function registerAgentOnChain({
 }
 
 /**
+ * Operator-triggered withdrawal on behalf of a creator.
+ * Returns tx hash or null if contract not configured / no earnings.
+ */
+export async function withdrawForCreator(creatorWallet: string): Promise<string | null> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) return null
+
+  try {
+    const { wallet, public: pub, account } = getOperatorClient()
+
+    const { request } = await pub.simulateContract({
+      address:      contractAddress,
+      abi:          WASIAI_MARKETPLACE_ABI,
+      functionName: 'withdrawFor',
+      args:         [creatorWallet as Address],
+      account,
+    })
+
+    const txHash = await wallet.writeContract(request)
+    console.log(`[marketplace] withdrawFor(${creatorWallet}) tx: ${txHash}`)
+    return txHash
+  } catch (err) {
+    console.error('[marketplace] withdrawFor failed:', err)
+    return null
+  }
+}
+
+/**
  * Read pending earnings for a creator wallet.
  */
 export async function getPendingEarnings(creatorWallet: string): Promise<number> {

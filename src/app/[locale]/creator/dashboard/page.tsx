@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getPendingEarnings } from '@/lib/contracts/marketplaceClient'
+import { WithdrawButton } from './WithdrawButton'
 
 interface ModelRow {
   id: string
@@ -30,6 +32,18 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale ?? 'en'}/login`)
+
+  // Fetch creator profile (wallet)
+  const { data: profile } = await supabase
+    .from('creator_profiles')
+    .select('wallet_address')
+    .eq('id', user.id)
+    .single()
+
+  // Fetch pending on-chain earnings
+  const pendingOnChain = profile?.wallet_address
+    ? await getPendingEarnings(profile.wallet_address).catch(() => 0)
+    : 0
 
   // Fetch creator's models
   const { data: models } = await supabase
@@ -80,6 +94,43 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
             highlight
           />
         </div>
+
+        {/* On-chain Earnings Withdrawal */}
+        <section className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-purple-50 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">On-chain Earnings</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Your USDC earnings accumulated in{' '}
+                <a
+                  href={`https://testnet.snowscan.xyz/address/${process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-500 hover:underline"
+                >
+                  WasiAIMarketplace.sol
+                </a>
+              </p>
+              {profile?.wallet_address ? (
+                <p className="mt-1 text-xs text-gray-400 font-mono">{profile.wallet_address}</p>
+              ) : (
+                <p className="mt-1 text-xs text-amber-600">⚠️ No wallet configured — set it in your profile to receive payouts</p>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-3xl font-bold text-indigo-700">
+                  ${pendingOnChain.toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-500">USDC available</p>
+              </div>
+              <WithdrawButton
+                pending={pendingOnChain}
+                hasWallet={!!profile?.wallet_address}
+              />
+            </div>
+          </div>
+        </section>
 
         {/* Models table */}
         <section>
