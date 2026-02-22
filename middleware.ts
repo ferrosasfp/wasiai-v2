@@ -39,9 +39,10 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options)
-          })
+          // Must update BOTH request and response so token refresh propagates
+          // through subsequent server reads in the same request cycle
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
         },
       },
     }
@@ -53,10 +54,10 @@ export async function middleware(request: NextRequest) {
   const locale = extractLocaleFromPath(pathname) ?? routing.defaultLocale
   const pathWithoutLocale = stripLocale(pathname, locale)
 
-  const isProtectedRoute = pathWithoutLocale.startsWith('/dashboard') ||
-    pathWithoutLocale.startsWith('/wallet') ||
-    pathWithoutLocale.startsWith('/contracts') ||
-    pathWithoutLocale.startsWith('/storage')
+  const isProtectedRoute =
+    pathWithoutLocale.startsWith('/creator') ||
+    pathWithoutLocale.startsWith('/publish') ||
+    pathWithoutLocale.startsWith('/agent-keys')
 
   const isAuthRoute = pathWithoutLocale.startsWith('/login') ||
     pathWithoutLocale.startsWith('/signup')
@@ -73,7 +74,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAuthRoute && user) {
-    const redirectUrl = new URL(`/${locale}/dashboard`, request.url)
+    const redirectUrl = new URL(`/${locale}/creator/dashboard`, request.url)
     const redirectResponse = NextResponse.redirect(redirectUrl)
 
     response.cookies.getAll().forEach((c) => {

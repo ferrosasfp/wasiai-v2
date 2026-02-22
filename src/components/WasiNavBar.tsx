@@ -26,10 +26,20 @@ export function WasiNavBar() {
 
   useEffect(() => {
     const supabase = createClient()
+
+    // Get initial session
     supabase.auth.getUser().then(({ data }) => {
       setUserEmail(data.user?.email ?? null)
       setLoading(false)
     })
+
+    // React to login / logout / token refresh in real time
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user?.email ?? null)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSignout() {
