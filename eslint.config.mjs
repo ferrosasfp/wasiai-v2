@@ -13,6 +13,7 @@ const eslintConfig = [
             ".claude/**",
             ".agent/**",
             "contracts/**",
+            "packages/**",
             "*.min.*",
         ],
     },

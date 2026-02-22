@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('agent_calls').insert({
         agent_id: model.id,
         caller_type: 'agent',
-        agent_id: 'mcp-client',
+        caller_agent_id: 'mcp-client',
         amount_paid: model.price_per_call,
         status: 'success',
       })

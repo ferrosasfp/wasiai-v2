@@ -232,7 +232,7 @@ async function logCall(
     (await supabase).from('agent_calls').insert({
       agent_id: model.id,
       caller_type: callerType,
-      agent_id: agentId,
+      caller_agent_id: agentId,
       amount_paid: model.price_per_call,
       tx_hash: txHash,
       status: result.status,
