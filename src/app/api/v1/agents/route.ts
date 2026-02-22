@@ -28,11 +28,53 @@ export async function GET(request: NextRequest) {
   const maxPrice   = searchParams.get('max_price')
   const limit      = Math.min(Number(searchParams.get('limit')  ?? 20), 100)
   const offset     = Number(searchParams.get('offset') ?? 0)
+  const slim       = searchParams.get('slim') === 'true' // PERF-05: lightweight mode
 
   const supabase = await createClient()
 
+  const CORS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, x-agent-key',
+    'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+  }
+
+  // PERF-05: slim mode — separate query for lightweight response
+  if (slim) {
+    let slimQuery = supabase
+      .from('agents')
+      .select('slug, name, description, category, agent_type, price_per_call, is_featured, mcp_tool_name', { count: 'exact' })
+      .eq('status', 'active')
+      .order('is_featured', { ascending: false })
+      .order('total_calls', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (category)  slimQuery = slimQuery.eq('category', category)
+    if (agentType) slimQuery = slimQuery.eq('agent_type', agentType)
+    if (q)         slimQuery = slimQuery.or(`name.ilike.%${q}%,description.ilike.%${q}%`)
+    if (maxPrice)  slimQuery = slimQuery.lte('price_per_call', parseFloat(maxPrice))
+
+    const { data: slimData, count: slimCount } = await slimQuery
+
+    return NextResponse.json({
+      schema: 'wasiai/agents/v1',
+      total: slimCount ?? (slimData?.length ?? 0), limit, offset,
+      agents: (slimData ?? []).map(a => ({
+        slug:           a.slug,
+        name:           a.name,
+        description:    a.description,
+        category:       a.category,
+        agent_type:     a.agent_type ?? 'model',
+        price_per_call: a.price_per_call,
+        invoke_url:     `https://wasiai.io/api/v1/models/${a.slug}/invoke`,
+        mcp_tool_name:  a.mcp_tool_name ?? a.slug.replace(/-/g, '_'),
+        featured:       a.is_featured,
+      })),
+    }, { headers: CORS })
+  }
+
   let query = supabase
-    .from('agents')                        // renamed from models in migration 006
+    .from('agents')
     .select(`
       id, slug, name, description, category,
       agent_type, dependencies,
@@ -45,7 +87,7 @@ export async function GET(request: NextRequest) {
       creator:creator_profiles(
         id, username, display_name, verified, wallet_address
       )
-    `)
+    `, { count: 'exact' })
     .eq('status', 'active')
     .order('is_featured', { ascending: false })
     .order('total_calls',  { ascending: false })
@@ -79,11 +121,8 @@ export async function GET(request: NextRequest) {
   if (offset > 0) linkParts.push(buildLink(Math.max(0, offset - limit), 'prev'))
   if (offset + limit < total) linkParts.push(buildLink(offset + limit, 'next'))
 
-  const CORS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-agent-key',
-    'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+  const corsWithPagination = {
+    ...CORS,
     'X-Total-Count': String(total),
     ...(linkParts.length > 0 ? { 'Link': linkParts.join(', ') } : {}),
   }
@@ -151,7 +190,7 @@ export async function GET(request: NextRequest) {
         return c ? { username: c.username, display_name: c.display_name, verified: c.verified } : null
       })(),
     })),
-  }, { headers: CORS })
+  }, { headers: corsWithPagination })
 }
 
 // OPTIONS for CORS preflight

@@ -158,13 +158,16 @@ export async function POST(
   await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result)
 
   // ── 6. Record invocation on-chain (non-blocking) ──────────────────────────
-  // The USDC is already in WasiAIMarketplace.sol (paid via x402).
-  // recordInvocation() splits earnings: 90% creator, 10% treasury.
+  // A2A-04: Extract real payer address from parsed x402 header
   if (result.status === 'success') {
+    // paymentHeader is the parsed X402Header object — 'from' contains payer address
+    const payerAddress = (paymentHeader as unknown as Record<string, string>)?.from
+      ?? '0x0000000000000000000000000000000000000000'
+
     recordInvocationOnChain({
-      slug:         slug,
-      payerAddress: '0x0000000000000000000000000000000000000000', // extracted from payment header ideally
-      amountUSDC:   model.price_per_call as number,
+      slug,
+      payerAddress,
+      amountUSDC: model.price_per_call as number,
     }).catch(err => console.error('[invoke] on-chain recording failed silently:', err))
   }
 
