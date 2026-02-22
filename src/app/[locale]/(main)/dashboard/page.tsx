@@ -18,11 +18,11 @@ export default async function DashboardPage({ params }: Props) {
   // Get creator profile + models
   const [profileResult, modelsResult, callsResult] = await Promise.all([
     supabase.from('creator_profiles').select('*').eq('id', user.id).single(),
-    supabase.from('models').select('*').eq('creator_id', user.id).order('created_at', { ascending: false }),
-    supabase.from('model_calls')
+    supabase.from('agents').select('*').eq('creator_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('agent_calls')
       .select('amount_paid, called_at, status, model_id, caller_type')
       .in('model_id',
-        (await supabase.from('models').select('id').eq('creator_id', user.id)).data?.map(m => m.id) ?? []
+        (await supabase.from('agents').select('id').eq('creator_id', user.id)).data?.map(m => m.id) ?? []
       )
       .order('called_at', { ascending: false })
       .limit(10),

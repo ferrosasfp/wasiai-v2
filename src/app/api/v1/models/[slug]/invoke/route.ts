@@ -30,7 +30,7 @@ export async function POST(
 
   // ── 1. Lookup model ───────────────────────────────────────────────────────
   const { data: model, error: modelError } = await supabase
-    .from('models')
+    .from('agents')
     .select('*')
     .eq('slug', slug)
     .eq('status', 'active')
@@ -169,7 +169,7 @@ export async function GET(
   const supabase = await createClient()
 
   const { data: model } = await supabase
-    .from('models')
+    .from('agents')
     .select('name, slug, description, category, price_per_call, currency, chain, capabilities')
     .eq('slug', slug)
     .eq('status', 'active')
@@ -229,8 +229,8 @@ async function logCall(
   result: { status: string; latencyMs: number },
 ) {
   await Promise.all([
-    (await supabase).from('model_calls').insert({
-      model_id: model.id,
+    (await supabase).from('agent_calls').insert({
+      agent_id: model.id,
       caller_type: callerType,
       agent_id: agentId,
       amount_paid: model.price_per_call,
@@ -240,7 +240,7 @@ async function logCall(
     }),
     result.status === 'success'
       ? (await supabase)
-          .from('models')
+          .from('agents')
           .update({
             total_calls: (model.total_calls as number) + 1,
             total_revenue: Number(model.total_revenue) + Number(model.price_per_call),

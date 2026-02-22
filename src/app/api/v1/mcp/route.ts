@@ -16,7 +16,7 @@ export async function GET() {
   const supabase = await createClient()
 
   const { data: models } = await supabase
-    .from('models')
+    .from('agents')
     .select('name, slug, description, category, price_per_call, capabilities')
     .eq('status', 'active')
     .limit(50)
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
     const { data: model } = await supabase
-      .from('models')
+      .from('agents')
       .select('*')
       .eq('slug', slug)
       .eq('status', 'active')
@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
       const result = await upstream.json()
 
       // Log the call
-      await supabase.from('model_calls').insert({
-        model_id: model.id,
+      await supabase.from('agent_calls').insert({
+        agent_id: model.id,
         caller_type: 'agent',
         agent_id: 'mcp-client',
         amount_paid: model.price_per_call,
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
   if (method === 'resources/read') {
     const supabase = await createClient()
     const { data: models } = await supabase
-      .from('models')
+      .from('agents')
       .select('name, slug, description, category, price_per_call')
       .eq('status', 'active')
 

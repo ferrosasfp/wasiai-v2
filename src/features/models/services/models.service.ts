@@ -14,7 +14,7 @@ export async function getModels({
 } = {}): Promise<Model[]> {
   const supabase = await createClient()
   let query = supabase
-    .from('models')
+    .from('agents')
     .select('*, creator:creator_profiles(id, username, display_name, avatar_url, verified)')
     .eq('status', 'active')
     .order('is_featured', { ascending: false })
@@ -35,7 +35,7 @@ export async function getModels({
 export async function getModelBySlug(slug: string): Promise<Model | null> {
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('models')
+    .from('agents')
     .select('*, creator:creator_profiles(id, username, display_name, avatar_url, verified, bio)')
     .eq('slug', slug)
     .eq('status', 'active')
@@ -48,7 +48,7 @@ export async function getModelBySlug(slug: string): Promise<Model | null> {
 export async function getCreatorModels(creatorId: string): Promise<Model[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('models')
+    .from('agents')
     .select('*')
     .eq('creator_id', creatorId)
     .order('created_at', { ascending: false })
@@ -63,7 +63,7 @@ export async function createModel(input: CreateModelInput): Promise<Model> {
   if (!user) throw new Error('Unauthorized')
 
   const { data, error } = await supabase
-    .from('models')
+    .from('agents')
     .insert({ ...input, creator_id: user.id })
     .select()
     .single()
@@ -75,7 +75,7 @@ export async function createModel(input: CreateModelInput): Promise<Model> {
 export async function getFeaturedModels(limit = 6): Promise<Model[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('models')
+    .from('agents')
     .select('*, creator:creator_profiles(id, username, display_name, avatar_url, verified)')
     .eq('status', 'active')
     .eq('is_featured', true)

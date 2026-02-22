@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from('models')
+    .from('agents')
     .insert({ ...result.data, creator_id: user.id })
     .select()
     .single()

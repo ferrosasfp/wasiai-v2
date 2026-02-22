@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
   // ── Check slug availability ───────────────────────────────────────────────
   const { data: existing } = await supabase
-    .from('models')
+    .from('agents')
     .select('id')
     .eq('slug', data.slug)
     .single()
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: agent, error: insertError } = await supabase
-    .from('models')
+    .from('agents')
     .insert(agentPayload)
     .select()
     .single()

@@ -16,7 +16,7 @@ interface ModelRow {
 
 interface CallRow {
   id: string
-  model_id: string
+  agent_id: string
   caller_type: string
   amount_paid: number
   status: string
@@ -33,7 +33,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
 
   // Fetch creator's models
   const { data: models } = await supabase
-    .from('models')
+    .from('agents')
     .select('id, name, slug, category, status, price_per_call, total_calls, total_revenue, created_at')
     .eq('creator_id', user.id)
     .order('total_calls', { ascending: false })
@@ -50,7 +50,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
   let recentCalls: CallRow[] = []
   if (modelIds.length > 0) {
     const { data: calls } = await supabase
-      .from('model_calls')
+      .from('agent_calls')
       .select('id, model_id, caller_type, amount_paid, status, latency_ms, created_at, model:models(name, slug)')
       .in('model_id', modelIds)
       .order('created_at', { ascending: false })

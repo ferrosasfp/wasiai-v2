@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
   let query = supabase
-    .from('models')
+    .from('agents')
     .select('name, slug, description, category, price_per_call, currency, chain, capabilities, total_calls')
     .eq('status', 'active')
     .order('total_calls', { ascending: false })
