@@ -1,65 +1,129 @@
+import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { mcpRequestSchema } from '@/lib/schemas/api.schemas'
+import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { logger } from '@/lib/logger'
 
 /**
  * WasiAI MCP Server Endpoint
- * 
+ *
  * Implements the Model Context Protocol (MCP) so any AI assistant
- * (Claude, ChatGPT, Cursor, etc.) can discover and call WasiAI models
- * as tools automatically.
- * 
- * GET  /api/v1/mcp         → Server info + tool list
- * POST /api/v1/mcp         → Execute a tool (call a model)
+ * (Claude Desktop, Cursor, etc.) can discover and call WasiAI agents
+ * as tools — with real budget-based payment via Agent Keys.
+ *
+ * Setup (claude_desktop_config.json):
+ *   { "mcpServers": { "wasiai": { "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wasi_YOUR_KEY" } } }
+ *
+ * GET  /api/v1/mcp?key=...  → Server info + tool list (free, no key needed)
+ * POST /api/v1/mcp?key=...  → Execute a tool (requires valid agent key with budget)
+ *
+ * Supported methods:
+ *   tools/list   → list all active agents as MCP tools
+ *   tools/call   → call an agent, deduct from key budget, log call
+ *   resources/read → wasiai://catalog — full agent list as JSON
  */
 
-export async function GET() {
-  const supabase = await createClient()
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-  const { data: models } = await supabase
+/** Wrap a message as an MCP error content response */
+function mcpError(message: string, status = 200) {
+  return NextResponse.json(
+    { content: [{ type: 'text', text: `❌ ${message}` }], isError: true },
+    { status },
+  )
+}
+
+/** Call the agent's upstream endpoint directly */
+async function callUpstreamMcp(
+  endpointUrl: string,
+  input: string,
+  options?: Record<string, unknown>,
+): Promise<{ data: unknown; status: 'success' | 'error'; latencyMs: number }> {
+  // SEC-01: validate endpoint to prevent SSRF
+  try {
+    validateEndpointUrl(endpointUrl)
+  } catch (err) {
+    return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error', latencyMs: 0 }
+  }
+
+  const startMs = Date.now()
+  try {
+    const upstream = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input, ...(options ?? {}) }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    const data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
+    return { data, status: upstream.ok ? 'success' : 'error', latencyMs: Date.now() - startMs }
+  } catch (err) {
+    return { data: { error: 'Upstream unreachable', detail: String(err) }, status: 'error', latencyMs: Date.now() - startMs }
+  }
+}
+
+/** Build the tool list from active agents */
+function buildTools(models: { name: string; slug: string; description: string | null; category: string; price_per_call: number; capabilities: unknown[] | null }[]) {
+  return models.map(model => ({
+    name: `wasiai_${model.slug.replace(/-/g, '_')}`,
+    description: `[WasiAI · $${model.price_per_call}/call] ${model.description ?? model.name} (${model.category})`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input to send to the agent' },
+        options: { type: 'object', description: 'Optional extra parameters' },
+      },
+      required: ['input'],
+    },
+  }))
+}
+
+// ── GET — Server discovery (no auth required) ─────────────────────────────────
+
+export async function GET() {
+  const supabase = createServiceClient()
+
+  const { data: models, error } = await supabase
     .from('agents')
     .select('name, slug, description, category, price_per_call, capabilities')
     .eq('status', 'active')
     .limit(50)
 
-  const tools = (models ?? []).map(model => ({
-    name: `wasiai_${model.slug.replace(/-/g, '_')}`,
-    description: `[WasiAI] ${model.description ?? model.name} — $${model.price_per_call}/call (${model.category})`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        input: {
-          type: 'string',
-          description: 'Input to send to the model',
-        },
-        options: {
-          type: 'object',
-          description: 'Optional parameters for the model',
-        },
-      },
-      required: ['input'],
-    },
-  }))
+  if (error) {
+    logger.error('MCP GET: failed to fetch agents', { error })
+    return NextResponse.json({ error: 'Failed to load agent catalog' }, { status: 500 })
+  }
 
   return NextResponse.json({
     schema: 'mcp/server/v1',
     name: 'WasiAI',
-    description: 'AI model marketplace. Pay per call in USDC on Avalanche.',
+    description:
+      'AI model marketplace. Discover and call agents. Pay per call in USDC on Avalanche. ' +
+      'Add ?key=wasi_YOUR_KEY to authenticate calls with your agent budget.',
     version: '1.0.0',
-    tools,
+    tools: buildTools(models ?? []),
     resources: [
       {
         uri: 'wasiai://catalog',
-        name: 'Model Catalog',
-        description: 'Browse all available AI models',
+        name: 'WasiAI Agent Catalog',
+        description: 'Full list of available AI agents with pricing',
         mimeType: 'application/json',
       },
     ],
+    auth: {
+      required: 'agent_key',
+      setup: 'Get a key at https://wasiai-v2.vercel.app/en/agent-keys',
+      usage: 'Append ?key=wasi_YOUR_KEY to the MCP server URL',
+    },
   })
 }
 
+// ── POST — Execute MCP methods ────────────────────────────────────────────────
+
 export async function POST(request: NextRequest) {
-  // S-03: Validate MCP request structure
+  const supabase = createServiceClient()
+
+  // Parse body
   let body: unknown
   try {
     body = await request.json()
@@ -77,83 +141,22 @@ export async function POST(request: NextRequest) {
 
   const { method, params } = parsed.data
 
+  // ── tools/list ──────────────────────────────────────────────────────────────
   if (method === 'tools/list') {
-    const response = await GET()
-    const data = await response.json()
-    return NextResponse.json({ tools: data.tools })
-  }
-
-  if (method === 'tools/call') {
-    const toolName: string = params?.name ?? ''
-    // Convert tool name back to slug: wasiai_my_model -> my-model
-    const slug = toolName.replace(/^wasiai_/, '').replace(/_/g, '-')
-    const input = params?.arguments?.['input']
-
-    if (!input) {
-      return NextResponse.json({ error: 'input is required' }, { status: 400 })
-    }
-
-    const supabase = await createClient()
-    const { data: model } = await supabase
-      .from('agents')
-      .select('*')
-      .eq('slug', slug)
-      .eq('status', 'active')
-      .single()
-
-    if (!model) {
-      return NextResponse.json({
-        content: [{ type: 'text', text: `Model '${slug}' not found on WasiAI.` }],
-        isError: true,
-      })
-    }
-
-    // Forward to model endpoint
-    if (!model.endpoint_url) {
-      return NextResponse.json({
-        content: [{ type: 'text', text: 'Model endpoint not configured.' }],
-        isError: true,
-      })
-    }
-
-    try {
-      const upstream = await fetch(model.endpoint_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input, ...(params?.arguments?.['options'] as Record<string, unknown> | undefined ?? {}) }),
-      })
-      const result = await upstream.json()
-
-      // Log the call
-      await supabase.from('agent_calls').insert({
-        agent_id: model.id,
-        caller_type: 'agent',
-        caller_agent_id: 'mcp-client',
-        amount_paid: model.price_per_call,
-        status: 'success',
-      })
-
-      return NextResponse.json({
-        content: [
-          {
-            type: 'text',
-            text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
-          },
-        ],
-      })
-    } catch {
-      return NextResponse.json({
-        content: [{ type: 'text', text: 'Model call failed.' }],
-        isError: true,
-      })
-    }
-  }
-
-  if (method === 'resources/read') {
-    const supabase = await createClient()
     const { data: models } = await supabase
       .from('agents')
-      .select('name, slug, description, category, price_per_call')
+      .select('name, slug, description, category, price_per_call, capabilities')
+      .eq('status', 'active')
+      .limit(50)
+
+    return NextResponse.json({ tools: buildTools(models ?? []) })
+  }
+
+  // ── resources/read ──────────────────────────────────────────────────────────
+  if (method === 'resources/read') {
+    const { data: models } = await supabase
+      .from('agents')
+      .select('name, slug, description, category, price_per_call, reputation_score, reputation_count')
       .eq('status', 'active')
 
     return NextResponse.json({
@@ -167,5 +170,111 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  return NextResponse.json({ error: 'Unknown method' }, { status: 400 })
+  // ── tools/call — requires agent key ────────────────────────────────────────
+  if (method === 'tools/call') {
+    // 1. Extract agent key from query params
+    const rawKey = request.nextUrl.searchParams.get('key')
+
+    if (!rawKey || !rawKey.startsWith('wasi_')) {
+      return mcpError(
+        'Agent key required. Add ?key=wasi_YOUR_KEY to the MCP server URL. ' +
+        'Get a key at https://wasiai-v2.vercel.app/en/agent-keys',
+      )
+    }
+
+    // 2. Resolve tool name → agent slug
+    const toolName: string = params?.name ?? ''
+    const slug = toolName.replace(/^wasiai_/, '').replace(/_/g, '-')
+    const input = String(params?.arguments?.['input'] ?? '')
+    const options = params?.arguments?.['options'] as Record<string, unknown> | undefined
+
+    if (!input) {
+      return mcpError('`input` is required in arguments.')
+    }
+
+    // 3. Fetch agent + validate key in parallel
+    const keyHash = createHash('sha256').update(rawKey).digest('hex')
+
+    const [{ data: model, error: modelError }, { data: keyRow }] = await Promise.all([
+      supabase.from('agents').select('*').eq('slug', slug).eq('status', 'active').single(),
+      supabase
+        .from('agent_keys')
+        .select('id, is_active, budget_usdc, spent_usdc')
+        .eq('key_hash', keyHash)
+        .eq('is_active', true)
+        .single(),
+    ])
+
+    if (modelError || !model) {
+      return mcpError(`Agent '${slug}' not found on WasiAI. Check available tools with tools/list.`)
+    }
+
+    if (!keyRow) {
+      return mcpError(
+        'Invalid or inactive agent key. ' +
+        'Verify your key at https://wasiai-v2.vercel.app/en/agent-keys',
+      )
+    }
+
+    // 4. Check budget
+    const remaining = Number(keyRow.budget_usdc) - Number(keyRow.spent_usdc)
+    if (remaining < model.price_per_call) {
+      return mcpError(
+        `Agent key budget exhausted. ` +
+        `Remaining: $${remaining.toFixed(4)} USDC — needed: $${model.price_per_call} USDC. ` +
+        `Top up at https://wasiai-v2.vercel.app/en/agent-keys`,
+      )
+    }
+
+    // 5. Call the agent
+    const result = await callUpstreamMcp(model.endpoint_url as string, input, options)
+
+    // 6. Deduct budget + log call (fire-and-forget safe — non-critical path)
+    if (result.status === 'success') {
+      await Promise.all([
+        supabase.rpc('increment_agent_key_spend', {
+          p_key_id: keyRow.id,
+          p_amount: model.price_per_call,
+        }),
+        supabase.rpc('increment_agent_stats', {
+          p_agent_id: model.id,
+          p_amount: model.price_per_call,
+        }),
+        supabase.from('agent_calls').insert({
+          agent_id: model.id,
+          caller_type: 'agent',
+          caller_agent_id: 'mcp-client',
+          amount_paid: model.price_per_call,
+          tx_hash: null,
+          status: 'success',
+          latency_ms: result.latencyMs,
+        }),
+      ])
+    }
+
+    // 7. Return MCP-format result
+    if (result.status === 'error') {
+      return mcpError(
+        `Agent call failed: ${JSON.stringify(result.data)}`,
+      )
+    }
+
+    const resultText =
+      typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data, null, 2)
+
+    return NextResponse.json({
+      content: [{ type: 'text', text: resultText }],
+      isError: false,
+      _meta: {
+        charged: model.price_per_call,
+        currency: 'USDC',
+        remaining_budget: parseFloat((remaining - model.price_per_call).toFixed(6)),
+        latency_ms: result.latencyMs,
+      },
+    })
+  }
+
+  return NextResponse.json({ error: 'Unknown method', supported: ['tools/list', 'tools/call', 'resources/read'] }, { status: 400 })
 }
