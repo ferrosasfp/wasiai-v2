@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getPendingEarnings } from '@/lib/contracts/marketplaceClient'
 import { WithdrawButton } from './WithdrawButton'
 import { WalletSetup } from './WalletSetup'
@@ -24,7 +24,7 @@ interface CallRow {
   amount_paid: number
   status: string
   latency_ms: number | null
-  created_at: string
+  called_at: string
   agent: { name: string; slug: string } | null
 }
 
@@ -60,15 +60,16 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
   const totalRevenue = safeModels.reduce((s, m) => s + Number(m.total_revenue ?? 0), 0)
   const activeModels = safeModels.filter(m => m.status === 'active').length
 
-  // Fetch last 20 calls across all creator models
+  // Fetch last 20 calls across all creator models (service client to avoid RLS issues)
   const modelIds = safeModels.map(m => m.id)
   let recentCalls: CallRow[] = []
   if (modelIds.length > 0) {
-    const { data: calls } = await supabase
+    const serviceClient = createServiceClient()
+    const { data: calls } = await serviceClient
       .from('agent_calls')
-      .select('id, agent_id, caller_type, amount_paid, status, latency_ms, created_at, agent:agents(name, slug)')
+      .select('id, agent_id, caller_type, amount_paid, status, latency_ms, called_at, agent:agents(name, slug)')
       .in('agent_id', modelIds)
-      .order('created_at', { ascending: false })
+      .order('called_at', { ascending: false })
       .limit(20)
     recentCalls = (calls as unknown as CallRow[]) ?? []
   }
@@ -244,7 +245,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                         <StatusBadge status={call.status} />
                       </td>
                       <td className="px-6 py-3 text-right text-xs text-gray-400">
-                        {new Date(call.created_at).toLocaleString('en-US')}
+                        {new Date(call.called_at).toLocaleString('en-US')}
                       </td>
                     </tr>
                   ))}
