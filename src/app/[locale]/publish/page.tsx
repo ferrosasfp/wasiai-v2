@@ -7,6 +7,7 @@ interface Props {
 }
 
 // UX-01: Auth gate — redirect to login if not authenticated
+// Wallet gate — wallet required before publishing
 export default async function PublishPage({ params }: Props) {
   const { locale } = await params
   const supabase = await createClient()
@@ -16,5 +17,12 @@ export default async function PublishPage({ params }: Props) {
     redirect(`/${locale}/login?next=/${locale}/publish`)
   }
 
-  return <PublishForm />
+  // Fetch wallet address — required to receive earnings
+  const { data: profile } = await supabase
+    .from('creator_profiles')
+    .select('wallet_address')
+    .eq('id', user.id)
+    .single()
+
+  return <PublishForm initialWallet={profile?.wallet_address ?? null} />
 }

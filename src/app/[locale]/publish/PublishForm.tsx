@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import { z } from 'zod'
+import { WalletSetup } from '@/components/WalletSetup'
 
 const MODEL_CATEGORIES = ['nlp', 'vision', 'audio', 'code', 'multimodal', 'data'] as const
 
@@ -18,7 +19,11 @@ const publishSchema = z.object({
 
 type PublishForm = z.infer<typeof publishSchema>
 
-export default function PublishForm() {
+interface PublishFormProps {
+  initialWallet: string | null
+}
+
+export default function PublishForm({ initialWallet }: PublishFormProps) {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
@@ -98,6 +103,30 @@ export default function PublishForm() {
       setLoading(false)
     }
   }
+
+  // ── Wallet gate ─────────────────────────────────────────────────────────
+  // Wallet must be set before publishing — earnings go there automatically
+  if (!initialWallet) return (
+    <main className="min-h-screen bg-gray-50 py-12 px-6">
+      <div className="mx-auto max-w-lg">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
+          <div className="text-5xl mb-4">💳</div>
+          <h1 className="text-xl font-bold text-gray-900">Configura tu wallet primero</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Necesitas una dirección EVM para recibir pagos en USDC cuando alguien invoque tu agente.
+            Sin wallet no hay a dónde enviar las ganancias.
+          </p>
+          <div className="mt-6 rounded-xl bg-white border border-amber-200 p-5 text-left">
+            <p className="text-sm font-semibold text-gray-700 mb-3">Tu wallet de cobros (EVM / Avalanche)</p>
+            <WalletSetup initialWallet={null} />
+          </div>
+          <p className="mt-4 text-xs text-gray-400">
+            Tras guardar tu wallet, esta página se actualizará automáticamente.
+          </p>
+        </div>
+      </div>
+    </main>
+  )
 
   if (success) return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
