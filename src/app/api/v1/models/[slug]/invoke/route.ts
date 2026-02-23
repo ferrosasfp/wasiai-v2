@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import {
   FacilitatorClient,
   extractPaymentFromHeaders,
@@ -65,7 +65,8 @@ export async function POST(
 ) {
   try {
   const { slug } = await params
-  const supabase = await createClient()
+  // Use service client to bypass RLS — invoke is a payment API, not auth-aware
+  const supabase = createServiceClient()
 
   // ── 0. Rate limiting ──────────────────────────────────────────────────────
   const rlId  = getIdentifier(request)
@@ -311,7 +312,7 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   return { data, status, latencyMs: Date.now() - startMs }
 }
 
-type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+type SupabaseClient = ReturnType<typeof createServiceClient>
 
 async function logCall(
   supabase: SupabaseClient,
