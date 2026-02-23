@@ -58,7 +58,7 @@ export async function login(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    redirect(`/${locale}/dashboard`)
+    redirect(`/${locale}/creator/dashboard`)
 }
 
 export async function signup(formData: FormData) {
@@ -143,7 +143,7 @@ export async function updatePassword(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    redirect(`/${locale}/dashboard`)
+    redirect(`/${locale}/creator/dashboard`)
 }
 
 export async function updateProfile(formData: FormData) {

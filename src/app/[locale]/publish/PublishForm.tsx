@@ -91,7 +91,7 @@ export default function PublishForm() {
       })
       if (!res.ok) throw new Error(await res.text())
       setSuccess(true)
-      setTimeout(() => router.push(`/${locale}/dashboard`), 2000)
+      setTimeout(() => router.push(`/${locale}/creator/dashboard`), 2000)
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : 'Error publishing model' })
     } finally {
