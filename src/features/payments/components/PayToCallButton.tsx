@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useWalletClient, useAccount, useConnect } from 'wagmi'
+import { useWalletClient, useAccount, useConnect, useSwitchChain } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import type { Model } from '@/features/models/types/models.types'
 import { isAddress } from 'viem'
@@ -40,6 +40,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const { data: walletClient } = useWalletClient({ chainId: AVALANCHE_CHAIN_ID })
   const { isConnected, address, chain: connectedChain } = useAccount()
   const { connect } = useConnect()
+  const { switchChain } = useSwitchChain()
 
   const [state, setState]   = useState<CallState>('idle')
   const [input, setInput]   = useState('')
@@ -83,7 +84,18 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
       const probeBody = await probe.json() as X402Requirements
 
       if (!walletClient) {
-        throw new Error('Wallet client not ready. Make sure your wallet is connected to Avalanche.')
+        // Wallet is connected but not on Avalanche — trigger network switch automatically
+        setState('idle')
+        setError('Switching to Avalanche network...')
+        try {
+          await switchChain({ chainId: AVALANCHE_CHAIN_ID })
+          setError(null)
+          // After switch, walletClient will become available — ask user to click again
+          setError('Network switched! Click "Pay & Call" again to continue.')
+        } catch {
+          setError('Please switch to Avalanche network in your wallet and try again.')
+        }
+        return
       }
 
       // A-06: Security validations before signing
@@ -94,11 +106,14 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
 
       // 2. Validate the user is on the correct network before signing
       if (connectedChain && connectedChain.id !== AVALANCHE_CHAIN_ID) {
-        throw new Error(
-          `Wrong network: you are on ${connectedChain.name} (${connectedChain.id}), ` +
-          `but payments require Avalanche chain ID ${AVALANCHE_CHAIN_ID}. ` +
-          `Please switch networks in your wallet.`
-        )
+        setState('idle')
+        try {
+          await switchChain({ chainId: AVALANCHE_CHAIN_ID })
+          setError('Network switched! Click "Pay & Call" again to continue.')
+        } catch {
+          setError('Please switch to Avalanche Fuji network in your wallet and try again.')
+        }
+        return
       }
 
       // 3. Sign EIP-712 TransferWithAuthorization manually.
