@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 
-const FACILITATOR_URL = 'https://facilitator.ultravioletadao.xyz'
+// WasiAI handles x402 settlement natively — no external facilitator
 const CHAIN_ID  = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
 const CHAIN_NAME = CHAIN_ID === 43114 ? 'avalanche' : 'avalanche-fuji'
 const SITE_URL  = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
@@ -153,11 +153,11 @@ export async function GET(request: NextRequest) {
 
       // Payment info for x402 clients
       payment: {
-        protocol:    'x402',
-        price:       agent.price_per_call,
-        currency:    'USDC',
-        facilitator: FACILITATOR_URL,
-        contract:    contractAddress,
+        protocol:   'x402',
+        price:      agent.price_per_call,
+        currency:   'USDC',
+        settlement: 'wasiai-native',
+        contract:   contractAddress,
       },
 
       // MCP integration

@@ -195,7 +195,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             <h2 className="text-3xl font-bold">Built for the Agentic Economy</h2>
             <p className="mt-3 max-w-xl mx-auto text-gray-400">
               Any AI agent can discover, pay, and call models on WasiAI autonomously.
-              x402 native. ERC-8004 identity. Gasless via Ultravioleta DAO.
+              x402 native. ERC-8004 identity. Gasless payments on Avalanche.
             </p>
           </div>
 

@@ -47,7 +47,7 @@ export function ModelCallSection({ model }: Props) {
 
       {/* Trust footer */}
       <p className="mt-3 text-center text-xs text-gray-400">
-        ⚡ Gasless · Powered by x402 + Ultravioleta DAO
+        ⚡ Gasless · Powered by WasiAI × Avalanche
       </p>
     </div>
   )

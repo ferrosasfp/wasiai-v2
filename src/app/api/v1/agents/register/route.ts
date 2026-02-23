@@ -27,7 +27,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
-import { BazaarClient } from 'uvd-x402-sdk/backend'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { CHAIN_NAME, CHAIN_NETWORKS } from '@/lib/chain'
@@ -206,24 +205,6 @@ export async function POST(request: NextRequest) {
       creatorWallet:    data.creator_wallet,
     }).catch(err => console.error('[register] on-chain failed:', err))
   }
-
-  // ── Register in Bazaar (non-blocking) ─────────────────────────────────────
-  try {
-    const bazaar = new BazaarClient({ apiKey: process.env.ULTRAVIOLETA_BAZAAR_API_KEY })
-    await bazaar.register({
-      url:          `${SITE_URL}/api/v1/agents/${data.slug}/invoke`,
-      name:         data.name,
-      description:  data.description ?? data.name,
-      category:     'ai',
-      networks:     CHAIN_NETWORKS,
-      tokens:       ['USDC'],
-      price:        String(data.price_per_call),
-      priceCurrency: 'USDC',
-      payTo:        process.env.WASIAI_TREASURY_ADDRESS ?? '',
-      mimeType:     'application/json',
-      tags:         [data.category, 'wasiai', data.agent_type],
-    })
-  } catch { /* best effort */ }
 
   // A2A-11: if key insert failed, still return agent but warn about missing key
   const managementKey = keyData?.raw_key ?? null

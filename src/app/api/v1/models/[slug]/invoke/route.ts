@@ -16,16 +16,12 @@ import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
 const CHAIN_ID_NUM     = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
 
-// The facilitator (facilitator.ultravioletadao.xyz) uses 'avalanche' for mainnet
-// and 'avalanche-testnet' for Fuji. The SDK wagmi adapter only has 'avalanche',
-// so we build payment requirements manually to support both environments.
 const CHAIN      = CHAIN_ID_NUM === 43114 ? 'avalanche' : 'avalanche-testnet'
 const USDC_ADDR  = CHAIN_ID_NUM === 43114
   ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'   // Avalanche mainnet USDC
   : '0x5425890298aed601595a70AB815c96711a31Bc65'   // Avalanche Fuji USDC (Circle test token)
 
-const FACILITATOR_URL  = 'https://facilitator.ultravioletadao.xyz'
-const SITE_URL         = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
 /**
  * Build x402 payment requirements manually.
@@ -57,7 +53,7 @@ function buildRequirements(options: {
  *
  * Two auth paths:
  *   A) x-agent-key  → budget-based, no on-chain payment per call
- *   B) X-PAYMENT    → real x402 via Ultravioleta DAO facilitator (Avalanche)
+ *   B) X-PAYMENT    → real x402, WasiAI-native settlement on Avalanche
  */
 export async function POST(
   request: NextRequest,
@@ -168,9 +164,8 @@ export async function POST(
   }
 
   // ── 4. Verify + Settle ────────────────────────────────────────────────────
-  // Mainnet: delegate to UVD facilitator (supports 'avalanche' chain name)
-  // Fuji testnet: self-verify + execute transferWithAuthorization directly
-  //   (UVD facilitator /verify endpoint does not accept 'avalanche-testnet')
+  // Fuji testnet: WasiAI-native settler (usdcSettler.ts)
+  // Mainnet: external facilitator fallback (can be replaced with native settler later)
 
   let settlement: { verified: boolean; settled: boolean; transactionHash?: string; error?: string }
 
@@ -186,7 +181,7 @@ export async function POST(
     const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
     settlement = await settlePaymentDirectly(evmPayload, atomicRequired)
   } else {
-    // Mainnet — use UVD facilitator
+    // Mainnet — external facilitator (future: replace with WasiAI native settler)
     const requirements = buildRequirements({
       amount: priceStr,
       recipient: CONTRACT_ADDRESS,
@@ -194,7 +189,8 @@ export async function POST(
       description: `Access to ${model.name} on WasiAI`,
       mimeType: 'application/json',
     })
-    const facilitator = new FacilitatorClient({ baseUrl: FACILITATOR_URL })
+    const MAINNET_FACILITATOR = 'https://facilitator.ultravioletadao.xyz'
+    const facilitator = new FacilitatorClient({ baseUrl: MAINNET_FACILITATOR })
     settlement = await facilitator.verifyAndSettle(paymentHeader, requirements)
   }
 
@@ -279,7 +275,7 @@ export async function GET(
       chain: CHAIN_NAME,
       chain_id: CHAIN_ID_NUM,
       protocol: 'x402',
-      facilitator: FACILITATOR_URL,
+      settlement: 'wasiai-native',
       // USDC: native (mainnet) or Circle test token (Fuji)
       usdc_contract: IS_MAINNET
         ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
