@@ -217,8 +217,9 @@ export async function POST(
   // ── 6. Record invocation on-chain (non-blocking) ──────────────────────────
   // A2A-04: Extract real payer address from parsed x402 header
   if (result.status === 'success') {
-    // paymentHeader is the parsed X402Header object — 'from' contains payer address
-    const payerAddress = (paymentHeader as unknown as Record<string, string>)?.from
+    // paymentHeader is the parsed X402Header object — payer is inside payload.authorization.from
+    const payerAddress = (paymentHeader as unknown as { payload?: { authorization?: { from?: string } } })
+      ?.payload?.authorization?.from
       ?? '0x0000000000000000000000000000000000000000'
 
     recordInvocationOnChain({
