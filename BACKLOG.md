@@ -12,6 +12,10 @@
 
 ## 🟠 Medium Priority (post-hackathon sprint)
 
+- [ ] **SEC-CSP** — CSP nonce-based solution — reemplazar `unsafe-inline` con nonces automáticos por request en middleware (Next.js `experimental.strictNextHead`)
+- [ ] **ARCH-P07** — Mover Web3Provider a route group `(web3)` — solo dashboard/publish/agent-keys lo necesitan. Alto riesgo de regresión, hacer como PR separado.
+- [ ] **SEC-T07** — On-chain recording retry queue ya implementado, pero pendiente agregar cron job en Vercel para ejecutar `/api/cron/retry-recordings` periódicamente
+
 - [ ] **A2A-04** — Extraer `payer_address` del header x402 en invoke route
 - [ ] **PERF-05** — Discovery API muy pesada — trim campos innecesarios en `/api/v1/agents`
 - [ ] **PERF-06** — Redundant `await` en `logCall` — hacer fire-and-forget
