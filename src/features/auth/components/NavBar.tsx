@@ -32,8 +32,8 @@ export function NavBar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
           {/* Logo */}
-          <Link href="/dashboard" className="text-lg font-bold text-gray-900">
-            NexusFactory
+          <Link href="/en" className="text-lg font-bold text-gray-900">
+            WasiAI
           </Link>
 
           {/* Desktop nav */}
