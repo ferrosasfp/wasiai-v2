@@ -10,6 +10,7 @@ import { recordInvocationOnChain } from '@/lib/contracts/marketplaceClient'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
+import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
 
 // x402 recipient = the marketplace contract (it splits 90/10 internally)
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
@@ -261,12 +262,12 @@ export async function GET(
     payment: {
       price: model.price_per_call,
       currency: 'USDC',
-      chain: CHAIN_ID_NUM === 43114 ? 'avalanche' : 'avalanche-fuji',
+      chain: CHAIN_NAME,
       chain_id: CHAIN_ID_NUM,
       protocol: 'x402',
       facilitator: FACILITATOR_URL,
       // USDC: native (mainnet) or Circle test token (Fuji)
-      usdc_contract: CHAIN_ID_NUM === 43114
+      usdc_contract: IS_MAINNET
         ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
         : '0x5425890298aed601595a70AB815c96711a31Bc65',
       marketplace_contract: CONTRACT_ADDRESS,
@@ -352,7 +353,7 @@ function buildResponse(
         latency_ms: result.latencyMs,
         charged: model.price_per_call,
         currency: 'USDC',
-        chain: 'avalanche',
+        chain: CHAIN_NAME,
         tx_hash: txHash ?? null,
         status: result.status,
       },

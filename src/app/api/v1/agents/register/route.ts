@@ -30,6 +30,7 @@ import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { BazaarClient } from 'uvd-x402-sdk/backend'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
+import { CHAIN_NAME, CHAIN_NETWORKS } from '@/lib/chain'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
     agent_type:     data.agent_type,
     price_per_call: data.price_per_call,
     currency:       'USDC',
-    chain:          'avalanche',
+    chain:          CHAIN_NAME,
     endpoint_url:   data.endpoint_url,
     capabilities:   data.capabilities,
     dependencies:   data.dependencies,
@@ -214,7 +215,7 @@ export async function POST(request: NextRequest) {
       name:         data.name,
       description:  data.description ?? data.name,
       category:     'ai',
-      networks:     ['avalanche'],
+      networks:     CHAIN_NETWORKS,
       tokens:       ['USDC'],
       price:        String(data.price_per_call),
       priceCurrency: 'USDC',

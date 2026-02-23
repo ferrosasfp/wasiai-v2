@@ -37,7 +37,7 @@ export function WithdrawButton({ pending, hasWallet }: Props) {
   if (result?.txHash) {
     return (
       <a
-        href={`https://testnet.snowscan.xyz/tx/${result.txHash}`}
+        href={`https://${Number(process.env.NEXT_PUBLIC_CHAIN_ID) === 43114 ? '' : 'testnet.'}snowscan.xyz/tx/${result.txHash}`}
         target="_blank"
         rel="noopener noreferrer"
         className="rounded-xl bg-green-100 px-5 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-200 transition"

@@ -6,6 +6,7 @@ import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { CHAIN_NETWORKS } from '@/lib/chain'
 
 const createModelSchema = z.object({
   name: z.string().min(3),
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
       name: result.data.name,
       description: result.data.description ?? `${result.data.name} on WasiAI`,
       category: 'ai',
-      networks: ['avalanche'],
+      networks: CHAIN_NETWORKS,
       tokens: ['USDC'],
       price: String(result.data.price_per_call),
       priceCurrency: 'USDC',

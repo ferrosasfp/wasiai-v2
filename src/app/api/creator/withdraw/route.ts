@@ -17,6 +17,7 @@ import {
   getPendingEarnings,
   withdrawForCreator,
 } from '@/lib/contracts/marketplaceClient'
+import { snowscanTx } from '@/lib/chain'
 
 export async function POST() {
   const supabase = await createClient()
@@ -62,7 +63,7 @@ export async function POST() {
     withdrawn_usdc: pending,
     wallet,
     tx_hash: txHash,
-    explorer: `https://testnet.snowscan.xyz/tx/${txHash}`,
+    explorer: snowscanTx(txHash),
   })
 }
 

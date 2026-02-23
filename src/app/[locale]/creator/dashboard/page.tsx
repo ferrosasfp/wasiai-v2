@@ -104,7 +104,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
               <p className="mt-1 text-sm text-gray-500">
                 Your USDC earnings accumulated in{' '}
                 <a
-                  href={`https://testnet.snowscan.xyz/address/${process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI}`}
+                  href={`https://${Number(process.env.NEXT_PUBLIC_CHAIN_ID) === 43114 ? '' : 'testnet.'}snowscan.xyz/address/${process.env.NEXT_PUBLIC_MARKETPLACE_CONTRACT_ADDRESS}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-indigo-500 hover:underline"
