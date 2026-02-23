@@ -215,19 +215,31 @@ export async function POST(
   const result = await callUpstream(model, request)
   await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result)
 
-  // ── 6. Record invocation on-chain (non-blocking) ──────────────────────────
+  // ── 6. Record invocation on-chain (AWAITED — fire-and-forget breaks in Vercel serverless)
   // A2A-04: Extract real payer address from parsed x402 header
+  let onChainTxHash: string | null = null
   if (result.status === 'success') {
-    // paymentHeader is the parsed X402Header object — payer is inside payload.authorization.from
     const payerAddress = (paymentHeader as unknown as { payload?: { authorization?: { from?: string } } })
       ?.payload?.authorization?.from
       ?? '0x0000000000000000000000000000000000000000'
 
-    recordInvocationOnChain({
-      slug,
-      payerAddress,
-      amountUSDC: model.price_per_call as number,
-    }).catch(err => console.error('[invoke] on-chain recording failed silently:', err))
+    try {
+      onChainTxHash = await recordInvocationOnChain({
+        slug,
+        payerAddress,
+        amountUSDC: model.price_per_call as number,
+      })
+
+      // Update on_chain_recorded flag in DB
+      if (onChainTxHash && settlement.transactionHash) {
+        await supabase.from('agent_calls')
+          .update({ on_chain_recorded: true, on_chain_tx_hash: onChainTxHash })
+          .eq('tx_hash', settlement.transactionHash)
+      }
+    } catch (err) {
+      console.error('[invoke] on-chain recording failed:', err)
+      // Non-fatal: payment already settled, caller still gets their result
+    }
   }
 
   return buildResponse(model, result, settlement.transactionHash)
