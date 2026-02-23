@@ -69,8 +69,24 @@ function createEnv() {
   return parsed.data
 }
 
-// Singleton: parsed once at module load time
-export const env = createEnv()
+// Singleton: parsed once at module load time.
+// During Next.js static build phase, env vars may not be injected yet
+// (especially in Vercel preview environments). We defer validation to
+// runtime so static page generation doesn't break the deploy.
+// At runtime (real requests), Vercel always injects env vars.
+const isBuildPhase =
+  process.env.NEXT_PHASE === 'phase-production-build' ||
+  process.env.NEXT_PHASE === 'phase-export'
+
+function createEnvSafe() {
+  if (isBuildPhase) {
+    // Skip strict validation at build time — env vars are injected at runtime
+    return process.env as unknown as z.infer<typeof envSchema>
+  }
+  return createEnv()
+}
+
+export const env = createEnvSafe()
 
 // ── Convenience re-exports ────────────────────────────────────────────────────
 
