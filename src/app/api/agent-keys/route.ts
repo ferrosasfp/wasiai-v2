@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAgentKey, getAgentKeys, revokeAgentKey } from '@/features/agent-api/services/agent-keys.service'
 import { z } from 'zod'
 import { getKeysLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
+import { validateCsrf } from '@/lib/security/csrf'
 
 const createSchema = z.object({
   name: z.string().min(1).max(64),
@@ -12,13 +13,20 @@ export async function GET() {
   try {
     const keys = await getAgentKeys()
     // Never expose raw keys
-    return NextResponse.json(keys.map(k => ({ ...k, key_hash: undefined })))
+    // P-11: Private cache — user-specific data, 30s browser cache
+    return NextResponse.json(keys.map(k => ({ ...k, key_hash: undefined })), {
+      headers: { 'Cache-Control': 'private, max-age=30' },
+    })
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 }
 
 export async function POST(request: NextRequest) {
+  // S-02: CSRF protection
+  const csrfError = validateCsrf(request)
+  if (csrfError) return csrfError
+
   const rlHit = await checkRateLimit(getKeysLimit(), getIdentifier(request))
   if (rlHit) return rlHit
   try {
@@ -37,6 +45,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  // S-02: CSRF protection
+  const csrfError = validateCsrf(request)
+  if (csrfError) return csrfError
+
   try {
     const { id } = await request.json()
     await revokeAgentKey(id)

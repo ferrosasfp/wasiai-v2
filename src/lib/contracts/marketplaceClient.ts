@@ -15,6 +15,7 @@ import { createWalletClient, createPublicClient, http, type Address } from 'viem
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { WASIAI_MARKETPLACE_ABI, toUSDCAtomics } from './WasiAIMarketplace'
+import { logger } from '@/lib/logger'
 
 function getChain() {
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
@@ -64,7 +65,7 @@ export async function recordInvocationOnChain({
 }): Promise<string | null> {
   const contractAddress = getContractAddress()
   if (!contractAddress) {
-    console.warn('[marketplace] Contract not configured — skipping recordInvocation')
+    logger.warn('[marketplace] Contract not configured — skipping recordInvocation')
     return null
   }
 
@@ -80,11 +81,11 @@ export async function recordInvocationOnChain({
     })
 
     const txHash = await wallet.writeContract(request)
-    console.log(`[marketplace] recordInvocation tx: ${txHash}`)
+    logger.info('[marketplace] recordInvocation tx', { txHash })
     return txHash
   } catch (err) {
     // Non-fatal: DB already recorded the payment. Log and continue.
-    console.error('[marketplace] recordInvocation failed:', err)
+    logger.error('[marketplace] recordInvocation failed', { err })
     return null
   }
 }
@@ -106,12 +107,12 @@ export async function registerAgentOnChain({
 }): Promise<string | null> {
   const contractAddress = getContractAddress()
   if (!contractAddress) {
-    console.warn('[marketplace] Contract not configured — skipping registerAgent')
+    logger.warn('[marketplace] Contract not configured — skipping registerAgent')
     return null
   }
 
   if (!creatorWallet || creatorWallet === '0x0000000000000000000000000000000000000000') {
-    console.warn('[marketplace] No creator wallet — skipping registerAgent')
+    logger.warn('[marketplace] No creator wallet — skipping registerAgent')
     return null
   }
 
@@ -132,10 +133,10 @@ export async function registerAgentOnChain({
     })
 
     const txHash = await wallet.writeContract(request)
-    console.log(`[marketplace] registerAgent tx: ${txHash}`)
+    logger.info('[marketplace] registerAgent tx', { txHash })
     return txHash
   } catch (err) {
-    console.error('[marketplace] registerAgent failed:', err)
+    logger.error('[marketplace] registerAgent failed', { err })
     return null
   }
 }
@@ -147,13 +148,13 @@ export async function registerAgentOnChain({
 export async function withdrawForCreator(creatorWallet: string): Promise<string | null> {
   const contractAddress = getContractAddress()
   if (!contractAddress) {
-    console.error('[marketplace] withdrawFor: MARKETPLACE_CONTRACT_ADDRESS not set')
+    logger.error('[marketplace] withdrawFor: MARKETPLACE_CONTRACT_ADDRESS not set')
     return null
   }
 
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
   const rpc     = chainId === 43114 ? process.env.NEXT_PUBLIC_RPC_MAINNET : process.env.NEXT_PUBLIC_RPC_TESTNET
-  console.log(`[marketplace] withdrawFor chainId=${chainId} rpc=${rpc ?? 'chain-default'} contract=${contractAddress}`)
+  logger.info('[marketplace] withdrawFor initiated', { chainId, rpc: rpc ?? 'chain-default', contractAddress })
 
   try {
     const { wallet, public: pub, account } = getOperatorClient()
@@ -167,12 +168,12 @@ export async function withdrawForCreator(creatorWallet: string): Promise<string 
     })
 
     const txHash = await wallet.writeContract(request)
-    console.log(`[marketplace] withdrawFor(${creatorWallet}) tx: ${txHash}`)
+    logger.info('[marketplace] withdrawFor tx', { creatorWallet, txHash })
     const receipt = await pub.waitForTransactionReceipt({ hash: txHash as `0x${string}`, timeout: 30_000 })
-    console.log(`[marketplace] withdrawFor confirmed: ${receipt.status}`)
+    logger.info('[marketplace] withdrawFor confirmed', { status: receipt.status })
     return txHash
   } catch (err) {
-    console.error('[marketplace] withdrawFor failed:', String(err).slice(0, 300))
+    logger.error('[marketplace] withdrawFor failed', { err: String(err).slice(0, 300) })
     return null
   }
 }
@@ -183,7 +184,7 @@ export async function withdrawForCreator(creatorWallet: string): Promise<string 
 export async function getPendingEarnings(creatorWallet: string): Promise<number> {
   const contractAddress = getContractAddress()
   if (!contractAddress) {
-    console.warn('[marketplace] getPendingEarnings: contract not configured')
+    logger.warn('[marketplace] getPendingEarnings: contract not configured')
     return 0
   }
 
@@ -196,10 +197,10 @@ export async function getPendingEarnings(creatorWallet: string): Promise<number>
       args:         [creatorWallet as Address],
     }) as bigint
     const result = Number(atomics) / 1_000_000
-    console.log(`[marketplace] getPendingEarnings(${creatorWallet.slice(0,8)}...) = $${result}`)
+    logger.debug('[marketplace] getPendingEarnings', { wallet: `${creatorWallet.slice(0,8)}...`, result })
     return result
   } catch (err) {
-    console.error('[marketplace] getPendingEarnings failed:', String(err).slice(0, 200))
+    logger.error('[marketplace] getPendingEarnings failed', { err: String(err).slice(0, 200) })
     return 0
   }
 }

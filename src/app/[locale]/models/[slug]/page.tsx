@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { setRequestLocale } from 'next-intl/server'
 import { getModelBySlug } from '@/features/models/services/models.service'
 import { ModelCallSection } from '@/features/models/components/ModelCallSection'
+import { AgentRating } from '@/features/reputation/components/AgentRating'
 import Link from 'next/link'
 
 // PERF-04: ISR — revalidate detail pages every 5 minutes
@@ -208,6 +209,14 @@ X-PAYMENT: <x402-eip712-signed-payload>
                 <span className="font-medium text-green-600">90%</span>
               </div>
             </div>
+
+            {/* ERC-8004 Reputation */}
+            <AgentRating
+              slug={model.slug}
+              initialScore={model.reputation_score ?? null}
+              initialCount={model.reputation_count ?? 0}
+            />
+
           </div>
         </div>
       </div>

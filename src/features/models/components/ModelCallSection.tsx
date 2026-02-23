@@ -1,6 +1,7 @@
 'use client'
 
 import { PayToCallButton } from '@/features/payments/components/PayToCallButton'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { Model } from '../types/models.types'
 
 interface Props {
@@ -42,8 +43,10 @@ export function ModelCallSection({ model }: Props) {
         </div>
       </div>
 
-      {/* Payment component */}
-      <PayToCallButton model={model} />
+      {/* T-17: ErrorBoundary prevents payment errors from crashing the entire page */}
+      <ErrorBoundary>
+        <PayToCallButton model={model} />
+      </ErrorBoundary>
 
       {/* Trust footer */}
       <p className="mt-3 text-center text-xs text-gray-400">

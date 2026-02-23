@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category') as ModelCategory | null
   const search = searchParams.get('search')
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '20'), 100)
-  const offset = parseInt(searchParams.get('offset') ?? '0')
+  // S-11: Always pass radix 10 to parseInt to avoid octal interpretation
+  const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100)
+  const offset = parseInt(searchParams.get('offset') ?? '0', 10)
 
   const supabase = await createClient()
   let query = supabase
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
     },
   }))
 
+  // P-09: Longer CDN cache with stale-while-revalidate for better performance
   return NextResponse.json({
     schema: 'wasiai/catalog/v1',
     total: models.length,
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
     models,
   }, {
     headers: {
-      'Cache-Control': 'public, s-maxage=60',
+      'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
     },
   })
 }

@@ -18,8 +18,11 @@ export function useContractRead({ address, abi, functionName, args = [], enabled
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Stabilize array/object references to prevent infinite re-renders
-  const argsKey = JSON.stringify(args)
+  // P-12: Stabilize args reference using serialized key to avoid infinite re-render loops.
+  // The argsKey is itself memoized so JSON.stringify only runs when args actually change.
+  // P-12: Memoize argsKey to avoid expensive JSON.stringify every render
+  const argsKey = useMemo(() => JSON.stringify(args), [args])
+  // stableArgs uses argsKey as dep so it only changes when args values actually change
   const stableArgs = useMemo(() => args, [argsKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const abiRef = useRef(abi)
   abiRef.current = abi

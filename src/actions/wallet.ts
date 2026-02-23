@@ -2,8 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { isAddress } from 'viem'
 
-const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address')
+// A-12: Use viem's isAddress() for EVM address validation (checksum-aware)
+const addressSchema = z.string().refine(
+  (val) => isAddress(val),
+  { message: 'Invalid Ethereum address' },
+)
 
 export async function linkWallet(walletAddress: string) {
     const validated = addressSchema.safeParse(walletAddress)

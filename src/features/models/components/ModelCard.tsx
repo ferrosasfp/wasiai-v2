@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import { memo } from 'react'
 import type { Model } from '../types/models.types'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -18,9 +19,12 @@ const CATEGORY_ICONS: Record<string, string> = {
 interface ModelCardProps {
   model: Model
   locale: string
+  /** Position index in the grid — first 3 are above the fold and get priority loading */
+  index?: number
 }
 
-export function ModelCard({ model, locale }: ModelCardProps) {
+// P-03: Memoized to avoid unnecessary re-renders in grid lists
+export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: ModelCardProps) {
   const remaining = Math.max(0, model.total_calls)
 
   return (
@@ -33,7 +37,15 @@ export function ModelCard({ model, locale }: ModelCardProps) {
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg shrink-0 overflow-hidden">
             {model.cover_image ? (
-              <Image src={model.cover_image} alt={model.name} fill className="object-cover" />
+              // P-04: sizes avoids downloading unnecessarily large images; priority for LCP candidates
+              <Image
+                src={model.cover_image}
+                alt={`${model.name} cover`}
+                fill
+                className="object-cover"
+                sizes="40px"
+                priority={index < 3}
+              />
             ) : (
               CATEGORY_ICONS[model.category] ?? '🤖'
             )}
@@ -83,6 +95,11 @@ export function ModelCard({ model, locale }: ModelCardProps) {
           {model.is_featured && (
             <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-600 font-medium shrink-0">Featured</span>
           )}
+          {model.reputation_score !== null && model.reputation_count > 0 && (
+            <span className="inline-flex items-center gap-1 shrink-0 text-green-600 font-medium">
+              👍 {model.reputation_score}%
+            </span>
+          )}
         </div>
         <div className="flex items-baseline gap-1 shrink-0">
           <span className="text-sm font-bold text-gray-900">${model.price_per_call}</span>
@@ -102,4 +119,4 @@ export function ModelCard({ model, locale }: ModelCardProps) {
       </div>
     </Link>
   )
-}
+})

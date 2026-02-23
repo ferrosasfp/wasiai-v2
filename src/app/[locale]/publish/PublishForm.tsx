@@ -3,21 +3,13 @@
 import { useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
-import { z } from 'zod'
 import { WalletSetup } from '@/components/WalletSetup'
+// A-07: Import shared schema to keep client/server validation in sync
+import { createModelSchema, MODEL_CATEGORIES, type CreateModelDraft, type ModelCapability } from '@/lib/schemas/model.schema'
+// T-11: Shared file upload hook
+import { useFileUpload } from '@/hooks/useFileUpload'
 
-const MODEL_CATEGORIES = ['nlp', 'vision', 'audio', 'code', 'multimodal', 'data'] as const
-
-const publishSchema = z.object({
-  name: z.string().min(3, 'Name must be at least 3 characters'),
-  slug: z.string().min(3).regex(/^[a-z0-9-]+$/, 'Only lowercase letters, numbers and hyphens'),
-  description: z.string().min(10, 'Please add a description'),
-  category: z.enum(MODEL_CATEGORIES),
-  price_per_call: z.number().min(0.01, 'Minimum price is $0.01').max(100),
-  endpoint_url: z.string().url('Must be a valid URL'),
-})
-
-type PublishForm = z.infer<typeof publishSchema>
+type PublishForm = CreateModelDraft
 
 interface PublishFormProps {
   initialWallet: string | null
@@ -36,11 +28,13 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [coverImage, setCoverImage] = useState<string | null>(null)
-  const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  type Capability = { name: string; description: string; inputType: string; outputType: string }
-  const [capabilities, setCapabilities] = useState<Capability[]>([])
+  // T-11: Use shared upload hook instead of inline upload logic
+  const { upload: uploadFile, uploading: uploadingImage, error: uploadError } = useFileUpload()
+
+  // A-07: Use shared ModelCapability type from schema
+  const [capabilities, setCapabilities] = useState<ModelCapability[]>([])
 
   function addCapability() {
     setCapabilities(prev => [...prev, { name: '', description: '', inputType: 'text', outputType: 'text' }])
@@ -48,23 +42,14 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
   function removeCapability(i: number) {
     setCapabilities(prev => prev.filter((_, idx) => idx !== i))
   }
-  function updateCapability(i: number, field: keyof Capability, value: string) {
+  function updateCapability(i: number, field: keyof ModelCapability, value: string) {
     setCapabilities(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c))
   }
 
   async function handleImageUpload(file: File) {
-    setUploadingImage(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch('/api/storage/upload', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Upload failed')
-      setCoverImage(data.url)
-    } catch (err) {
-      setErrors(prev => ({ ...prev, cover_image: err instanceof Error ? err.message : 'Upload error' }))
-    } finally {
-      setUploadingImage(false)
+    const result = await uploadFile(file)
+    if (result) {
+      setCoverImage(result.url)
     }
   }
 
@@ -80,7 +65,8 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const result = publishSchema.safeParse(form)
+    // A-07: Using shared schema for consistent client/server validation
+    const result = createModelSchema.safeParse(form)
     if (!result.success) {
       const fieldErrors: Record<string, string> = {}
       result.error.issues.forEach(i => { fieldErrors[i.path[0] as string] = i.message })
@@ -185,7 +171,10 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
               className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f) }}
             />
-            {errors.cover_image && <p className="mt-1 text-xs text-red-500">{errors.cover_image}</p>}
+            {/* T-11: Show upload error from useFileUpload hook OR form validation error */}
+            {(uploadError || errors.cover_image) && (
+              <p className="mt-1 text-xs text-red-500">{uploadError ?? errors.cover_image}</p>
+            )}
           </div>
 
           {/* Name */}

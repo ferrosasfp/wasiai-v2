@@ -24,13 +24,20 @@ export function useAuth() {
         }
 
         // Get initial user
-        supabase.auth.getUser().then(({ data: { user } }) => {
-            setUser(user)
-            if (user) {
-                getProfile(user.id)
-            }
-            setLoading(false)
-        })
+        // T-04: Added .catch() and .finally() for proper error handling
+        supabase.auth.getUser()
+            .then(({ data: { user } }) => {
+                setUser(user)
+                if (user) {
+                    getProfile(user.id)
+                }
+            })
+            .catch((err) => {
+                console.error('[useAuth] failed to get user:', err)
+            })
+            .finally(() => {
+                setLoading(false)
+            })
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(

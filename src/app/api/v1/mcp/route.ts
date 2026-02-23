@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { mcpRequestSchema } from '@/lib/schemas/api.schemas'
 
 /**
  * WasiAI MCP Server Endpoint
@@ -58,8 +59,23 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json()
-  const { method, params } = body
+  // S-03: Validate MCP request structure
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const parsed = mcpRequestSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid MCP request', details: parsed.error.flatten().fieldErrors },
+      { status: 400 },
+    )
+  }
+
+  const { method, params } = parsed.data
 
   if (method === 'tools/list') {
     const response = await GET()
@@ -71,7 +87,7 @@ export async function POST(request: NextRequest) {
     const toolName: string = params?.name ?? ''
     // Convert tool name back to slug: wasiai_my_model -> my-model
     const slug = toolName.replace(/^wasiai_/, '').replace(/_/g, '-')
-    const input = params?.arguments?.input
+    const input = params?.arguments?.['input']
 
     if (!input) {
       return NextResponse.json({ error: 'input is required' }, { status: 400 })
@@ -104,7 +120,7 @@ export async function POST(request: NextRequest) {
       const upstream = await fetch(model.endpoint_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input, ...params?.arguments?.options }),
+        body: JSON.stringify({ input, ...(params?.arguments?.['options'] as Record<string, unknown> | undefined ?? {}) }),
       })
       const result = await upstream.json()
 

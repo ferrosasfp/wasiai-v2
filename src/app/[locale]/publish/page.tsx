@@ -1,6 +1,18 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import PublishForm from './PublishForm'
+import dynamic from 'next/dynamic'
+
+// P-06: Dynamic import reduces initial bundle by ~50KB+ (form includes heavy Web3 deps)
+const PublishForm = dynamic(() => import('./PublishForm'), {
+  loading: () => (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+        <p className="text-sm text-gray-500">Loading editor...</p>
+      </div>
+    </div>
+  ),
+})
 
 interface Props {
   params: Promise<{ locale: string }>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useWalletClient, useAccount, useConnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import type { Model } from '@/features/models/types/models.types'
+import { isAddress } from 'viem'
 
 interface PayToCallButtonProps {
   model: Model
@@ -37,7 +38,7 @@ interface X402Requirements {
 
 export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const { data: walletClient } = useWalletClient({ chainId: AVALANCHE_CHAIN_ID })
-  const { isConnected, address } = useAccount()
+  const { isConnected, address, chain: connectedChain } = useAccount()
   const { connect } = useConnect()
 
   const [state, setState]   = useState<CallState>('idle')
@@ -83,6 +84,21 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
 
       if (!walletClient) {
         throw new Error('Wallet client not ready. Make sure your wallet is connected to Avalanche.')
+      }
+
+      // A-06: Security validations before signing
+      // 1. Validate payTo address is a valid EVM address (prevents MITM attacks)
+      if (!probeBody.payTo || !isAddress(probeBody.payTo)) {
+        throw new Error('Payment rejected: invalid payTo address in server response')
+      }
+
+      // 2. Validate the user is on the correct network before signing
+      if (connectedChain && connectedChain.id !== AVALANCHE_CHAIN_ID) {
+        throw new Error(
+          `Wrong network: you are on ${connectedChain.name} (${connectedChain.id}), ` +
+          `but payments require Avalanche chain ID ${AVALANCHE_CHAIN_ID}. ` +
+          `Please switch networks in your wallet.`
+        )
       }
 
       // 3. Sign EIP-712 TransferWithAuthorization manually.

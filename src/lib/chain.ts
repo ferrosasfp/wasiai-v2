@@ -49,6 +49,7 @@ export const snowscanAddr = (addr: string) => `${SNOWSCAN_URL}/address/${addr}`
  * Networks array for Bazaar discovery metadata.
  * Always 'avalanche' — BazaarNetwork type doesn't include testnet variants.
  * The USDC/contract addresses are handled per-chain internally.
+ *
+ * T-08: Using readonly string[] instead of any[] for type safety.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const CHAIN_NETWORKS: any[] = ['avalanche']
+export const CHAIN_NETWORKS = ['avalanche'] as const

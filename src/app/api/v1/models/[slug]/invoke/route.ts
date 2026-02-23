@@ -11,6 +11,8 @@ import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdc
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
+import { logger } from '@/lib/logger'
+import { enqueuePendingRecording } from '@/lib/chain/pendingRecordings'
 
 // x402 recipient = the marketplace contract (it splits 90/10 internally)
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
@@ -48,6 +50,65 @@ function buildRequirements(options: {
   }
 }
 
+// ── A-01: Extracted helpers (each < 50 lines, golden path logic unchanged) ───
+
+type SupabaseServiceClient = ReturnType<typeof createServiceClient>
+type SettlementResult = { verified: boolean; settled: boolean; transactionHash?: string; error?: string }
+
+/**
+ * Returns 402 instructions response (probe / no payment path).
+ */
+function build402Instructions(model: Record<string, unknown>, priceStr: string, resourceUrl: string): NextResponse {
+  const requirements = buildRequirements({
+    amount: priceStr,
+    recipient: CONTRACT_ADDRESS,
+    resource: resourceUrl,
+    description: `Access to ${model.name as string} on WasiAI`,
+    mimeType: 'application/json',
+  })
+  return NextResponse.json(
+    { x402Version: 1, ...requirements, model: { slug: model.slug, name: model.name, category: model.category }, docs: 'https://wasiai.io/docs/agents#x402' },
+    { status: 402, headers: { 'Content-Type': 'application/json', ...X402_CORS_HEADERS } },
+  )
+}
+
+/**
+ * Verify + settle x402 payment. Handles both Fuji (native) and mainnet (facilitator).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function settleX402(paymentHeader: any, model: Record<string, unknown>, priceStr: string, resourceUrl: string): Promise<SettlementResult | NextResponse> {
+  if (CHAIN_ID_NUM === 43113) {
+    const evmPayload = (paymentHeader as { payload?: X402EVMPayload })?.payload
+    if (!evmPayload?.authorization || !evmPayload?.signature) {
+      return NextResponse.json({ error: 'Invalid payment header', code: 'payment_invalid' }, { status: 402 })
+    }
+    const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
+    return settlePaymentDirectly(evmPayload, atomicRequired)
+  } else {
+    const requirements = buildRequirements({ amount: priceStr, recipient: CONTRACT_ADDRESS, resource: resourceUrl, description: `Access to ${model.name as string} on WasiAI`, mimeType: 'application/json' })
+    const facilitator = new FacilitatorClient({ baseUrl: 'https://facilitator.ultravioletadao.xyz' })
+    return facilitator.verifyAndSettle(paymentHeader, requirements)
+  }
+}
+
+/**
+ * Record successful invocation on-chain and update the DB flag.
+ */
+async function recordOnChain(supabase: SupabaseServiceClient, slug: string, model: Record<string, unknown>, paymentHeader: unknown, txHash: string): Promise<void> {
+  const payerAddress = (paymentHeader as { payload?: { authorization?: { from?: string } } })?.payload?.authorization?.from ?? '0x0000000000000000000000000000000000000000'
+  try {
+    const onChainTxHash = await recordInvocationOnChain({ slug, payerAddress, amountUSDC: model.price_per_call as number })
+    if (onChainTxHash) {
+      await supabase.from('agent_calls').update({ on_chain_recorded: true, on_chain_tx_hash: onChainTxHash }).eq('tx_hash', txHash)
+    }
+  } catch (err) {
+    logger.error('[invoke] on-chain recording failed — enqueueing for retry', { err })
+    // T-07: Non-fatal: enqueue for retry with exponential backoff
+    const { data: callRecord } = await supabase.from('agent_calls').select('id').eq('tx_hash', txHash).single()
+    await enqueuePendingRecording({ agentCallId: callRecord?.id, slug, payerAddress, amountUsdc: model.price_per_call as number })
+  }
+}
+
 /**
  * POST /api/v1/models/:slug/invoke
  *
@@ -69,13 +130,24 @@ export async function POST(
   const rlHit = await checkRateLimit(getInvokeLimit(), rlId)
   if (rlHit) return rlHit
 
-  // ── 1. Lookup model ───────────────────────────────────────────────────────
-  const { data: model, error: modelError } = await supabase
-    .from('agents')
-    .select('*')
-    .eq('slug', slug)
-    .eq('status', 'active')
-    .single()
+  // ── 1. Detect auth path early, then parallelize lookups ─────────────────
+  // P-02: Run model + agent-key lookups in parallel to cut TTFB
+  const rawAgentKey = request.headers.get('x-agent-key')
+  const keyHash = rawAgentKey
+    ? createHash('sha256').update(rawAgentKey).digest('hex')
+    : null
+
+  const [{ data: model, error: modelError }, keyRowResult] = await Promise.all([
+    supabase.from('agents').select('*').eq('slug', slug).eq('status', 'active').single(),
+    keyHash
+      ? supabase
+          .from('agent_keys')
+          .select('id, is_active, budget_usdc, spent_usdc')
+          .eq('key_hash', keyHash)
+          .eq('is_active', true)
+          .single()
+      : Promise.resolve(null),
+  ])
 
   if (modelError || !model) {
     return NextResponse.json({ error: 'Model not found' }, { status: 404 })
@@ -85,16 +157,8 @@ export async function POST(
   const resourceUrl = `${SITE_URL}/api/v1/models/${slug}/invoke`
 
   // ── 2. Route A: Agent Key (budget-based) ─────────────────────────────────
-  const rawAgentKey = request.headers.get('x-agent-key')
-
   if (rawAgentKey) {
-    const hash = createHash('sha256').update(rawAgentKey).digest('hex')
-    const { data: keyRow } = await supabase
-      .from('agent_keys')
-      .select('id, is_active, budget_usdc, spent_usdc')
-      .eq('key_hash', hash)
-      .eq('is_active', true)
-      .single()
+    const keyRow = keyRowResult?.data ?? null
 
     if (!keyRow) {
       return NextResponse.json(
@@ -140,68 +204,29 @@ export async function POST(
   const paymentHeader = extractPaymentFromHeaders(headers)
 
   if (!paymentHeader) {
-    // No payment — return 402 with x402 payment instructions
-    const requirements = buildRequirements({
-      amount: priceStr,
-      recipient: CONTRACT_ADDRESS,
-      resource: resourceUrl,
-      description: `Access to ${model.name} on WasiAI`,
-      mimeType: 'application/json',
-    })
-
-    return NextResponse.json(
-      {
-        x402Version: 1,
-        ...requirements,
-        model: { slug: model.slug, name: model.name, category: model.category },
-        docs: 'https://wasiai.io/docs/agents#x402',
-      },
-      {
-        status: 402,
-        headers: { 'Content-Type': 'application/json', ...X402_CORS_HEADERS },
-      },
-    )
+    // No payment — return 402 with x402 payment instructions (A-01: extracted)
+    return build402Instructions(model, priceStr, resourceUrl)
   }
 
-  // ── 4. Verify + Settle ────────────────────────────────────────────────────
-  // Fuji testnet: WasiAI-native settler (usdcSettler.ts)
-  // Mainnet: external facilitator fallback (can be replaced with native settler later)
+  // ── 4. Verify + Settle (A-01: extracted to settleX402 helper) ─────────────
+  const settlementOrError = await settleX402(paymentHeader, model, priceStr, resourceUrl)
 
-  let settlement: { verified: boolean; settled: boolean; transactionHash?: string; error?: string }
+  // If helper returned a NextResponse (error), return it directly
+  if (settlementOrError instanceof NextResponse) return settlementOrError
 
-  if (CHAIN_ID_NUM === 43113) {
-    // Fuji — self-settle
-    const evmPayload = paymentHeader?.payload as X402EVMPayload | undefined
-    if (!evmPayload?.authorization || !evmPayload?.signature) {
-      return NextResponse.json(
-        { error: 'Invalid payment header', code: 'payment_invalid' },
-        { status: 402 },
-      )
-    }
-    const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
-    settlement = await settlePaymentDirectly(evmPayload, atomicRequired)
-  } else {
-    // Mainnet — external facilitator (future: replace with WasiAI native settler)
-    const requirements = buildRequirements({
-      amount: priceStr,
-      recipient: CONTRACT_ADDRESS,
-      resource: resourceUrl,
-      description: `Access to ${model.name} on WasiAI`,
-      mimeType: 'application/json',
-    })
-    const MAINNET_FACILITATOR = 'https://facilitator.ultravioletadao.xyz'
-    const facilitator = new FacilitatorClient({ baseUrl: MAINNET_FACILITATOR })
-    settlement = await facilitator.verifyAndSettle(paymentHeader, requirements)
-  }
+  const settlement = settlementOrError as SettlementResult
 
   if (!settlement.verified) {
-    console.error('[invoke] payment verification failed:', JSON.stringify(settlement))
+    logger.error('[invoke] payment verification failed', settlement)
     return NextResponse.json(
       {
         error: 'Payment verification failed',
         code: 'payment_invalid',
         reason: settlement.error,
-        debug: { chain: CHAIN, usdc: USDC_ADDR, contract: CONTRACT_ADDRESS },
+        // S-10: Only expose debug info in development — never in production
+        ...(process.env.NODE_ENV === 'development'
+          ? { debug: { chain: CHAIN, usdc: USDC_ADDR, contract: CONTRACT_ADDRESS } }
+          : {}),
       },
       { status: 402 },
     )
@@ -211,38 +236,20 @@ export async function POST(
   const result = await callUpstream(model, request)
   await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result)
 
-  // ── 6. Record invocation on-chain (AWAITED — fire-and-forget breaks in Vercel serverless)
-  // A2A-04: Extract real payer address from parsed x402 header
-  let onChainTxHash: string | null = null
-  if (result.status === 'success') {
-    const payerAddress = (paymentHeader as unknown as { payload?: { authorization?: { from?: string } } })
-      ?.payload?.authorization?.from
-      ?? '0x0000000000000000000000000000000000000000'
-
-    try {
-      onChainTxHash = await recordInvocationOnChain({
-        slug,
-        payerAddress,
-        amountUSDC: model.price_per_call as number,
-      })
-
-      // Update on_chain_recorded flag in DB
-      if (onChainTxHash && settlement.transactionHash) {
-        await supabase.from('agent_calls')
-          .update({ on_chain_recorded: true, on_chain_tx_hash: onChainTxHash })
-          .eq('tx_hash', settlement.transactionHash)
-      }
-    } catch (err) {
-      console.error('[invoke] on-chain recording failed:', err)
-      // Non-fatal: payment already settled, caller still gets their result
-    }
+  // ── 6. Record invocation on-chain (A-01: extracted to recordOnChain helper) ─
+  if (result.status === 'success' && settlement.transactionHash) {
+    await recordOnChain(supabase, slug, model, paymentHeader, settlement.transactionHash)
   }
 
   return buildResponse(model, result, settlement.transactionHash)
   } catch (err) {
-    console.error('[invoke] unhandled error:', err)
+    logger.error('[invoke] unhandled error', { err })
+    // S-10: Never expose raw error details in production
     return NextResponse.json(
-      { error: 'Internal server error', detail: String(err) },
+      {
+        error: 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' ? { detail: String(err) } : {}),
+      },
       { status: 500 }
     )
   }
@@ -320,10 +327,8 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   return { data, status, latencyMs: Date.now() - startMs }
 }
 
-type SupabaseClient = ReturnType<typeof createServiceClient>
-
 async function logCall(
-  supabase: SupabaseClient,
+  supabase: SupabaseServiceClient,
   model: Record<string, unknown>,
   callerType: 'human' | 'agent',
   agentId: string | null,

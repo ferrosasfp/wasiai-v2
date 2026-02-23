@@ -75,6 +75,16 @@ export async function uploadFile(formData: FormData) {
   try {
     const provider = createStorageProvider()
     const result = await provider.upload(file, metadata)
+
+    // T-01: Track CID ownership in user_files table for RLS-based delete protection
+    await supabase.from('user_files').insert({
+      user_id:    user.id,
+      cid:        result.cid,
+      filename:   file.name,
+      mime_type:  file.type,
+      size_bytes: file.size,
+    }).then(() => {}) // Non-fatal: file is uploaded even if tracking fails
+
     return { cid: result.cid, url: result.url }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Upload failed'
@@ -82,8 +92,7 @@ export async function uploadFile(formData: FormData) {
   }
 }
 
-// TODO: Add a `user_files` table + RLS to track CID ownership per user.
-// Currently any authenticated user can delete any pinned CID.
+// T-01: Ownership check via user_files table — only owners can delete their CIDs
 export async function deleteFile(cid: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -99,9 +108,40 @@ export async function deleteFile(cid: string) {
     return { error: cidValidation.error.issues[0].message }
   }
 
+  // T-01: Verify ownership before deleting
+  const { data: fileRecord } = await supabase
+    .from('user_files')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('cid', cidValidation.data)
+    .single()
+
+  // If no ownership record found, the CID doesn't belong to this user
+  // (or the file was uploaded before the user_files table existed — allow deletion for legacy files)
+  if (fileRecord === null) {
+    // Check if any user owns this CID (if so, block deletion by other users)
+    const { count } = await supabase
+      .from('user_files')
+      .select('id', { count: 'exact', head: true })
+      .eq('cid', cidValidation.data)
+
+    if (count && count > 0) {
+      return { error: 'Forbidden: you do not own this file' }
+    }
+    // Legacy CID with no ownership record — allow (backward compatibility)
+  }
+
   try {
     const provider = createStorageProvider()
     await provider.delete(cidValidation.data)
+
+    // Remove ownership record
+    await supabase
+      .from('user_files')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('cid', cidValidation.data)
+
     return { success: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Delete failed'

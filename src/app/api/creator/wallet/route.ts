@@ -1,7 +1,12 @@
-import { NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { validateCsrf } from '@/lib/security/csrf'
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // S-02: CSRF protection — validate request origin
+  const csrfError = validateCsrf(req)
+  if (csrfError) return csrfError
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

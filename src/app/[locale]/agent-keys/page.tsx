@@ -48,13 +48,23 @@ export default function AgentKeysPage() {
     setCreating(false)
   }
 
+  // T-05: Wrapped in try/catch to surface errors instead of silently failing
   async function handleRevoke(id: string) {
-    await fetch('/api/agent-keys', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    })
-    loadKeys()
+    try {
+      const res = await fetch('/api/agent-keys', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        console.error('[handleRevoke] failed:', data)
+      }
+    } catch (err) {
+      console.error('[handleRevoke] network error:', err)
+    } finally {
+      loadKeys()
+    }
   }
 
   function copyKey(key: string) {

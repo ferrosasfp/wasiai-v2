@@ -21,6 +21,7 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji } from 'viem/chains'
+import { logger } from '@/lib/logger'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -208,12 +209,12 @@ export async function settlePaymentDirectly(
       return { verified: true, settled: false, error: `Transaction reverted (${txHash})` }
     }
 
-    console.log(`[settler] USDC transfer confirmed: ${txHash}`)
+    logger.info('[settler] USDC transfer confirmed', { txHash })
     return { verified: true, settled: true, transactionHash: txHash }
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error('[settler] error:', msg)
+    logger.error('[settler] settlement error', { msg })
     return { verified: false, settled: false, error: msg }
   }
 }

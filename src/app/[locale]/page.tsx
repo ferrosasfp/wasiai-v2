@@ -2,8 +2,8 @@ import { Suspense } from 'react'
 import { setRequestLocale } from 'next-intl/server'
 import Link from 'next/link'
 
-// PERF-03: ISR — revalidate every 60 seconds
-export const revalidate = 60
+// P-10: ISR — revalidate every 5 minutes (increased from 60s)
+export const revalidate = 300
 
 import { getModels } from '@/features/models/services/models.service'
 import { ModelCard } from '@/features/models/components/ModelCard'
@@ -141,8 +141,8 @@ export default async function HomePage({ params, searchParams }: Props) {
           ) : (
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {models.map((model) => (
-                  <ModelCard key={model.id} model={model} locale={locale} />
+                {models.map((model, i) => (
+                  <ModelCard key={model.id} model={model} locale={locale} index={i} />
                 ))}
               </div>
 

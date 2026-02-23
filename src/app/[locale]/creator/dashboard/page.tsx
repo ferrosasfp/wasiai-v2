@@ -1,9 +1,10 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { getPendingEarnings } from '@/lib/contracts/marketplaceClient'
-import { WithdrawButton } from './WithdrawButton'
-import { WalletSetup } from './WalletSetup'
+// WithdrawButton and WalletSetup are used inside EarningsSection sub-component
+// A-02: Sub-component with Suspense for streaming — async blockchain call isolated
+import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection'
 
 interface ModelRow {
   id: string
@@ -34,19 +35,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale ?? 'en'}/login`)
 
-  // Fetch creator profile (wallet)
-  const { data: profile } = await supabase
-    .from('creator_profiles')
-    .select('wallet_address')
-    .eq('id', user.id)
-    .single()
-
-  // Fetch pending on-chain earnings
-  const pendingOnChain = profile?.wallet_address
-    ? await getPendingEarnings(profile.wallet_address).catch(() => 0)
-    : 0
-
-  // Fetch creator's models
+  // P-01 + A-02: Fetch models only; earnings/wallet fetched inside EarningsSection (Suspense)
   const { data: models } = await supabase
     .from('agents')
     .select('id, name, slug, category, status, price_per_call, total_calls, total_revenue, created_at')
@@ -54,25 +43,25 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
     .order('total_calls', { ascending: false })
 
   const safeModels: ModelRow[] = models ?? []
+  const modelIds = safeModels.map(m => m.id)
+
+  // Recent calls — fetched in parallel with above (independent query)
+  const serviceClient = createServiceClient()
+  const recentCallsData = modelIds.length > 0
+    ? await serviceClient
+        .from('agent_calls')
+        .select('id, agent_id, caller_type, amount_paid, status, latency_ms, called_at, agent:agents(name, slug)')
+        .in('agent_id', modelIds)
+        .order('called_at', { ascending: false })
+        .limit(20)
+    : { data: [] }
+
+  const recentCalls: CallRow[] = (recentCallsData.data as unknown as CallRow[]) ?? []
 
   // Aggregate stats
   const totalCalls = safeModels.reduce((s, m) => s + (m.total_calls ?? 0), 0)
   const totalRevenue = safeModels.reduce((s, m) => s + Number(m.total_revenue ?? 0), 0)
   const activeModels = safeModels.filter(m => m.status === 'active').length
-
-  // Fetch last 20 calls across all creator models (service client to avoid RLS issues)
-  const modelIds = safeModels.map(m => m.id)
-  let recentCalls: CallRow[] = []
-  if (modelIds.length > 0) {
-    const serviceClient = createServiceClient()
-    const { data: calls } = await serviceClient
-      .from('agent_calls')
-      .select('id, agent_id, caller_type, amount_paid, status, latency_ms, called_at, agent:agents(name, slug)')
-      .in('agent_id', modelIds)
-      .order('called_at', { ascending: false })
-      .limit(20)
-    recentCalls = (calls as unknown as CallRow[]) ?? []
-  }
 
   return (
     <main className="min-h-screen bg-gray-50 px-6 py-10">
@@ -97,38 +86,10 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
           />
         </div>
 
-        {/* On-chain Earnings Withdrawal */}
-        <section className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-purple-50 p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-semibold text-gray-900">On-chain Earnings</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Your USDC earnings accumulated in{' '}
-                <a
-                  href={`https://${Number(process.env.NEXT_PUBLIC_CHAIN_ID) === 43114 ? '' : 'testnet.'}snowscan.xyz/address/${process.env.NEXT_PUBLIC_MARKETPLACE_CONTRACT_ADDRESS}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-500 hover:underline"
-                >
-                  WasiAIMarketplace.sol
-                </a>
-              </p>
-              <WalletSetup initialWallet={profile?.wallet_address ?? null} />
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-3xl font-bold text-indigo-700">
-                  ${pendingOnChain.toFixed(2)}
-                </p>
-                <p className="text-xs text-gray-500">USDC available</p>
-              </div>
-              <WithdrawButton
-                pending={pendingOnChain}
-                hasWallet={!!profile?.wallet_address}
-              />
-            </div>
-          </div>
-        </section>
+        {/* A-02: On-chain Earnings with Suspense — blockchain RPC doesn't block page render */}
+        <Suspense fallback={<EarningsSkeleton />}>
+          <EarningsSection userId={user.id} />
+        </Suspense>
 
         {/* Models table */}
         <section>

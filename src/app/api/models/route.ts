@@ -1,26 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { z } from 'zod'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
-
-const createModelSchema = z.object({
-  name: z.string().min(3),
-  slug: z.string().min(3).regex(/^[a-z0-9-]+$/),
-  description: z.string().optional(),
-  category: z.enum(['nlp', 'vision', 'audio', 'code', 'multimodal', 'data']),
-  price_per_call: z.number().min(0.01).max(100),
-  endpoint_url: z.string().url(),
-  capabilities: z.array(z.object({
-    name: z.string(),
-    description: z.string(),
-    inputType: z.string(),
-    outputType: z.string(),
-  })).optional().default([]),
-  cover_image: z.string().url().optional().nullable(),
-})
+import { validateCsrf } from '@/lib/security/csrf'
+// A-07: Use shared schema to keep client/server validation in sync
+import { createModelSchema } from '@/lib/schemas/model.schema'
 
 export async function POST(request: NextRequest) {
+  // S-02: CSRF protection
+  const csrfError = validateCsrf(request)
+  if (csrfError) return csrfError
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

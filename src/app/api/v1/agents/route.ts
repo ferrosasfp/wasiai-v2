@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-agent-key',
-    'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+    // P-09: Increased CDN cache time for better performance
+    'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
   }
 
   // PERF-05: slim mode — separate query for lightweight response
