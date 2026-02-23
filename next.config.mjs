@@ -17,7 +17,7 @@ const securityHeaders = [
       "default-src 'self'",
       isDev
         ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-        : "script-src 'self'",
+        : "script-src 'self' 'unsafe-inline'", // Next.js requires unsafe-inline for hydration scripts; unsafe-eval only in dev
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self'",
