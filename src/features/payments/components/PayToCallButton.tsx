@@ -251,7 +251,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Result</p>
             {txHash && (
               <a
-                href={`https://snowtrace.io/tx/${txHash}`}
+                href={`https://${AVALANCHE_CHAIN_ID === 43113 ? 'testnet.' : ''}snowtrace.io/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-indigo-500 hover:underline"
