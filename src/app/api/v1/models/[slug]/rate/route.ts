@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     .from('agents')
     .select('id, reputation_score, reputation_count')
     .eq('slug', slug)
-    .eq('is_active', true)
+    .eq('status', 'active')
     .single()
 
   if (agentErr || !agent) {
@@ -104,6 +104,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     .from('agents')
     .select('id, reputation_score, reputation_count')
     .eq('slug', slug)
+    .eq('status', 'active')
     .single()
 
   if (!agent) return NextResponse.json({ error: 'Not found' }, { status: 404 })
