@@ -22,10 +22,10 @@ function getChain() {
 }
 
 function getOperatorClient() {
-  const pk = process.env.OPERATOR_PRIVATE_KEY
-  if (!pk) throw new Error('OPERATOR_PRIVATE_KEY not set')
-
-  const account = privateKeyToAccount(`0x${pk}` as `0x${string}`)
+  const pkRaw = process.env.OPERATOR_PRIVATE_KEY
+  if (!pkRaw) throw new Error('OPERATOR_PRIVATE_KEY not set')
+  const pkHex = pkRaw.trim().replace(/^0x/i, '')
+  const account = privateKeyToAccount(`0x${pkHex}` as `0x${string}`)
   const chain   = getChain()
 
   return {

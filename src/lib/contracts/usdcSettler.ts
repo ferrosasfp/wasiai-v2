@@ -157,10 +157,11 @@ export async function settlePaymentDirectly(
     }
 
     // ── 4. Execute transferWithAuthorization via operator wallet ────────────
-    const pk = process.env.OPERATOR_PRIVATE_KEY
-    if (!pk) throw new Error('OPERATOR_PRIVATE_KEY not set')
-
-    const account = privateKeyToAccount(`0x${pk}` as `0x${string}`)
+    const pkRaw = process.env.OPERATOR_PRIVATE_KEY
+    if (!pkRaw) throw new Error('OPERATOR_PRIVATE_KEY not set')
+    // Normalize: strip whitespace and 0x prefix if already present
+    const pkHex = pkRaw.trim().replace(/^0x/i, '')
+    const account = privateKeyToAccount(`0x${pkHex}` as `0x${string}`)
     const chain   = IS_FUJI ? avalancheFuji : avalanche
     const rpcUrl  = RPC[CHAIN_ID] ?? ''
 
