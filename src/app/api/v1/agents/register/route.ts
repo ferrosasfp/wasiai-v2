@@ -29,7 +29,7 @@ import { createClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
-import { CHAIN_NAME, CHAIN_NETWORKS } from '@/lib/chain'
+import { CHAIN_NAME } from '@/lib/chain'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
