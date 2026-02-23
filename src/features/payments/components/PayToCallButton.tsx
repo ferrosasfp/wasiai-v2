@@ -165,7 +165,11 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
 
       if (!paid.ok) {
         const err = await paid.json()
-        throw new Error(err.error ?? `Error ${paid.status}`)
+        console.error('[x402] payment failed:', JSON.stringify(err))
+        const msg = err.reason
+          ? `${err.error}: ${err.reason}`
+          : (err.error ?? `Error ${paid.status}`)
+        throw new Error(msg)
       }
 
       const data = await paid.json()

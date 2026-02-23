@@ -7,6 +7,7 @@ import {
   X402_CORS_HEADERS,
 } from 'uvd-x402-sdk/backend'
 import { recordInvocationOnChain } from '@/lib/contracts/marketplaceClient'
+import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
@@ -164,24 +165,45 @@ export async function POST(
     )
   }
 
-  // ── 4. Verify + Settle via Ultravioleta DAO facilitator ───────────────────
-  const requirements = buildRequirements({
-    amount: priceStr,
-    recipient: CONTRACT_ADDRESS,
-    resource: resourceUrl,
-    description: `Access to ${model.name} on WasiAI`,
-    mimeType: 'application/json',
-  })
+  // ── 4. Verify + Settle ────────────────────────────────────────────────────
+  // Mainnet: delegate to UVD facilitator (supports 'avalanche' chain name)
+  // Fuji testnet: self-verify + execute transferWithAuthorization directly
+  //   (UVD facilitator /verify endpoint does not accept 'avalanche-testnet')
 
-  const facilitator = new FacilitatorClient({ baseUrl: FACILITATOR_URL })
-  const settlement = await facilitator.verifyAndSettle(paymentHeader, requirements)
+  let settlement: { verified: boolean; settled: boolean; transactionHash?: string; error?: string }
+
+  if (CHAIN_ID_NUM === 43113) {
+    // Fuji — self-settle
+    const evmPayload = paymentHeader?.payload as X402EVMPayload | undefined
+    if (!evmPayload?.authorization || !evmPayload?.signature) {
+      return NextResponse.json(
+        { error: 'Invalid payment header', code: 'payment_invalid' },
+        { status: 402 },
+      )
+    }
+    const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
+    settlement = await settlePaymentDirectly(evmPayload, atomicRequired)
+  } else {
+    // Mainnet — use UVD facilitator
+    const requirements = buildRequirements({
+      amount: priceStr,
+      recipient: CONTRACT_ADDRESS,
+      resource: resourceUrl,
+      description: `Access to ${model.name} on WasiAI`,
+      mimeType: 'application/json',
+    })
+    const facilitator = new FacilitatorClient({ baseUrl: FACILITATOR_URL })
+    settlement = await facilitator.verifyAndSettle(paymentHeader, requirements)
+  }
 
   if (!settlement.verified) {
+    console.error('[invoke] payment verification failed:', JSON.stringify(settlement))
     return NextResponse.json(
       {
         error: 'Payment verification failed',
         code: 'payment_invalid',
         reason: settlement.error,
+        debug: { chain: CHAIN, usdc: USDC_ADDR, contract: CONTRACT_ADDRESS },
       },
       { status: 402 },
     )
