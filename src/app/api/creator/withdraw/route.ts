@@ -40,20 +40,25 @@ export async function POST() {
 
   const wallet = profile.wallet_address
 
-  // Check pending earnings
-  const pending = await getPendingEarnings(wallet)
+  // Check pending earnings — skip balance check if RPC unavailable (let contract revert naturally)
+  let pending = 0
+  try {
+    pending = await getPendingEarnings(wallet)
+  } catch (err) {
+    console.error('[withdraw] getPendingEarnings failed:', err)
+    // Proceed anyway — withdrawFor will revert on-chain if truly empty
+  }
+
   if (pending <= 0) {
-    return NextResponse.json(
-      { error: 'No pending earnings to withdraw', pending: 0 },
-      { status: 400 },
-    )
+    // Double-check: let the contract try anyway (RPC read might have failed)
+    console.warn('[withdraw] pending=0 — attempting withdrawFor regardless')
   }
 
   // Trigger on-chain withdrawal via operator
   const txHash = await withdrawForCreator(wallet)
   if (!txHash) {
     return NextResponse.json(
-      { error: 'Withdrawal failed — contract not configured or transaction reverted' },
+      { error: 'Withdrawal failed — contract not configured or no pending earnings' },
       { status: 500 },
     )
   }

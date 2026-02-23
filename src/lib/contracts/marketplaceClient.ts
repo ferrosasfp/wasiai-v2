@@ -28,24 +28,15 @@ function getOperatorClient() {
   const account = privateKeyToAccount(`0x${pkHex}` as `0x${string}`)
   const chain   = getChain()
 
+  // Trim to prevent whitespace bugs (Vercel env vars can have trailing \n)
+  const rpcUrl = (chain.id === 43114
+    ? process.env.NEXT_PUBLIC_RPC_MAINNET
+    : process.env.NEXT_PUBLIC_RPC_TESTNET
+  )?.trim() || undefined
+
   return {
-    wallet: createWalletClient({
-      account,
-      chain,
-      transport: http(
-        chain.id === 43114
-          ? process.env.NEXT_PUBLIC_RPC_MAINNET
-          : process.env.NEXT_PUBLIC_RPC_TESTNET,
-      ),
-    }),
-    public: createPublicClient({
-      chain,
-      transport: http(
-        chain.id === 43114
-          ? process.env.NEXT_PUBLIC_RPC_MAINNET
-          : process.env.NEXT_PUBLIC_RPC_TESTNET,
-      ),
-    }),
+    wallet: createWalletClient({ account, chain, transport: http(rpcUrl) }),
+    public: createPublicClient({ chain, transport: http(rpcUrl) }),
     account,
   }
 }
@@ -155,7 +146,14 @@ export async function registerAgentOnChain({
  */
 export async function withdrawForCreator(creatorWallet: string): Promise<string | null> {
   const contractAddress = getContractAddress()
-  if (!contractAddress) return null
+  if (!contractAddress) {
+    console.error('[marketplace] withdrawFor: MARKETPLACE_CONTRACT_ADDRESS not set')
+    return null
+  }
+
+  const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+  const rpc     = chainId === 43114 ? process.env.NEXT_PUBLIC_RPC_MAINNET : process.env.NEXT_PUBLIC_RPC_TESTNET
+  console.log(`[marketplace] withdrawFor chainId=${chainId} rpc=${rpc ?? 'chain-default'} contract=${contractAddress}`)
 
   try {
     const { wallet, public: pub, account } = getOperatorClient()
@@ -170,9 +168,11 @@ export async function withdrawForCreator(creatorWallet: string): Promise<string 
 
     const txHash = await wallet.writeContract(request)
     console.log(`[marketplace] withdrawFor(${creatorWallet}) tx: ${txHash}`)
+    const receipt = await pub.waitForTransactionReceipt({ hash: txHash as `0x${string}`, timeout: 30_000 })
+    console.log(`[marketplace] withdrawFor confirmed: ${receipt.status}`)
     return txHash
   } catch (err) {
-    console.error('[marketplace] withdrawFor failed:', err)
+    console.error('[marketplace] withdrawFor failed:', String(err).slice(0, 300))
     return null
   }
 }
@@ -182,7 +182,10 @@ export async function withdrawForCreator(creatorWallet: string): Promise<string 
  */
 export async function getPendingEarnings(creatorWallet: string): Promise<number> {
   const contractAddress = getContractAddress()
-  if (!contractAddress) return 0
+  if (!contractAddress) {
+    console.warn('[marketplace] getPendingEarnings: contract not configured')
+    return 0
+  }
 
   try {
     const { public: pub } = getOperatorClient()
@@ -192,8 +195,11 @@ export async function getPendingEarnings(creatorWallet: string): Promise<number>
       functionName: 'getPendingEarnings',
       args:         [creatorWallet as Address],
     }) as bigint
-    return Number(atomics) / 1_000_000
-  } catch {
+    const result = Number(atomics) / 1_000_000
+    console.log(`[marketplace] getPendingEarnings(${creatorWallet.slice(0,8)}...) = $${result}`)
+    return result
+  } catch (err) {
+    console.error('[marketplace] getPendingEarnings failed:', String(err).slice(0, 200))
     return 0
   }
 }
