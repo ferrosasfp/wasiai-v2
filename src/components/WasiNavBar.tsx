@@ -71,20 +71,22 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
           <Link
             href={`/${locale}`}
             aria-label="WasiAI — go to homepage"
-            className="flex items-center gap-1.5 shrink-0"
+            className="flex items-center gap-2 shrink-0"
           >
-            {/* Icon mark */}
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect width="32" height="32" rx="8" fill="#E84142"/>
-              <polyline points="5,8 9.5,22 16,11 22.5,22 27,8" stroke="white" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-              <circle cx="5"  cy="8"  r="1.8" fill="white"/>
-              <circle cx="16" cy="11" r="1.8" fill="white"/>
-              <circle cx="27" cy="8"  r="1.8" fill="white"/>
-              <circle cx="9.5" cy="22" r="1.4" fill="rgba(255,255,255,0.65)"/>
-              <circle cx="22.5" cy="22" r="1.4" fill="rgba(255,255,255,0.65)"/>
+            {/* Icon mark — house with double gable (W = Wasi) + AI nodes */}
+            <svg width="30" height="30" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="48" height="48" rx="12" fill="#E84142"/>
+              <rect x="7" y="27" width="34" height="16" rx="1.5" fill="white"/>
+              <rect x="19" y="31" width="10" height="12" rx="2" fill="#E84142"/>
+              <polyline points="3,27 13,10 24,20 35,10 45,27" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              <circle cx="13" cy="10" r="2.8" fill="white"/>
+              <circle cx="35" cy="10" r="2.8" fill="white"/>
+              <circle cx="24" cy="20" r="2"   fill="rgba(255,255,255,0.7)"/>
+              <circle cx="3"  cy="27" r="1.6" fill="rgba(255,255,255,0.45)"/>
+              <circle cx="45" cy="27" r="1.6" fill="rgba(255,255,255,0.45)"/>
             </svg>
             {/* Wordmark */}
-            <span className="text-lg font-extrabold text-gray-900 tracking-tight">
+            <span className="text-lg font-extrabold tracking-tight text-gray-900">
               Wasi<span className="text-avax-500">AI</span>
             </span>
           </Link>
