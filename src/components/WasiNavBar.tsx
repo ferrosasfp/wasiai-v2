@@ -71,15 +71,22 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
           <Link
             href={`/${locale}`}
             aria-label="WasiAI — go to homepage"
-            className="flex items-center gap-2 text-lg font-extrabold text-gray-900 shrink-0"
+            className="flex items-center gap-1.5 shrink-0"
           >
-            <span
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-avax-500 text-sm text-white"
-              aria-hidden="true"
-            >
-              W
+            {/* Icon mark */}
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="32" height="32" rx="8" fill="#E84142"/>
+              <polyline points="5,8 9.5,22 16,11 22.5,22 27,8" stroke="white" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              <circle cx="5"  cy="8"  r="1.8" fill="white"/>
+              <circle cx="16" cy="11" r="1.8" fill="white"/>
+              <circle cx="27" cy="8"  r="1.8" fill="white"/>
+              <circle cx="9.5" cy="22" r="1.4" fill="rgba(255,255,255,0.65)"/>
+              <circle cx="22.5" cy="22" r="1.4" fill="rgba(255,255,255,0.65)"/>
+            </svg>
+            {/* Wordmark */}
+            <span className="text-lg font-extrabold text-gray-900 tracking-tight">
+              Wasi<span className="text-avax-500">AI</span>
             </span>
-            WasiAI
           </Link>
 
           {/* Desktop nav */}

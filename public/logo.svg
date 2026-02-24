@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
+  <!-- Icon mark: rounded square with W + node dots -->
+  <rect width="48" height="48" rx="12" fill="#E84142"/>
+
+  <!-- W shape: two V strokes forming W -->
+  <polyline
+    points="10,13 16,35 24,18 32,35 38,13"
+    stroke="white"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  <!-- Node dots at peaks of W -->
+  <circle cx="10" cy="13" r="2.5" fill="white"/>
+  <circle cx="24" cy="18" r="2.5" fill="white"/>
+  <circle cx="38" cy="13" r="2.5" fill="white"/>
+  <!-- Bottom node dots -->
+  <circle cx="16" cy="35" r="2" fill="rgba(255,255,255,0.6)"/>
+  <circle cx="32" cy="35" r="2" fill="rgba(255,255,255,0.6)"/>
+
+  <!-- Wordmark: WasiAI -->
+  <text
+    x="60"
+    y="20"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+    font-size="17"
+    font-weight="800"
+    fill="#111827"
+    letter-spacing="-0.3"
+  >Wasi</text>
+  <text
+    x="104"
+    y="20"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+    font-size="17"
+    font-weight="800"
+    fill="#E84142"
+    letter-spacing="-0.3"
+  >AI</text>
+
+  <!-- Tagline -->
+  <text
+    x="60"
+    y="36"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+    font-size="9"
+    font-weight="500"
+    fill="#6b7280"
+    letter-spacing="0.5"
+  >AGENT MARKETPLACE · AVALANCHE</text>
+</svg>
