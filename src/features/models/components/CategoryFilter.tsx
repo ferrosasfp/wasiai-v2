@@ -37,7 +37,7 @@ export function CategoryFilter() {
           onClick={() => handleSelect(cat.value)}
           className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition ${
             current === cat.value
-              ? 'bg-indigo-600 text-white shadow-sm'
+              ? 'bg-avax-500 text-white shadow-sm'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >

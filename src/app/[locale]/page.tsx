@@ -49,45 +49,65 @@ export default async function HomePage({ params, searchParams }: Props) {
     <main className="min-h-screen bg-gray-50">
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 px-6 py-20 text-white">
+      <section className="bg-white border-b border-gray-100 px-6 py-16">
         <div className="mx-auto max-w-4xl text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm backdrop-blur">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-avax-50 border border-avax-100 px-4 py-1.5 text-sm text-avax-600 font-medium">
             <span>⚡</span>
-            <span>The marketplace for the agentic economy</span>
+            <span>Built on Avalanche · x402 native payments</span>
           </div>
-          <h1 className="text-5xl font-extrabold tracking-tight">WasiAI</h1>
-          <p className="mt-4 text-xl text-white/80">
-            AI agents discover, pay, and call models autonomously.<br />
-            x402 native payments on Avalanche. No subscriptions. No friction.
+          <h1 className="text-5xl font-extrabold tracking-tight text-gray-900">
+            The marketplace where<br />
+            <span className="text-avax-500">AI agents do business</span>
+          </h1>
+          <p className="mt-5 text-lg text-gray-500 max-w-2xl mx-auto">
+            Discover, pay, and invoke AI models autonomously.
+            No subscriptions. No friction. 90% of every call goes to creators.
           </p>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a
               href="#models"
-              className="rounded-full bg-white px-6 py-3 font-semibold text-indigo-600 shadow hover:bg-indigo-50 transition"
+              className="rounded-full bg-avax-500 px-7 py-3 font-semibold text-white shadow-sm hover:bg-avax-600 transition"
             >
               Browse Models
             </a>
             <Link
               href={`/${locale}/publish`}
-              className="rounded-full border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10 transition"
+              className="rounded-full border border-gray-300 px-7 py-3 font-semibold text-gray-700 hover:bg-gray-50 transition"
             >
               Publish a Model →
             </Link>
           </div>
 
           {/* Dual audience pills */}
-          <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs text-white/60">
-            <span className="rounded-full border border-white/20 px-3 py-1">🤖 For AI agents</span>
-            <span className="rounded-full border border-white/20 px-3 py-1">👩‍💻 For developers</span>
-            <span className="rounded-full border border-white/20 px-3 py-1">💰 For model creators</span>
+          <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs text-gray-400">
+            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">🤖 For AI agents</span>
+            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">👩‍💻 For developers</span>
+            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">💰 For model creators</span>
           </div>
+        </div>
+      </section>
 
-          <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-white/70">
-            <div><span className="block text-3xl font-bold text-white">x402</span>Native payments</div>
-            <div><span className="block text-3xl font-bold text-white">$0.02</span>Min. per call</div>
-            <div><span className="block text-3xl font-bold text-white">90%</span>To creators</div>
-            <div><span className="block text-3xl font-bold text-white">ERC-8004</span>Agent identity</div>
+      {/* ── Stats bar ────────────────────────────────────────────────────── */}
+      <section className="bg-gray-50 border-b border-gray-100 px-6 py-8">
+        <div className="mx-auto max-w-4xl">
+          <div className="flex flex-wrap justify-center gap-8 text-center text-sm text-gray-500">
+            <div>
+              <span className="block text-2xl font-extrabold text-avax-500">x402</span>
+              Native payments
+            </div>
+            <div>
+              <span className="block text-2xl font-extrabold text-gray-900">$0.02</span>
+              Min. per call
+            </div>
+            <div>
+              <span className="block text-2xl font-extrabold text-gray-900">90%</span>
+              To creators
+            </div>
+            <div>
+              <span className="block text-2xl font-extrabold text-avax-500">ERC-8004</span>
+              Agent identity
+            </div>
           </div>
         </div>
       </section>
@@ -125,14 +145,14 @@ export default async function HomePage({ params, searchParams }: Props) {
                     Clear filters
                   </Link>
                   {!search && category && (
-                    <Link href={`/${locale}`} className="rounded-full bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-100 transition">
+                    <Link href={`/${locale}`} className="rounded-full bg-avax-50 px-4 py-2 text-sm font-medium text-avax-600 hover:bg-avax-100 transition">
                       Browse all categories
                     </Link>
                   )}
                 </div>
               ) : (
                 <div className="mt-4 flex flex-wrap justify-center gap-3">
-                  <Link href={`/${locale}/publish`} className="rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                  <Link href={`/${locale}/publish`} className="rounded-full bg-avax-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition">
                     Be the first to publish →
                   </Link>
                 </div>
@@ -189,7 +209,7 @@ export default async function HomePage({ params, searchParams }: Props) {
       <section className="bg-gray-900 px-6 py-16 text-white">
         <div className="mx-auto max-w-4xl">
           <div className="mb-10 text-center">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-4 py-1.5 text-sm text-indigo-300">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-avax-500/20 px-4 py-1.5 text-sm text-avax-300">
               <span>🤖</span><span>Coinbase AgentKit compatible</span>
             </div>
             <h2 className="text-3xl font-bold">Built for the Agentic Economy</h2>
@@ -231,7 +251,7 @@ x-agent-key: wasi_xxx
           <div className="flex flex-wrap justify-center gap-4">
             <Link
               href={`/${locale}/agent-keys`}
-              className="rounded-full bg-indigo-500 px-6 py-2.5 font-semibold hover:bg-indigo-400 transition"
+              className="rounded-full bg-avax-500 px-6 py-2.5 font-semibold hover:bg-avax-600 transition"
             >
               Get Agent Key →
             </Link>
@@ -260,7 +280,7 @@ function SearchInput({ defaultValue, category }: { defaultValue?: string; catego
         name="search"
         defaultValue={defaultValue}
         placeholder="Search models..."
-        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm focus:border-indigo-400 focus:outline-none sm:w-52"
+        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm focus:border-avax-400 focus:outline-none sm:w-52"
       />
     </form>
   )

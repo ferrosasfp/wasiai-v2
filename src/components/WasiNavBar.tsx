@@ -74,7 +74,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             className="flex items-center gap-2 text-lg font-extrabold text-gray-900 shrink-0"
           >
             <span
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-sm text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-avax-500 text-sm text-white"
               aria-hidden="true"
             >
               W
@@ -92,7 +92,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                 aria-current={isActive(href) ? 'page' : undefined}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive(href)
-                    ? 'bg-indigo-50 text-indigo-600'
+                    ? 'bg-avax-50 text-avax-600'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
@@ -127,7 +127,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                 </Link>
                 <Link
                   href={`/${locale}/signup`}
-                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+                  className="rounded-lg bg-avax-500 px-4 py-1.5 text-sm font-semibold text-white hover:bg-avax-600 transition"
                 >
                   Sign up
                 </Link>
@@ -165,7 +165,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                 aria-current={isActive(href) ? 'page' : undefined}
                 className={`block rounded-lg px-3 py-2 text-sm font-medium ${
                   isActive(href)
-                    ? 'bg-indigo-50 text-indigo-600'
+                    ? 'bg-avax-50 text-avax-600'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -195,7 +195,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                   </Link>
                   <Link
                     href={`/${locale}/signup`}
-                    className="flex-1 rounded-lg bg-indigo-600 py-2 text-center text-sm font-semibold text-white"
+                    className="flex-1 rounded-lg bg-avax-500 py-2 text-center text-sm font-semibold text-white"
                   >
                     Sign up
                   </Link>

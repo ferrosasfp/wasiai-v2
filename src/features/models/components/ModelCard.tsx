@@ -5,10 +5,10 @@ import type { Model } from '../types/models.types'
 
 const CATEGORY_COLORS: Record<string, string> = {
   nlp:        'bg-blue-100 text-blue-700',
-  vision:     'bg-purple-100 text-purple-700',
+  vision:     'bg-orange-100 text-orange-700',
   audio:      'bg-green-100 text-green-700',
   code:       'bg-orange-100 text-orange-700',
-  multimodal: 'bg-pink-100 text-pink-700',
+  multimodal: 'bg-yellow-100 text-yellow-700',
   data:       'bg-yellow-100 text-yellow-700',
 }
 
@@ -35,7 +35,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: M
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg shrink-0 overflow-hidden">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-avax-400 to-avax-600 text-lg shrink-0 overflow-hidden">
             {model.cover_image ? (
               // P-04: sizes avoids downloading unnecessarily large images; priority for LCP candidates
               <Image
@@ -51,7 +51,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: M
             )}
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors truncate">
+            <h3 className="font-semibold text-gray-900 group-hover:text-avax-600 transition-colors truncate">
               {model.name}
             </h3>
             {model.creator && (
@@ -93,7 +93,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: M
         <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
           <span className="shrink-0">⚡ {remaining.toLocaleString('en-US')} calls</span>
           {model.is_featured && (
-            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-600 font-medium shrink-0">Featured</span>
+            <span className="rounded-full bg-avax-50 px-2 py-0.5 text-avax-600 font-medium shrink-0">Featured</span>
           )}
           {model.reputation_score !== null && model.reputation_count > 0 && (
             <span className="inline-flex items-center gap-1 shrink-0 text-green-600 font-medium">
@@ -113,7 +113,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: M
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400" />
           Avalanche · x402
         </span>
-        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+        <span className="rounded-full bg-avax-50 px-3 py-1 text-xs font-semibold text-avax-600 group-hover:bg-avax-500 group-hover:text-white transition-colors">
           Try →
         </span>
       </div>
