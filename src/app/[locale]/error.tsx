@@ -38,7 +38,7 @@ export default function ErrorPage({ error, reset }: Props) {
         <button
           type="button"
           onClick={reset}
-          className="mt-6 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          className="mt-6 rounded-lg bg-avax-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-avax-600 focus:outline-none focus:ring-2 focus:ring-avax-400 focus:ring-offset-2"
         >
           {t('tryAgain')}
         </button>

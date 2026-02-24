@@ -23,7 +23,7 @@ function CheckEmailContent() {
         <p className="text-gray-600">{t('checkEmailMessage')}</p>
         <Link
           href="/login"
-          className="inline-block text-blue-600 hover:underline"
+          className="inline-block text-avax-600 hover:underline"
         >
           {t('backToLogin')}
         </Link>

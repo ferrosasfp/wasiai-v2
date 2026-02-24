@@ -34,11 +34,14 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
   const explorerBase = IS_MAINNET ? 'snowscan.xyz' : 'testnet.snowscan.xyz'
 
   return (
-    <section className="rounded-2xl border border-avax-100 bg-gradient-to-br from-avax-500 to-avax-700 p-6">
+    <section className="rounded-2xl border border-gray-200 bg-white p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-semibold text-gray-900">On-chain Earnings</h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-block h-2 w-2 rounded-full bg-avax-500" />
+            <h2 className="font-semibold text-gray-900">On-chain Earnings</h2>
+          </div>
+          <p className="text-sm text-gray-500">
             Your USDC earnings accumulated in{' '}
             <a
               href={`https://${explorerBase}/address/${contractAddress}`}
@@ -53,7 +56,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-3xl font-bold text-avax-700">
+            <p className="text-3xl font-bold text-gray-900">
               ${pendingOnChain.toFixed(2)}
             </p>
             <p className="text-xs text-gray-500">USDC available</p>
@@ -73,7 +76,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
  */
 export function EarningsSkeleton() {
   return (
-    <section className="rounded-2xl border border-avax-100 bg-gradient-to-br from-avax-500 to-avax-700 p-6 animate-pulse">
+    <section className="rounded-2xl border border-gray-200 bg-white p-6 animate-pulse">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="h-5 w-40 rounded bg-avax-200/60" />

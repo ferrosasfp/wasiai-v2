@@ -33,7 +33,7 @@ export function TxStatus({ hash }: TxStatusProps) {
         {status === 'pending' && !isWaiting && (
           <button
             onClick={waitForConfirmation}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-avax-600 hover:underline"
           >
             {t('status')}
           </button>

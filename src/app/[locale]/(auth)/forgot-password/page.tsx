@@ -28,7 +28,7 @@ function ForgotPasswordContent() {
         <ForgotPasswordForm />
 
         <p className="text-center text-sm text-gray-600">
-          <Link href="/login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-avax-600 hover:underline">
             {t('backToLogin')}
           </Link>
         </p>

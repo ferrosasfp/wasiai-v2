@@ -58,7 +58,7 @@ export function ConnectWallet() {
       onClick={connectWallet}
       disabled={isConnecting}
       aria-label={isConnecting ? 'Connecting wallet...' : 'Connect your Web3 wallet'}
-      className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+      className="rounded-md bg-avax-500 px-4 py-2 text-white hover:bg-avax-600 disabled:opacity-50"
     >
       {isConnecting ? '...' : t('connect')}
     </button>

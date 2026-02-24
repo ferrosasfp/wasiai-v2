@@ -17,7 +17,7 @@ export function NetworkSwitcher() {
             onClick={() => switchToChain(chain.id)}
             className={`rounded-md px-3 py-1 text-sm ${
               currentChain?.id === chain.id
-                ? 'bg-blue-600 text-white'
+                ? 'bg-avax-500 text-white'
                 : 'border border-gray-300 hover:bg-gray-100'
             }`}
           >

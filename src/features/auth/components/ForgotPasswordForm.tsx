@@ -44,7 +44,7 @@ export function ForgotPasswordForm() {
                     name="email"
                     type="email"
                     required
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-avax-400 focus:outline-none focus:ring-1 focus:ring-avax-400"
                 />
             </div>
 
@@ -55,7 +55,7 @@ export function ForgotPasswordForm() {
             <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                className="w-full rounded-md bg-avax-500 px-4 py-2 text-white hover:bg-avax-600 disabled:opacity-50"
             >
                 {loading ? t('sending') : t('sendResetLink')}
             </button>

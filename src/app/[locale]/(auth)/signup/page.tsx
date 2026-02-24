@@ -29,7 +29,7 @@ function SignupContent() {
 
         <p className="text-center text-sm text-gray-600">
           {t('hasAccount')}{' '}
-          <Link href="/login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-avax-600 hover:underline">
             {t('loginLink')}
           </Link>
         </p>

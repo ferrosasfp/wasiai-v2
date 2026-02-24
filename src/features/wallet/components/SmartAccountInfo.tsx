@@ -38,7 +38,7 @@ export function SmartAccountInfo() {
             type="button"
             onClick={createSmartAccount}
             disabled={!isConnected || isCreating}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-avax-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-avax-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isCreating ? 'Creating...' : 'Create Smart Account'}
           </button>
