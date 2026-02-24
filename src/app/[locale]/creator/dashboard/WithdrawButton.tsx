@@ -52,7 +52,7 @@ export function WithdrawButton({ pending, hasWallet }: Props) {
       <button
         onClick={handleWithdraw}
         disabled={loading || pending <= 0}
-        className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+        className="rounded-xl bg-avax-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {loading ? 'Withdrawing…' : 'Withdraw USDC →'}
       </button>

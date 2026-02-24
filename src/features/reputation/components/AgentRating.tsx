@@ -90,7 +90,7 @@ export function AgentRating({ slug, initialScore, initialCount, compact = false 
       {score !== null && count > 0 && (
         <div className="mb-4 h-1.5 w-full rounded-full bg-gray-100">
           <div
-            className="h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500"
+            className="h-1.5 rounded-full bg-gradient-to-r from-avax-500 to-avax-700 transition-all duration-500"
             style={{ width: `${score}%` }}
           />
         </div>

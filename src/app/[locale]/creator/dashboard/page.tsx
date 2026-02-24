@@ -97,7 +97,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
             <h2 className="font-semibold text-gray-900">Your Models</h2>
             <Link
               href={`/${locale}/publish`}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+              className="rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600 transition"
             >
               + Publish Model
             </Link>
@@ -129,7 +129,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                       <td className="px-6 py-4">
                         <Link
                           href={`/models/${model.slug}`}
-                          className="font-medium text-gray-900 hover:text-indigo-600"
+                          className="font-medium text-gray-900 hover:text-avax-600"
                         >
                           {model.name}
                         </Link>
@@ -231,7 +231,7 @@ Content-Type: application/json
 { "input": "..." }`}</pre>
           <Link
             href={`/${locale}/agent-keys`}
-            className="mt-4 inline-block rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+            className="mt-4 inline-block rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600 transition"
           >
             Manage Agent Keys →
           </Link>
@@ -270,7 +270,7 @@ function StatCard({
 function CategoryBadge({ category }: { category: string }) {
   const colors: Record<string, string> = {
     nlp: 'bg-blue-100 text-blue-700',
-    vision: 'bg-purple-100 text-purple-700',
+    vision: 'bg-avax-500 text-avax-600',
     audio: 'bg-pink-100 text-pink-700',
     code: 'bg-green-100 text-green-700',
     multimodal: 'bg-orange-100 text-orange-700',
@@ -314,7 +314,7 @@ function EmptyState({
       {cta && (
         <Link
           href={cta.href}
-          className="mt-4 inline-block rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+          className="mt-4 inline-block rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600 transition"
         >
           {cta.label}
         </Link>

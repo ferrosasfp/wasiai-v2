@@ -141,7 +141,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
               onClick={() => fileInputRef.current?.click()}
               onDragOver={e => e.preventDefault()}
               onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageUpload(f) }}
-              className="relative flex h-36 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50/30 transition"
+              className="relative flex h-36 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 hover:border-avax-300 hover:bg-avax-50/30 transition"
             >
               {coverImage ? (
                 <>
@@ -155,7 +155,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
                   </button>
                 </>
               ) : uploadingImage ? (
-                <p className="text-sm text-indigo-500 animate-pulse">Uploading to IPFS…</p>
+                <p className="text-sm text-avax-500 animate-pulse">Uploading to IPFS…</p>
               ) : (
                 <div className="text-center">
                   <p className="text-2xl">🖼️</p>
@@ -185,7 +185,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
               value={form.name ?? ''}
               onChange={e => handleChange('name', e.target.value)}
               placeholder="GPT Spanish Translator"
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
             />
             {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
           </div>
@@ -213,7 +213,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
               <select
                 value={form.category}
                 onChange={e => handleChange('category', e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-indigo-400 focus:outline-none"
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none"
               >
                 {MODEL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -243,7 +243,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
               value={form.endpoint_url ?? ''}
               onChange={e => handleChange('endpoint_url', e.target.value)}
               placeholder="https://your-api.com/predict"
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
             />
             {errors.endpoint_url && <p className="mt-1 text-xs text-red-500">{errors.endpoint_url}</p>}
           </div>
@@ -256,7 +256,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
               onChange={e => handleChange('description', e.target.value)}
               placeholder="Describe what your model does, what inputs it accepts and what outputs it returns..."
               rows={4}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
             />
             {errors.description && <p className="mt-1 text-xs text-red-500">{errors.description}</p>}
           </div>
@@ -265,7 +265,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-sm font-medium text-gray-700">Capabilities <span className="text-gray-400 font-normal">(optional)</span></label>
-              <button type="button" onClick={addCapability} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition">
+              <button type="button" onClick={addCapability} className="text-xs font-medium text-avax-600 hover:text-avax-700 transition">
                 + Add Capability
               </button>
             </div>
@@ -285,13 +285,13 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
                       placeholder="Name (e.g. summarize)"
                       value={cap.name}
                       onChange={e => updateCapability(i, 'name', e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-avax-400 focus:outline-none"
                     />
                     <input
                       placeholder="Description"
                       value={cap.description}
                       onChange={e => updateCapability(i, 'description', e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-avax-400 focus:outline-none"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <select value={cap.inputType} onChange={e => updateCapability(i, 'inputType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none">
@@ -308,7 +308,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
           </div>
 
           {/* Revenue info */}
-          <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-700">
+          <div className="rounded-xl bg-avax-50 p-4 text-sm text-avax-700">
             💰 You earn <strong>90%</strong> of every call · WasiAI takes 10% · Paid instantly in USDC
           </div>
 
@@ -317,7 +317,7 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-50"
+            className="w-full rounded-xl bg-avax-500 py-3 font-semibold text-white hover:bg-avax-600 transition disabled:opacity-50"
           >
             {loading ? 'Publishing...' : 'Publish Model →'}
           </button>

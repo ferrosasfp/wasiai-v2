@@ -43,14 +43,14 @@ export default async function ModelDetailPage({ params }: Props) {
             {/* Header */}
             <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
               <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl shrink-0">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-avax-500 to-avax-700 text-2xl shrink-0">
                   🤖
                 </div>
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-bold text-gray-900">{model.name}</h1>
                     {model.is_featured && (
-                      <span className="rounded-full bg-indigo-50 px-3 py-0.5 text-xs font-semibold text-indigo-600">Featured</span>
+                      <span className="rounded-full bg-avax-50 px-3 py-0.5 text-xs font-semibold text-avax-600">Featured</span>
                     )}
                     <span className="rounded-full bg-gray-100 px-3 py-0.5 text-xs font-medium text-gray-600 capitalize">
                       {model.category}
@@ -59,7 +59,7 @@ export default async function ModelDetailPage({ params }: Props) {
                   {model.creator && (
                     <p className="mt-1 text-sm text-gray-500">
                       by <span className="font-medium text-gray-700">@{model.creator.username}</span>
-                      {model.creator.verified && <span className="ml-1 text-indigo-500">✓</span>}
+                      {model.creator.verified && <span className="ml-1 text-avax-500">✓</span>}
                     </p>
                   )}
                 </div>
@@ -92,9 +92,9 @@ export default async function ModelDetailPage({ params }: Props) {
                             <p className="mb-1 font-medium text-gray-500">Input</p>
                             <p className="font-mono text-gray-700">{cap.example.input}</p>
                           </div>
-                          <div className="rounded-lg bg-indigo-50 p-2">
-                            <p className="mb-1 font-medium text-indigo-500">Output</p>
-                            <p className="font-mono text-indigo-700">{cap.example.output}</p>
+                          <div className="rounded-lg bg-avax-50 p-2">
+                            <p className="mb-1 font-medium text-avax-500">Output</p>
+                            <p className="font-mono text-avax-700">{cap.example.output}</p>
                           </div>
                         </div>
                       )}
@@ -140,7 +140,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   href={`/${  'en'}/agent-keys`}
-                  className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold hover:bg-indigo-400 transition"
+                  className="rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold hover:bg-avax-400 transition"
                 >
                   Get Agent Key →
                 </Link>
@@ -169,13 +169,13 @@ X-PAYMENT: <x402-eip712-signed-payload>
                   Creator
                 </h3>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-base font-bold text-indigo-600 shrink-0">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-avax-100 text-base font-bold text-avax-600 shrink-0">
                     {(model.creator.display_name ?? model.creator.username)[0].toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-gray-800 truncate">
                       {model.creator.display_name ?? model.creator.username}
-                      {model.creator.verified && <span className="ml-1 text-indigo-500">✓</span>}
+                      {model.creator.verified && <span className="ml-1 text-avax-500">✓</span>}
                     </p>
                     <p className="text-xs text-gray-500">@{model.creator.username}</p>
                   </div>

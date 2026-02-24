@@ -34,7 +34,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
   const explorerBase = IS_MAINNET ? 'snowscan.xyz' : 'testnet.snowscan.xyz'
 
   return (
-    <section className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-purple-50 p-6">
+    <section className="rounded-2xl border border-avax-100 bg-gradient-to-br from-avax-500 to-avax-700 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-semibold text-gray-900">On-chain Earnings</h2>
@@ -44,7 +44,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
               href={`https://${explorerBase}/address/${contractAddress}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-indigo-500 hover:underline"
+              className="text-avax-500 hover:underline"
             >
               WasiAIMarketplace.sol
             </a>
@@ -53,7 +53,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-3xl font-bold text-indigo-700">
+            <p className="text-3xl font-bold text-avax-700">
               ${pendingOnChain.toFixed(2)}
             </p>
             <p className="text-xs text-gray-500">USDC available</p>
@@ -73,18 +73,18 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
  */
 export function EarningsSkeleton() {
   return (
-    <section className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 animate-pulse">
+    <section className="rounded-2xl border border-avax-100 bg-gradient-to-br from-avax-500 to-avax-700 p-6 animate-pulse">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="h-5 w-40 rounded bg-indigo-200/60" />
-          <div className="mt-2 h-4 w-56 rounded bg-indigo-100/60" />
+          <div className="h-5 w-40 rounded bg-avax-200/60" />
+          <div className="mt-2 h-4 w-56 rounded bg-avax-100/60" />
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className="h-9 w-24 rounded bg-indigo-200/60" />
-            <div className="mt-1 h-3 w-20 rounded bg-indigo-100/60" />
+            <div className="h-9 w-24 rounded bg-avax-200/60" />
+            <div className="mt-1 h-3 w-20 rounded bg-avax-100/60" />
           </div>
-          <div className="h-10 w-24 rounded-xl bg-indigo-200/60" />
+          <div className="h-10 w-24 rounded-xl bg-avax-200/60" />
         </div>
       </div>
     </section>

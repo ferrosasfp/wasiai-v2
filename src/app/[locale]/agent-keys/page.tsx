@@ -85,7 +85,7 @@ export default function AgentKeysPage() {
           </div>
           <button
             onClick={() => setShowForm(true)}
-            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+            className="rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition"
           >
             + New Key
           </button>
@@ -130,7 +130,7 @@ export default function AgentKeysPage() {
                   value={form.name}
                   onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                   placeholder="My trading agent"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-indigo-400 focus:outline-none"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none"
                   required
                 />
               </div>
@@ -144,14 +144,14 @@ export default function AgentKeysPage() {
                   onChange={e => setForm(p => ({ ...p, budget_usdc: parseFloat(e.target.value) }))}
                   min={1}
                   step={1}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-indigo-400 focus:outline-none"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none"
                 />
               </div>
               <div className="flex gap-3">
                 <button
                   type="submit"
                   disabled={creating}
-                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-avax-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 disabled:opacity-50"
                 >
                   {creating ? 'Creating...' : 'Create Key'}
                 </button>
@@ -177,7 +177,7 @@ export default function AgentKeysPage() {
               <p className="text-gray-500 text-sm">No agent keys yet</p>
               <button
                 onClick={() => setShowForm(true)}
-                className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                className="mt-4 rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600"
               >
                 Create your first key
               </button>
@@ -203,7 +203,7 @@ export default function AgentKeysPage() {
                     {/* Budget bar */}
                     <div className="mt-2 h-1.5 w-full rounded-full bg-gray-100">
                       <div
-                        className="h-1.5 rounded-full bg-indigo-400"
+                        className="h-1.5 rounded-full bg-avax-400"
                         style={{ width: `${Math.min((key.spent_usdc / key.budget_usdc) * 100, 100)}%` }}
                       />
                     </div>

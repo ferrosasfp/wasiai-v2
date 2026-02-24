@@ -244,14 +244,14 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
         onChange={e => setInput(e.target.value)}
         placeholder="Enter your input for the model..."
         rows={3}
-        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-indigo-400 focus:outline-none resize-none"
+        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-avax-400 focus:outline-none resize-none"
       />
 
       {/* Wallet info */}
       {isConnected && address && (
         <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-2 text-xs text-gray-500">
           <span>🔗 {address.slice(0, 6)}...{address.slice(-4)} · Avalanche</span>
-          <span className="text-indigo-500">Gasless · WasiAI × Avalanche</span>
+          <span className="text-avax-500">Gasless · WasiAI × Avalanche</span>
         </div>
       )}
 
@@ -262,7 +262,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
         className={`w-full rounded-xl py-3 font-semibold text-white transition disabled:opacity-60 ${
           state === 'success' ? 'bg-green-600 hover:bg-green-700' :
           state === 'error'   ? 'bg-red-600 hover:bg-red-700' :
-                                'bg-indigo-600 hover:bg-indigo-700'
+                                'bg-avax-500 hover:bg-avax-600'
         }`}
       >
         {buttonLabel[state]}
@@ -285,7 +285,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
                 href={`https://${AVALANCHE_CHAIN_ID === 43113 ? 'testnet.' : ''}snowtrace.io/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-indigo-500 hover:underline"
+                className="text-xs text-avax-500 hover:underline"
               >
                 tx ↗
               </a>

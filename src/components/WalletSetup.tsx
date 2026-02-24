@@ -50,7 +50,7 @@ export function WalletSetup({ initialWallet }: Props) {
         </p>
         <button
           onClick={() => { setEditing(true); setSaved(false) }}
-          className="text-xs text-indigo-400 hover:text-indigo-600 hover:underline"
+          className="text-xs text-avax-400 hover:text-avax-600 hover:underline"
         >
           Editar
         </button>
@@ -73,12 +73,12 @@ export function WalletSetup({ initialWallet }: Props) {
           onChange={e => { setWallet(e.target.value); setError(null) }}
           placeholder="0x..."
           spellCheck={false}
-          className="w-64 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-mono text-gray-800 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+          className="w-64 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-mono text-gray-800 placeholder-gray-400 focus:border-avax-400 focus:outline-none focus:ring-1 focus:ring-avax-400"
         />
         <button
           onClick={handleSave}
           disabled={loading || wallet.length < 42}
-          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          className="rounded-lg bg-avax-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-avax-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? 'Guardando…' : 'Guardar'}
         </button>
