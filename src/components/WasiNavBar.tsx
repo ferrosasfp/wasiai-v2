@@ -73,17 +73,28 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             aria-label="WasiAI — go to homepage"
             className="flex items-center gap-2 shrink-0"
           >
-            {/* Icon mark — house with double gable (W = Wasi) + AI nodes */}
+            {/* Icon mark — outer house (territory) + inner agent network (house within house) */}
             <svg width="30" height="30" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect width="48" height="48" rx="12" fill="#E84142"/>
-              <rect x="7" y="27" width="34" height="16" rx="1.5" fill="white"/>
-              <rect x="19" y="31" width="10" height="12" rx="2" fill="#E84142"/>
-              <polyline points="3,27 13,10 24,20 35,10 45,27" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-              <circle cx="13" cy="10" r="2.8" fill="white"/>
-              <circle cx="35" cy="10" r="2.8" fill="white"/>
-              <circle cx="24" cy="20" r="2"   fill="rgba(255,255,255,0.7)"/>
-              <circle cx="3"  cy="27" r="1.6" fill="rgba(255,255,255,0.45)"/>
-              <circle cx="45" cy="27" r="1.6" fill="rgba(255,255,255,0.45)"/>
+              <rect width="48" height="48" rx="11" fill="#E84142"/>
+              {/* Outer house — the home/territory */}
+              <path d="M5 27 L24 7 L43 27 L43 46 L5 46 Z" fill="white" fillOpacity="0.12" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
+              {/* Network lines — agents connecting */}
+              <g stroke="white" strokeLinecap="round" opacity={0.5}>
+                <line x1="24" y1="17" x2="14" y2="27" strokeWidth="1"/>
+                <line x1="24" y1="17" x2="34" y2="27" strokeWidth="1"/>
+                <line x1="14" y1="27" x2="34" y2="27" strokeWidth="1"/>
+                <line x1="24" y1="17" x2="24" y2="39" strokeWidth="1"/>
+                <line x1="14" y1="27" x2="15" y2="39" strokeWidth="1"/>
+                <line x1="34" y1="27" x2="33" y2="39" strokeWidth="1"/>
+                <line x1="15" y1="39" x2="33" y2="39" strokeWidth="1"/>
+              </g>
+              {/* Agent nodes */}
+              <circle cx="24" cy="17" r="3.2" fill="white"/>
+              <circle cx="14" cy="27" r="2.2" fill="white" opacity={0.9}/>
+              <circle cx="34" cy="27" r="2.2" fill="white" opacity={0.9}/>
+              <circle cx="15" cy="39" r="1.7" fill="white" opacity={0.7}/>
+              <circle cx="33" cy="39" r="1.7" fill="white" opacity={0.7}/>
+              <circle cx="24" cy="39" r="1.4" fill="white" opacity={0.5}/>
             </svg>
             {/* Wordmark */}
             <span className="text-lg font-extrabold tracking-tight text-gray-900">
