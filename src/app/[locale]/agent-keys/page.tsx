@@ -54,6 +54,16 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
   async function handleDeposit() {
     setErrorMsg('')
 
+    // HAL-013: Guard — never send to empty contract address
+    if (CHAIN_ID === 43114 && !MARKETPLACE_ADDRESS) {
+      setErrorMsg('Mainnet contract not configured. Contact support.')
+      return
+    }
+    if (!MARKETPLACE_ADDRESS) {
+      setErrorMsg('Contract address not configured. Check NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI in env.')
+      return
+    }
+
     // 1. Check wallet availability
     const win = window as typeof window & { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }
     if (!win.ethereum) {
@@ -584,7 +594,7 @@ export default function AgentKeysPage() {
                 directamente desde el contrato sin nuestra intervención.
               </p>
               <p className="mt-1 font-mono text-blue-600 break-all">
-                Contrato: 0x02e8A1c86E4D246ED281E8Cd45B2a8480B15Db71
+                Contrato: {MARKETPLACE_ADDRESS || '(dirección no configurada — ver NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI)'}
               </p>
               <p className="mt-1">Función: <code className="bg-blue-100 px-1 rounded">emergencyWithdrawKey(bytes32 keyId)</code></p>
             </div>

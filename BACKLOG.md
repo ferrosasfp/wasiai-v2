@@ -5,38 +5,50 @@
 
 ---
 
-## 🏗️ Stack Oficial (Golden Path)
+## 🏗️ Stack Oficial (Golden Path) — actualizado 2026-02-25
 
-```
-Web2:  Next.js 14 · Supabase · Upstash Redis · Pinata · Tailwind · next-intl
-Web3:  Avalanche C-Chain · Solidity 0.8.24 + Foundry · viem v2 · wagmi v3
-       x402 + ERC-3009 · uvd-x402-sdk
-Regla: sin ethers.js · sin hardcodes · sin NEXT_PUBLIC para secrets · sin datos simulados
-ERC-4337: roadmap futuro (Épica 1) — no activo hoy
-```
+### Web2
+- Framework: Next.js 14 (App Router)
+- DB: Supabase (Postgres + Auth + RLS)
+- Rate limiting: Upstash Redis
+- Storage: Pinata (IPFS)
+- Estilos: Tailwind CSS
+- i18n: next-intl
+
+### Web3
+- Blockchain: Avalanche C-Chain (Fuji 43113 / Mainnet 43114)
+- Contratos: Solidity 0.8.24 + Foundry
+- Lib blockchain: viem v2 (NO ethers.js)
+- Wallet React: wagmi v3
+- Pagos: x402 + ERC-3009 (uvd-x402-sdk)
+- ERC-4337: NO activo (roadmap futuro — ver Épica 1)
+
+### Reglas
+- Nunca NEXT_PUBLIC_ para secrets o API keys de pago
+- Nunca hardcodear direcciones de contrato — siempre desde env var
+- Nunca ethers.js — usar viem
+- Nunca datos simulados en producción
 
 ---
 
-## 🚨 SPRINT ACTIVO — Auditoría crítica + ERC-4337
+## ✅ SPRINT COMPLETADO — Auditoría crítica + ERC-4337 (2026-02-25)
 
-> En progreso por sub-agente. No tocar hasta que termine.
-
-- [~] Eliminar ERC-4337 / permissionless / Pimlico del codebase
-- [~] HAL-001: Dirección contrato vieja hardcodeada en emergency withdraw
-- [~] HAL-002: Management key rota en registro A2A (columnas inexistentes)
-- [~] HAL-003: Auth bypass en registro A2A
-- [~] HAL-005: Seed usa tabla `models` (renombrada a `agents`)
-- [~] HAL-006: Métricas fabricadas en seed (total_calls, total_revenue)
-- [~] HAL-007: CRON_SECRET faltante en .env.example
-- [~] HAL-008: Cron retry-recordings sin auth cuando CRON_SECRET ausente
-- [~] HAL-009: URL facilitador UVD hardcodeada en invoke route
-- [~] HAL-010: ethers.js en signReceipt.ts → migrar a viem
-- [~] HAL-011: Race condition en budget_usdc (read-then-write no atómica)
-- [~] HAL-012: Bug doble conteo en increment_agent_key_spend (día de reset)
-- [~] HAL-013: Sin guardia cuando MARKETPLACE_ADDRESS_MAINNET vacío
-- [~] HAL-014: SSRF parcial — IPv6 privado no bloqueado
-- [~] HAL-015: Cron sin alerta balance_mismatch (on-chain < DB)
-- [~] HAL-016: CHAIN_NAME inconsistente entre routes
+- [x] Eliminar ERC-4337 / permissionless / Pimlico del codebase
+- [x] HAL-001: Dirección contrato vieja hardcodeada en emergency withdraw
+- [x] HAL-002: Management key rota en registro A2A (columnas inexistentes)
+- [x] HAL-003: Auth bypass en registro A2A
+- [x] HAL-005: Seed usa tabla `models` (renombrada a `agents`)
+- [x] HAL-006: Métricas fabricadas en seed (total_calls, total_revenue)
+- [x] HAL-007: CRON_SECRET faltante en .env.example
+- [x] HAL-008: Cron retry-recordings sin auth cuando CRON_SECRET ausente
+- [x] HAL-009: URL facilitador UVD hardcodeada en invoke route
+- [x] HAL-010: ethers.js en signReceipt.ts → migrado a viem
+- [x] HAL-011: Race condition en budget_usdc → RPC atómica increment_key_budget
+- [x] HAL-012: Bug doble conteo en increment_agent_key_spend → single UPDATE
+- [x] HAL-013: Sin guardia cuando MARKETPLACE_ADDRESS_MAINNET vacío
+- [x] HAL-014: SSRF parcial — IPv6 privado bloqueado
+- [x] HAL-015: Cron con alerta balance_mismatch (on-chain < DB)
+- [x] HAL-016: CHAIN_NAME unificado desde @/lib/chain
 
 ---
 

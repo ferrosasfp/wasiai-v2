@@ -11,13 +11,14 @@ import { processPendingRecordings } from '@/lib/chain/pendingRecordings'
 import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
-  // Verify cron secret to prevent unauthorized calls
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authorization = request.headers.get('authorization')
-    if (authorization !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  // HAL-008: SIEMPRE verificar — si CRON_SECRET no está configurado, rechazar todo
+  const cronSecret = process.env.CRON_SECRET?.trim()
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
+  }
+  const authorization = request.headers.get('authorization')
+  if (authorization !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {

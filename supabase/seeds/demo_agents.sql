@@ -22,7 +22,8 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- ── Agent 1: WasiSummarizer (direct seed) ──────────────────────────────────
-INSERT INTO models (
+-- HAL-005: renamed models → agents (migration 006)
+INSERT INTO agents (
   id, creator_id, name, slug, description, category,
   price_per_call, currency, chain, endpoint_url,
   capabilities, status, is_featured, agent_type,
@@ -45,7 +46,8 @@ INSERT INTO models (
 ON CONFLICT (slug) DO NOTHING;
 
 -- ── Agent 2: WasiExtractor (direct seed) ───────────────────────────────────
-INSERT INTO models (
+-- HAL-005: renamed models → agents (migration 006)
+INSERT INTO agents (
   id, creator_id, name, slug, description, category,
   price_per_call, currency, chain, endpoint_url,
   capabilities, status, is_featured, agent_type,

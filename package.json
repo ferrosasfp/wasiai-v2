@@ -33,7 +33,6 @@
     "@upstash/redis": "^1.36.2",
     "next": "^16.0.0",
     "next-intl": "^4.8.2",
-    "permissionless": "^0.3.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "uvd-x402-sdk": "^2.25.0",

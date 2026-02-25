@@ -96,23 +96,21 @@ export async function POST(
 
     logger.info('[deposit] on-chain tx submitted', { txHash })
 
-    // 5. Update budget_usdc in DB (read-then-write)
-    const currentBudget = Number(keyRow.budget_usdc) || 0
-    const newBudget = currentBudget + body.amount
-
-    const { error: updateError } = await supabase
-      .from('agent_keys')
-      .update({ budget_usdc: newBudget })
-      .eq('id', id)
-      .eq('owner_id', user.id)
+    // 5. HAL-011: Update budget_usdc atomically via RPC (prevents race condition)
+    const { error: updateError } = await supabase.rpc('increment_key_budget', {
+      p_key_id:   id,
+      p_amount:   body.amount,
+      p_owner_id: user.id,
+    })
 
     if (updateError) {
       // On-chain tx succeeded, DB update failed — log but return partial success
-      logger.error('[deposit] DB budget_usdc update failed (tx already submitted)', { updateError, txHash })
+      logger.error('[deposit] DB budget_usdc atomic update failed (tx already submitted)', { updateError, txHash })
     }
 
     // 6. Fetch on-chain balance for response
     const onChainBalance = await getKeyBalanceOnChain(keyRow.key_hash)
+    const newBudget = Number(keyRow.budget_usdc) + body.amount  // optimistic estimate
 
     return NextResponse.json({
       ok:            true,

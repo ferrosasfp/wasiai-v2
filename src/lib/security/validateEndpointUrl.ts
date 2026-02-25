@@ -1,6 +1,8 @@
 /**
  * Validates that an endpoint URL is safe to call from the server.
- * Prevents SSRF attacks by blocking private/internal addresses.
+ * Prevents SSRF attacks by blocking private/internal addresses (IPv4 and IPv6).
+ *
+ * HAL-014: Added IPv6 private ranges.
  */
 export function validateEndpointUrl(rawUrl: string): void {
   let url: URL
@@ -16,7 +18,8 @@ export function validateEndpointUrl(rawUrl: string): void {
 
   const hostname = url.hostname.toLowerCase()
 
-  const blockedPatterns = [
+  // IPv4 private/internal patterns
+  const blockedIPv4Patterns = [
     'localhost',
     '127.',
     '0.0.0.0',
@@ -45,7 +48,24 @@ export function validateEndpointUrl(rawUrl: string): void {
     'metadata.internal',
   ]
 
-  if (blockedPatterns.some(p => hostname.startsWith(p) || hostname === p.replace('.', ''))) {
+  if (blockedIPv4Patterns.some(p => hostname.startsWith(p) || hostname === p.replace('.', ''))) {
     throw new Error('Private or internal endpoint URLs are not allowed')
+  }
+
+  // HAL-014: IPv6 private/internal patterns
+  const blockedIPv6Patterns = [
+    /^\[?::1\]?$/,               // loopback
+    /^\[?fc[0-9a-f]{2}:/i,       // fc00::/7 Unique Local
+    /^\[?fd[0-9a-f]{2}:/i,       // fd00::/8 Unique Local
+    /^\[?fe80:/i,                 // fe80::/10 Link-Local
+    /^\[?::ffff:/i,               // IPv4-mapped IPv6
+    /^\[?0:0:0:0:0:ffff:/i,      // IPv4-mapped alternativo
+    /^\[?64:ff9b:/i,              // NAT64
+  ]
+
+  for (const pattern of blockedIPv6Patterns) {
+    if (pattern.test(hostname)) {
+      throw new Error('Private or internal IPv6 endpoint URLs are not allowed')
+    }
   }
 }

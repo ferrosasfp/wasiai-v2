@@ -87,7 +87,8 @@ async function settleX402(paymentHeader: any, model: Record<string, unknown>, pr
     return settlePaymentDirectly(evmPayload, atomicRequired)
   } else {
     const requirements = buildRequirements({ amount: priceStr, recipient: CONTRACT_ADDRESS, resource: resourceUrl, description: `Access to ${model.name as string} on WasiAI`, mimeType: 'application/json' })
-    const facilitator = new FacilitatorClient({ baseUrl: 'https://facilitator.ultravioletadao.xyz' })
+    const facilitatorUrl = (process.env.X402_FACILITATOR_URL ?? 'https://facilitator.ultravioletadao.xyz').trim()
+    const facilitator = new FacilitatorClient({ baseUrl: facilitatorUrl })
     return facilitator.verifyAndSettle(paymentHeader, requirements)
   }
 }

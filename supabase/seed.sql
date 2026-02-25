@@ -51,7 +51,7 @@ VALUES
   '{"author": "WasiAI", "version": "1.0.0", "model_backend": "groq/llama-3.1-8b-instant", "avg_latency_ms": 420, "max_input_tokens": 4096}'::jsonb,
   'agent', 'wasiai_summarize', 'Resume texto en bullets o párrafo corto',
   'active', true,
-  142, 0.142
+  0, 0
 ),
 
 -- 2. Language Translator
@@ -69,7 +69,7 @@ VALUES
   '{"author": "WasiAI", "version": "1.0.0", "model_backend": "groq/llama-3.1-8b-instant", "avg_latency_ms": 380, "supported_pairs": ["es-en", "en-es", "es-pt", "pt-es", "en-pt", "pt-en"]}'::jsonb,
   'agent', 'wasiai_translate', 'Traduce texto entre ES, EN y PT con contexto latinoamericano',
   'active', true,
-  98, 0.098
+  0, 0
 ),
 
 -- 3. Code Generator
@@ -88,7 +88,7 @@ VALUES
   '{"author": "WasiAI", "version": "1.0.0", "model_backend": "groq/llama-3.1-70b-versatile", "avg_latency_ms": 1100, "specialties": ["solidity", "avalanche", "web3", "typescript", "python"]}'::jsonb,
   'agent', 'wasiai_codegen', 'Genera código funcional con explicación, especializado en Web3/Avalanche',
   'active', true,
-  67, 0.201
+  0, 0
 ),
 
 -- 4. Sentiment Analyzer
@@ -106,7 +106,7 @@ VALUES
   '{"author": "WasiAI", "version": "1.0.0", "model_backend": "groq/llama-3.1-8b-instant", "avg_latency_ms": 290, "output_schema": {"sentiment": "positive|negative|neutral", "confidence": "number", "emotions": "string[]"}}'::jsonb,
   'agent', 'wasiai_sentiment', 'Analiza sentimiento de texto con score de confianza',
   'active', false,
-  213, 0.107
+  0, 0
 ),
 
 -- 5. Data Extractor
@@ -125,7 +125,7 @@ VALUES
   '{"author": "WasiAI", "version": "1.0.0", "model_backend": "groq/llama-3.1-70b-versatile", "avg_latency_ms": 650, "output": "structured JSON"}'::jsonb,
   'agent', 'wasiai_extract', 'Extrae datos estructurados de texto no estructurado como JSON limpio',
   'active', false,
-  55, 0.110
+  0, 0
 )
 
 ON CONFLICT (slug) DO UPDATE SET

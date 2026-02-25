@@ -25,11 +25,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { CHAIN_NAME } from '@/lib/chain'
+import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
+import { createHash } from 'crypto'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
@@ -70,6 +72,7 @@ export async function POST(request: NextRequest) {
   if (rlHit) return rlHit
 
   const supabase = await createClient()
+  const serviceClient = createServiceClient()
 
   // ── Auth ─────────────────────────────────────────────────────────────────
   let creatorId: string | null   = null
@@ -87,10 +90,32 @@ export async function POST(request: NextRequest) {
       authMethod = 'jwt'
     }
   } else if (agentKey) {
-    // Agent-to-agent registration
+    // HAL-003: Validate agent key — MUST verify before granting access
+    const hash = createHash('sha256').update(agentKey).digest('hex')
+    const { data: validKey } = await serviceClient
+      .from('agent_keys')
+      .select('id, owner_id, is_active, budget_usdc, spent_usdc')
+      .eq('key_hash', hash)
+      .eq('is_active', true)
+      .single()
+
+    if (!validKey) {
+      return NextResponse.json({ error: 'Invalid agent key', code: 'invalid_key' }, { status: 401 })
+    }
+
     authMethod = 'agent_key'
-    // Agent key validated — creator is the key owner
-    // (simplified: we use the key as creator identifier)
+
+    // The owner of the key is the creator of the new agent
+    const { data: ownerProfile } = await serviceClient
+      .from('creator_profiles')
+      .select('id, wallet_address')
+      .eq('user_id', validKey.owner_id)
+      .single()
+
+    if (!ownerProfile) {
+      return NextResponse.json({ error: 'Creator profile not found' }, { status: 400 })
+    }
+    creatorId = ownerProfile.id
   } else if (regKey === process.env.OPEN_REGISTRATION_KEY) {
     authMethod = 'open_key'
   } else if (!process.env.OPEN_REGISTRATION_KEY) {
@@ -186,16 +211,27 @@ export async function POST(request: NextRequest) {
 
   // ── Issue management API key ──────────────────────────────────────────────
   // So the registering agent can update/pause its own listing
-  const { data: keyData } = await supabase
-    .from('agent_keys')
-    .insert({
-      name:        `${data.slug}-management`,
-      budget_usdc: 0,          // management key, not for payments
-      creator_id:  creatorId,
-      metadata:    { type: 'management', agent_slug: data.slug },
-    })
-    .select('id, raw_key')
-    .single()
+  // HAL-002: Use correct columns (owner_id, key_hash) via serviceClient
+  let managementKey: string | null = null
+  if (creatorId) {
+    const { raw, hash } = generateApiKey()
+    const { error: keyInsertError } = await serviceClient
+      .from('agent_keys')
+      .insert({
+        owner_id:    creatorId,
+        name:        `${data.slug}-management`,
+        key_hash:    hash,
+        budget_usdc: 0,    // management key, not for payments
+        spent_usdc:  0,
+        is_active:   true,
+      })
+
+    if (!keyInsertError) {
+      managementKey = raw  // Only shown once — caller must store it
+    } else {
+      console.error('[register] management key insert failed:', keyInsertError)
+    }
+  }
 
   // ── Register on-chain (non-blocking) ─────────────────────────────────────
   if (data.creator_wallet) {
@@ -205,9 +241,6 @@ export async function POST(request: NextRequest) {
       creatorWallet:    data.creator_wallet,
     }).catch(err => console.error('[register] on-chain failed:', err))
   }
-
-  // A2A-11: if key insert failed, still return agent but warn about missing key
-  const managementKey = keyData?.raw_key ?? null
 
   return NextResponse.json({
     message:    'Agent registered successfully',

@@ -18,9 +18,14 @@ import { logger } from '@/lib/logger'
  * Si no está disponible, este endpoint puede llamarse manualmente con el CRON_SECRET.
  */
 export async function GET(request: NextRequest) {
-  // Verificar autorización — Vercel Cron envía este header automáticamente
+  // HAL-008: SIEMPRE verificar — si CRON_SECRET no está configurado, rechazar todo
+  const cronSecret = process.env.CRON_SECRET?.trim()
+  if (!cronSecret) {
+    logger.error('[settle-key-batches] CRON_SECRET not configured')
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
+  }
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     logger.warn('[settle-key-batches] Unauthorized cron attempt')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -138,14 +143,39 @@ export async function GET(request: NextRequest) {
         results.push({ keyId, txHash: null, callCount: validCalls.length, error: 'on-chain call returned null' })
       }
     } catch (err) {
-      logger.error('[settle-key-batches] batch failed', { keyId, err })
+      // HAL-015: Detect balance mismatch (on-chain < DB) and alert
+      const isInsufficientBalance = String(err).includes('insufficient key balance')
 
-      // Marcar batch como fallido para retry
-      await supabase
-        .from('key_batch_settlements')
-        .update({ status: 'failed', error: String(err).slice(0, 500) })
-        .eq('key_id', keyId)
-        .eq('status', 'pending')
+      logger.error('[settle-key-batches] batch failed', {
+        keyId,
+        err,
+        alert: isInsufficientBalance ? 'KEY_BALANCE_MISMATCH' : 'UNKNOWN_ERROR',
+      })
+
+      if (isInsufficientBalance) {
+        // Clear failed batch assignment from calls so they can be retried later
+        await supabase
+          .from('agent_calls')
+          .update({ settlement_batch_id: null })
+          .in('id', calls.map(c => c.id))
+
+        // Mark the pending batch as balance_mismatch for manual reconciliation
+        await supabase
+          .from('key_batch_settlements')
+          .update({
+            status: 'balance_mismatch',
+            error: 'On-chain balance < DB accumulated spend. Manual reconciliation required.',
+          })
+          .eq('key_id', keyId)
+          .eq('status', 'pending')
+      } else {
+        // Generic failure — mark as failed for retry
+        await supabase
+          .from('key_batch_settlements')
+          .update({ status: 'failed', error: String(err).slice(0, 500) })
+          .eq('key_id', keyId)
+          .eq('status', 'pending')
+      }
 
       results.push({ keyId, txHash: null, callCount: calls.length, error: String(err).slice(0, 200) })
     }

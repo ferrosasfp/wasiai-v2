@@ -5,9 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
+import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of truth
 
-const CHAIN_ID   = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-const CHAIN_NAME = CHAIN_ID === 43114 ? 'avalanche' : 'avalanche-fuji'
 const SITE_URL   = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
 
 const CORS = {
