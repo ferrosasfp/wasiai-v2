@@ -228,12 +228,19 @@ forge script script/Deploy.s.sol --rpc-url fuji --broadcast
 
 ## Why Avalanche?
 
-- **Speed:** Sub-second finality — critical for real-time agent payments
-- **Low fees:** $0.001–0.003 per tx — economically viable for micropayments
-- **EVM:** Full Solidity compatibility, USDC native support
-- **Ecosystem:** Core Wallet integration, growing AI + DeFi builder community
+WasiAI is only possible on Avalanche. This isn't a "could work on any chain" project — each core feature maps directly to an Avalanche capability:
 
-The vision: WasiAI becomes the commerce layer for the agentic economy — the place where AI agents discover, pay, and get paid for services at machine speed.
+| Avalanche Feature | How WasiAI Uses It |
+|---|---|
+| **Fast Finality (~1s)** | x402 payments confirm in ~1s — agents can't wait 12 seconds per call. Real-time machine payments require real-time settlement. |
+| **Low Transaction Costs** | Micropayments of $0.001–$0.05/call are only economically viable with Avalanche's fees. On Ethereum mainnet, gas would exceed the payment itself. |
+| **EVM Compatibility** | `WasiAIMarketplace.sol` is standard Solidity. USDC EIP-3009 `transferWithAuthorization` and EIP-712 signatures work out of the box — no new tooling needed. |
+| **Unified Liquidity (C-Chain)** | USDC on C-Chain gives access to the full Avalanche liquidity ecosystem from day one. |
+| **Native Interoperability** | Future: agents deployed on any Avalanche L1 can call the WasiAI marketplace via Interchain Messaging — enabling a cross-L1 agent economy. |
+
+**The core argument:** The agentic economy runs on micropayments at machine speed. That combination — sub-second + sub-cent — only exists on Avalanche today.
+
+> *"WasiAI is the commerce layer for the agentic economy, and Avalanche is the only chain fast and cheap enough to power it."*
 
 ---
 
