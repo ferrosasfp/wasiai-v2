@@ -6,7 +6,7 @@ import {
   extractPaymentFromHeaders,
   X402_CORS_HEADERS,
 } from 'uvd-x402-sdk/backend'
-import { recordInvocationOnChain } from '@/lib/contracts/marketplaceClient'
+import { recordInvocationOnChain, settleKeyCallOnChain } from '@/lib/contracts/marketplaceClient'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
@@ -142,7 +142,7 @@ export async function POST(
     keyHash
       ? supabase
           .from('agent_keys')
-          .select('id, is_active, budget_usdc, spent_usdc')
+          .select('id, key_hash, is_active, budget_usdc, spent_usdc')
           .eq('key_hash', keyHash)
           .eq('is_active', true)
           .single()
@@ -197,10 +197,21 @@ export async function POST(
     const result = await callUpstream(model, request)
 
     if (result.status === 'success') {
+      // Increment DB spend (source of truth for UI) — always do this first
       await supabase.rpc('increment_agent_key_spend', {
         p_key_id: keyRow.id,
         p_amount: model.price_per_call,
       })
+
+      // Settle on-chain (non-fatal — does not block response)
+      // Uses keyRow.key_hash to identify the key on-chain via bytes32
+      if (keyRow.key_hash) {
+        settleKeyCallOnChain({
+          keyId:      keyRow.key_hash,
+          slug,
+          amountUSDC: model.price_per_call as number,
+        }).catch(err => logger.error('[invoke] settleKeyCallOnChain async error', { err }))
+      }
     }
 
     await logCall(supabase, model, 'agent', null, null, result) // SEC-06: don't log key prefix

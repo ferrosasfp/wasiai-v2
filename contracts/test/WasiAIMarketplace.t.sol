@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "../src/WasiAIMarketplace.sol";
 
-/// @dev Minimal ERC-20 mock for testing (no real USDC needed)
+/// @dev Minimal ERC-20 mock with ERC-3009 support for testing
 contract MockUSDC {
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
@@ -25,9 +25,31 @@ contract MockUSDC {
         balanceOf[to]   += amount;
         return true;
     }
+
     function approve(address spender, uint256 amount) external returns (bool) {
         allowance[msg.sender][spender] = amount;
         return true;
+    }
+
+    /**
+     * @dev ERC-3009 mock: transferWithAuthorization.
+     *      In tests, we skip signature verification and just transfer.
+     *      The `from` account must have sufficient balance (pre-minted in setUp).
+     */
+    function transferWithAuthorization(
+        address from,
+        address to,
+        uint256 value,
+        uint256 /* validAfter */,
+        uint256 /* validBefore */,
+        bytes32 /* nonce */,
+        uint8   /* v */,
+        bytes32 /* r */,
+        bytes32 /* s */
+    ) external {
+        require(balanceOf[from] >= value, "MockUSDC: insufficient balance for auth");
+        balanceOf[from] -= value;
+        balanceOf[to]   += value;
     }
 }
 
@@ -170,5 +192,178 @@ contract WasiAIMarketplaceTest is Test {
         assertEq(marketplace.getPendingEarnings(creator), 90_000);
         assertEq(marketplace.totalInvocations(), 5);
         assertEq(marketplace.totalVolume(), PRICE * 5);
+    }
+
+    // ── Pre-funded Key Tests ───────────────────────────────────────────────────
+
+    bytes32 constant KEY_ID = bytes32(uint256(0xDEADBEEF));
+
+    function test_DepositForKey() public {
+        // Give user (payer) some USDC to fund their key
+        usdc.mint(payer, 1_000_000); // $1.00
+
+        // Operator calls depositForKey on behalf of user
+        vm.prank(operator);
+        marketplace.depositForKey(
+            KEY_ID,
+            payer,
+            1_000_000,
+            0,             // validAfter
+            type(uint256).max, // validBefore
+            bytes32(0),    // nonce
+            0, bytes32(0), bytes32(0) // v, r, s (mock ignores)
+        );
+
+        // Check on-chain balance
+        assertEq(marketplace.getKeyBalance(KEY_ID), 1_000_000);
+        // Check owner registered
+        assertEq(marketplace.keyOwners(KEY_ID), payer);
+        // Check USDC transferred to contract
+        assertEq(usdc.balanceOf(address(marketplace)), 1_000_000);
+        assertEq(usdc.balanceOf(payer), 0);
+    }
+
+    function test_DepositForKey_OnlyOperator() public {
+        usdc.mint(payer, PRICE);
+        vm.prank(payer); // not operator
+        vm.expectRevert("WasiAI: not operator");
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+    }
+
+    function test_DepositForKey_ZeroKeyId() public {
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: zero keyId");
+        marketplace.depositForKey(bytes32(0), payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+    }
+
+    function test_DepositForKey_ZeroAmount() public {
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: zero amount");
+        marketplace.depositForKey(KEY_ID, payer, 0, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+    }
+
+    function test_DepositForKey_OwnerNotOverwritten() public {
+        // First deposit: payer becomes owner
+        usdc.mint(payer, 2_000_000);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, 1_000_000, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        // Second deposit (top-up): owner should not change
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, 1_000_000, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        assertEq(marketplace.keyOwners(KEY_ID), payer);
+        assertEq(marketplace.getKeyBalance(KEY_ID), 2_000_000);
+    }
+
+    function test_SettleKeyCall_Split() public {
+        // Register agent
+        vm.prank(operator);
+        marketplace.registerAgent(SLUG, PRICE, creator, 0);
+
+        // Fund key
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        // Settle call
+        vm.prank(operator);
+        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+
+        // Key balance now 0
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
+        // Platform gets 10% = 2000
+        assertEq(usdc.balanceOf(treasury), 2_000);
+        // Creator gets 90% = 18000
+        assertEq(marketplace.getPendingEarnings(creator), 18_000);
+        // Stats updated
+        assertEq(marketplace.totalVolume(), PRICE);
+        assertEq(marketplace.totalInvocations(), 1);
+    }
+
+    function test_SettleKeyCall_InsufficientBalance() public {
+        vm.prank(operator);
+        marketplace.registerAgent(SLUG, PRICE, creator, 0);
+
+        // Key has no balance
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: insufficient key balance");
+        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+    }
+
+    function test_SettleKeyCall_InactiveAgent() public {
+        vm.startPrank(operator);
+        marketplace.registerAgent(SLUG, PRICE, creator, 0);
+        marketplace.updateAgent(SLUG, PRICE, false); // pause agent
+        vm.stopPrank();
+
+        // Fund key
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        // Try to settle — should fail because agent inactive
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: agent inactive");
+        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+    }
+
+    function test_SettleKeyCall_OnlyOperator() public {
+        vm.prank(operator);
+        marketplace.registerAgent(SLUG, PRICE, creator, 0);
+
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        vm.prank(payer); // not operator
+        vm.expectRevert("WasiAI: not operator");
+        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+    }
+
+    function test_WithdrawKeyBalance() public {
+        // Fund key
+        usdc.mint(payer, 1_000_000);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, 1_000_000, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        // Register agent + settle one call
+        vm.prank(operator);
+        marketplace.registerAgent(SLUG, PRICE, creator, 0);
+        vm.prank(operator);
+        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+
+        // Remaining balance = 1_000_000 - 20_000 = 980_000
+        uint256 remaining = marketplace.getKeyBalance(KEY_ID);
+        assertEq(remaining, 980_000);
+
+        // Payer withdraws
+        vm.prank(payer);
+        marketplace.withdrawKeyBalance(KEY_ID);
+
+        assertEq(usdc.balanceOf(payer),             remaining);
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
+    }
+
+    function test_WithdrawKeyBalance_NotOwner() public {
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        vm.prank(creator); // different address
+        vm.expectRevert("WasiAI: not key owner");
+        marketplace.withdrawKeyBalance(KEY_ID);
+    }
+
+    function test_WithdrawKeyBalance_NothingToWithdraw() public {
+        // Key not funded → keyOwners[KEY_ID] == address(0) ≠ payer, reverts with "not key owner"
+        vm.prank(payer);
+        vm.expectRevert("WasiAI: not key owner");
+        marketplace.withdrawKeyBalance(KEY_ID);
+    }
+
+    function test_GetKeyBalance_Empty() public view {
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
     }
 }

@@ -129,6 +129,86 @@ export const WASIAI_MARKETPLACE_ABI = [
       { name: 'amount',  type: 'uint256', indexed: false },
     ],
   },
+  // ── Pre-funded Key Functions ───────────────────────────────────────────────
+  {
+    name: 'depositForKey',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'keyId',       type: 'bytes32' },
+      { name: 'owner',       type: 'address' },
+      { name: 'amount',      type: 'uint256' },
+      { name: 'validAfter',  type: 'uint256' },
+      { name: 'validBefore', type: 'uint256' },
+      { name: 'nonce',       type: 'bytes32' },
+      { name: 'v',           type: 'uint8'   },
+      { name: 'r',           type: 'bytes32' },
+      { name: 's',           type: 'bytes32' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'settleKeyCall',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'keyId',  type: 'bytes32' },
+      { name: 'slug',   type: 'string'  },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'withdrawKeyBalance',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'keyId', type: 'bytes32' }],
+    outputs: [],
+  },
+  {
+    name: 'getKeyBalance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'keyId', type: 'bytes32' }],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'keyOwners',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'keyId', type: 'bytes32' }],
+    outputs: [{ type: 'address' }],
+  },
+  // ── Pre-funded Key Events ─────────────────────────────────────────────────
+  {
+    name: 'KeyFunded',
+    type: 'event',
+    inputs: [
+      { name: 'keyId',  type: 'bytes32', indexed: true  },
+      { name: 'owner',  type: 'address', indexed: true  },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    name: 'KeyCallSettled',
+    type: 'event',
+    inputs: [
+      { name: 'keyId',         type: 'bytes32', indexed: true  },
+      { name: 'slug',          type: 'string',  indexed: false },
+      { name: 'amount',        type: 'uint256', indexed: false },
+      { name: 'creatorShare',  type: 'uint256', indexed: false },
+      { name: 'platformShare', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    name: 'KeyRefunded',
+    type: 'event',
+    inputs: [
+      { name: 'keyId',  type: 'bytes32', indexed: true  },
+      { name: 'owner',  type: 'address', indexed: true  },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
 ] as const
 
 // ── Contract address helper ────────────────────────────────────────────────

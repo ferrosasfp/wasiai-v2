@@ -7,6 +7,24 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
+ * @notice ERC-3009: Token Transfer With Authorization
+ * @dev Used for gasless USDC transfers (Circle's USDC implements this)
+ */
+interface IERC3009 {
+    function transferWithAuthorization(
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+}
+
+/**
  * @title  WasiAIMarketplace
  * @notice Agent-to-agent marketplace with x402 payment accounting.
  *
@@ -54,6 +72,11 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     uint256 public totalVolume;   // lifetime USDC volume (atomic units)
     uint256 public totalInvocations;
 
+    /// keyId (bytes32 from SHA-256 key_hash) → on-chain USDC balance
+    mapping(bytes32 => uint256) public keyBalances;
+    /// keyId → address that can withdraw the key's remaining balance
+    mapping(bytes32 => address) public keyOwners;
+
     // ─── Events ───────────────────────────────────────────────────────────────
 
     event AgentRegistered(
@@ -73,6 +96,11 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     event Withdrawn(address indexed creator, uint256 amount);
     event PlatformFeeUpdated(uint16 oldBps, uint16 newBps);
     event OperatorSet(address indexed operator, bool active);
+
+    // ── Pre-funded Key Events ────────────────────────────────────────────────
+    event KeyFunded(bytes32 indexed keyId, address indexed owner, uint256 amount);
+    event KeyCallSettled(bytes32 indexed keyId, string slug, uint256 amount, uint256 creatorShare, uint256 platformShare);
+    event KeyRefunded(bytes32 indexed keyId, address indexed owner, uint256 amount);
 
     // ─── Modifiers ────────────────────────────────────────────────────────────
 
@@ -219,6 +247,102 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         usdc.safeTransfer(creator, amount);
 
         emit Withdrawn(creator, amount);
+    }
+
+    // ─── Pre-funded API Key Flows ─────────────────────────────────────────────
+
+    /**
+     * @notice Fund an API key with USDC via ERC-3009 transferWithAuthorization.
+     * @dev Operator calls this after user signs the ERC-3009 authorization off-chain.
+     *      USDC is transferred from the user directly to this contract.
+     * @param keyId  bytes32 derived from SHA-256 of the raw API key (hex string → bytes32)
+     * @param owner  User wallet address (must have signed the ERC-3009 authorization)
+     * @param amount USDC amount in atomic units (6 decimals)
+     */
+    function depositForKey(
+        bytes32 keyId,
+        address owner,
+        uint256 amount,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint8   v,
+        bytes32 r,
+        bytes32 s
+    ) external onlyOperator nonReentrant {
+        require(keyId  != bytes32(0), "WasiAI: zero keyId");
+        require(owner  != address(0), "WasiAI: zero owner");
+        require(amount > 0,           "WasiAI: zero amount");
+
+        IERC3009(address(usdc)).transferWithAuthorization(
+            owner, address(this), amount,
+            validAfter, validBefore, nonce, v, r, s
+        );
+
+        keyBalances[keyId] += amount;
+        if (keyOwners[keyId] == address(0)) {
+            keyOwners[keyId] = owner;
+        }
+
+        emit KeyFunded(keyId, owner, amount);
+    }
+
+    /**
+     * @notice Operator settles a key-based agent call on-chain.
+     * @dev Called after a successful agent invocation using an API key.
+     *      Deducts from keyBalances and splits earnings like recordInvocation.
+     * @param keyId  bytes32 derived from key_hash in the DB
+     * @param slug   Agent slug
+     * @param amount USDC amount in atomic units to deduct and distribute
+     */
+    function settleKeyCall(
+        bytes32        keyId,
+        string calldata slug,
+        uint256        amount
+    ) external onlyOperator nonReentrant {
+        require(keyBalances[keyId] >= amount, "WasiAI: insufficient key balance");
+
+        Agent storage agent = agents[slug];
+        require(agent.active, "WasiAI: agent inactive");
+        require(amount > 0,   "WasiAI: zero amount");
+
+        keyBalances[keyId] -= amount;
+
+        uint256 platformShare = (amount * platformFeeBps) / 10_000;
+        uint256 creatorShare  = amount - platformShare;
+
+        earnings[agent.creator] += creatorShare;
+
+        if (platformShare > 0) {
+            usdc.safeTransfer(treasury, platformShare);
+        }
+
+        totalVolume      += amount;
+        totalInvocations += 1;
+
+        emit KeyCallSettled(keyId, slug, amount, creatorShare, platformShare);
+    }
+
+    /**
+     * @notice Key owner withdraws remaining unused USDC balance.
+     * @dev Only the original depositor (keyOwners[keyId]) can call this.
+     */
+    function withdrawKeyBalance(bytes32 keyId) external nonReentrant {
+        require(keyOwners[keyId] == msg.sender, "WasiAI: not key owner");
+        uint256 amount = keyBalances[keyId];
+        require(amount > 0, "WasiAI: nothing to withdraw");
+
+        keyBalances[keyId] = 0;
+        usdc.safeTransfer(msg.sender, amount);
+
+        emit KeyRefunded(keyId, msg.sender, amount);
+    }
+
+    /**
+     * @notice View key on-chain USDC balance.
+     */
+    function getKeyBalance(bytes32 keyId) external view returns (uint256) {
+        return keyBalances[keyId];
     }
 
     // ─── Admin ────────────────────────────────────────────────────────────────
