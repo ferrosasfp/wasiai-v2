@@ -154,7 +154,6 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                       </td>
                       <td className="px-6 py-4 text-center">
                         <AgentActions
-                          agentId={model.id}
                           slug={model.slug}
                           locale={locale}
                           currentStatus={model.status}

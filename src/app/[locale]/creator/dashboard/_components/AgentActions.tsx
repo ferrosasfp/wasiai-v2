@@ -5,14 +5,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 interface AgentActionsProps {
-  agentId: string
   slug: string
   locale: string
   currentStatus: string
   agentName: string
 }
 
-export function AgentActions({ agentId: _agentId, slug, locale, currentStatus, agentName }: AgentActionsProps) {
+export function AgentActions({ slug, locale, currentStatus, agentName }: AgentActionsProps) {
   const router = useRouter()
   const [status, setStatus] = useState(currentStatus)
   const [loadingStatus, setLoadingStatus] = useState(false)
