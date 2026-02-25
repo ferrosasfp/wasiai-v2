@@ -6,7 +6,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 // A-02: Sub-component with Suspense for streaming — async blockchain call isolated
 import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection'
 import { AgentActions } from './_components/AgentActions'
-import { PendingEarningsBanner } from '@/components/PendingEarningsBanner' // used in JSX below
+import { PendingEarningsBanner } from '@/components/PendingEarningsBanner'
 
 interface ModelRow {
   id: string
