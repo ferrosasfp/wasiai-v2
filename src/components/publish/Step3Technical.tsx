@@ -16,6 +16,13 @@ interface Props {
 export function Step3Technical({ data, onChange, errors, onPublish, onBack, publishing }: Props) {
   const t = useTranslations('publish')
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({})
+  const [testResult, setTestResult] = useState<{
+    ok: boolean
+    status?: number
+    latencyMs?: number
+    error?: string
+  } | null>(null)
+  const [testing, setTesting] = useState(false)
 
   function handlePublish() {
     const errs: Record<string, string> = {}
@@ -37,6 +44,34 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
   }
 
   const allErrors = { ...localErrors, ...errors }
+
+  async function handleTest() {
+    if (!data.endpoint_url) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetch('/api/creator/test-endpoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint_url: data.endpoint_url,
+          auth_header:  (data as Record<string, unknown>).auth_header as string | undefined,
+        }),
+      })
+      const json = await res.json()
+      if (res.status === 429) {
+        setTestResult({ ok: false, error: 'rate_limit' })
+      } else if (!res.ok) {
+        setTestResult({ ok: false, error: json.error ?? 'error' })
+      } else {
+        setTestResult(json)
+      }
+    } catch {
+      setTestResult({ ok: false, error: 'unreachable' })
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
     <div className="space-y-6 rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
@@ -62,6 +97,46 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         />
         {allErrors.endpoint_url && (
           <p className="mt-1 text-xs text-red-500">{allErrors.endpoint_url}</p>
+        )}
+
+        {/* Test endpoint button + result */}
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleTest}
+            disabled={testing || !data.endpoint_url}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            {testing ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Probando...
+              </span>
+            ) : 'Probar endpoint'}
+          </button>
+        </div>
+
+        {testResult && (
+          <div className={`mt-2 rounded-lg px-3 py-2 text-sm ${
+            testResult.ok
+              ? 'bg-green-50 text-green-700 border border-green-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
+            {testResult.ok
+              ? `✅ OK · ${testResult.latencyMs}ms`
+              : testResult.error === 'timeout'
+                ? '❌ No alcanzable (timeout > 5s)'
+                : testResult.error === 'rate_limit'
+                  ? '⏳ Demasiadas pruebas — espera un momento'
+                  : `⚠️ Error ${testResult.status ?? ''} — ${testResult.error ?? 'verifica tu endpoint'}`
+            }
+            <p className="mt-1 text-xs opacity-60">
+              El timeout de producción puede variar según la carga del servidor.
+            </p>
+          </div>
         )}
       </div>
 
