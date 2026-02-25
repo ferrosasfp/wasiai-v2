@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 
 interface AgentKey {
   id: string
@@ -29,9 +30,9 @@ const MARKETPLACE_ADDRESS = CHAIN_ID === 43114
 // ── DepositModal ──────────────────────────────────────────────────────────────
 
 interface DepositModalProps {
-  keyId:   string
-  keyName: string
-  onClose: () => void
+  keyId:     string
+  keyName:   string
+  onClose:   () => void
   onSuccess: () => void
 }
 
@@ -229,7 +230,6 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
               <p>• Signs a gasless ERC-3009 authorization (no ETH needed)</p>
               <p>• USDC transferred directly from your wallet to the contract</p>
               <p>• Each API call deducts the agent price from your on-chain balance</p>
-              {/* TODO: Add "Withdraw Unused USDC" — requires user tx (not operator-mediated) */}
             </div>
 
             <button
@@ -248,19 +248,134 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
   )
 }
 
+// ── CloseKeyModal ─────────────────────────────────────────────────────────────
+
+interface CloseKeyModalProps {
+  keyId:     string
+  keyName:   string
+  balance:   number
+  onClose:   () => void
+  onSuccess: (txHash: string | null) => void
+}
+
+function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKeyModalProps) {
+  const [status, setStatus]     = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [result, setResult]     = useState<{ txHash: string | null; refundedUsdc: number } | null>(null)
+
+  async function handleClose() {
+    setStatus('loading')
+    setErrorMsg('')
+    try {
+      const res = await fetch(`/api/agent-keys/${keyId}/refund`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`)
+
+      setResult({ txHash: data.txHash, refundedUsdc: data.refundedUsdc ?? 0 })
+      setStatus('success')
+      onSuccess(data.txHash)
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : String(err))
+      setStatus('error')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Close API Key</h2>
+            <p className="text-sm text-gray-500">{keyName}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {status === 'success' && result ? (
+          <div className="space-y-3">
+            <div className="text-center text-4xl">✅</div>
+            <p className="text-center font-semibold text-green-700">Key closed successfully</p>
+            {result.refundedUsdc > 0 ? (
+              <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+                <p className="font-medium">${result.refundedUsdc.toFixed(4)} USDC moved to your Earnings</p>
+                <p className="mt-1 text-xs text-green-600">
+                  You can claim your earnings from the{' '}
+                  <Link href="/creator/dashboard" className="underline">Creator Dashboard →</Link>
+                </p>
+              </div>
+            ) : (
+              <p className="text-center text-sm text-gray-500">No remaining balance to refund.</p>
+            )}
+            {result.txHash && (
+              <p className="text-center text-xs text-gray-400 font-mono break-all">
+                Tx: {result.txHash.slice(0, 20)}...{result.txHash.slice(-8)}
+              </p>
+            )}
+            <button
+              onClick={onClose}
+              className="w-full rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+              <p className="font-medium">This will permanently revoke the key.</p>
+              <ul className="mt-2 space-y-1 text-xs text-amber-700 list-disc list-inside">
+                <li>All pending calls will be settled to creators</li>
+                {balance > 0 && (
+                  <li>Remaining <strong>${balance.toFixed(4)} USDC</strong> will move to your Earnings</li>
+                )}
+                <li>Your agent will stop working immediately</li>
+              </ul>
+            </div>
+
+            {errorMsg && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+                <p className="text-xs text-red-700">{errorMsg}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClose}
+                disabled={status === 'loading'}
+                className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
+              >
+                {status === 'loading' ? '⏳ Closing...' : 'Close Key'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AgentKeysPage() {
-  const [keys, setKeys]       = useState<AgentKey[]>([])
-  const [loading, setLoading] = useState(true)
+  const [keys, setKeys]         = useState<AgentKey[]>([])
+  const [loading, setLoading]   = useState(true)
   const [creating, setCreating] = useState(false)
-  const [newKey, setNewKey]   = useState<AgentKey | null>(null)
-  const [form, setForm]       = useState({ name: '', budget_usdc: 10 })
+  const [newKey, setNewKey]     = useState<AgentKey | null>(null)
+  const [form, setForm]         = useState({ name: '' })
   const [showForm, setShowForm] = useState(false)
-  const [copied, setCopied]   = useState(false)
+  const [copied, setCopied]     = useState(false)
 
-  // Deposit modal state
+  // Modal state
   const [depositKey, setDepositKey] = useState<{ id: string; name: string } | null>(null)
+  const [closeKey, setCloseKey]     = useState<{ id: string; name: string; balance: number } | null>(null)
 
   const loadKeys = useCallback(() => {
     fetch('/api/agent-keys')
@@ -277,7 +392,7 @@ export default function AgentKeysPage() {
     const res = await fetch('/api/agent-keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ name: form.name, budget_usdc: 0 }),
     })
     if (res.ok) {
       const created = await res.json()
@@ -286,24 +401,6 @@ export default function AgentKeysPage() {
       loadKeys()
     }
     setCreating(false)
-  }
-
-  async function handleRevoke(id: string) {
-    try {
-      const res = await fetch('/api/agent-keys', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        console.error('[handleRevoke] failed:', data)
-      }
-    } catch (err) {
-      console.error('[handleRevoke] network error:', err)
-    } finally {
-      loadKeys()
-    }
   }
 
   function copyKey(key: string) {
@@ -319,7 +416,7 @@ export default function AgentKeysPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Agent Keys</h1>
             <p className="mt-1 text-sm text-gray-500">
-              API keys for your AI agents to call WasiAI models autonomously.
+              API keys para que tus agentes de IA llamen modelos WasiAI de forma autónoma.
             </p>
           </div>
           <button
@@ -336,8 +433,8 @@ export default function AgentKeysPage() {
             <div className="flex items-start gap-3">
               <span className="text-2xl">🔑</span>
               <div className="flex-1">
-                <p className="font-semibold text-green-800">Key created — save it now!</p>
-                <p className="text-sm text-green-600">This key will never be shown again.</p>
+                <p className="font-semibold text-green-800">Key creada — ¡guárdala ahora!</p>
+                <p className="text-sm text-green-600">Esta key no volverá a mostrarse.</p>
                 <div className="mt-3 flex items-center gap-2">
                   <code className="flex-1 rounded-lg bg-white border border-green-200 px-3 py-2 text-sm font-mono text-gray-800 break-all">
                     {newKey.raw_key}
@@ -352,7 +449,7 @@ export default function AgentKeysPage() {
               </div>
             </div>
             <button onClick={() => setNewKey(null)} className="mt-3 text-xs text-green-600 hover:underline">
-              I saved it, dismiss
+              La guardé, cerrar
             </button>
           </div>
         )}
@@ -360,30 +457,20 @@ export default function AgentKeysPage() {
         {/* Create form */}
         {showForm && (
           <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-            <h2 className="mb-4 font-semibold text-gray-900">New Agent Key</h2>
+            <h2 className="mb-1 font-semibold text-gray-900">Nueva Agent Key</h2>
+            <p className="mb-4 text-xs text-gray-400">
+              Tu key comienza vacía. Añade USDC para activarla.
+            </p>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Key Name</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Nombre de la key</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                  placeholder="My trading agent"
+                  placeholder="Mi agente de trading"
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none"
                   required
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Initial Budget (USDC) <span className="text-gray-400">— agent stops when exhausted</span>
-                </label>
-                <input
-                  type="number"
-                  value={form.budget_usdc}
-                  onChange={e => setForm(p => ({ ...p, budget_usdc: parseFloat(e.target.value) }))}
-                  min={1}
-                  step={1}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none"
                 />
               </div>
               <div className="flex gap-3">
@@ -392,14 +479,14 @@ export default function AgentKeysPage() {
                   disabled={creating}
                   className="rounded-xl bg-avax-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 disabled:opacity-50"
                 >
-                  {creating ? 'Creating...' : 'Create Key'}
+                  {creating ? 'Creando...' : 'Crear Key'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
                   className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
                 >
-                  Cancel
+                  Cancelar
                 </button>
               </div>
             </form>
@@ -409,71 +496,104 @@ export default function AgentKeysPage() {
         {/* Keys list */}
         <div className="rounded-2xl bg-white shadow-sm border border-gray-100">
           {loading ? (
-            <div className="py-12 text-center text-gray-400">Loading...</div>
+            <div className="py-12 text-center text-gray-400">Cargando...</div>
           ) : keys.length === 0 ? (
             <div className="py-12 text-center">
               <div className="text-4xl mb-3">🤖</div>
-              <p className="text-gray-500 text-sm">No agent keys yet</p>
+              <p className="text-gray-500 text-sm">Sin agent keys todavía</p>
               <button
                 onClick={() => setShowForm(true)}
                 className="mt-4 rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600"
               >
-                Create your first key
+                Crear tu primera key
               </button>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
-              {keys.map(key => (
-                <div key={key.id} className="flex items-center gap-4 px-6 py-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{key.name}</span>
-                      {!key.is_active && (
-                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">Revoked</span>
+              {keys.map(key => {
+                const available = Math.max(0, Number(key.budget_usdc) - Number(key.spent_usdc))
+                const pct       = key.budget_usdc > 0
+                  ? Math.min((key.spent_usdc / key.budget_usdc) * 100, 100)
+                  : 0
+
+                return (
+                  <div key={key.id} className="px-6 py-4">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{key.name}</span>
+                          {!key.is_active && (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">Revocada</span>
+                          )}
+                          {key.is_active && key.budget_usdc === 0 && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600">Sin fondos</span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                          <span>Total depositado: <strong className="text-gray-600">${Number(key.budget_usdc).toFixed(2)}</strong></span>
+                          <span>Gastado: <strong className="text-gray-600">${Number(key.spent_usdc).toFixed(3)}</strong></span>
+                          <span>Disponible: <strong className="text-avax-600">${available.toFixed(3)}</strong></span>
+                          {key.last_used_at && (
+                            <span>Último uso: {new Date(key.last_used_at).toLocaleDateString('es')}</span>
+                          )}
+                        </div>
+                        {/* Budget bar */}
+                        {key.budget_usdc > 0 && (
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-gray-100">
+                            <div
+                              className="h-1.5 rounded-full bg-avax-400"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {key.is_active && (
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            onClick={() => setDepositKey({ id: key.id, name: key.name })}
+                            className="rounded-lg border border-avax-200 bg-avax-50 px-3 py-1.5 text-xs font-medium text-avax-700 hover:bg-avax-100 transition"
+                            title="Añadir USDC on-chain"
+                          >
+                            + Añadir USDC
+                          </button>
+                          <button
+                            onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
+                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
+                          >
+                            Cerrar Key
+                          </button>
+                        </div>
                       )}
-                    </div>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
-                      <span>Budget: <strong className="text-gray-600">${key.budget_usdc} USDC</strong></span>
-                      <span>Spent: <strong className="text-gray-600">${key.spent_usdc.toFixed(3)}</strong></span>
-                      {key.last_used_at && (
-                        <span>Last used: {new Date(key.last_used_at).toLocaleDateString('en-US')}</span>
-                      )}
-                    </div>
-                    {/* Budget bar */}
-                    <div className="mt-2 h-1.5 w-full rounded-full bg-gray-100">
-                      <div
-                        className="h-1.5 rounded-full bg-avax-400"
-                        style={{ width: `${Math.min((key.spent_usdc / key.budget_usdc) * 100, 100)}%` }}
-                      />
                     </div>
                   </div>
-                  {key.is_active && (
-                    <div className="flex shrink-0 gap-2">
-                      {/* Add USDC button — opens DepositModal */}
-                      <button
-                        onClick={() => setDepositKey({ id: key.id, name: key.name })}
-                        className="rounded-lg border border-avax-200 bg-avax-50 px-3 py-1.5 text-xs font-medium text-avax-700 hover:bg-avax-100 transition"
-                        title="Fund this key with real USDC on-chain"
-                      >
-                        + Add USDC
-                      </button>
-                      <button
-                        onClick={() => handleRevoke(key.id)}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
 
+        {/* Emergency withdraw info */}
+        <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">ℹ️</span>
+            <div className="text-xs text-blue-700">
+              <p className="font-medium mb-1">Salida de emergencia garantizada</p>
+              <p>
+                Si WasiAI dejara de operar por más de 30 días, podrás recuperar tu USDC
+                directamente desde el contrato sin nuestra intervención.
+              </p>
+              <p className="mt-1 font-mono text-blue-600 break-all">
+                Contrato: 0x02e8A1c86E4D246ED281E8Cd45B2a8480B15Db71
+              </p>
+              <p className="mt-1">Función: <code className="bg-blue-100 px-1 rounded">emergencyWithdrawKey(bytes32 keyId)</code></p>
+            </div>
+          </div>
+        </div>
+
         {/* Usage example */}
-        <div className="mt-6 rounded-2xl bg-gray-900 p-5 text-white">
-          <p className="mb-3 text-sm font-semibold text-gray-300">Usage in your agent:</p>
+        <div className="mt-4 rounded-2xl bg-gray-900 p-5 text-white">
+          <p className="mb-3 text-sm font-semibold text-gray-300">Uso en tu agente:</p>
           <pre className="overflow-auto text-sm text-green-400">{`POST /api/v1/models/gpt-translator/invoke
 x-agent-key: wasi_your_key_here
 Content-Type: application/json
@@ -490,6 +610,20 @@ Content-Type: application/json
           onClose={() => setDepositKey(null)}
           onSuccess={() => {
             setDepositKey(null)
+            loadKeys()
+          }}
+        />
+      )}
+
+      {/* Close Key Modal */}
+      {closeKey && (
+        <CloseKeyModal
+          keyId={closeKey.id}
+          keyName={closeKey.name}
+          balance={closeKey.balance}
+          onClose={() => setCloseKey(null)}
+          onSuccess={() => {
+            setCloseKey(null)
             loadKeys()
           }}
         />

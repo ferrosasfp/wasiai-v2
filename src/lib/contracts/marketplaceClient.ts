@@ -186,7 +186,7 @@ export async function withdrawForCreator(creatorWallet: string): Promise<string 
  * key_hash is the SHA-256 hex of the raw key (64 hex chars = 32 bytes).
  * We left-pad to 32 bytes if shorter, or take first 32 bytes if longer.
  */
-function keyHashToBytes32(keyHash: string): `0x${string}` {
+export function keyHashToBytes32(keyHash: string): `0x${string}` {
   // Normalize: strip 0x prefix if present, then pad/truncate to 64 hex chars (32 bytes)
   const hex = keyHash.replace(/^0x/i, '').toLowerCase()
   const padded = hex.padEnd(64, '0').slice(0, 64)
@@ -194,46 +194,77 @@ function keyHashToBytes32(keyHash: string): `0x${string}` {
 }
 
 /**
- * Settle a key-based agent call on-chain after successful invocation.
+ * Settle a batch of key-based agent calls on-chain in a single tx.
+ * Gas amortizado: una tx cubre cientos de llamadas.
  * Non-fatal: logs error and returns null on failure — caller must not block response.
  *
- * @param keyId    SHA-256 hex string from agent_keys.key_hash
- * @param slug     Agent slug
- * @param amountUSDC Price in USDC dollars (e.g. 0.02)
+ * @param keyHash     SHA-256 hex string from agent_keys.key_hash
+ * @param slugs       Array of agent slugs (1-to-1 with amountsUsdc)
+ * @param amountsUsdc Array of amounts in USDC dollars (e.g. [0.02, 0.01])
  */
-export async function settleKeyCallOnChain({
-  keyId,
-  slug,
-  amountUSDC,
-}: {
-  keyId:      string
-  slug:       string
-  amountUSDC: number
-}): Promise<string | null> {
+export async function settleKeyBatchOnChain(
+  keyHash: string,
+  slugs: string[],
+  amountsUsdc: number[]
+): Promise<string | null> {
   const contractAddress = getContractAddress()
   if (!contractAddress) {
-    logger.warn('[marketplace] Contract not configured — skipping settleKeyCall')
+    logger.warn('[marketplace] Contract not configured — skipping settleKeyBatch')
     return null
   }
 
   try {
     const { wallet, public: pub, account } = getOperatorClient()
-    const bytes32KeyId = keyHashToBytes32(keyId)
+    const bytes32KeyId  = keyHashToBytes32(keyHash)
+    const atomicAmounts = amountsUsdc.map(a => toUSDCAtomics(a))
 
     const { request } = await pub.simulateContract({
       address:      contractAddress,
       abi:          WASIAI_MARKETPLACE_ABI,
-      functionName: 'settleKeyCall',
-      args:         [bytes32KeyId, slug, toUSDCAtomics(amountUSDC)],
+      functionName: 'settleKeyBatch',
+      args:         [bytes32KeyId, slugs, atomicAmounts],
       account,
     })
 
     const txHash = await wallet.writeContract(request)
-    logger.info('[marketplace] settleKeyCall tx', { txHash, keyId: keyId.slice(0, 8) })
+    logger.info('[marketplace] settleKeyBatch tx', { txHash, keyHash: keyHash.slice(0, 8), batchSize: slugs.length })
     return txHash
   } catch (err) {
-    // Non-fatal: DB already tracked the spend. Log and return null.
-    logger.error('[marketplace] settleKeyCall failed', { err: String(err).slice(0, 300) })
+    logger.error('[marketplace] settleKeyBatch failed', { err: String(err).slice(0, 300) })
+    return null
+  }
+}
+
+/**
+ * Move remaining key balance to earnings of the key owner.
+ * Called when the user closes their key (refund flow).
+ * The owner can then call withdraw() like any creator.
+ */
+export async function refundKeyToEarningsOnChain(keyHash: string): Promise<string | null> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) {
+    logger.warn('[marketplace] Contract not configured — skipping refundKeyToEarnings')
+    return null
+  }
+
+  try {
+    const { wallet, public: pub, account } = getOperatorClient()
+    const bytes32KeyId = keyHashToBytes32(keyHash)
+
+    const { request } = await pub.simulateContract({
+      address:      contractAddress,
+      abi:          WASIAI_MARKETPLACE_ABI,
+      functionName: 'refundKeyToEarnings',
+      args:         [bytes32KeyId],
+      account,
+    })
+
+    const txHash = await wallet.writeContract(request)
+    const receipt = await pub.waitForTransactionReceipt({ hash: txHash as `0x${string}`, timeout: 30_000 })
+    logger.info('[marketplace] refundKeyToEarnings tx', { txHash, status: receipt.status })
+    return txHash
+  } catch (err) {
+    logger.error('[marketplace] refundKeyToEarnings failed', { err: String(err).slice(0, 300) })
     return null
   }
 }

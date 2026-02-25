@@ -20,7 +20,10 @@
     "contracts:slither": "cd contracts && slither src/ --filter-paths lib/",
     "contracts:sync-abi": "node scripts/sync-abi.mjs",
     "contracts:deploy:fuji": "cd contracts && forge script script/DeployToken.s.sol --rpc-url fuji --broadcast",
-    "qa:hybrid": "npm run qa && npm run contracts:build && npm run contracts:test"
+    "qa:hybrid": "npm run qa && npm run contracts:build && npm run contracts:test",
+    "test:e2e:fuji": "npx tsx scripts/test-e2e-fuji.ts",
+    "test:api": "bash scripts/test-api.sh",
+    "verify:receipt": "npx tsx scripts/verify-receipt.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.0",

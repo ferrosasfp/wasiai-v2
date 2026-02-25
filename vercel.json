@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/settle-key-batches",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

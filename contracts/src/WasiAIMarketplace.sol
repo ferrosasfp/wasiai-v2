@@ -35,6 +35,13 @@ interface IERC3009 {
  *   3. Backend operator calls recordInvocation() → splits earnings
  *   4. Creator calls withdraw() to claim their USDC anytime
  *
+ * Key Flow (pre-funded):
+ *   1. User deposits USDC via depositForKey() (ERC-3009 gasless)
+ *   2. Each call deducts from keyBalances (tracked in DB, batch settled daily)
+ *   3. Operator calls settleKeyBatch() once/day for all calls
+ *   4. User can close key via refundKeyToEarnings() (operator) or
+ *      emergencyWithdrawKey() (trustless exit after 30d inactivity)
+ *
  * Fee model:
  *   - Default: 10% to WasiAI treasury, 90% to agent creator
  *   - Adjustable by owner (max 30%)
@@ -76,6 +83,13 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     mapping(bytes32 => uint256) public keyBalances;
     /// keyId → address that can withdraw the key's remaining balance
     mapping(bytes32 => address) public keyOwners;
+
+    /// Timestamp of the last operator activity.
+    /// If > EMERGENCY_TIMEOUT has passed, key owners can exit trustlessly.
+    uint256 public lastOperatorActivity;
+
+    /// 30 days without operator activity → users can emergency-withdraw
+    uint256 public constant EMERGENCY_TIMEOUT = 30 days;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -120,6 +134,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         usdc     = IERC20(_usdc);
         treasury = _treasury;
         operators[msg.sender] = true;
+        lastOperatorActivity  = block.timestamp;
     }
 
     // ─── Agent Registry ───────────────────────────────────────────────────────
@@ -136,6 +151,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         address creator,
         uint64  erc8004Id
     ) external onlyOperator {
+        lastOperatorActivity = block.timestamp;
         require(bytes(slug).length > 0, "WasiAI: empty slug");
         require(creator != address(0),  "WasiAI: zero creator");
         require(
@@ -192,6 +208,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         address          payer,
         uint256          amount
     ) external onlyOperator nonReentrant {
+        lastOperatorActivity = block.timestamp;
         Agent storage agent = agents[slug];
         require(agent.active,  "WasiAI: agent inactive");
         require(amount > 0,    "WasiAI: zero amount");
@@ -240,6 +257,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
      * @dev Useful for automatic payouts triggered by the backend.
      */
     function withdrawFor(address creator) external onlyOperator nonReentrant {
+        lastOperatorActivity = block.timestamp;
         uint256 amount = earnings[creator];
         require(amount > 0, "WasiAI: nothing to withdraw");
 
@@ -270,6 +288,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         bytes32 r,
         bytes32 s
     ) external onlyOperator nonReentrant {
+        lastOperatorActivity = block.timestamp;
         require(keyId  != bytes32(0), "WasiAI: zero keyId");
         require(owner  != address(0), "WasiAI: zero owner");
         require(amount > 0,           "WasiAI: zero amount");
@@ -288,47 +307,80 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Operator settles a key-based agent call on-chain.
-     * @dev Called after a successful agent invocation using an API key.
-     *      Deducts from keyBalances and splits earnings like recordInvocation.
-     * @param keyId  bytes32 derived from key_hash in the DB
-     * @param slug   Agent slug
-     * @param amount USDC amount in atomic units to deduct and distribute
+     * @notice Liquida un batch de llamadas de key en una sola tx.
+     * @dev Gas amortizado: una tx cubre cientos de llamadas.
+     *      slugs[i] y amounts[i] corresponden 1-a-1.
+     *      El balance total se deduce primero para evitar reentrancy parcial.
      */
-    function settleKeyCall(
-        bytes32        keyId,
-        string calldata slug,
-        uint256        amount
+    function settleKeyBatch(
+        bytes32          keyId,
+        string[] calldata slugs,
+        uint256[] calldata amounts
     ) external onlyOperator nonReentrant {
-        require(keyBalances[keyId] >= amount, "WasiAI: insufficient key balance");
+        lastOperatorActivity = block.timestamp;
+        require(slugs.length == amounts.length, "WasiAI: length mismatch");
+        require(slugs.length > 0,               "WasiAI: empty batch");
 
-        Agent storage agent = agents[slug];
-        require(agent.active, "WasiAI: agent inactive");
-        require(amount > 0,   "WasiAI: zero amount");
-
-        keyBalances[keyId] -= amount;
-
-        uint256 platformShare = (amount * platformFeeBps) / 10_000;
-        uint256 creatorShare  = amount - platformShare;
-
-        earnings[agent.creator] += creatorShare;
-
-        if (platformShare > 0) {
-            usdc.safeTransfer(treasury, platformShare);
+        // Compute total first — fail early if insufficient balance
+        uint256 total = 0;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            total += amounts[i];
         }
+        require(keyBalances[keyId] >= total, "WasiAI: insufficient key balance");
 
-        totalVolume      += amount;
-        totalInvocations += 1;
+        // Deduct full amount atomically before any transfers (reentrancy-safe)
+        keyBalances[keyId] -= total;
 
-        emit KeyCallSettled(keyId, slug, amount, creatorShare, platformShare);
+        for (uint256 i = 0; i < slugs.length; i++) {
+            require(amounts[i] > 0,          "WasiAI: zero amount");
+            Agent storage agent = agents[slugs[i]];
+            require(agent.active,            "WasiAI: agent inactive");
+
+            uint256 platformShare = (amounts[i] * platformFeeBps) / 10_000;
+            uint256 creatorShare  = amounts[i] - platformShare;
+
+            earnings[agent.creator] += creatorShare;
+
+            if (platformShare > 0) {
+                usdc.safeTransfer(treasury, platformShare);
+            }
+
+            totalVolume      += amounts[i];
+            totalInvocations += 1;
+
+            emit KeyCallSettled(keyId, slugs[i], amounts[i], creatorShare, platformShare);
+        }
     }
 
     /**
-     * @notice Key owner withdraws remaining unused USDC balance.
-     * @dev Only the original depositor (keyOwners[keyId]) can call this.
+     * @notice Mueve el balance restante de una key a earnings del owner.
+     * @dev Operador llama esto cuando el usuario cierra su key.
+     *      El owner luego usa withdraw() como cualquier creator.
      */
-    function withdrawKeyBalance(bytes32 keyId) external nonReentrant {
+    function refundKeyToEarnings(bytes32 keyId) external onlyOperator nonReentrant {
+        lastOperatorActivity = block.timestamp;
+        require(keyOwners[keyId] != address(0), "WasiAI: unknown key");
+        uint256 amount = keyBalances[keyId];
+        require(amount > 0, "WasiAI: nothing to refund");
+
+        keyBalances[keyId] = 0;
+        earnings[keyOwners[keyId]] += amount;
+
+        emit KeyRefunded(keyId, keyOwners[keyId], amount);
+    }
+
+    /**
+     * @notice Salida de emergencia: usuario recupera su USDC si el operador
+     *         lleva más de EMERGENCY_TIMEOUT sin actividad.
+     * @dev Trustless exit — no requiere permiso del operador.
+     */
+    function emergencyWithdrawKey(bytes32 keyId) external nonReentrant {
+        require(
+            block.timestamp > lastOperatorActivity + EMERGENCY_TIMEOUT,
+            "WasiAI: operator still active"
+        );
         require(keyOwners[keyId] == msg.sender, "WasiAI: not key owner");
+
         uint256 amount = keyBalances[keyId];
         require(amount > 0, "WasiAI: nothing to withdraw");
 

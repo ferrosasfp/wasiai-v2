@@ -6,7 +6,8 @@ import {
   extractPaymentFromHeaders,
   X402_CORS_HEADERS,
 } from 'uvd-x402-sdk/backend'
-import { recordInvocationOnChain, settleKeyCallOnChain } from '@/lib/contracts/marketplaceClient'
+import { recordInvocationOnChain, keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
+import { signReceipt } from '@/lib/receipts/signReceipt'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
@@ -196,26 +197,52 @@ export async function POST(
 
     const result = await callUpstream(model, request)
 
+    // Track receipt signature (non-fatal if it fails)
+    let receiptSignature: string | null = null
+    let callId: string | null = null
+
     if (result.status === 'success') {
-      // Increment DB spend (source of truth for UI) — always do this first
+      // 1. Log call to DB first to get the call ID
+      const { id: insertedId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
+      callId = insertedId ?? null
+
+      // 2. Sign a cryptographic receipt for the caller to audit
+      if (callId && keyRow.key_hash) {
+        const timestamp = Math.floor(Date.now() / 1000)
+        receiptSignature = await signReceipt({
+          keyId:      keyHashToBytes32(keyRow.key_hash),
+          callId,
+          agentSlug:  slug,
+          amountUsdc: model.price_per_call as number,
+          timestamp,
+        }).catch(err => {
+          logger.warn('[invoke] signReceipt failed (non-fatal)', { err: String(err).slice(0, 200) })
+          return null
+        })
+
+        // 3. Save signature to DB (best effort)
+        if (receiptSignature) {
+          // Best-effort: save receipt signature in background
+          void Promise.resolve(
+            supabase
+              .from('agent_calls')
+              .update({ receipt_signature: receiptSignature })
+              .eq('id', callId)
+          ).catch(err => logger.warn('[invoke] receipt_signature update failed', { err }))
+        }
+      }
+
+      // 4. Increment DB spend (source of truth for UI)
       await supabase.rpc('increment_agent_key_spend', {
         p_key_id: keyRow.id,
         p_amount: model.price_per_call,
       })
-
-      // Settle on-chain (non-fatal — does not block response)
-      // Uses keyRow.key_hash to identify the key on-chain via bytes32
-      if (keyRow.key_hash) {
-        settleKeyCallOnChain({
-          keyId:      keyRow.key_hash,
-          slug,
-          amountUSDC: model.price_per_call as number,
-        }).catch(err => logger.error('[invoke] settleKeyCallOnChain async error', { err }))
-      }
+    } else {
+      // Log failed call (no receipt needed)
+      await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
     }
 
-    await logCall(supabase, model, 'agent', null, null, result) // SEC-06: don't log key prefix
-    return buildResponse(model, result)
+    return buildResponse(model, result, undefined, receiptSignature ?? undefined)
   }
 
   // ── 3. Route B: x402 Payment (Ultravioleta DAO / Avalanche) ──────────────
@@ -253,7 +280,7 @@ export async function POST(
 
   // ── 5. Payment valid — call the upstream model ────────────────────────────
   const result = await callUpstream(model, request)
-  await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result)
+  await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
 
   // ── 6. Record invocation on-chain (A-01: extracted to recordOnChain helper) ─
   if (result.status === 'success' && settlement.transactionHash) {
@@ -353,18 +380,22 @@ async function logCall(
   agentId: string | null,
   txHash: string | null,
   result: { status: string; latencyMs: number },
-) {
+  keyId?: string | null,
+  agentSlug?: string | null,
+): Promise<{ id?: string }> {
   // PERF-06: supabase is already resolved — no redundant await
-  await Promise.all([
+  const [insertResult] = await Promise.all([
     supabase.from('agent_calls').insert({
-      agent_id: model.id,
-      caller_type: callerType,
+      agent_id:        model.id,
+      caller_type:     callerType,
       caller_agent_id: agentId,
-      amount_paid: model.price_per_call,
-      tx_hash: txHash,
-      status: result.status,
-      latency_ms: result.latencyMs,
-    }),
+      amount_paid:     model.price_per_call,
+      tx_hash:         txHash,
+      status:          result.status,
+      latency_ms:      result.latencyMs,
+      key_id:          keyId ?? null,
+      agent_slug:      agentSlug ?? null,
+    }).select('id').single(),
     result.status === 'success'
       ? supabase.rpc('increment_agent_stats', {
           p_agent_id: model.id,
@@ -372,12 +403,14 @@ async function logCall(
         })
       : Promise.resolve(),
   ])
+  return { id: (insertResult.data as { id?: string } | null)?.id }
 }
 
 function buildResponse(
   model: Record<string, unknown>,
   result: { data: unknown; status: string; latencyMs: number },
   txHash?: string,
+  receiptSignature?: string,
 ) {
   return NextResponse.json(
     {
@@ -391,6 +424,11 @@ function buildResponse(
         tx_hash: txHash ?? null,
         status: result.status,
       },
+      // Cryptographic receipt — lets the caller audit that this call was real.
+      // Verify with: verifyReceipt(receipt, signature) from @/lib/receipts/signReceipt
+      receipt: receiptSignature
+        ? { signature: receiptSignature }
+        : undefined,
     },
     { headers: X402_CORS_HEADERS },
   )

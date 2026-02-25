@@ -62,8 +62,10 @@ contract WasiAIMarketplaceTest is Test {
     address creator  = address(0x3);
     address payer    = address(0x4);
     address operator = address(0x5);
+    address stranger = address(0x6);
 
-    string constant SLUG = "gpt-translator";
+    string constant SLUG  = "gpt-translator";
+    string constant SLUG2 = "text-summarizer";
     uint256 constant PRICE = 20_000; // $0.02 USDC (6 decimals)
 
     function setUp() public {
@@ -72,6 +74,19 @@ contract WasiAIMarketplaceTest is Test {
         marketplace = new WasiAIMarketplace(address(usdc), treasury);
         marketplace.setOperator(operator, true);
         vm.stopPrank();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function _fundKey(bytes32 keyId, address keyOwner, uint256 amount) internal {
+        usdc.mint(keyOwner, amount);
+        vm.prank(operator);
+        marketplace.depositForKey(keyId, keyOwner, amount, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+    }
+
+    function _registerAgent(string memory slug, address agentCreator) internal {
+        vm.prank(operator);
+        marketplace.registerAgent(slug, PRICE, agentCreator, 0);
     }
 
     // ── Registration ──────────────────────────────────────────────────────────
@@ -99,6 +114,14 @@ contract WasiAIMarketplaceTest is Test {
         vm.prank(payer); // not an operator
         vm.expectRevert("WasiAI: not operator");
         marketplace.registerAgent(SLUG, PRICE, creator, 0);
+    }
+
+    function test_RegisterAgent_UpdatesLastActivity() public {
+        uint256 before = marketplace.lastOperatorActivity();
+        vm.warp(block.timestamp + 100);
+        vm.prank(operator);
+        marketplace.registerAgent(SLUG, PRICE, creator, 0);
+        assertGt(marketplace.lastOperatorActivity(), before);
     }
 
     // ── Invocation & Split ────────────────────────────────────────────────────
@@ -257,111 +280,393 @@ contract WasiAIMarketplaceTest is Test {
         assertEq(marketplace.getKeyBalance(KEY_ID), 2_000_000);
     }
 
-    function test_SettleKeyCall_Split() public {
-        // Register agent
-        vm.prank(operator);
-        marketplace.registerAgent(SLUG, PRICE, creator, 0);
-
-        // Fund key
+    function test_DepositForKey_UpdatesLastActivity() public {
         usdc.mint(payer, PRICE);
+        uint256 before = marketplace.lastOperatorActivity();
+        vm.warp(block.timestamp + 50);
         vm.prank(operator);
         marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
-
-        // Settle call
-        vm.prank(operator);
-        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
-
-        // Key balance now 0
-        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
-        // Platform gets 10% = 2000
-        assertEq(usdc.balanceOf(treasury), 2_000);
-        // Creator gets 90% = 18000
-        assertEq(marketplace.getPendingEarnings(creator), 18_000);
-        // Stats updated
-        assertEq(marketplace.totalVolume(), PRICE);
-        assertEq(marketplace.totalInvocations(), 1);
+        assertGt(marketplace.lastOperatorActivity(), before);
     }
 
-    function test_SettleKeyCall_InsufficientBalance() public {
-        vm.prank(operator);
-        marketplace.registerAgent(SLUG, PRICE, creator, 0);
+    // ── settleKeyBatch Tests ───────────────────────────────────────────────────
 
-        // Key has no balance
+    function test_SettleKeyBatch_Split() public {
+        // Register two agents
+        _registerAgent(SLUG,  creator);
+        _registerAgent(SLUG2, creator);
+
+        // Fund key with $1.00
+        _fundKey(KEY_ID, payer, 1_000_000);
+
+        string[] memory slugs   = new string[](2);
+        uint256[] memory amounts = new uint256[](2);
+        slugs[0]   = SLUG;   amounts[0] = 20_000; // $0.02
+        slugs[1]   = SLUG2;  amounts[1] = 10_000; // $0.01
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        // Key balance: 1_000_000 - 30_000 = 970_000
+        assertEq(marketplace.getKeyBalance(KEY_ID), 970_000);
+
+        // Total platform share = 10% of 30_000 = 3_000
+        assertEq(usdc.balanceOf(treasury), 3_000);
+
+        // Creator earnings: 90% of 30_000 = 27_000
+        assertEq(marketplace.getPendingEarnings(creator), 27_000);
+
+        // Stats
+        assertEq(marketplace.totalVolume(),      30_000);
+        assertEq(marketplace.totalInvocations(), 2);
+    }
+
+    function test_SettleKeyBatch_CorrectPerItemSplit() public {
+        // Register agent with a second creator to test per-item split
+        address creator2 = address(0x10);
+        _registerAgent(SLUG,  creator);
+        vm.prank(operator);
+        marketplace.registerAgent(SLUG2, PRICE, creator2, 0);
+
+        _fundKey(KEY_ID, payer, 1_000_000);
+
+        string[] memory slugs   = new string[](2);
+        uint256[] memory amounts = new uint256[](2);
+        slugs[0]   = SLUG;   amounts[0] = 100_000; // $0.10
+        slugs[1]   = SLUG2;  amounts[1] = 50_000;  // $0.05
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        // creator1: 90% of 100_000 = 90_000
+        assertEq(marketplace.getPendingEarnings(creator),  90_000);
+        // creator2: 90% of 50_000 = 45_000
+        assertEq(marketplace.getPendingEarnings(creator2), 45_000);
+
+        // treasury: 10% of (100_000 + 50_000) = 15_000
+        assertEq(usdc.balanceOf(treasury), 15_000);
+    }
+
+    function test_SettleKeyBatch_InsufficientBalance() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 10_000); // $0.01 only
+
+        string[] memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = 20_000; // $0.02 — more than funded
+
         vm.prank(operator);
         vm.expectRevert("WasiAI: insufficient key balance");
-        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
     }
 
-    function test_SettleKeyCall_InactiveAgent() public {
-        vm.startPrank(operator);
-        marketplace.registerAgent(SLUG, PRICE, creator, 0);
-        marketplace.updateAgent(SLUG, PRICE, false); // pause agent
-        vm.stopPrank();
+    function test_SettleKeyBatch_LengthMismatch() public {
+        _fundKey(KEY_ID, payer, 100_000);
 
-        // Fund key
-        usdc.mint(payer, PRICE);
+        string[] memory slugs   = new string[](2);
+        uint256[] memory amounts = new uint256[](1); // mismatched
+        slugs[0]   = SLUG;
+        slugs[1]   = SLUG2;
+        amounts[0] = 20_000;
+
         vm.prank(operator);
-        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+        vm.expectRevert("WasiAI: length mismatch");
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+    }
 
-        // Try to settle — should fail because agent inactive
+    function test_SettleKeyBatch_EmptyBatch() public {
+        _fundKey(KEY_ID, payer, 100_000);
+
+        string[] memory slugs   = new string[](0);
+        uint256[] memory amounts = new uint256[](0);
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: empty batch");
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+    }
+
+    function test_SettleKeyBatch_ZeroAmount() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 100_000);
+
+        string[] memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = 0; // zero amount — should revert
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: zero amount");
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+    }
+
+    function test_SettleKeyBatch_InactiveAgent() public {
+        _registerAgent(SLUG, creator);
+        vm.prank(operator);
+        marketplace.updateAgent(SLUG, PRICE, false); // pause
+
+        _fundKey(KEY_ID, payer, 100_000);
+
+        string[] memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = 20_000;
+
         vm.prank(operator);
         vm.expectRevert("WasiAI: agent inactive");
-        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
     }
 
-    function test_SettleKeyCall_OnlyOperator() public {
-        vm.prank(operator);
-        marketplace.registerAgent(SLUG, PRICE, creator, 0);
+    function test_SettleKeyBatch_OnlyOperator() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 100_000);
 
-        usdc.mint(payer, PRICE);
-        vm.prank(operator);
-        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+        string[] memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = 20_000;
 
-        vm.prank(payer); // not operator
+        vm.prank(stranger);
         vm.expectRevert("WasiAI: not operator");
-        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
     }
 
-    function test_WithdrawKeyBalance() public {
-        // Fund key
-        usdc.mint(payer, 1_000_000);
-        vm.prank(operator);
-        marketplace.depositForKey(KEY_ID, payer, 1_000_000, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+    function test_SettleKeyBatch_UpdatesLastActivity() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 100_000);
 
-        // Register agent + settle one call
-        vm.prank(operator);
-        marketplace.registerAgent(SLUG, PRICE, creator, 0);
-        vm.prank(operator);
-        marketplace.settleKeyCall(KEY_ID, SLUG, PRICE);
+        uint256 before = marketplace.lastOperatorActivity();
+        vm.warp(block.timestamp + 100);
 
-        // Remaining balance = 1_000_000 - 20_000 = 980_000
-        uint256 remaining = marketplace.getKeyBalance(KEY_ID);
-        assertEq(remaining, 980_000);
+        string[] memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = 20_000;
 
-        // Payer withdraws
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+        assertGt(marketplace.lastOperatorActivity(), before);
+    }
+
+    function test_SettleKeyBatch_LargeBatch() public {
+        _registerAgent(SLUG, creator);
+        uint256 batchSize = 50;
+        uint256 perCall   = 1_000; // $0.001
+        _fundKey(KEY_ID, payer, batchSize * perCall);
+
+        string[] memory slugs   = new string[](batchSize);
+        uint256[] memory amounts = new uint256[](batchSize);
+        for (uint256 i = 0; i < batchSize; i++) {
+            slugs[i]   = SLUG;
+            amounts[i] = perCall;
+        }
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts); // must not OOG
+
+        assertEq(marketplace.getKeyBalance(KEY_ID),   0);
+        assertEq(marketplace.totalInvocations(), batchSize);
+        assertEq(marketplace.totalVolume(), batchSize * perCall);
+    }
+
+    function test_SettleKeyBatch_TotalVolumeAndInvocations() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 1_000_000);
+
+        string[] memory slugs   = new string[](3);
+        uint256[] memory amounts = new uint256[](3);
+        for (uint256 i = 0; i < 3; i++) {
+            slugs[i]   = SLUG;
+            amounts[i] = 10_000;
+        }
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        assertEq(marketplace.totalVolume(),      30_000);
+        assertEq(marketplace.totalInvocations(), 3);
+    }
+
+    // ── refundKeyToEarnings Tests ─────────────────────────────────────────────
+
+    function test_RefundKeyToEarnings() public {
+        _fundKey(KEY_ID, payer, 1_000_000);
+
+        vm.prank(operator);
+        marketplace.refundKeyToEarnings(KEY_ID);
+
+        // Key balance zeroed
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
+        // Earnings of payer increased
+        assertEq(marketplace.getPendingEarnings(payer), 1_000_000);
+    }
+
+    function test_RefundKeyToEarnings_OwnerCanWithdraw() public {
+        _fundKey(KEY_ID, payer, 500_000);
+
+        vm.prank(operator);
+        marketplace.refundKeyToEarnings(KEY_ID);
+
+        // Payer withdraws their earnings
         vm.prank(payer);
-        marketplace.withdrawKeyBalance(KEY_ID);
+        marketplace.withdraw();
 
-        assertEq(usdc.balanceOf(payer),             remaining);
+        assertEq(usdc.balanceOf(payer), 500_000);
+        assertEq(marketplace.getPendingEarnings(payer), 0);
+    }
+
+    function test_RefundKeyToEarnings_UnknownKey() public {
+        bytes32 unknownKey = bytes32(uint256(0xCAFEBABE));
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: unknown key");
+        marketplace.refundKeyToEarnings(unknownKey);
+    }
+
+    function test_RefundKeyToEarnings_NothingToRefund() public {
+        // Fund then settle everything
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, PRICE);
+
+        string[] memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = PRICE;
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        // Balance is now 0
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: nothing to refund");
+        marketplace.refundKeyToEarnings(KEY_ID);
+    }
+
+    function test_RefundKeyToEarnings_OnlyOperator() public {
+        _fundKey(KEY_ID, payer, 100_000);
+
+        vm.prank(stranger);
+        vm.expectRevert("WasiAI: not operator");
+        marketplace.refundKeyToEarnings(KEY_ID);
+    }
+
+    function test_RefundKeyToEarnings_UpdatesLastActivity() public {
+        _fundKey(KEY_ID, payer, 100_000);
+        uint256 before = marketplace.lastOperatorActivity();
+        vm.warp(block.timestamp + 100);
+
+        vm.prank(operator);
+        marketplace.refundKeyToEarnings(KEY_ID);
+        assertGt(marketplace.lastOperatorActivity(), before);
+    }
+
+    // ── emergencyWithdrawKey Tests ────────────────────────────────────────────
+
+    function test_EmergencyWithdrawKey_OperatorStillActive() public {
+        _fundKey(KEY_ID, payer, 100_000);
+
+        // Try emergency withdraw — operator just deposited so it's recent
+        vm.prank(payer);
+        vm.expectRevert("WasiAI: operator still active");
+        marketplace.emergencyWithdrawKey(KEY_ID);
+    }
+
+    function test_EmergencyWithdrawKey_Success() public {
+        _fundKey(KEY_ID, payer, 100_000);
+
+        // Warp past EMERGENCY_TIMEOUT (30 days + 1 second)
+        vm.warp(block.timestamp + 30 days + 1);
+
+        uint256 balanceBefore = usdc.balanceOf(payer);
+
+        vm.prank(payer);
+        marketplace.emergencyWithdrawKey(KEY_ID);
+
+        assertEq(usdc.balanceOf(payer),         balanceBefore + 100_000);
         assertEq(marketplace.getKeyBalance(KEY_ID), 0);
     }
 
-    function test_WithdrawKeyBalance_NotOwner() public {
-        usdc.mint(payer, PRICE);
+    function test_EmergencyWithdrawKey_NotOwner() public {
+        _fundKey(KEY_ID, payer, 100_000);
+        vm.warp(block.timestamp + 31 days);
+
+        vm.prank(stranger);
+        vm.expectRevert("WasiAI: not key owner");
+        marketplace.emergencyWithdrawKey(KEY_ID);
+    }
+
+    function test_EmergencyWithdrawKey_NothingToWithdraw() public {
+        // Fund then completely drain
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, PRICE);
+
+        string[] memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = PRICE;
+
         vm.prank(operator);
-        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
 
-        vm.prank(creator); // different address
-        vm.expectRevert("WasiAI: not key owner");
-        marketplace.withdrawKeyBalance(KEY_ID);
-    }
+        // Warp past timeout
+        vm.warp(block.timestamp + 31 days);
 
-    function test_WithdrawKeyBalance_NothingToWithdraw() public {
-        // Key not funded → keyOwners[KEY_ID] == address(0) ≠ payer, reverts with "not key owner"
         vm.prank(payer);
-        vm.expectRevert("WasiAI: not key owner");
-        marketplace.withdrawKeyBalance(KEY_ID);
+        vm.expectRevert("WasiAI: nothing to withdraw");
+        marketplace.emergencyWithdrawKey(KEY_ID);
     }
+
+    function test_EmergencyWithdrawKey_ExactlyAtTimeout_Reverts() public {
+        _fundKey(KEY_ID, payer, 100_000);
+        // Warp to exactly lastOperatorActivity + 30 days — NOT past it
+        vm.warp(marketplace.lastOperatorActivity() + 30 days);
+
+        vm.prank(payer);
+        vm.expectRevert("WasiAI: operator still active");
+        marketplace.emergencyWithdrawKey(KEY_ID);
+    }
+
+    function test_EmergencyWithdrawKey_ActivityResetPreventsExit() public {
+        _fundKey(KEY_ID, payer, 100_000);
+        vm.warp(block.timestamp + 29 days);
+
+        // Operator does something → resets timer
+        _registerAgent(SLUG, creator);
+
+        // Warp another 2 days (total 31 from start, but only 2 from last activity)
+        vm.warp(block.timestamp + 2 days);
+
+        vm.prank(payer);
+        vm.expectRevert("WasiAI: operator still active");
+        marketplace.emergencyWithdrawKey(KEY_ID);
+    }
+
+    // ── lastOperatorActivity tracking ─────────────────────────────────────────
+
+    function test_LastOperatorActivity_SetOnConstruction() public view {
+        // Constructor sets it to block.timestamp
+        assertGt(marketplace.lastOperatorActivity(), 0);
+    }
+
+    function test_LastOperatorActivity_UpdatedOnWithdrawFor() public {
+        // Setup earnings for creator
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE);
+
+        uint256 before = marketplace.lastOperatorActivity();
+        vm.warp(block.timestamp + 200);
+
+        vm.prank(operator);
+        marketplace.withdrawFor(creator);
+        assertGt(marketplace.lastOperatorActivity(), before);
+    }
+
+    // ── Legacy settleKeyCall removed — verify it doesn't compile ──────────────
+    // (The function was intentionally removed from the contract)
+
+    // ── GetKeyBalance ─────────────────────────────────────────────────────────
 
     function test_GetKeyBalance_Empty() public view {
         assertEq(marketplace.getKeyBalance(KEY_ID), 0);

@@ -148,18 +148,25 @@ export const WASIAI_MARKETPLACE_ABI = [
     outputs: [],
   },
   {
-    name: 'settleKeyCall',
+    name: 'settleKeyBatch',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'keyId',  type: 'bytes32' },
-      { name: 'slug',   type: 'string'  },
-      { name: 'amount', type: 'uint256' },
+      { name: 'keyId',   type: 'bytes32'   },
+      { name: 'slugs',   type: 'string[]'  },
+      { name: 'amounts', type: 'uint256[]' },
     ],
     outputs: [],
   },
   {
-    name: 'withdrawKeyBalance',
+    name: 'refundKeyToEarnings',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'keyId', type: 'bytes32' }],
+    outputs: [],
+  },
+  {
+    name: 'emergencyWithdrawKey',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [{ name: 'keyId', type: 'bytes32' }],
@@ -178,6 +185,13 @@ export const WASIAI_MARKETPLACE_ABI = [
     stateMutability: 'view',
     inputs: [{ name: 'keyId', type: 'bytes32' }],
     outputs: [{ type: 'address' }],
+  },
+  {
+    name: 'lastOperatorActivity',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
   },
   // ── Pre-funded Key Events ─────────────────────────────────────────────────
   {
