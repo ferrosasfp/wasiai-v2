@@ -24,10 +24,12 @@ export const createModelSchema = z.object({
     .min(3, 'Name must be at least 3 characters')
     .max(64, 'Name is too long'),
 
+  // HU-1.2: slug is auto-generated server-side if not provided
   slug: z.string()
     .min(3, 'Slug must be at least 3 characters')
     .max(64, 'Slug is too long')
-    .regex(/^[a-z0-9-]+$/, 'Only lowercase letters, numbers and hyphens'),
+    .regex(/^[a-z0-9-]+$/, 'Only lowercase letters, numbers and hyphens')
+    .optional(),
 
   description: z.string()
     .min(10, 'Please add a description (at least 10 characters)')
@@ -38,20 +40,26 @@ export const createModelSchema = z.object({
     error: () => ({ message: `Category must be one of: ${MODEL_CATEGORIES.join(', ')}` }),
   }),
 
+  // HU-1.2: price_per_call is optional for drafts (filled in step 2)
   price_per_call: z.number()
     .min(0.01, 'Minimum price is $0.01 USDC')
-    .max(100, 'Maximum price is $100 USDC'),
+    .max(100, 'Maximum price is $100 USDC')
+    .optional(),
 
-  endpoint_url: z.string().url('Must be a valid HTTPS URL'),
+  // HU-1.2: endpoint_url is optional for drafts (filled in step 3)
+  endpoint_url: z.string().url('Must be a valid HTTPS URL').optional(),
 
   capabilities: z.array(modelCapabilitySchema).optional().default([]),
 
   cover_image: z.string().url('Must be a valid URL').optional().nullable(),
 
   agent_type: z.enum(['model', 'agent', 'workflow']).optional().default('model'),
+
+  // HU-1.2: status field for draft support
+  status: z.enum(['draft', 'active']).optional().default('active'),
 })
 
 export type CreateModelInput = z.infer<typeof createModelSchema>
 
-// For form state (partial)
+// For form state (partial) — HU-1.2: explicit draft type for multi-step form
 export type CreateModelDraft = Partial<CreateModelInput>

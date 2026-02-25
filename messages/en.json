@@ -123,7 +123,27 @@
     "capabilityName": "Name",
     "capabilityDesc": "Description",
     "inputType": "Input",
-    "outputType": "Output"
+    "outputType": "Output",
+    "steps": {
+      "basic": "Basic",
+      "product": "Product",
+      "technical": "Technical"
+    },
+    "preview": {
+      "label": "Preview",
+      "pricePlaceholder": "— USDC/call"
+    },
+    "draftModal": {
+      "title": "You have an unpublished draft",
+      "cta": "Continue draft",
+      "discard": "Discard and start over"
+    },
+    "cta": {
+      "next": "Next",
+      "back": "Back",
+      "publish": "Publish agent",
+      "publishing": "Publishing..."
+    }
   },
   "dashboard": {
     "title": "Creator Dashboard",

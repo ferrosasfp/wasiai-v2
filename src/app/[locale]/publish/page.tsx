@@ -2,13 +2,13 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import dynamic from 'next/dynamic'
 
-// P-06: Dynamic import reduces initial bundle by ~50KB+ (form includes heavy Web3 deps)
+// P-06: Dynamic import reduces initial bundle size
 const PublishForm = dynamic(() => import('./PublishForm'), {
   loading: () => (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="text-center">
         <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-avax-600 border-t-transparent" />
-        <p className="text-sm text-gray-500">Loading editor...</p>
+        <p className="text-sm text-gray-500">Cargando editor...</p>
       </div>
     </div>
   ),
@@ -20,7 +20,6 @@ interface Props {
 }
 
 // UX-01: Auth gate — redirect to login if not authenticated
-// Wallet gate — wallet required before publishing
 export default async function PublishPage({ params, searchParams }: Props) {
   const { locale }   = await params
   const { from }     = await searchParams
@@ -31,12 +30,15 @@ export default async function PublishPage({ params, searchParams }: Props) {
     redirect(`/${locale}/login?next=/${locale}/publish`)
   }
 
-  // Fetch wallet address — required to receive earnings
-  const { data: profile } = await supabase
-    .from('creator_profiles')
-    .select('wallet_address')
-    .eq('id', user.id)
-    .single()
+  // HU-1.2: Detect existing draft from this creator
+  const { data: draft } = await supabase
+    .from('agents')
+    .select('slug, name, description, category, price_per_call, capabilities, endpoint_url, cover_image')
+    .eq('creator_id', user.id)
+    .eq('status', 'draft')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  return <PublishForm initialWallet={profile?.wallet_address ?? null} from={from} />
+  return <PublishForm initialDraft={draft ?? null} from={from} />
 }

@@ -123,7 +123,27 @@
     "capabilityName": "Nombre",
     "capabilityDesc": "Descripción",
     "inputType": "Entrada",
-    "outputType": "Salida"
+    "outputType": "Salida",
+    "steps": {
+      "basic": "Básico",
+      "product": "Producto",
+      "technical": "Técnico"
+    },
+    "preview": {
+      "label": "Vista previa",
+      "pricePlaceholder": "— USDC/call"
+    },
+    "draftModal": {
+      "title": "Tienes un borrador sin publicar",
+      "cta": "Continuar borrador",
+      "discard": "Descartar y empezar de nuevo"
+    },
+    "cta": {
+      "next": "Siguiente",
+      "back": "Atrás",
+      "publish": "Publicar agente",
+      "publishing": "Publicando..."
+    }
   },
   "dashboard": {
     "title": "Panel del Creator",
