@@ -1,291 +1,199 @@
 # WasiAI — Backlog
 
-> Items ordenados por prioridad. Estado: `[ ]` pendiente · `[x]` hecho · `[-]` descartado · `[~]` en progreso.
+> Priorizado por criterio de PO: Riesgo → Valor de negocio → Esfuerzo.
+> Estado: `[ ]` pendiente · `[x]` hecho · `[~]` en progreso · `[-]` descartado
 
 ---
 
-## 📋 ÉPICAS — Product Roadmap
+## 🏗️ Stack Oficial (Golden Path)
 
-Las épicas representan capacidades completas de negocio. Cada una se trabaja por separado, de arriba hacia abajo.
-
----
-
-### 🔴 ÉPICA 1 — Creators Reales en el Marketplace
-
-> **"Como developer independiente, quiero publicar mi agente en WasiAI en menos de 10 minutos, sin necesitar entender blockchain, para empezar a monetizarlo inmediatamente."**
-
-**Por qué es prioridad 1:** Sin creators reales, WasiAI es una vitrina vacía. Todo lo técnico que construimos es infraestructura sin negocio encima.
-
-**Criterios de aceptación de la épica:**
-- Al menos 5 creators externos (no del equipo WasiAI) con agentes publicados y activos
-- El flujo de publicación no requiere conocimiento de wallets, x402 ni blockchain
-- Un agente puede estar publicado y recibiendo llamadas en menos de 10 minutos desde el registro
-
-**Historias de usuario:**
-
-- [ ] **HU-1.1 — Onboarding sin fricción**
-  > "Como developer sin experiencia Web3, quiero publicar mi agente solo con mi API key de OpenAI/Groq/Anthropic, sin necesitar una wallet ni USDC, para empezar a ganar dinero sin barreras."
-  - Flujo: Developer ingresa nombre, endpoint, precio → WasiAI crea wallet custodial para él → puede hacer withdraw cuando tenga suficiente saldo
-  - Alternativa: pago en fiat (Stripe) que WasiAI convierte internamente a USDC
-  - Aceptación: creator puede publicar sin instalar Core Wallet
-
-- [ ] **HU-1.2 — Formulario de publicación multi-paso**
-  > "Como creator, quiero un formulario guiado paso a paso para publicar mi agente, con validaciones en tiempo real, para no cometer errores técnicos."
-  - Paso 1: Básico (nombre, slug, descripción, precio, endpoint)
-  - Paso 2: Producto (descripción larga, casos de uso, ejemplos input/output)
-  - Paso 3: Técnico (capabilities, auth, health check, parámetros)
-  - Aceptación: creator ve preview de su ficha antes de publicar
-
-- [ ] **HU-1.3 — Test de endpoint en tiempo real**
-  > "Como creator, quiero probar mi endpoint directamente desde el formulario de publicación, para asegurarme de que WasiAI puede llamarlo correctamente antes de publicar."
-  - UI muestra resultado de `POST endpoint { input: "test" }` en tiempo real
-  - Muestra latencia, status code, y si el formato de respuesta es correcto
-
-- [ ] **HU-1.4 — Portal de creator analytics**
-  > "Como creator, quiero ver métricas detalladas de mi agente (llamadas por día, latencia promedio, tasa de error, ingresos por período), para tomar decisiones sobre mi agente."
-  - Dashboard con: gráfica de llamadas/día, top inputs, latencia p50/p95, earnings históricos
-  - Alertas por email si el health check falla
-
-- [ ] **HU-1.5 — Página de perfil del creator**
-  > "Como usuario del marketplace, quiero ver el perfil del creator de un agente (otros agentes que tiene, reputación, tiempo en la plataforma), para decidir si confío en su trabajo."
+```
+Web2:  Next.js 14 · Supabase · Upstash Redis · Pinata · Tailwind · next-intl
+Web3:  Avalanche C-Chain · Solidity 0.8.24 + Foundry · viem v2 · wagmi v3
+       x402 + ERC-3009 · uvd-x402-sdk
+Regla: sin ethers.js · sin hardcodes · sin NEXT_PUBLIC para secrets · sin datos simulados
+ERC-4337: roadmap futuro (Épica 1) — no activo hoy
+```
 
 ---
 
-### 🔴 ÉPICA 2 — SDK para Developers (@wasiai/sdk)
+## 🚨 SPRINT ACTIVO — Auditoría crítica + ERC-4337
 
-> **"Como developer que quiere usar agentes de WasiAI, quiero una librería npm que abstraiga todo el protocolo de pago, para integrar agentes en mi app en 5 líneas de código."**
+> En progreso por sub-agente. No tocar hasta que termine.
 
-**Por qué es prioridad 1:** Hoy usar WasiAI desde código requiere saber x402, EIP-712, headers HTTP, y tener una wallet. Eso elimina al 95% de los developers potenciales.
-
-**Criterios de aceptación de la épica:**
-- `npm install @wasiai/sdk` funciona
-- Puedo invocar cualquier agente con 3 líneas de código
-- La documentación tiene ejemplos para Node.js, Python, y desde Claude/Cursor via MCP
-
-**Historias de usuario:**
-
-- [ ] **HU-2.1 — SDK core (Node.js / TypeScript)**
-  > "Como developer Node.js, quiero `npm install @wasiai/sdk` y poder invocar agentes sin entender el protocolo de pagos subyacente."
-  ```typescript
-  const wasiai = new WasiAI({ apiKey: 'wasi_xxx' })
-  const result = await wasiai.invoke('summarizer', { input: 'texto...' })
-  ```
-  - Maneja: autenticación, retry, errores, recibos
-  - Publicar en npm como `@wasiai/sdk`
-
-- [ ] **HU-2.2 — SDK Python**
-  > "Como data scientist / ML engineer, quiero un wrapper Python para usar agentes de WasiAI desde mis notebooks y scripts."
-  ```python
-  from wasiai import WasiAI
-  client = WasiAI(api_key="wasi_xxx")
-  result = client.invoke("summarizer", input="texto...")
-  ```
-  - Publicar en PyPI como `wasiai`
-
-- [ ] **HU-2.3 — Documentación interactiva**
-  > "Como developer nuevo en WasiAI, quiero probar la API directamente desde la documentación, sin instalar nada."
-  - Docs en `/docs` con ejemplos ejecutables (tipo Stripe Docs)
-  - Cada agente del marketplace tiene su propia página de docs auto-generada
-
-- [ ] **HU-2.4 — CLI de WasiAI**
-  > "Como developer, quiero invocar agentes desde la terminal para prototipar rápido."
-  ```bash
-  wasiai invoke summarizer "mi texto aquí"
-  wasiai list agents
-  wasiai keys create --budget 10
-  ```
+- [~] Eliminar ERC-4337 / permissionless / Pimlico del codebase
+- [~] HAL-001: Dirección contrato vieja hardcodeada en emergency withdraw
+- [~] HAL-002: Management key rota en registro A2A (columnas inexistentes)
+- [~] HAL-003: Auth bypass en registro A2A
+- [~] HAL-005: Seed usa tabla `models` (renombrada a `agents`)
+- [~] HAL-006: Métricas fabricadas en seed (total_calls, total_revenue)
+- [~] HAL-007: CRON_SECRET faltante en .env.example
+- [~] HAL-008: Cron retry-recordings sin auth cuando CRON_SECRET ausente
+- [~] HAL-009: URL facilitador UVD hardcodeada en invoke route
+- [~] HAL-010: ethers.js en signReceipt.ts → migrar a viem
+- [~] HAL-011: Race condition en budget_usdc (read-then-write no atómica)
+- [~] HAL-012: Bug doble conteo en increment_agent_key_spend (día de reset)
+- [~] HAL-013: Sin guardia cuando MARKETPLACE_ADDRESS_MAINNET vacío
+- [~] HAL-014: SSRF parcial — IPv6 privado no bloqueado
+- [~] HAL-015: Cron sin alerta balance_mismatch (on-chain < DB)
+- [~] HAL-016: CHAIN_NAME inconsistente entre routes
 
 ---
 
-### 🔴 ÉPICA 3 — Free Trial por Agente
+## 🔴 P1 — Seguridad y correctness (bloquean confianza en producción)
 
-> **"Como usuario del marketplace, quiero probar cualquier agente con una llamada gratuita antes de comprar crédito, para saber si me sirve antes de pagar."**
+> Resolver antes de onboardear creators externos o hacer demo pública.
 
-**Por qué es crítico:** Sin esto, la conversión es casi cero. Nadie paga por algo que no ha probado.
+- [ ] **HAL-017** `invoke/route.ts` — x402 path: USDC recibido pero creator no cobra si `recordInvocationOnChain` falla permanentemente. El retry queue existe pero sin SLA ni alerta. Agregar: monitoreo de pending_recordings con edad > 1h → alerta operativa + dashboard interno.
 
-**Criterios de aceptación:**
-- Cada usuario autenticado tiene 1 llamada gratuita por agente
-- El resultado es real, no un mock
-- El creator es compensado por las llamadas free (WasiAI absorbe el costo)
+- [ ] **HAL-018** `settle-key-batches/route.ts` — Cron no tiene límite de batch size. Si hay 10,000 llamadas pendientes de una sola key, el array de slugs/amounts puede exceder el gas limit del contrato. Agregar: paginación de máximo 500 items por batch, con loop hasta liquidar todo.
 
-**Historias de usuario:**
+- [ ] **HAL-019** `usdcSettler.ts` — La función `settlePaymentDirectly` no verifica que el `validBefore` (deadline) de la autorización ERC-3009 no haya expirado antes de intentar la tx on-chain. Si el RPC está lento y el deadline pasó, la tx on-chain falla pero el usuario ya recibió el resultado del agente. El creator no cobra. Agregar: check `validBefore > Date.now() / 1000` antes de llamar al contrato.
 
-- [ ] **HU-3.1 — Trial call desde la ficha del agente**
-  > "Como visitante, quiero escribir un input en la página del agente y ver el resultado real antes de crear una cuenta o pagar."
-  - Input visible en la página de detalle del agente
-  - Límite: 1 trial por usuario (o por IP para no autenticados)
-  - Aceptación: resultado aparece en menos de 5 segundos
+- [ ] **HAL-020** `agent-keys/[id]/deposit/route.ts` — No verifica que el `ownerAddress` del body coincida con la wallet del usuario autenticado. Un usuario podría hacer un depósito firmado por otra wallet y asignarlo a su key. Agregar: validar que `ownerAddress === creator_profiles.wallet_address` del usuario autenticado.
 
-- [ ] **HU-3.2 — Playground de agentes**
-  > "Como developer, quiero un playground donde pueda probar varios agentes seguidos con mis datos, para comparar calidad y velocidad antes de elegir cuál integrar."
-  - UI tipo ChatGPT Playground
-  - Historial de llamadas de prueba guardado en sesión
+- [ ] **HAL-021** `invoke/route.ts` — El `callRecord` se busca por `caller_type = 'agent'` y `tx_hash IS NULL ORDER BY called_at DESC LIMIT 1`. En carga concurrente alta, dos llamadas simultáneas pueden firmar el mismo `callId`. El receipt quedaría asignado al registro incorrecto. Fix: pasar el `callId` directamente como parámetro a `logCall` y retornarlo, no buscarlo después.
+
+- [ ] **HAL-022** `validateEndpointUrl.ts` — Los dominios cloud metadata no están todos bloqueados. Faltan:
+  - `metadata.google.internal` (GCP)
+  - `169.254.169.254` sin http:// (acceso directo)
+  - `100.100.100.200` (Alibaba Cloud metadata)
+  Agregar a la blocklist.
 
 ---
 
-### 🟡 ÉPICA 4 — Discovery y Calidad del Catálogo
+## 🟠 P2 — Deuda técnica que afecta calidad del producto
 
-> **"Como developer buscando una solución específica, quiero encontrar el agente correcto en menos de 1 minuto, con suficiente información para saber si cumple mis necesidades."**
+> Resolver antes de lanzar SDK público o abrir el marketplace a creators externos.
 
-**Historias de usuario:**
+- [ ] **HAL-023** `agent-keys/page.tsx` — El `DepositModal` firma la autorización ERC-3009 con `validBefore = Date.now() / 1000 + 3600` (1 hora). Si el usuario demora más de 1 hora entre firmar y que el operador procese (ej: cola llena, RPC lento), el depósito falla silenciosamente. Ampliar a 24h o mostrar countdown al usuario.
 
-- [ ] **HU-4.1 — Search semántica**
-  > "Como usuario, quiero buscar agentes por lo que hacen (no solo por nombre), para encontrar lo que necesito aunque no sepa el nombre exacto."
-  - Búsqueda full-text con Postgres `tsvector` o Supabase pgvector
-  - Búsqueda en: nombre, descripción, casos de uso, categoría, capabilities
+- [ ] **HAL-024** `marketplaceClient.ts` — `getOperatorClient()` crea un nuevo `JsonRpcProvider` y `Wallet` en cada llamada. En el cron que procesa N keys, esto significa N instancias de provider. Extraer a singleton con lazy initialization.
 
-- [ ] **HU-4.2 — Filtros avanzados**
-  > "Como usuario, quiero filtrar agentes por precio, latencia, uptime, y categoría combinados, para encontrar el que mejor se adapta a mi caso de uso."
+- [ ] **HAL-025** `agent-keys/[id]/refund/route.ts` — Si `refundKeyToEarningsOnChain` falla (RPC caído), la key ya fue revocada en DB (`is_active = false`) pero los fondos siguen en el contrato. El usuario pierde acceso a la key Y no puede recuperar su USDC. Fix: hacer el refund on-chain ANTES de revocar la key en DB. Si el on-chain falla, no revocar.
 
-- [ ] **HU-4.3 — Ejemplos de input/output en cada ficha**
-  > "Como usuario, quiero ver ejemplos reales de qué entra y qué sale de cada agente, para evaluar la calidad antes de usarlo."
-  - El creator puede agregar hasta 3 ejemplos curados
-  - Se muestran en la ficha con syntax highlighting
+- [ ] **HAL-026** `settle-key-batches/route.ts` — El cron consulta TODOS los `agent_calls` no liquidados sin límite de tiempo. En producción con meses de historial, esta query puede tardar minutos. Agregar: `AND called_at > NOW() - INTERVAL '7 days'` como ventana máxima, y proceso separado para reconciliar llamadas más antiguas.
 
-- [ ] **HU-4.4 — Reputación con datos reales**
-  > "Como usuario, quiero ver el uptime histórico, latencia promedio y tasa de éxito de cada agente, para elegir uno confiable."
-  - WasiAI hace health checks cada 5 minutos y guarda el historial
-  - Badge "99.9% uptime" visible en la tarjeta del marketplace
-  - Reemplaza el sistema 👍/👎 actual con métricas objetivas
+- [ ] **HAL-027** `signReceipt.ts` — El timestamp del receipt es `Math.floor(Date.now() / 1000)` en el momento de la firma, pero el receipt se guarda en DB con `called_at` diferente. Si hay drift entre el tiempo de firma y el tiempo de llamada, la auditoría del usuario no cuadra. Usar el mismo timestamp para ambos.
 
-- [ ] **HU-4.5 — Colecciones y featured**
-  > "Como usuario nuevo, quiero ver colecciones curadas ('Mejores para startups', 'Agentes de código', 'Más rápidos'), para descubrir agentes de calidad sin saber qué buscar."
+- [ ] **HAL-028** `api/v1/agents/route.ts` — La query de discovery devuelve todos los campos de la tabla `agents` incluyendo `endpoint_url` (URL privada del creator). Cualquier agente externo que llame al discovery endpoint puede ver los endpoints internos de todos los creators. Filtrar: excluir `endpoint_url` de la respuesta pública.
+
+- [ ] **HAL-029** Falta `.env.example` completo y actualizado. Varias vars nuevas agregadas en los últimos sprints no están documentadas: `CRON_SECRET`, `X402_FACILITATOR_URL`, `OPERATOR_PRIVATE_KEY` (¿debería estar?). Un developer nuevo no puede levantar el proyecto desde el README.
+
+- [ ] **SEC-CSP** `middleware.ts` — CSP usa `unsafe-inline` para scripts. Reemplazar con nonces por request via `experimental.strictNextHead` en Next.js. Sin esto, cualquier XSS inyecta scripts arbitrarios.
 
 ---
 
-### 🟡 ÉPICA 5 — Agent-to-Agent Routing (Compose API)
+## 🟡 P3 — Mejoras de producto que aumentan conversión y retención
 
-> **"Como agente de IA o developer, quiero encadenar múltiples agentes de WasiAI en un pipeline donde cada paso se paga on-chain automáticamente, para resolver tareas complejas sin lógica de orquestación propia."**
+> Trabajar en paralelo con las Épicas. Cada una es una HU pequeña, entregable en 1-2 días.
 
-**Por qué diferencia:** Esto es lo que nadie más tiene. Un agente que llama a otros agentes, cada paso se liquida on-chain. La "economía agentica" real.
+- [ ] **UX-01** Empty state de búsqueda sin resultados — mostrar sugerencias de agentes populares en lugar de pantalla vacía.
 
-**Historias de usuario:**
+- [ ] **UX-02** `publish/page.tsx` — Preview live del agent card mientras el creator llena el formulario. El creator ve exactamente cómo quedará su ficha antes de publicar.
 
-- [ ] **HU-5.1 — Compose API (secuencial)**
-  > "Como developer, quiero un endpoint que tome una lista de agentes y los ejecute en secuencia, pasando el output de uno como input del siguiente, y cobre automáticamente por cada paso."
-  ```json
-  POST /api/v1/compose
-  {
-    "pipeline": [
-      { "agent": "translator", "params": { "target": "english" } },
-      { "agent": "summarizer" },
-      { "agent": "sentiment-analyzer" }
-    ],
-    "input": "texto en español largo..."
-  }
-  ```
+- [ ] **UX-03** Capabilities — editor de campos estructurado en lugar de JSON crudo. La mayoría de creators no saben qué es JSON.
 
-- [ ] **HU-5.2 — Compose paralelo**
-  > "Como developer, quiero ejecutar múltiples agentes en paralelo sobre el mismo input y combinar sus resultados, para velocidad y redundancia."
+- [ ] **UX-04** Página de detalle del agente — agregar sección "Cómo usar" con código de ejemplo auto-generado (curl, Node.js, Python) basado en el slug y precio del agente.
 
-- [ ] **HU-5.3 — Routing inteligente**
-  > "Como developer, quiero que WasiAI elija automáticamente el mejor agente para mi tarea basándose en precio, latencia y reputación, sin que yo tenga que especificarlo."
-  ```json
-  { "task": "summarize", "optimize_for": "quality" }
-  → WasiAI elige el mejor agente de summarization disponible
-  ```
+- [ ] **UX-05** Navbar — indicador visual del saldo de API key activo (cuánto USDC disponible). Sin esto el usuario no sabe si puede usar agentes.
 
-- [ ] **HU-5.4 — UI de pipelines**
-  > "Como usuario no técnico, quiero construir pipelines de agentes visualmente, arrastrando y conectando bloques, para automatizar tareas sin escribir código."
+- [ ] **UX-06** Dashboard creator — gráfica de llamadas por día (últimos 30 días). Hoy solo hay tabla de últimas llamadas.
+
+- [ ] **UX-07** Hero copy — actualmente genérico. Necesita copy específico para los dos usuarios: "Publish your AI agent → get paid automatically" (creator) y "Find the right AI agent → integrate in minutes" (consumer).
+
+- [ ] **i18n-01** Archivos de traducción `en.json` y `es.json` tienen copy del template NexusFactory. Actualizar con copy real de WasiAI en todas las secciones.
 
 ---
 
-### 🟡 ÉPICA 6 — Mainnet Avalanche
+## 📋 ÉPICAS — Roadmap de producto
 
-> **"Como creator y como usuario, quiero usar WasiAI con USDC real en Avalanche mainnet, para que mis earnings y pagos tengan valor real."**
+### 🔴 ÉPICA 1 — Creators Reales en el Marketplace *(siguiente sprint)*
+> Sin creators externos, no hay marketplace. Esta es LA prioridad de negocio.
 
-**Historias de usuario:**
+- [ ] **HU-1.1** Onboarding sin fricción — publicar agente sin wallet ni USDC (custodial onboarding)
+- [ ] **HU-1.2** Formulario multi-paso — básico → producto → técnico con preview live
+- [ ] **HU-1.3** Test de endpoint en tiempo real desde el formulario
+- [ ] **HU-1.4** Creator analytics — llamadas/día, latencia, earnings históricos, alertas de health
+- [ ] **HU-1.5** Perfil público del creator con todos sus agentes
 
-- [ ] **HU-6.1 — Deploy contrato en mainnet**
-  > "Como equipo WasiAI, queremos desplegar el contrato en Avalanche C-Chain mainnet, verificarlo en Snowtrace, y configurar el operator wallet con AVAX real para gas."
-  - Prerequisito: auditoría de seguridad del contrato
-  - USDC mainnet: `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E`
+### 🔴 ÉPICA 2 — SDK (@wasiai/sdk) *(en paralelo con Épica 1)*
+> Sin SDK, developers no pueden integrar. Multiplica el alcance por 10x.
 
-- [ ] **HU-6.2 — Migración de agentes demo a mainnet**
-  > "Como WasiAI, queremos registrar on-chain los agentes demo en mainnet y tener al menos 3 agentes reales de terceros registrados en el contrato."
+- [ ] **HU-2.1** SDK Node.js/TypeScript — `npm install @wasiai/sdk`
+- [ ] **HU-2.2** SDK Python — `pip install wasiai`
+- [ ] **HU-2.3** Documentación interactiva con ejemplos ejecutables
+- [ ] **HU-2.4** CLI — `wasiai invoke <agent> "<input>"`
 
-- [ ] **HU-6.3 — Monitoring de operator wallet**
-  > "Como operador, quiero alertas automáticas cuando el balance de AVAX del operator wallet esté por debajo de un umbral, para no quedarme sin gas en producción."
+### 🔴 ÉPICA 3 — Free Trial por Agente *(antes de abrir registro público)*
+> Sin esto, conversión es casi cero. Nadie paga por algo que no probó.
 
----
+- [ ] **HU-3.1** 1 llamada gratuita por usuario por agente desde la ficha
+- [ ] **HU-3.2** Playground — probar y comparar múltiples agentes
 
-### 🟢 ÉPICA 7 — Integraciones con Ecosistema AI
+### 🟡 ÉPICA 4 — Discovery y Calidad del Catálogo *(mes 2)*
 
-> **"Como developer que usa frameworks populares de IA, quiero usar agentes de WasiAI directamente desde mi stack actual, sin cambiar mi flujo de trabajo."**
+- [ ] **HU-4.1** Búsqueda semántica (pgvector o tsvector)
+- [ ] **HU-4.2** Filtros avanzados (precio, latencia, uptime, categoría)
+- [ ] **HU-4.3** Ejemplos de input/output curados por el creator
+- [ ] **HU-4.4** Reputación con datos reales (uptime histórico, latencia p50/p95, tasa de error) — reemplaza 👍/👎
+- [ ] **HU-4.5** Colecciones curadas y featured agents
 
-**Historias de usuario:**
+### 🟡 ÉPICA 5 — Agent-to-Agent Routing *(mes 2-3)*
+> El diferenciador real. Ningún otro marketplace tiene esto.
 
-- [ ] **HU-7.1 — Plugin para LangChain**
-  > "Como developer de LangChain, quiero usar cualquier agente de WasiAI como un Tool de LangChain, para integrarlo en mis chains sin código adicional."
+- [ ] **HU-5.1** `POST /api/v1/compose` — pipeline secuencial con pago por paso
+- [ ] **HU-5.2** Ejecución paralela de agentes
+- [ ] **HU-5.3** Routing inteligente por precio/latencia/reputación
+- [ ] **HU-5.4** UI visual de pipelines
 
-- [ ] **HU-7.2 — Plugin para LlamaIndex**
-  > Similar a LangChain pero para LlamaIndex.
+### 🟡 ÉPICA 6 — Mainnet Avalanche *(mes 3)*
+> Mientras sea Fuji, es un juguete. Mainnet = producto real.
 
-- [ ] **HU-7.3 — Ejemplo con AgentKit (Coinbase)**
-  > "Como developer usando AgentKit, quiero ver un ejemplo funcionando de un agente que usa y paga agentes de WasiAI automáticamente, para entender cómo integrarlo."
+- [ ] **HU-6.1** Auditoría de seguridad del contrato por firma externa
+- [ ] **HU-6.2** Deploy contrato en mainnet + configurar operator wallet con AVAX real
+- [ ] **HU-6.3** Migrar agentes demo a mainnet
+- [ ] **HU-6.4** Monitoring del operator wallet (alerta cuando AVAX < umbral)
 
-- [ ] **HU-7.4 — Ejemplo con Claude / Cursor via MCP**
-  > "Como usuario de Claude Desktop o Cursor, quiero configurar WasiAI como servidor MCP y tener acceso a todos los agentes del marketplace como herramientas."
-  - Documentar `claude_desktop_config.json` con WasiAI MCP
+### 🟢 ÉPICA 7 — Integraciones con Ecosistema AI *(mes 3-4)*
 
----
+- [ ] **HU-7.1** Plugin LangChain — WasiAI como Tool nativo
+- [ ] **HU-7.2** Plugin LlamaIndex
+- [ ] **HU-7.3** Ejemplo AgentKit (Coinbase) — agente que paga agentes
+- [ ] **HU-7.4** Documentación MCP para Claude Desktop y Cursor
 
-### 🟢 ÉPICA 8 — Infraestructura de Confianza y Seguridad
+### 🟢 ÉPICA 8 — Transparencia y Confianza *(mes 4)*
 
-> **"Como creator y como usuario, quiero saber que mis fondos están seguros, que WasiAI no puede actuar maliciosamente, y que el sistema funciona aunque WasiAI tenga problemas."**
-
-**Historias de usuario:**
-
-- [ ] **HU-8.1 — Auditoría de seguridad del contrato**
-  > "Como WasiAI, queremos que el contrato sea auditado por una firma especializada antes del deploy en mainnet."
-
-- [ ] **HU-8.2 — Dashboard de transparencia on-chain**
-  > "Como usuario, quiero ver en tiempo real: volumen total del marketplace, earnings pendientes de liquidar, último batch settlement, y saldo del operator wallet."
-  - Página pública `/transparency` con datos on-chain en tiempo real
-
-- [ ] **HU-8.3 — Notificaciones de actividad de keys**
-  > "Como usuario con API keys activas, quiero recibir notificaciones por email cuando mi saldo esté por agotarse o cuando se detecte uso inusual."
-
-- [ ] **HU-8.4 — Rate limiting por agente configurable**
-  > "Como creator, quiero configurar rate limits para mi agente (llamadas por minuto, por hora, por usuario), para proteger mi endpoint de abuso."
-
----
-
-## 🔧 DEUDA TÉCNICA (heredada del sprint anterior)
-
-- [ ] **SEC-CSP** — CSP nonce-based en vez de `unsafe-inline`
-- [ ] **ARCH-P07** — Web3Provider solo en rutas que lo necesitan
-- [ ] **PERF-05** — Discovery API — trim campos innecesarios
-- [ ] **UX-04** — Empty state con sugerencias en búsqueda sin resultados
-- [ ] **UX-06** — Preview live en formulario de publicación
-- [ ] **UX-11** — Capabilities con UI de inputs en vez de JSON crudo
-- [ ] **i18n** — Copy real de WasiAI en archivos de traducción
-- [ ] **SEC-T07** — Cron de retry para on-chain recordings fallidos
+- [ ] **HU-8.1** Auditoría de contrato por firma externa (prerequisito mainnet)
+- [ ] **HU-8.2** Dashboard público `/transparency` — volumen, settlements, operator health
+- [ ] **HU-8.3** Notificaciones — email cuando saldo de key < 20%, uso inusual detectado
+- [ ] **HU-8.4** Rate limiting configurable por creator (proteger su endpoint de abuso)
 
 ---
 
 ## ✅ Completado
 
-- [x] Deploy contrato Fuji v1 + verificado Snowscan
-- [x] Migrations Supabase 000–012
-- [x] Rate limiting Upstash Redis
-- [x] SSRF protection en todos los endpoints
-- [x] CSP + security headers
+- [x] Deploy Next.js + Supabase + Tailwind (golden path base)
+- [x] Migrations 000–013
+- [x] Rate limiting Upstash Redis en todos los endpoints críticos
+- [x] SSRF protection (IPv4 — IPv6 pendiente HAL-014/HAL-022)
+- [x] CSP + security headers (nonces pendiente SEC-CSP)
 - [x] Auth gate en /publish
 - [x] Paginación homepage
 - [x] Health endpoint A2A
 - [x] Pinata IPFS image upload
 - [x] On-chain payout (withdrawFor + WithdrawButton)
+- [x] Favicon SVG custom
 - [x] Deploy producción: https://wasiai-v2.vercel.app
-- [x] x402 real con Ultravioleta DAO (Fuji)
+- [x] x402 settlement con Ultravioleta DAO (Fuji)
 - [x] Self-registration API para agentes
 - [x] MCP server con pagos reales via agent keys
 - [x] ERC-8004 Reputation (agent_ratings)
-- [x] Auditoría 117 hallazgos aplicada
 - [x] UI rebrand Avalanche red + logo "casa de agentes"
 - [x] USDC pre-fondeado real para API keys (escrow on-chain)
-- [x] Recibos criptográficos firmados por llamada
+- [x] Recibos criptográficos firmados por llamada (signReceipt)
 - [x] Batch settlement diario (cron)
 - [x] Emergency withdraw 30 días (trustless exit)
 - [x] refundKeyToEarnings — withdraw unificado
-- [x] Contrato v3 Fuji: 0x71CddCdF8a40951a1d8C22C8774448FbcA089b53 verificado Sourcify + Snowtrace
+- [x] Contrato v3 Fuji: `0x71CddCdF8a40951a1d8C22C8774448FbcA089b53` verificado Sourcify + Snowtrace
+- [x] Auditoría 30 hallazgos — sprint de corrección [~] en progreso
