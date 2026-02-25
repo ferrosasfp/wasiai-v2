@@ -179,7 +179,7 @@ export async function withdrawForCreator(creatorWallet: string): Promise<string 
 }
 
 // ── Pre-funded API Key Functions ───────────────────────────────────────────
-// TODO: Update CONTRACT_ADDRESS after redeployment
+// Contract v2 deployed 2026-02-25 — includes USDC pre-funded key support
 
 /**
  * Convert a DB key_hash hex string to a bytes32 for on-chain use.
