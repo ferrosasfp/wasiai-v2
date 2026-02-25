@@ -5,6 +5,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 // WithdrawButton and WalletSetup are used inside EarningsSection sub-component
 // A-02: Sub-component with Suspense for streaming — async blockchain call isolated
 import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection'
+import { AgentActions } from './_components/AgentActions'
 
 interface ModelRow {
   id: string
@@ -121,6 +122,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                     <th className="px-6 py-3 text-right">Calls</th>
                     <th className="px-6 py-3 text-right">Revenue</th>
                     <th className="px-6 py-3 text-center">Status</th>
+                    <th className="px-6 py-3 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -149,6 +151,15 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                       </td>
                       <td className="px-6 py-4 text-center">
                         <StatusBadge status={model.status} />
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <AgentActions
+                          agentId={model.id}
+                          slug={model.slug}
+                          locale={locale}
+                          currentStatus={model.status}
+                          agentName={model.name}
+                        />
                       </td>
                     </tr>
                   ))}

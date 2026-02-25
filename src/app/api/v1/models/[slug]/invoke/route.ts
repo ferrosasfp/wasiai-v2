@@ -138,7 +138,7 @@ export async function POST(
     : null
 
   const [{ data: model, error: modelError }, keyRowResult] = await Promise.all([
-    supabase.from('agents').select('*').eq('slug', slug).eq('status', 'active').single(),
+    supabase.from('agents').select('*').eq('slug', slug).single(),
     keyHash
       ? supabase
           .from('agent_keys')
@@ -151,6 +151,14 @@ export async function POST(
 
   if (modelError || !model) {
     return NextResponse.json({ error: 'Model not found' }, { status: 404 })
+  }
+
+  // S-03: Explicit agent status check — must be active before any payment processing
+  if (model.status !== 'active') {
+    return NextResponse.json(
+      { error: 'agent_unavailable', message: 'This agent is currently paused' },
+      { status: 503 },
+    )
   }
 
   const priceStr = String(model.price_per_call)    // e.g. "0.02"
