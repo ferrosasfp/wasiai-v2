@@ -3,11 +3,11 @@
 # Version: 6.0.3
 # Date: 2026-02-25T18:59:39.178Z
 
-project_name: wasiai-v2
-user_skill_level: intermediate
-planning_artifacts: "{project-root}/_bmad-output/planning-artifacts"
-implementation_artifacts: "{project-root}/_bmad-output/implementation-artifacts"
-project_knowledge: "{project-root}/docs"
+project_name: WasiAI
+user_skill_level: expert
+planning_artifacts: "{project-root}/.nexus/docs/prd"
+implementation_artifacts: "{project-root}/.nexus/docs/sdd"
+project_knowledge: "{project-root}/project-context.md"
 
 # Core Configuration Values
 user_name: Fernando
