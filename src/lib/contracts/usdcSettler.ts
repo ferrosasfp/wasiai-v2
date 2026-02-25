@@ -120,6 +120,8 @@ export async function settlePaymentDirectly(
     // ── 1. Timing checks ────────────────────────────────────────────────────
     const now = Math.floor(Date.now() / 1000)
 
+    // HAL-019: validBefore check — rejects expired authorizations before hitting the chain
+    // Prevents creator not getting paid when RPC is slow and deadline has passed
     if (Number(auth.validBefore) < now) {
       return { verified: false, settled: false, error: 'Authorization expired (validBefore < now)' }
     }

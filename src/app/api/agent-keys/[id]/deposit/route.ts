@@ -72,6 +72,27 @@ export async function POST(
       return NextResponse.json({ error: 'Key has no hash — cannot identify on-chain' }, { status: 500 })
     }
 
+    // HAL-020: Verify ownerAddress matches authenticated user's wallet
+    const { data: creatorProfile } = await supabase
+      .from('creator_profiles')
+      .select('wallet_address')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!creatorProfile?.wallet_address) {
+      return NextResponse.json(
+        { error: 'No wallet configured. Set up your wallet in /creator/dashboard first.' },
+        { status: 400 },
+      )
+    }
+
+    if (body.ownerAddress.toLowerCase() !== creatorProfile.wallet_address.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'ownerAddress does not match your configured wallet address' },
+        { status: 403 },
+      )
+    }
+
     // 4. Submit ERC-3009 deposit on-chain (operator-mediated)
     logger.info('[deposit] initiating depositForKey', { keyId: keyRow.key_hash.slice(0, 8), amount: body.amount })
 

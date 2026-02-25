@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
 import { logger } from '@/lib/logger'
 
+const BATCH_SIZE_LIMIT = 500
+
 /**
  * Vercel Cron — ejecutar diariamente a las 02:00 UTC
  *
@@ -83,65 +85,71 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      // Filtrar llamadas con slug y amount válidos
-      const validCalls = calls.filter(c => c.agent_slug && c.amount_paid && Number(c.amount_paid) > 0)
-      if (validCalls.length === 0) {
+      // HAL-018: Limitar batch a BATCH_SIZE_LIMIT para evitar exceder gas limit
+      const allValidCalls = calls.filter(c => c.agent_slug && c.amount_paid && Number(c.amount_paid) > 0)
+      if (allValidCalls.length === 0) {
         logger.warn('[settle-key-batches] no valid calls for key', { keyId })
         continue
       }
 
-      const slugs   = validCalls.map(c => c.agent_slug as string)
-      const amounts = validCalls.map(c => Number(c.amount_paid))
-      const callIds = validCalls.map(c => c.id)
+      // Procesar en sub-batches de BATCH_SIZE_LIMIT
+      for (let batchStart = 0; batchStart < allValidCalls.length; batchStart += BATCH_SIZE_LIMIT) {
+        const validCalls = allValidCalls.slice(batchStart, batchStart + BATCH_SIZE_LIMIT)
+        if (validCalls.length === 0) continue
 
-      const totalUsdc = amounts.reduce((a, b) => a + b, 0)
+        const slugs   = validCalls.map(c => c.agent_slug as string)
+        const amounts = validCalls.map(c => Number(c.amount_paid))
+        const callIds = validCalls.map(c => c.id)
 
-      // Crear registro de batch
-      const { data: batchRecord } = await supabase
-        .from('key_batch_settlements')
-        .insert({
-          key_id:     keyId,
-          key_hash:   keyRow.key_hash,
-          total_usdc: totalUsdc,
-          call_count: validCalls.length,
-          status:     'pending',
-        })
-        .select('id')
-        .single()
+        const totalUsdc = amounts.reduce((a, b) => a + b, 0)
 
-      // Llamar al contrato on-chain
-      const txHash = await settleKeyBatchOnChain(keyRow.key_hash, slugs, amounts)
-
-      const now = new Date().toISOString()
-
-      // Actualizar batch como confirmado (o fallido si txHash es null)
-      if (txHash) {
-        await supabase
+        // Crear registro de batch
+        const { data: batchRecord } = await supabase
           .from('key_batch_settlements')
-          .update({ status: 'confirmed', tx_hash: txHash, confirmed_at: now })
-          .eq('id', batchRecord?.id)
-
-        // Marcar las llamadas como liquidadas
-        await supabase
-          .from('agent_calls')
-          .update({
-            settled_at:          now,
-            settlement_tx_hash:  txHash,
-            settlement_batch_id: batchRecord?.id,
+          .insert({
+            key_id:     keyId,
+            key_hash:   keyRow.key_hash,
+            total_usdc: totalUsdc,
+            call_count: validCalls.length,
+            status:     'pending',
           })
-          .in('id', callIds)
+          .select('id')
+          .single()
 
-        totalSettled += validCalls.length
-        results.push({ keyId, txHash, callCount: validCalls.length })
-      } else {
-        // settleKeyBatchOnChain returned null (non-fatal error logged internally)
-        await supabase
-          .from('key_batch_settlements')
-          .update({ status: 'failed', error: 'on-chain call returned null' })
-          .eq('id', batchRecord?.id)
+        // Llamar al contrato on-chain
+        const txHash = await settleKeyBatchOnChain(keyRow.key_hash, slugs, amounts)
 
-        results.push({ keyId, txHash: null, callCount: validCalls.length, error: 'on-chain call returned null' })
-      }
+        const now = new Date().toISOString()
+
+        // Actualizar batch como confirmado (o fallido si txHash es null)
+        if (txHash) {
+          await supabase
+            .from('key_batch_settlements')
+            .update({ status: 'confirmed', tx_hash: txHash, confirmed_at: now })
+            .eq('id', batchRecord?.id)
+
+          // Marcar las llamadas como liquidadas
+          await supabase
+            .from('agent_calls')
+            .update({
+              settled_at:          now,
+              settlement_tx_hash:  txHash,
+              settlement_batch_id: batchRecord?.id,
+            })
+            .in('id', callIds)
+
+          totalSettled += validCalls.length
+          results.push({ keyId, txHash, callCount: validCalls.length })
+        } else {
+          // settleKeyBatchOnChain returned null (non-fatal error logged internally)
+          await supabase
+            .from('key_batch_settlements')
+            .update({ status: 'failed', error: 'on-chain call returned null' })
+            .eq('id', batchRecord?.id)
+
+          results.push({ keyId, txHash: null, callCount: validCalls.length, error: 'on-chain call returned null' })
+        }
+      } // end sub-batch loop
     } catch (err) {
       // HAL-015: Detect balance mismatch (on-chain < DB) and alert
       const isInsufficientBalance = String(err).includes('insufficient key balance')

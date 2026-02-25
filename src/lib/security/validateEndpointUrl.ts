@@ -42,6 +42,8 @@ export function validateEndpointUrl(rawUrl: string): void {
     '172.30.',
     '172.31.',
     '192.168.',
+    '100.100.100.200', // Alibaba Cloud metadata
+    '169.254.169.254', // AWS/GCP metadata exact match
     '[::1]',
     '::1',
     'metadata.google.internal',
@@ -61,6 +63,7 @@ export function validateEndpointUrl(rawUrl: string): void {
     /^\[?::ffff:/i,               // IPv4-mapped IPv6
     /^\[?0:0:0:0:0:ffff:/i,      // IPv4-mapped alternativo
     /^\[?64:ff9b:/i,              // NAT64
+    /^\[?fd00:ec2:/i,             // AWS IMDSv2 IPv6
   ]
 
   for (const pattern of blockedIPv6Patterns) {

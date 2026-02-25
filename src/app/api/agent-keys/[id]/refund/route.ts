@@ -87,19 +87,30 @@ export async function POST(
     logger.error('[refund] mini-batch settle failed (non-fatal)', { keyId: id, err })
   }
 
-  // 4. Llamar refundKeyToEarnings on-chain
+  // 4. Llamar refundKeyToEarnings on-chain ANTES de revocar en DB
+  // HAL-025: Si hay saldo y el on-chain falla, NO revocar la key (usuario perdería fondos Y key)
   let refundTxHash: string | null = null
   const refundedUsdc = Math.max(0, Number(keyRow.budget_usdc) - Number(keyRow.spent_usdc))
 
   if (keyRow.key_hash && refundedUsdc > 0) {
     refundTxHash = await refundKeyToEarningsOnChain(keyRow.key_hash)
     if (!refundTxHash) {
-      logger.warn('[refund] refundKeyToEarningsOnChain returned null — no on-chain balance or contract not configured', { keyId: id })
-      // Continue: DB state is what matters for the UI
+      // HAL-025: On-chain refund failed and there's real balance — abort to protect user funds
+      logger.error('[refund] refundKeyToEarningsOnChain failed with pending balance — aborting revoke to protect funds', {
+        keyId: id,
+        refundedUsdc,
+      })
+      return NextResponse.json(
+        {
+          error: 'On-chain refund failed. Your key remains active and your USDC is safe. Please try again in a few minutes.',
+          code: 'REFUND_ONCHAIN_FAILED',
+        },
+        { status: 503 },
+      )
     }
   }
 
-  // 5. Revocar la key en DB
+  // 5. Revocar la key en DB (solo después de confirmar el on-chain o si no había saldo)
   const { error: revokeError } = await supabase
     .from('agent_keys')
     .update({ is_active: false })

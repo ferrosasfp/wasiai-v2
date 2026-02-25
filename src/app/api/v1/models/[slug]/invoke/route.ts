@@ -404,6 +404,9 @@ async function logCall(
         })
       : Promise.resolve(),
   ])
+  // HAL-021: callId viene directamente del insert (no de búsqueda posterior)
+  // Esto previene race conditions donde dos llamadas concurrentes podrían
+  // obtener el mismo callId si se buscara por ORDER BY called_at DESC LIMIT 1
   return { id: (insertResult.data as { id?: string } | null)?.id }
 }
 

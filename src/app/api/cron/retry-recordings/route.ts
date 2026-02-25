@@ -26,9 +26,31 @@ export async function POST(request: NextRequest) {
     const stats = await processPendingRecordings()
     logger.info('[cron/retry-recordings] completed', stats)
 
+    // HAL-017: Monitor stale pending recordings (age > 1h)
+    // Any stale recordings indicate x402 payments where creator may not get paid
+    const { createServiceClient } = await import('@/lib/supabase/server')
+    const monitorSupabase = createServiceClient()
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { count: staleCount } = await monitorSupabase
+      .from('pending_recordings')
+      .select('*', { count: 'exact', head: true })
+      .is('resolved_at', null)
+      .lt('next_retry_at', oneHourAgo)
+      .lt('attempts', 5)
+
+    if (staleCount && staleCount > 0) {
+      logger.error('[cron/retry-recordings] ALERT: stale pending recordings detected', {
+        alert: 'PENDING_RECORDINGS_STALE',
+        staleCount,
+        message: `${staleCount} payment(s) older than 1h could not be recorded on-chain. Creators may not receive payment.`,
+        action: 'Check RPC connectivity and operator wallet AVAX balance.',
+      })
+    }
+
     return NextResponse.json({
       ok: true,
       ...stats,
+      staleCount: staleCount ?? 0,
       timestamp: new Date().toISOString(),
     })
   } catch (err) {
