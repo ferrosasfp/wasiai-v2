@@ -33,7 +33,7 @@ export async function POST() {
 
   if (!profile?.wallet_address) {
     return NextResponse.json(
-      { error: 'No wallet address configured. Set it in your profile first.' },
+      { error: 'Configura tu wallet para retirar', action: 'setup_wallet' },
       { status: 400 },
     )
   }

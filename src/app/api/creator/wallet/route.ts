@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
+import { triggerImmediateSettlement } from '@/lib/settlement/immediateSettlement'
 
 export async function POST(req: NextRequest) {
   // S-02: CSRF protection — validate request origin
@@ -27,6 +28,12 @@ export async function POST(req: NextRequest) {
     .eq('id', user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fire-and-forget: settle accumulated pending earnings now that wallet is set.
+  // Non-fatal — wallet is already saved. Cron diario resuelve si falla.
+  triggerImmediateSettlement(user.id).catch(err =>
+    console.error('[wallet] immediate settlement failed:', err),
+  )
 
   return NextResponse.json({ ok: true })
 }

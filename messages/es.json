@@ -141,6 +141,30 @@
     "noModels": "Sin modelos todavía",
     "noModelsSubtitle": "Publica tu primer modelo para empezar a ganar.",
     "noCalls": "Sin llamadas todavía",
-    "noCallsSubtitle": "Las llamadas a tus modelos aparecerán aquí en tiempo real."
+    "noCallsSubtitle": "Las llamadas a tus modelos aparecerán aquí en tiempo real.",
+    "pendingEarnings": "Tienes {amount} USDC pendientes",
+    "pendingEarningsSubtitle": "Configura tu wallet para cobrarlos",
+    "pendingEarningsCta": "Configurar wallet"
+  },
+  "onboarding": {
+    "step1": {
+      "title": "Cuéntanos sobre ti",
+      "subtitle": "Tus datos básicos para tu perfil público",
+      "namePlaceholder": "Tu nombre o alias",
+      "bioPlaceholder": "Describe qué tipo de agentes construyes (opcional)",
+      "cta": "Continuar"
+    },
+    "step2": {
+      "title": "Publica tu primer agente",
+      "subtitle": "Tu agente en el marketplace en minutos",
+      "cta": "Publicar agente",
+      "skip": "Saltar por ahora"
+    },
+    "step3": {
+      "title": "Configura tu wallet",
+      "subtitle": "Para recibir tus ganancias en USDC",
+      "optional": "Opcional",
+      "skip": "Ir al dashboard"
+    }
   }
 }

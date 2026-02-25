@@ -15,14 +15,16 @@ const PublishForm = dynamic(() => import('./PublishForm'), {
 })
 
 interface Props {
-  params: Promise<{ locale: string }>
+  params:       Promise<{ locale: string }>
+  searchParams: Promise<{ from?: string }>
 }
 
 // UX-01: Auth gate — redirect to login if not authenticated
 // Wallet gate — wallet required before publishing
-export default async function PublishPage({ params }: Props) {
-  const { locale } = await params
-  const supabase = await createClient()
+export default async function PublishPage({ params, searchParams }: Props) {
+  const { locale }   = await params
+  const { from }     = await searchParams
+  const supabase     = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -36,5 +38,5 @@ export default async function PublishPage({ params }: Props) {
     .eq('id', user.id)
     .single()
 
-  return <PublishForm initialWallet={profile?.wallet_address ?? null} />
+  return <PublishForm initialWallet={profile?.wallet_address ?? null} from={from} />
 }

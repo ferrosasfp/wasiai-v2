@@ -13,9 +13,10 @@ type PublishForm = CreateModelDraft
 
 interface PublishFormProps {
   initialWallet: string | null
+  from?:         string
 }
 
-export default function PublishForm({ initialWallet }: PublishFormProps) {
+export default function PublishForm({ initialWallet, from }: PublishFormProps) {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
@@ -82,7 +83,10 @@ export default function PublishForm({ initialWallet }: PublishFormProps) {
       })
       if (!res.ok) throw new Error(await res.text())
       setSuccess(true)
-      setTimeout(() => router.push(`/${locale}/creator/dashboard`), 2000)
+      const successRedirect = from === 'onboarding'
+        ? `/${locale}/onboarding?published=true`
+        : `/${locale}/creator/dashboard`
+      setTimeout(() => router.push(successRedirect), 2000)
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : 'Error publishing model' })
     } finally {

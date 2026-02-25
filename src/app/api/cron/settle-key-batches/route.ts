@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
+import { PENDING_WALLET_SENTINEL } from '@/lib/settlement/immediateSettlement'
 import { logger } from '@/lib/logger'
 
 const BATCH_SIZE_LIMIT = 500
@@ -58,6 +59,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, message: 'No unsettled calls', settled: 0 })
   }
 
+  // 1b. Build slug → { creatorId, hasWallet } map to check wallet before settling
+  //     Prevents on-chain settlement for creators without wallet_address configured.
+  const uniqueSlugs = [...new Set(unsettledCalls.map(c => c.agent_slug).filter(Boolean))] as string[]
+
+  const slugCreatorMap = new Map<string, { creatorId: string; hasWallet: boolean }>()
+
+  if (uniqueSlugs.length > 0) {
+    const { data: agentRows } = await supabase
+      .from('agents')
+      .select('slug, creator_id')
+      .in('slug', uniqueSlugs)
+
+    if (agentRows && agentRows.length > 0) {
+      const creatorIds = [...new Set(agentRows.map(a => a.creator_id).filter(Boolean))] as string[]
+
+      const { data: profileRows } = await supabase
+        .from('creator_profiles')
+        .select('id, wallet_address')
+        .in('id', creatorIds)
+
+      const walletByCreator = new Map<string, boolean>()
+      for (const p of profileRows ?? []) {
+        walletByCreator.set(p.id, !!p.wallet_address)
+      }
+
+      for (const a of agentRows) {
+        if (a.slug && a.creator_id) {
+          slugCreatorMap.set(a.slug, {
+            creatorId: a.creator_id,
+            hasWallet: walletByCreator.get(a.creator_id) ?? false,
+          })
+        }
+      }
+    }
+  }
+
   // 2. Agrupar por key_id
   const byKey = new Map<string, typeof unsettledCalls>()
   for (const call of unsettledCalls) {
@@ -97,9 +134,55 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      // Procesar en sub-batches de BATCH_SIZE_LIMIT
-      for (let batchStart = 0; batchStart < allValidCalls.length; batchStart += BATCH_SIZE_LIMIT) {
-        const validCalls = allValidCalls.slice(batchStart, batchStart + BATCH_SIZE_LIMIT)
+      // HU-1.1: Split calls by whether the creator has a wallet configured.
+      //   No-wallet calls: accumulate in pending_earnings_usdc, mark as PENDING_WALLET.
+      //   Wallet calls: proceed with on-chain settlement.
+      const walletCalls   = allValidCalls.filter(c => slugCreatorMap.get(c.agent_slug ?? '')?.hasWallet !== false)
+      const noWalletCalls = allValidCalls.filter(c => slugCreatorMap.get(c.agent_slug ?? '')?.hasWallet === false)
+
+      // Handle no-wallet calls: accumulate display counter and mark as pending
+      if (noWalletCalls.length > 0) {
+        const now = new Date().toISOString()
+
+        // Group by creator to update each creator's pending_earnings_usdc
+        const pendingByCreator = new Map<string, number>()
+        for (const call of noWalletCalls) {
+          const info = slugCreatorMap.get(call.agent_slug ?? '')
+          if (!info) continue
+          pendingByCreator.set(info.creatorId, (pendingByCreator.get(info.creatorId) ?? 0) + Number(call.amount_paid))
+        }
+
+        for (const [creatorId, amount] of pendingByCreator.entries()) {
+          try {
+            await supabase.rpc('increment_pending_earnings', {
+              p_user_id: creatorId,
+              p_amount:  amount,
+            })
+          } catch (err) {
+            logger.error('[settle-key-batches] increment_pending_earnings failed', { creatorId, err })
+          }
+        }
+
+        // Mark calls as PENDING_WALLET so they're not re-processed or double-counted
+        await supabase
+          .from('agent_calls')
+          .update({
+            settled_at:         now,
+            settlement_tx_hash: PENDING_WALLET_SENTINEL,
+          })
+          .in('id', noWalletCalls.map(c => c.id))
+
+        logger.info('[settle-key-batches] accumulated no-wallet calls', {
+          keyId, count: noWalletCalls.length, creators: pendingByCreator.size,
+        })
+      }
+
+      // If no wallet calls remain, skip on-chain settlement for this key
+      if (walletCalls.length === 0) continue
+
+      // Procesar en sub-batches de BATCH_SIZE_LIMIT (solo wallet calls)
+      for (let batchStart = 0; batchStart < walletCalls.length; batchStart += BATCH_SIZE_LIMIT) {
+        const validCalls = walletCalls.slice(batchStart, batchStart + BATCH_SIZE_LIMIT)
         if (validCalls.length === 0) continue
 
         const slugs   = validCalls.map(c => c.agent_slug as string)

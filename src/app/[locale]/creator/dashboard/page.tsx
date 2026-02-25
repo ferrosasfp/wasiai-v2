@@ -6,6 +6,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 // A-02: Sub-component with Suspense for streaming — async blockchain call isolated
 import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection'
 import { AgentActions } from './_components/AgentActions'
+import { PendingEarningsBanner } from '@/components/PendingEarningsBanner' // used in JSX below
 
 interface ModelRow {
   id: string
@@ -35,6 +36,21 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale ?? 'en'}/login`)
+
+  // HU-1.1: Check onboarding status and pending earnings
+  const { data: creatorProfile } = await supabase
+    .from('creator_profiles')
+    .select('onboarding_completed, onboarding_step, pending_earnings_usdc, wallet_address')
+    .eq('id', user.id)
+    .single()
+
+  // Redirect to onboarding wizard if not yet completed
+  if (creatorProfile && !creatorProfile.onboarding_completed) {
+    redirect(`/${locale ?? 'en'}/onboarding`)
+  }
+
+  const pendingEarnings = Number(creatorProfile?.pending_earnings_usdc ?? 0)
+  const hasWallet       = !!creatorProfile?.wallet_address
 
   // P-01 + A-02: Fetch models only; earnings/wallet fetched inside EarningsSection (Suspense)
   const { data: models } = await supabase
@@ -73,6 +89,11 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
           <h1 className="text-2xl font-bold text-gray-900">Creator Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">{user.email}</p>
         </div>
+
+        {/* HU-1.1: Pending earnings banner — visible if pending_earnings_usdc > 0 AND no wallet */}
+        {pendingEarnings > 0 && !hasWallet && (
+          <PendingEarningsBanner pendingEarnings={pendingEarnings} />
+        )}
 
         {/* Stats cards */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
