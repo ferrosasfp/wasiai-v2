@@ -52,47 +52,27 @@
 
 ---
 
-## 🔴 P1 — Seguridad y correctness (bloquean confianza en producción)
+## 🔴 P1 — Seguridad y correctness ✅ COMPLETADO (2026-02-25)
 
-> Resolver antes de onboardear creators externos o hacer demo pública.
-
-- [ ] **HAL-017** `invoke/route.ts` — x402 path: USDC recibido pero creator no cobra si `recordInvocationOnChain` falla permanentemente. El retry queue existe pero sin SLA ni alerta. Agregar: monitoreo de pending_recordings con edad > 1h → alerta operativa + dashboard interno.
-
-- [ ] **HAL-018** `settle-key-batches/route.ts` — Cron no tiene límite de batch size. Si hay 10,000 llamadas pendientes de una sola key, el array de slugs/amounts puede exceder el gas limit del contrato. Agregar: paginación de máximo 500 items por batch, con loop hasta liquidar todo.
-
-- [ ] **HAL-019** `usdcSettler.ts` — La función `settlePaymentDirectly` no verifica que el `validBefore` (deadline) de la autorización ERC-3009 no haya expirado antes de intentar la tx on-chain. Si el RPC está lento y el deadline pasó, la tx on-chain falla pero el usuario ya recibió el resultado del agente. El creator no cobra. Agregar: check `validBefore > Date.now() / 1000` antes de llamar al contrato.
-
-- [ ] **HAL-020** `agent-keys/[id]/deposit/route.ts` — No verifica que el `ownerAddress` del body coincida con la wallet del usuario autenticado. Un usuario podría hacer un depósito firmado por otra wallet y asignarlo a su key. Agregar: validar que `ownerAddress === creator_profiles.wallet_address` del usuario autenticado.
-
-- [ ] **HAL-021** `invoke/route.ts` — El `callRecord` se busca por `caller_type = 'agent'` y `tx_hash IS NULL ORDER BY called_at DESC LIMIT 1`. En carga concurrente alta, dos llamadas simultáneas pueden firmar el mismo `callId`. El receipt quedaría asignado al registro incorrecto. Fix: pasar el `callId` directamente como parámetro a `logCall` y retornarlo, no buscarlo después.
-
-- [ ] **HAL-022** `validateEndpointUrl.ts` — Los dominios cloud metadata no están todos bloqueados. Faltan:
-  - `metadata.google.internal` (GCP)
-  - `169.254.169.254` sin http:// (acceso directo)
-  - `100.100.100.200` (Alibaba Cloud metadata)
-  Agregar a la blocklist.
+- [x] **HAL-017** Monitoreo pending_recordings > 1h → alerta operativa en retry-recordings cron
+- [x] **HAL-018** Batch size limit 500 con sub-batch loop en settle-key-batches
+- [x] **HAL-019** Check `validBefore > Date.now() / 1000` antes de tx on-chain en usdcSettler.ts
+- [x] **HAL-020** Validar `ownerAddress === creator_profiles.wallet_address` en deposit route
+- [x] **HAL-021** `callId` retornado directamente de `logCall`, no buscado después
+- [x] **HAL-022** SSRF blocklist extendida: Alibaba Cloud `100.100.100.200`, AWS IMDSv2 IPv6 `fd00:ec2:`
 
 ---
 
-## 🟠 P2 — Deuda técnica que afecta calidad del producto
+## 🟠 P2 — Deuda técnica ✅ COMPLETADO (2026-02-25)
 
-> Resolver antes de lanzar SDK público o abrir el marketplace a creators externos.
-
-- [ ] **HAL-023** `agent-keys/page.tsx` — El `DepositModal` firma la autorización ERC-3009 con `validBefore = Date.now() / 1000 + 3600` (1 hora). Si el usuario demora más de 1 hora entre firmar y que el operador procese (ej: cola llena, RPC lento), el depósito falla silenciosamente. Ampliar a 24h o mostrar countdown al usuario.
-
-- [ ] **HAL-024** `marketplaceClient.ts` — `getOperatorClient()` crea un nuevo `JsonRpcProvider` y `Wallet` en cada llamada. En el cron que procesa N keys, esto significa N instancias de provider. Extraer a singleton con lazy initialization.
-
-- [ ] **HAL-025** `agent-keys/[id]/refund/route.ts` — Si `refundKeyToEarningsOnChain` falla (RPC caído), la key ya fue revocada en DB (`is_active = false`) pero los fondos siguen en el contrato. El usuario pierde acceso a la key Y no puede recuperar su USDC. Fix: hacer el refund on-chain ANTES de revocar la key en DB. Si el on-chain falla, no revocar.
-
-- [ ] **HAL-026** `settle-key-batches/route.ts` — El cron consulta TODOS los `agent_calls` no liquidados sin límite de tiempo. En producción con meses de historial, esta query puede tardar minutos. Agregar: `AND called_at > NOW() - INTERVAL '7 days'` como ventana máxima, y proceso separado para reconciliar llamadas más antiguas.
-
-- [ ] **HAL-027** `signReceipt.ts` — El timestamp del receipt es `Math.floor(Date.now() / 1000)` en el momento de la firma, pero el receipt se guarda en DB con `called_at` diferente. Si hay drift entre el tiempo de firma y el tiempo de llamada, la auditoría del usuario no cuadra. Usar el mismo timestamp para ambos.
-
-- [ ] **HAL-028** `api/v1/agents/route.ts` — La query de discovery devuelve todos los campos de la tabla `agents` incluyendo `endpoint_url` (URL privada del creator). Cualquier agente externo que llame al discovery endpoint puede ver los endpoints internos de todos los creators. Filtrar: excluir `endpoint_url` de la respuesta pública.
-
-- [ ] **HAL-029** Falta `.env.example` completo y actualizado. Varias vars nuevas agregadas en los últimos sprints no están documentadas: `CRON_SECRET`, `X402_FACILITATOR_URL`, `OPERATOR_PRIVATE_KEY` (¿debería estar?). Un developer nuevo no puede levantar el proyecto desde el README.
-
-- [ ] **SEC-CSP** `middleware.ts` — CSP usa `unsafe-inline` para scripts. Reemplazar con nonces por request via `experimental.strictNextHead` en Next.js. Sin esto, cualquier XSS inyecta scripts arbitrarios.
+- [x] **HAL-023** `validBefore` en DepositModal extendido a 24h
+- [x] **HAL-024** `getOperatorClient()` refactorizado a singleton lazy — una RPC connection por proceso
+- [x] **HAL-025** Refund on-chain ANTES de revocar key en DB; si on-chain falla → 503, key sigue activa
+- [x] **HAL-026** settle-key-batches: query limitada a últimos 7 días
+- [x] **HAL-027** `receiptTimestamp` capturado inmediatamente después de `logCall`, mismo valor para firma y DB
+- [x] **HAL-028** `endpoint_url` excluido de discovery API pública
+- [x] **HAL-029** `.env.example` actualizado con todas las vars actuales ordenadas por sección
+- [x] **SEC-CSP** Nonce por request en middleware; `unsafe-inline` eliminado de producción
 
 ---
 
