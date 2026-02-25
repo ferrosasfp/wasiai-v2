@@ -84,6 +84,25 @@ export async function middleware(request: NextRequest) {
     return redirectResponse
   }
 
+  // SEC-CSP: Generar nonce por request para CSP sin unsafe-inline
+  // Usa Web Crypto API (disponible en Edge Runtime — no depende de Node.js crypto)
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16))
+  const nonce = btoa(String.fromCharCode(...Array.from(nonceBytes)))
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ''}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https: blob:",
+    "font-src 'self'",
+    "connect-src 'self' https://*.supabase.co https://api.avax.network https://api.avax-test.network https://facilitator.ultravioletadao.xyz wss://*.supabase.co",
+    "frame-ancestors 'none'",
+  ].join('; ')
+
+  response.headers.set('x-nonce', nonce)
+  response.headers.set('Content-Security-Policy', csp)
+
   return response
 }
 

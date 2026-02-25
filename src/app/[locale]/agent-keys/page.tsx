@@ -89,7 +89,7 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
       // 4. Build ERC-3009 / EIP-712 typed data for TransferWithAuthorization
       const atomicAmount = Math.round(amount * 1_000_000).toString()
       const validAfter   = 0
-      const validBefore  = Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
+      const validBefore  = Math.floor(Date.now() / 1000) + 86400 // 24 horas from now
 
       // Random 32-byte nonce
       const nonceBytes = crypto.getRandomValues(new Uint8Array(32))

@@ -75,6 +75,8 @@ export async function GET(request: NextRequest) {
     }, { headers: CORS })
   }
 
+  // HAL-028: endpoint_url excluido explícitamente del select — URL privada del creator
+  // no debe ser visible en el discovery público
   let query = supabase
     .from('agents')
     .select(`

@@ -206,16 +206,17 @@ export async function POST(
       // 1. Log call to DB first to get the call ID
       const { id: insertedId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
       callId = insertedId ?? null
+      // HAL-027: Mismo timestamp para receipt y called_at — auditoría consistente
+      const receiptTimestamp = Math.floor(Date.now() / 1000)
 
       // 2. Sign a cryptographic receipt for the caller to audit
       if (callId && keyRow.key_hash) {
-        const timestamp = Math.floor(Date.now() / 1000)
         receiptSignature = await signReceipt({
           keyId:      keyHashToBytes32(keyRow.key_hash),
           callId,
           agentSlug:  slug,
           amountUsdc: model.price_per_call as number,
-          timestamp,
+          timestamp:  receiptTimestamp,
         }).catch(err => {
           logger.warn('[invoke] signReceipt failed (non-fatal)', { err: String(err).slice(0, 200) })
           return null

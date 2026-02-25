@@ -22,14 +22,16 @@ function getChain() {
   return chainId === 43114 ? avalanche : avalancheFuji
 }
 
-function getOperatorClient() {
+// HAL-024: Singleton — evita crear N conexiones RPC en el cron
+let _operatorClientInstance: ReturnType<typeof _createOperatorClient> | null = null
+
+function _createOperatorClient() {
   const pkRaw = process.env.OPERATOR_PRIVATE_KEY
   if (!pkRaw) throw new Error('OPERATOR_PRIVATE_KEY not set')
   const pkHex = pkRaw.trim().replace(/^0x/i, '')
   const account = privateKeyToAccount(`0x${pkHex}` as `0x${string}`)
   const chain   = getChain()
 
-  // Trim to prevent whitespace bugs (Vercel env vars can have trailing \n)
   const rpcUrl = (chain.id === 43114
     ? process.env.NEXT_PUBLIC_RPC_MAINNET
     : process.env.NEXT_PUBLIC_RPC_TESTNET
@@ -40,6 +42,13 @@ function getOperatorClient() {
     public: createPublicClient({ chain, transport: http(rpcUrl) }),
     account,
   }
+}
+
+function getOperatorClient() {
+  if (!_operatorClientInstance) {
+    _operatorClientInstance = _createOperatorClient()
+  }
+  return _operatorClientInstance
 }
 
 function getContractAddress(): Address {

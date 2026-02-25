@@ -35,12 +35,17 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceClient()
 
   // 1. Encontrar todas las llamadas con key no liquidadas
+  // HAL-026: Limitar a últimos 7 días para evitar timeout con historial largo
+  // Llamadas más antiguas se reconcilian con proceso separado si es necesario
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
   const { data: unsettledCalls, error } = await supabase
     .from('agent_calls')
     .select('id, key_id, agent_slug, amount_paid')
     .not('key_id', 'is', null)
     .is('settled_at', null)
     .neq('status', 'error')  // solo llamadas exitosas
+    .gte('called_at', sevenDaysAgo)
     .order('called_at', { ascending: true })
 
   if (error) {
