@@ -1,105 +1,43 @@
-// ═══════════════════════════════════════════════════════════════════
-// @wasiai/sdk — Types
-// ═══════════════════════════════════════════════════════════════════
+export interface WasiAIConfig {
+  /** WasiAI API key (starts with `wasi_`) */
+  apiKey: string
+  /** Override the base URL (useful for tests or self-hosted deployments) */
+  baseUrl?: string
+}
 
-export type AgentCategory =
-  | 'nlp'
-  | 'vision'
-  | 'audio'
-  | 'code'
-  | 'multimodal'
-  | 'data'
-  | 'finance'
-  | 'other'
+export interface InvokeOptions {
+  /** Text input for the agent */
+  input: string
+  /** Request timeout in milliseconds (default: 30000) */
+  timeout?: number
+}
 
-export type AgentType = 'model' | 'agent' | 'workflow'
+export interface InvokeResult {
+  /** The agent's output */
+  output: string
+  /** Time taken by the agent in milliseconds */
+  latencyMs: number
+  /** On-chain payment receipt identifier */
+  receiptId: string
+}
 
-export interface AgentCapability {
+export interface Agent {
+  slug: string
   name: string
   description: string
-  input?: Record<string, string>
-  output?: Record<string, string>
+  category: string
+  /** Price per call in USDC (as a string for precision, e.g. "0.02") */
+  priceUsdc: string
+  inputExample?: string
 }
 
-/** Config que el builder pasa a createAgent() */
-export interface AgentConfig {
-  /** Nombre visible en el marketplace */
-  name: string
-
-  /** Descripción para humanos y agentes */
-  description: string
-
-  /** Categoría del agente */
-  category: AgentCategory
-
-  /** Precio por llamada en USDC (default: 0.001) */
-  price?: number
-
-  /** Tipo de agente (default: 'agent') */
-  type?: AgentType
-
-  /** Capacidades machine-readable */
-  capabilities?: AgentCapability[]
-
-  /** Nombre del tool MCP (snake_case) */
-  mcpToolName?: string
-
-  /** URL de tu agente en producción — si no se pasa, WasiAI la infiere del registro */
-  endpointUrl?: string
-
-  /** Wallet Avalanche para recibir pagos on-chain */
-  creatorWallet?: string
-
-  /** URL del marketplace WasiAI (default: https://wasiai.vercel.app) */
-  marketplaceUrl?: string
-}
-
-/** Lo que el builder recibe en su handler */
-export interface AgentRequest<T = Record<string, unknown>> {
-  /** Body parseado del request */
-  input: T
-
-  /** Metadata del pago verificado (cuando viene por x402) */
-  payment?: {
-    txHash: string | null
-    amount: number
-    payer: string | null
-  }
-
-  /** Metadata del agent key (cuando viene por x-agent-key) */
-  agentKey?: {
-    id: string
-    remaining: number
-  }
-}
-
-/** Lo que el handler del builder debe devolver */
-export interface AgentResponse<T = unknown> {
-  output: T
-  /** Metadatos opcionales que se incluyen en la respuesta */
-  meta?: Record<string, unknown>
-}
-
-/** Función handler del builder */
-export type AgentHandler<TInput = Record<string, unknown>, TOutput = unknown> = (
-  req: AgentRequest<TInput>,
-) => Promise<AgentResponse<TOutput>> | AgentResponse<TOutput>
-
-/** Configuración x402 para verificación de pagos */
-export interface X402Config {
-  /** Wallet treasury de WasiAI que recibe los pagos (se obtiene del marketplace) */
-  treasury: string
-  /** URL del facilitator (default: https://facilitator.ultravioletadao.xyz) */
-  facilitatorUrl?: string
-  /** Chain name (default: 'avalanche') */
-  chain?: string
-}
-
-/** Resultado del registro en WasiAI */
-export interface PublishResult {
-  success: boolean
-  slug?: string
-  marketplaceUrl?: string
-  invokeUrl?: string
-  error?: string
+export interface ListOptions {
+  /** Filter by category (e.g. "nlp", "vision") */
+  category?: string
+  /** Full-text search term */
+  search?: string
+  /** Maximum number of results (default: 20) */
+  limit?: number
+  /** Pagination offset */
+  offset?: number
 }
