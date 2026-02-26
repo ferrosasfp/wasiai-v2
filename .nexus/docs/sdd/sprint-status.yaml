@@ -44,9 +44,9 @@ development_status:
   # ─── ÉPICA 2: SDK @wasiai/sdk ───────────────────────────────────────────
   # HU-2.1 tiene SDD borrador (.nexus/docs/sdd/HU-2.1-sdk-nodejs.md)
   # pero NO tiene story file del SM → backlog hasta que SM genere story-HU-2.1.md
-  epic-2: backlog
+  epic-2: in-progress
 
-  2-1-sdk-node-js-typescript: backlog
+  2-1-sdk-node-js-typescript: ready-for-dev
   2-2-sdk-python: backlog
   2-3-documentacion-interactiva: backlog
   2-4-cli-wasiai: backlog
@@ -114,14 +114,14 @@ development_status:
 
   # ─── ÉPICA 9: UX Improvements ───────────────────────────────────────────
   # 9.4 y 9.6 tienen SDD borrador pero NO story file del SM → backlog
-  epic-9: backlog
+  epic-9: in-progress
 
   9-1-empty-state-de-busqueda: backlog
   9-2-preview-live-en-publish: backlog
   9-3-editor-de-capabilities-sin-json-crudo: backlog
-  9-4-code-examples-auto-generados: backlog
+  9-4-code-examples-auto-generados: ready-for-dev
   9-5-indicador-de-saldo-de-api-key-en-navbar: backlog
-  9-6-hero-copy-especifico-por-usuario: backlog
+  9-6-hero-copy-especifico-por-usuario: ready-for-dev
   9-7-i18n-copias-reales-de-wasiai: backlog
 
   epic-9-retrospective: optional
