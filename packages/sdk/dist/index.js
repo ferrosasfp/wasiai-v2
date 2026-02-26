@@ -115,8 +115,7 @@ var WasiAI = class {
     if (options.limit) params.set("limit", String(options.limit));
     if (options.offset) params.set("offset", String(options.offset));
     const res = await fetch(
-      `${this.baseUrl}/api/v1/agents?${params.toString()}`,
-      { headers: { "X-API-Key": this.apiKey } }
+      `${this.baseUrl}/api/v1/agents?${params.toString()}`
     );
     if (!res.ok) throw new WasiAIError(`List failed: ${res.status}`);
     const data = await res.json();
@@ -127,8 +126,7 @@ var WasiAI = class {
    */
   async get(slug) {
     const res = await fetch(
-      `${this.baseUrl}/api/v1/agents/${slug}`,
-      { headers: { "X-API-Key": this.apiKey } }
+      `${this.baseUrl}/api/v1/agents/${slug}`
     );
     if (res.status === 404) return null;
     if (!res.ok) throw new WasiAIError(`Get failed: ${res.status}`);

@@ -76,8 +76,7 @@ export class WasiAI {
     if (options.offset)   params.set('offset', String(options.offset))
 
     const res = await fetch(
-      `${this.baseUrl}/api/v1/agents?${params.toString()}`,
-      { headers: { 'X-API-Key': this.apiKey } }
+      `${this.baseUrl}/api/v1/agents?${params.toString()}`
     )
 
     if (!res.ok) throw new WasiAIError(`List failed: ${res.status}`)
@@ -91,8 +90,7 @@ export class WasiAI {
    */
   async get(slug: string): Promise<Agent | null> {
     const res = await fetch(
-      `${this.baseUrl}/api/v1/agents/${slug}`,
-      { headers: { 'X-API-Key': this.apiKey } }
+      `${this.baseUrl}/api/v1/agents/${slug}`
     )
 
     if (res.status === 404) return null
