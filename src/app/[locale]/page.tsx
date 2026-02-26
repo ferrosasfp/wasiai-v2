@@ -21,7 +21,8 @@ export default async function HomePage({ params, searchParams }: Props) {
   const { locale } = await params
   const { category, search, page: pageStr } = await searchParams
   setRequestLocale(locale)
-  const t = await getTranslations('home')
+  const t  = await getTranslations('home')
+  const tc = await getTranslations('common')
 
   const page   = Math.max(1, parseInt(pageStr ?? '1', 10))
   const offset = (page - 1) * PAGE_SIZE
@@ -126,15 +127,15 @@ export default async function HomePage({ params, searchParams }: Props) {
         <div className="mx-auto max-w-6xl">
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Available Models</h2>
+              <h2 className="text-2xl font-bold text-gray-900">{t('availableModels')}</h2>
               {total > 0 && (
-                <p className="mt-0.5 text-sm text-gray-400">{total} models · page {page} of {totalPages}</p>
+                <p className="mt-0.5 text-sm text-gray-400">{t('modelsCount', { total, page, total_pages: totalPages })}</p>
               )}
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Suspense>
-                <SearchInput defaultValue={search} category={category} />
+                <SearchInput defaultValue={search} category={category} placeholder={tc('search')} />
               </Suspense>
               <Suspense>
                 <CategoryFilter />
@@ -146,7 +147,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             <div className="rounded-2xl border-2 border-dashed border-gray-200 py-16 text-center">
               <p className="text-4xl mb-4">🔍</p>
               <p className="text-gray-600 font-medium text-lg">
-                {search ? `No results for "${search}"` : category ? `No models in "${category}" yet` : 'No models yet.'}
+                {search || category ? t('noModelsFiltered') : t('noModels')}
               </p>
               {(search || category) ? (
                 <div className="mt-4 flex flex-wrap justify-center gap-3">
@@ -223,8 +224,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             </div>
             <h2 className="text-3xl font-bold">Built for the Agentic Economy</h2>
             <p className="mt-3 max-w-xl mx-auto text-gray-400">
-              Any AI agent can discover, pay, and call models on WasiAI autonomously.
-              x402 native. ERC-8004 identity. Gasless payments on Avalanche.
+              {t('builtSubtitle')}
             </p>
           </div>
 
@@ -238,7 +238,7 @@ x-agent-key: wasi_xxx
     status: "ok" }`}</pre>
             </div>
             <div className="rounded-xl bg-gray-800 p-4">
-              <p className="mb-2 text-xs font-semibold text-gray-400">2. Discover models</p>
+              <p className="mb-2 text-xs font-semibold text-gray-400">{t('step2Label')}</p>
               <pre className="overflow-auto text-xs text-green-400">{`GET /api/v1/models
   ?category=vision
   &max_price=0.05
@@ -280,7 +280,7 @@ x-agent-key: wasi_xxx
 }
 
 // ── Search input ──────────────────────────────────────────────────────────────
-function SearchInput({ defaultValue, category }: { defaultValue?: string; category?: string }) {
+function SearchInput({ defaultValue, category, placeholder }: { defaultValue?: string; category?: string; placeholder: string }) {
   return (
     <form method="GET" className="flex items-center gap-2">
       {category && <input type="hidden" name="category" value={category} />}
@@ -288,7 +288,7 @@ function SearchInput({ defaultValue, category }: { defaultValue?: string; catego
         type="search"
         name="search"
         defaultValue={defaultValue}
-        placeholder="Search models..."
+        placeholder={placeholder}
         className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm focus:border-avax-400 focus:outline-none sm:w-52"
       />
     </form>
