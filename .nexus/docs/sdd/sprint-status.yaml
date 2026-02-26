@@ -46,7 +46,7 @@ development_status:
   # pero NO tiene story file del SM → backlog hasta que SM genere story-HU-2.1.md
   epic-2: in-progress
 
-  2-1-sdk-node-js-typescript: ready-for-dev
+  2-1-sdk-node-js-typescript: in-progress
   2-2-sdk-python: backlog
   2-3-documentacion-interactiva: backlog
   2-4-cli-wasiai: backlog
@@ -119,9 +119,9 @@ development_status:
   9-1-empty-state-de-busqueda: backlog
   9-2-preview-live-en-publish: backlog
   9-3-editor-de-capabilities-sin-json-crudo: backlog
-  9-4-code-examples-auto-generados: ready-for-dev
+  9-4-code-examples-auto-generados: done
   9-5-indicador-de-saldo-de-api-key-en-navbar: backlog
-  9-6-hero-copy-especifico-por-usuario: ready-for-dev
+  9-6-hero-copy-especifico-por-usuario: done
   9-7-i18n-copias-reales-de-wasiai: backlog
 
   epic-9-retrospective: optional
