@@ -100,14 +100,14 @@
 
 ## 📋 ÉPICAS — Roadmap de producto
 
-### 🔴 ÉPICA 1 — Creators Reales en el Marketplace *(siguiente sprint)*
+### 🔴 ÉPICA 1 — Creators Reales en el Marketplace *(sprint 2 activo)*
 > Sin creators externos, no hay marketplace. Esta es LA prioridad de negocio.
 
-- [ ] **HU-1.1** Onboarding sin fricción — publicar agente sin wallet ni USDC (custodial onboarding)
-- [ ] **HU-1.2** Formulario multi-paso — básico → producto → técnico con preview live
-- [ ] **HU-1.3** Test de endpoint en tiempo real desde el formulario
-- [ ] **HU-1.4** Creator analytics — llamadas/día, latencia, earnings históricos, alertas de health
-- [ ] **HU-1.5** Perfil público del creator con todos sus agentes
+- [x] **HU-1.1** Onboarding sin fricción — publicar agente sin wallet ni USDC (custodial onboarding)
+- [x] **HU-1.2** Formulario multi-paso — básico → producto → técnico con preview live
+- [x] **HU-1.3** Test de endpoint en tiempo real desde el formulario
+- [~] **HU-1.4** Creator analytics — llamadas/día, latencia, earnings históricos, alertas de health *(sprint 2)*
+- [~] **HU-1.5** Perfil público del creator con todos sus agentes *(sprint 2)*
 
 ### 🔴 ÉPICA 2 — SDK (@wasiai/sdk) *(en paralelo con Épica 1)*
 > Sin SDK, developers no pueden integrar. Multiplica el alcance por 10x.
@@ -120,7 +120,7 @@
 ### 🔴 ÉPICA 3 — Free Trial por Agente *(antes de abrir registro público)*
 > Sin esto, conversión es casi cero. Nadie paga por algo que no probó.
 
-- [ ] **HU-3.1** 1 llamada gratuita por usuario por agente desde la ficha
+- [~] **HU-3.1** 1 llamada gratuita por usuario por agente desde la ficha *(sprint 2)*
 - [ ] **HU-3.2** Playground — probar y comparar múltiples agentes
 
 ### 🟡 ÉPICA 4 — Discovery y Calidad del Catálogo *(mes 2)*
