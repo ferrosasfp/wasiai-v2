@@ -244,6 +244,26 @@ WasiAI is only possible on Avalanche. This isn't a "could work on any chain" pro
 
 ---
 
+## SDKs
+
+### Node.js / TypeScript
+
+```bash
+npm install @wasiai/sdk
+```
+
+📦 https://www.npmjs.com/package/@wasiai/sdk
+
+### Python
+
+```bash
+pip install wasiai
+```
+
+📦 https://pypi.org/project/wasiai/
+
+---
+
 ## Team
 
 **Fernando Rosas** — Full-stack developer & Web3 builder  

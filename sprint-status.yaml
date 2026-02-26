@@ -1,0 +1,75 @@
+sprint: 3
+semana: "2026-02-26 → 2026-02-28"
+estado: in_progress
+
+objetivo: >
+  Fortalecer el producto con SDKs publicados, documentación interactiva
+  y quick wins de UX. Base para onboardear developers reales.
+
+historias:
+  - id: HU-2.1
+    titulo: "SDK Node.js (@wasiai/sdk)"
+    estado: done
+    notas: "Código completo, AR+CR+QA aprobados, push hecho. Pendiente npm publish con token."
+
+  - id: HU-2.2
+    titulo: "SDK Python (wasiai)"
+    estado: done
+    notas: "Código completo, AR+CR+QA aprobados, push hecho. Pendiente PyPI publish."
+
+  - id: HU-2.3
+    titulo: "Documentación interactiva (/docs)"
+    estado: done
+    notas: "Completo. AR+CR+QA aprobados. Push hecho. En prod."
+
+  - id: UX-07
+    titulo: "Hero dual creator/consumer"
+    estado: done
+    notas: "Completo. AR+CR+QA aprobados. Push hecho. En prod."
+
+pendiente_sprint:
+  - id: HU-2.4
+    titulo: "CLI (wasiai invoke)"
+    prioridad: media
+    notas: "Pendiente S0 → HU_APPROVED"
+
+  - id: HU-3.2
+    titulo: "Playground — comparar agentes"
+    prioridad: media
+    notas: "Pendiente S0 → HU_APPROVED"
+
+  - id: UX-04
+    titulo: "Código de ejemplo auto-generado en ficha del agente"
+    prioridad: alta
+    notas: "Pendiente S0 → HU_APPROVED"
+
+  - id: UX-05
+    titulo: "Saldo API key visible en navbar"
+    prioridad: alta
+    notas: "Pendiente S0 → HU_APPROVED"
+
+bloqueantes:
+  - "npm token para publicar @wasiai/sdk — Fer configurando"
+  - "PyPI credentials para publicar wasiai"
+
+kpis_build_games:
+  agentes_reales: 0/10
+  creadores_onboardeados: 0/5
+  mainnet_deploy: false
+  agentkit_example: false
+  routing_api: false
+
+criterios_exito_semana:
+  - "@wasiai/sdk publicado en npm"
+  - "wasiai publicado en PyPI"
+  - "Al menos 1 creator real onboardeado"
+  - "HU-2.4 o UX-04/05 completadas con metodología completa"
+
+metodologia:
+  reglas_activas:
+    - "S0 → HU_APPROVED explícito antes de S1"
+    - "S1 + Readiness Check → SPEC_APPROVED explícito antes de Story File"
+    - "SM genera story-HU-X.X.md antes de Dev"
+    - "Dev → Adversarial Review → Code Review → QA por ACs → push"
+    - 'Gates: solo "HU_APPROVED" y "SPEC_APPROVED" exactos activan el gate'
+    - "Sin excepciones. Sin atajos."

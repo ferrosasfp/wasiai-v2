@@ -112,8 +112,8 @@
 ### 🔴 ÉPICA 2 — SDK (@wasiai/sdk) *(en paralelo con Épica 1)*
 > Sin SDK, developers no pueden integrar. Multiplica el alcance por 10x.
 
-- [ ] **HU-2.1** SDK Node.js/TypeScript — `npm install @wasiai/sdk`
-- [ ] **HU-2.2** SDK Python — `pip install wasiai`
+- [x] **HU-2.1** SDK Node.js/TypeScript — `npm install @wasiai/sdk`
+- [x] **HU-2.2** SDK Python — `pip install wasiai`
 - [ ] **HU-2.3** Documentación interactiva con ejemplos ejecutables
 - [ ] **HU-2.4** CLI — `wasiai invoke <agent> "<input>"`
 
