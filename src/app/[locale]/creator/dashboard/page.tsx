@@ -7,6 +7,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection'
 import { AgentActions } from './_components/AgentActions'
 import { PendingEarningsBanner } from '@/components/PendingEarningsBanner'
+import { CreatorAnalytics } from '@/features/creator/components/CreatorAnalytics'
 
 interface ModelRow {
   id: string
@@ -112,6 +113,9 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
         <Suspense fallback={<EarningsSkeleton />}>
           <EarningsSection userId={user.id} />
         </Suspense>
+
+        {/* HU-1.4: Creator Analytics */}
+        <CreatorAnalytics agents={safeModels.map(m => ({ id: m.id, name: m.name }))} />
 
         {/* Models table */}
         <section>
