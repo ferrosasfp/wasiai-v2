@@ -4,6 +4,7 @@ import { getModelBySlug } from '@/features/models/services/models.service'
 import { ModelCallSection } from '@/features/models/components/ModelCallSection'
 import { AgentRating } from '@/features/reputation/components/AgentRating'
 import { AgentTrialPlayground } from '@/features/agents/components/AgentTrialPlayground'
+import { CodeExamples } from '@/features/models/components/CodeExamples'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 
@@ -122,6 +123,12 @@ export default async function ModelDetailPage({ params }: Props) {
 
             {/* HU-3.1: Free Trial Playground */}
             <AgentTrialPlayground slug={model.slug} isAuthenticated={isAuthenticated} />
+
+            {/* UX-04: Code Examples auto-generated */}
+            <CodeExamples
+              slug={model.slug}
+              inputExample={model.capabilities?.[0]?.example?.input ?? null}
+            />
 
             {/* Agent API — both auth methods */}
             <div className="rounded-2xl bg-gray-900 p-6 text-white">
