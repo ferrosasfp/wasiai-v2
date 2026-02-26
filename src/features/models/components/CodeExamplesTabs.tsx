@@ -3,9 +3,17 @@ import { useState } from 'react'
 
 type Tab = 'curl' | 'node' | 'python'
 
+interface Labels {
+  copy: string
+  copied: string
+  replace: string
+  getKey: string
+}
+
 interface Props {
   snippets: { curl: string; node: string; python: string }
   keysUrl: string
+  labels: Labels
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -14,7 +22,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'python', label: 'Python' },
 ]
 
-export function CodeExamplesTabs({ snippets, keysUrl }: Props) {
+export function CodeExamplesTabs({ snippets, keysUrl, labels }: Props) {
   const [tab, setTab]       = useState<Tab>('curl')
   const [copied, setCopied] = useState(false)
 
@@ -23,7 +31,7 @@ export function CodeExamplesTabs({ snippets, keysUrl }: Props) {
     navigator.clipboard.writeText(snippets[tab]).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    }).catch(() => {/* silent fail */})
+    }).catch(() => {/* silent fail — AC-4 */})
   }
 
   return (
@@ -49,7 +57,7 @@ export function CodeExamplesTabs({ snippets, keysUrl }: Props) {
           onClick={copy}
           className="text-xs text-gray-400 hover:text-white transition-colors px-2 py-1"
         >
-          {copied ? '✓ Copiado' : 'Copiar'}
+          {copied ? labels.copied : labels.copy}
         </button>
       </div>
 
@@ -60,14 +68,14 @@ export function CodeExamplesTabs({ snippets, keysUrl }: Props) {
 
       {/* Footer */}
       <div className="px-4 pb-3 text-xs text-gray-500">
-        Reemplaza <span className="text-gray-300">wasi_YOUR_KEY</span> por tu API key.{' '}
+        {labels.replace}{' '}
         <a
           href={keysUrl}
           className="text-avax-400 hover:text-avax-300"
           target="_blank"
           rel="noreferrer"
         >
-          Obtener API key →
+          {labels.getKey} →
         </a>
       </div>
     </>

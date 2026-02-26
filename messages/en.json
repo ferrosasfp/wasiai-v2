@@ -257,5 +257,12 @@
     "tryItResponse": "Response",
     "tryItLatency": "Latency",
     "contents": "Contents"
+  },
+  "codeExamples": {
+    "title": "How to use",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "replace": "Replace wasi_YOUR_KEY with your API key.",
+    "getKey": "Get API key"
   }
 }

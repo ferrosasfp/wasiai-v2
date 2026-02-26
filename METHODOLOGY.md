@@ -306,5 +306,83 @@ _bmad/                      ← BMAD Method v6 (agentes y workflows reales)
 
 ---
 
+---
+
+## Modelo de ejecución con sub-agentes (regla permanente desde 2026-02-26)
+
+### San es la orquestadora — los sub-agentes son los roles BMAD
+
+San NO genera HUs, SDDs, story files ni hace code review directamente.
+San coordina el flujo, mantiene el contexto y hace los gates con Fer.
+Cada fase la ejecuta un sub-agente con su rol específico del directorio `_bmad/bmm/agents/`.
+
+### Flujo de sub-agentes por fase
+
+```
+FASE 1 — Discovery
+  San lanza → sub-agente PM (_bmad/bmm/agents/pm.md) → genera S0 (HU + ACs + Scope + Riesgos)
+  Fer → HU_APPROVED
+  [Si hay decisión técnica compleja]
+  San lanza → sub-agente Architect (_bmad/bmm/agents/architect.md) → ADR
+
+FASE 2 — Spec
+  San lanza → sub-agente PM (_bmad/bmm/agents/pm.md) → genera S1 (SDD completo)
+  San ejecuta → Implementation Readiness Check (formal, no mental)
+  Fer → SPEC_APPROVED
+
+FASE 2.5 — Story File
+  San lanza → sub-agente SM (_bmad/bmm/agents/sm.md) → genera story-HU-X.X.md
+
+FASE 3 — Implementación
+  San lanza → sub-agente Dev (_bmad/bmm/agents/dev.md) → implementa desde story file
+
+FASE 3.5 — Adversarial Review
+  San lanza → sub-agente AR (rol adversarial explícito) → busca problemas reales
+
+FASE 3.6 — Code Review
+  San lanza → sub-agente CR (rol reviewer explícito) → revisa calidad y consistencia
+
+FASE 4 — QA
+  San lanza → sub-agente QA (_bmad/bmm/agents/qa.md) → verifica cada AC del story file
+
+Push → solo si QA aprueba todos los ACs
+```
+
+### Regla de oro
+San NUNCA mezcla roles. Si está orquestando, no implementa.
+Si un sub-agente implementa, San no revisa — lanza otro sub-agente para eso.
+
+### Golden Path — obligatorio para TODOS los sub-agentes
+
+Cada sub-agente (PM, Architect, Dev, SM, QA, AR, CR) debe:
+1. Leer `project-context.md` antes de operar
+2. Respetar el stack inmutable de Nexus Factory sin excepciones:
+   - Web2: Next.js 14 · Supabase · Tailwind · next-intl · Upstash Redis
+   - Web3: Avalanche C-Chain · Solidity 0.8.24 · Foundry · viem v2 · wagmi v3
+   - Pagos: x402 + ERC-3009 · uvd-x402-sdk
+3. Nunca proponer ni implementar:
+   - ethers.js (usar viem)
+   - NEXT_PUBLIC_ para secrets o API keys
+   - Hardcodes de addresses, amounts o URLs
+   - Datos simulados en rutas de producción
+   - permissionless / ERC-4337 (removido del stack)
+4. El Dev siempre implementa en este orden:
+   Migration DB → Contrato + forge tests → Backend → Frontend → Tests unitarios
+5. Cualquier violación al Golden Path es BLOQUEANTE en el AR
+
+El Golden Path no es negociable. Ningún sub-agente puede proponer alternativas
+al stack sin pasar por el agente Architect y documentar un ADR.
+
+### Archivos de referencia de cada agente
+- PM: `_bmad/bmm/agents/pm.md`
+- Architect: `_bmad/bmm/agents/architect.md`
+- Dev: `_bmad/bmm/agents/dev.md`
+- SM: `_bmad/bmm/agents/sm.md`
+- QA: `_bmad/bmm/agents/qa.md`
+- UX: `_bmad/bmm/agents/ux-designer.md`
+
+---
+
 *Metodología diseñada para WasiAI por San + Fer — 2026-02-25*
+*Modelo de sub-agentes por roles BMAD añadido — 2026-02-26*
 *BMAD Method v6 + Nexus Factory — producción real, no hackathon*

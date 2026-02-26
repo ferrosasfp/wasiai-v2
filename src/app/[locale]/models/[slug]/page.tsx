@@ -129,6 +129,7 @@ export default async function ModelDetailPage({ params }: Props) {
               slug={model.slug}
               priceUsdc={model.price_per_call > 0 ? model.price_per_call.toString() : null}
               inputExample={model.capabilities?.[0]?.example?.input ?? null}
+              locale={locale}
             />
 
             {/* Agent API — both auth methods */}
@@ -158,7 +159,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
 
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
-                  href={`/${  'en'}/agent-keys`}
+                  href={`/${locale}/agent-keys`}
                   className="rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold hover:bg-avax-400 transition"
                 >
                   Get Agent Key →

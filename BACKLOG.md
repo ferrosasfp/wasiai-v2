@@ -189,3 +189,20 @@
 - [x] refundKeyToEarnings — withdraw unificado
 - [x] Contrato v3 Fuji: `0x71CddCdF8a40951a1d8C22C8774448FbcA089b53` verificado Sourcify + Snowtrace
 - [x] Auditoría 30 hallazgos — sprint de corrección [~] en progreso
+
+---
+
+## 📋 Mejoras post-Build Games (documentadas como HUs)
+
+### HU-7.3b — AgentKit con CDP Wallet
+Migrar el ejemplo AgentKit de private key en .env a CDP Wallet de Coinbase con KYC completo.
+Requiere: cuenta Coinbase Developer Platform aprobada.
+Dependencia: HU-7.3 completada.
+
+### HU-5.1b — Agent-to-Agent Routing Async
+Migrar POST /api/v1/compose de síncrono (25s) a async con polling:
+- POST /api/v1/compose → retorna {pipeline_id, status: "pending"}
+- GET /api/v1/compose/:id → retorna estado + resultado parcial
+- Webhooks opcionales para notificar completion
+Requiere: tabla pipeline_executions en Supabase, worker o Vercel Edge Functions.
+Dependencia: HU-5.1 síncrona completada.
