@@ -75,7 +75,7 @@ Marketplace on-chain de agentes IA en Avalanche. Cualquier developer publica un 
 7. **trim()** en todas las env vars leídas al arrancar
 8. **RLS activo** antes de cualquier commit con tablas nuevas
 9. **Push siempre:** `git push origin master master:main`
-10. **Migrations numeradas:** `0XX_descripcion.sql` — próxima disponible: 015
+10. **Migrations numeradas:** `0XX_descripcion.sql` — próxima disponible: 017
 
 ---
 
@@ -174,35 +174,59 @@ _bmad/                     ← agentes y workflows BMAD
 
 ---
 
-## Backlog — Épicas activas
+## Estado de sprints y épicas
+
+### Sprints cerrados
+| Sprint | HUs | Commits | Tests |
+|--------|-----|---------|-------|
+| Sprint 1 | HU-1.1, HU-1.2, HU-1.3 | `a036cbe` | 144/144 |
+| Sprint 2 | HU-1.4, HU-1.5, HU-3.1 | `4ff5ddc` | 182/182 |
+
+### Épicas activas
 
 | Épica | Estado | Prioridad |
 |-------|--------|-----------|
-| E1 — Creators Reales | 🔜 próxima | P0 |
-| E2 — SDK @wasiai/sdk | 🔜 próxima | P1 |
-| E3 — Free Trial | pendiente | P2 |
-| E4 — Discovery | pendiente | P2 |
-| E5 — Compose API | pendiente | P3 |
-| E6 — Mainnet | pendiente | P3 |
-| E7 — Integraciones | pendiente | P4 |
+| E1 — Creators Reales | ✅ COMPLETA | — |
+| E2 — SDK @wasiai/sdk | 🔜 Sprint 3 | P0 |
+| E3 — Free Trial | ✅ HU-3.1 done | P0 |
+| E4 — Discovery | pendiente | P1 |
+| E5 — Compose API | pendiente | P2 |
+| E6 — Mainnet | 🔒 diferida (producto más robusto primero) | P3 |
+| E7 — Integraciones | pendiente | P3 |
 | E8 — Transparencia | pendiente | P4 |
 
 Ver detalle completo: `BACKLOG.md`
+
+### Columnas DB críticas (no confundir)
+- `agent_calls.status` → `'success' | 'error'` (NO `status_code`)
+- `agent_calls.latency_ms` → duración en ms (NO `duration_ms`)
+- `creator_profiles.id = auth.users.id` (NO hay columna `user_id` separada)
+- `agent_calls.is_trial` → boolean, trials sin costo
+- `creator_profiles.username` + `creator_profiles.bio` → desde migration 016
+- `agent_trials` → tabla de control de trials (1 por usuario/agente)
 
 ---
 
 ## Decisiones de arquitectura tomadas (ADRs)
 
-| ID | Decisión | Razón |
-|----|----------|-------|
-| ADR-001 | Batch settlement (no per-call) | Gas ~$0.037/tx supera el 10% fee en calls de $0.02 |
-| ADR-002 | refundKeyToEarnings (no withdrawKeyBalance) | Único punto de salida de USDC via withdraw() |
-| ADR-003 | emergencyWithdrawKey con 30 días | Trustless exit — fondos recuperables sin WasiAI |
-| ADR-004 | Receipts ECDSA por llamada | Auditoría criptográfica por el usuario |
-| ADR-005 | ERC-4337 eliminado | Era leftover de plantilla con Pimlico key en NEXT_PUBLIC_ |
-| ADR-006 | viem v2 reemplaza ethers.js | Golden Path — consistencia y seguridad de tipos |
-| ADR-007 | Métricas fake = 0 | No datos simulados en producción |
+Archivos completos en `.nexus/docs/architecture/`
+
+| ID | Decisión | Razón | Sprint |
+|----|----------|-------|--------|
+| ADR-001 | Batch settlement (no per-call) | Gas ~$0.037/tx supera el 10% fee en calls de $0.02 | Pre-Sprint |
+| ADR-002 | refundKeyToEarnings (no withdrawKeyBalance) | Único punto de salida de USDC via withdraw() | Pre-Sprint |
+| ADR-003 | emergencyWithdrawKey con 30 días | Trustless exit — fondos recuperables sin WasiAI | Pre-Sprint |
+| ADR-004 | Receipts ECDSA por llamada | Auditoría criptográfica por el usuario | Pre-Sprint |
+| ADR-005 | ERC-4337 eliminado | Era leftover de plantilla con Pimlico key en NEXT_PUBLIC_ | Pre-Sprint |
+| ADR-006 | viem v2 reemplaza ethers.js | Golden Path — consistencia y seguridad de tipos | Pre-Sprint |
+| ADR-007 | Métricas fake = 0 | No datos simulados en producción | Pre-Sprint |
+| ADR-008 | pending_earnings_usdc = DB counter (Option A) | Cron salta si no hay wallet; settled al configurar wallet | Sprint 1 |
+| ADR-009 | registerAgentOnChain en PATCH status (no POST) | Evita registro on-chain de drafts nunca publicados | Sprint 1 |
+| ADR-010 | CallsChart = barras CSS (no recharts) | Cero dependencias nuevas; entrega más rápida | Sprint 2 |
+| ADR-011 | Username desde email con REGEXP_REPLACE | Sin friction en onboarding; backfill automático en migration | Sprint 2 |
+| ADR-012 | Trial rate limit = lazy singleton Ratelimit | Prefix wasiai:trial, 3 req/hora por IP; aislado del rate limit principal | Sprint 2 |
+| ADR-013 | creator_profiles.id = auth.users.id | Sin columna user_id separada; simplifica todas las queries | Sprint 1 |
 
 ---
 
-*Última actualización: 2026-02-25 | Migrations aplicadas: 000–014*
+*Última actualización: 2026-02-26 | Migrations aplicadas: 000–016 | Próxima: 017*
