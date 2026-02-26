@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { setRequestLocale } from 'next-intl/server'
+import { setRequestLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 
 // P-10: ISR — revalidate every 5 minutes (increased from 60s)
@@ -21,6 +21,7 @@ export default async function HomePage({ params, searchParams }: Props) {
   const { locale } = await params
   const { category, search, page: pageStr } = await searchParams
   setRequestLocale(locale)
+  const t = await getTranslations('home')
 
   const page   = Math.max(1, parseInt(pageStr ?? '1', 10))
   const offset = (page - 1) * PAGE_SIZE
@@ -51,40 +52,48 @@ export default async function HomePage({ params, searchParams }: Props) {
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="bg-white border-b border-gray-100 px-6 py-16">
         <div className="mx-auto max-w-4xl text-center">
+
+          {/* Badge */}
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-avax-50 border border-avax-100 px-4 py-1.5 text-sm text-avax-600 font-medium">
             <span>⚡</span>
-            <span>Built on Avalanche · x402 native payments</span>
+            <span>{t('badge')}</span>
           </div>
-          <h1 className="text-5xl font-extrabold tracking-tight text-gray-900">
-            The marketplace where<br />
-            <span className="text-avax-500">AI agents do business</span>
+
+          {/* Headline */}
+          <h1 className="text-5xl font-extrabold tracking-tight text-gray-900 mb-4">
+            {t('heroTitle')}
+            <br />
+            <span className="text-avax-500">{t('heroSubtitle')}</span>
           </h1>
-          <p className="mt-5 text-lg text-gray-500 max-w-2xl mx-auto">
-            Discover, pay, and invoke AI models autonomously.
-            No subscriptions. No friction. 90% of every call goes to creators.
+
+          <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto">
+            {t('heroDescription')}
           </p>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <a
-              href="#models"
-              className="rounded-full bg-avax-500 px-7 py-3 font-semibold text-white shadow-sm hover:bg-avax-600 transition"
-            >
-              Browse Models
-            </a>
+          {/* Dual CTA */}
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
             <Link
               href={`/${locale}/publish`}
-              className="rounded-full border border-gray-300 px-7 py-3 font-semibold text-gray-700 hover:bg-gray-50 transition"
+              className="inline-flex items-center gap-2 bg-avax-500 text-white font-semibold px-6 py-3 rounded-xl hover:bg-avax-600 transition-colors"
             >
-              Publish a Model →
+              {t('ctaCreator')}
+            </Link>
+            <Link
+              href="#agents"
+              className="inline-flex items-center gap-2 border border-gray-200 text-gray-700 font-semibold px-6 py-3 rounded-xl hover:border-avax-300 hover:text-avax-600 transition-colors"
+            >
+              {t('ctaConsumer')}
             </Link>
           </div>
 
-          {/* Dual audience pills */}
-          <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs text-gray-400">
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">🤖 For AI agents</span>
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">👩‍💻 For developers</span>
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">💰 For model creators</span>
+          {/* Stats pills */}
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-400">
+            <span>⚡ {t('statPayments')}</span>
+            <span>💰 {t('statMinCall')}</span>
+            <span>🏠 {t('statToCreators')}</span>
+            <span>🔗 {t('statIdentity')}</span>
           </div>
+
         </div>
       </section>
 
@@ -113,7 +122,7 @@ export default async function HomePage({ params, searchParams }: Props) {
       </section>
 
       {/* ── Models ───────────────────────────────────────────────────────── */}
-      <section id="models" className="px-6 py-12">
+      <section id="agents" className="px-6 py-12">
         <div className="mx-auto max-w-6xl">
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
