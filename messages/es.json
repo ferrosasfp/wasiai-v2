@@ -186,5 +186,38 @@
       "optional": "Opcional",
       "skip": "Ir al dashboard"
     }
+  },
+  "trial": {
+    "badge": "Prueba gratuita",
+    "placeholder": "Escribe tu input para el agente...",
+    "button": "Probar gratis",
+    "loading": "Invocando agente...",
+    "used": "Ya probaste este agente",
+    "cta": "Obtener API key →",
+    "error_timeout": "El agente tardó demasiado. Intenta más tarde.",
+    "error_generic": "El agente encontró un error. Puede ser temporal.",
+    "error_ratelimit": "Demasiados intentos. Espera un momento.",
+    "success_cta": "¿Te gustó? Úsalo sin límites con una API key."
+  },
+  "analytics": {
+    "title": "Analytics",
+    "calls_24h": "Llamadas (24h)",
+    "total_calls": "Total de llamadas",
+    "avg_latency": "Latencia promedio",
+    "uptime": "Uptime (24h)",
+    "earnings": "Earnings",
+    "chart_title": "Llamadas por día",
+    "alert_error_rate": "Alta tasa de error en {agent}. Revisa tu endpoint.",
+    "alert_no_activity": "{agent} sin actividad en 7 días. ¿Está activo?",
+    "empty_state": "Aún no hay llamadas. Comparte tu agente o intégralo via API.",
+    "all_agents": "Todos los agentes"
+  },
+  "creator_profile": {
+    "agents_count": "{count} agentes",
+    "calls_count": "{count} llamadas",
+    "member_since": "Desde {year}",
+    "no_agents": "Este creator aún no ha publicado agentes.",
+    "not_found": "Creator no encontrado.",
+    "back_to_marketplace": "← Volver al marketplace"
   }
 }

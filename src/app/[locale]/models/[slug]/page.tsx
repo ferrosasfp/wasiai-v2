@@ -3,6 +3,8 @@ import { setRequestLocale } from 'next-intl/server'
 import { getModelBySlug } from '@/features/models/services/models.service'
 import { ModelCallSection } from '@/features/models/components/ModelCallSection'
 import { AgentRating } from '@/features/reputation/components/AgentRating'
+import { AgentTrialPlayground } from '@/features/agents/components/AgentTrialPlayground'
+import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 
 // PERF-04: ISR — revalidate detail pages every 5 minutes
@@ -18,8 +20,14 @@ export default async function ModelDetailPage({ params }: Props) {
   const { locale, slug } = await params
   setRequestLocale(locale)
 
-  const model = await getModelBySlug(slug)
+  const [model, supabase] = await Promise.all([
+    getModelBySlug(slug),
+    createClient(),
+  ])
   if (!model) notFound()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const isAuthenticated = !!user
 
   const invokeUrl = `${APP_URL}/api/v1/models/${model.slug}/invoke`
 
@@ -112,6 +120,9 @@ export default async function ModelDetailPage({ params }: Props) {
               )}
             </div>
 
+            {/* HU-3.1: Free Trial Playground */}
+            <AgentTrialPlayground slug={model.slug} isAuthenticated={isAuthenticated} />
+
             {/* Agent API — both auth methods */}
             <div className="rounded-2xl bg-gray-900 p-6 text-white">
               <h2 className="mb-4 font-semibold text-gray-100">🤖 Agent API</h2>
@@ -168,18 +179,21 @@ X-PAYMENT: <x402-eip712-signed-payload>
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
                   Creator
                 </h3>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-avax-100 text-base font-bold text-avax-600 shrink-0">
+                <Link
+                  href={`/${locale}/creator/${model.creator.username}`}
+                  className="flex items-center gap-3 group"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-avax-100 text-base font-bold text-avax-600 shrink-0 group-hover:bg-avax-200 transition">
                     {(model.creator.display_name ?? model.creator.username)[0].toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-800 truncate">
+                    <p className="font-medium text-gray-800 group-hover:text-avax-600 truncate transition">
                       {model.creator.display_name ?? model.creator.username}
                       {model.creator.verified && <span className="ml-1 text-avax-500">✓</span>}
                     </p>
                     <p className="text-xs text-gray-500">@{model.creator.username}</p>
                   </div>
-                </div>
+                </Link>
                 {model.creator.bio && (
                   <p className="mt-3 text-sm text-gray-600 leading-relaxed">{model.creator.bio}</p>
                 )}

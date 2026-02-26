@@ -186,5 +186,38 @@
       "optional": "Optional",
       "skip": "Go to dashboard"
     }
+  },
+  "trial": {
+    "badge": "Free trial",
+    "placeholder": "Write your input for the agent...",
+    "button": "Try for free",
+    "loading": "Invoking agent...",
+    "used": "You already tried this agent",
+    "cta": "Get API key →",
+    "error_timeout": "The agent took too long. Try again later.",
+    "error_generic": "The agent encountered an error. It may be temporary.",
+    "error_ratelimit": "Too many attempts. Wait a moment.",
+    "success_cta": "Liked it? Use it without limits with an API key."
+  },
+  "analytics": {
+    "title": "Analytics",
+    "calls_24h": "Calls (24h)",
+    "total_calls": "Total calls",
+    "avg_latency": "Avg latency",
+    "uptime": "Uptime (24h)",
+    "earnings": "Earnings",
+    "chart_title": "Calls per day",
+    "alert_error_rate": "High error rate on {agent}. Check your endpoint.",
+    "alert_no_activity": "{agent} with no activity in 7 days. Is it active?",
+    "empty_state": "No calls yet. Share your agent or integrate it via API.",
+    "all_agents": "All agents"
+  },
+  "creator_profile": {
+    "agents_count": "{count} agents",
+    "calls_count": "{count} calls",
+    "member_since": "Since {year}",
+    "no_agents": "This creator hasn't published any agents yet.",
+    "not_found": "Creator not found.",
+    "back_to_marketplace": "← Back to marketplace"
   }
 }
