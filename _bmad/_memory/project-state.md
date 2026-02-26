@@ -25,6 +25,12 @@
 - HU-1.3: Test de endpoint en tiempo real + SSRF protection
 - Linear: WAS-5, WAS-6, WAS-7 → Done
 
+### Sprint 3 (commit `9979b7b`)
+- HU-9.6: hero copy modelos→agentes, i18n + hardcodes eliminados de page.tsx
+- HU-9.4: CodeExamples → Server Component, BASE_URL sin hardcode, CodeExamplesTabs Client Component
+- HU-2.1: @wasiai/sdk — invoke/list/get, errores tipados, 45 tests, README
+- Tests: 234 totales (189 main + 45 SDK) | Linear: WAS-10, WAS-28, WAS-31 → Done
+
 ### Sprint 2 (commit `4ff5ddc`)
 - HU-1.4: Creator analytics — API + SummaryCards + CallsChart CSS + AlertBanner
 - HU-1.5: Perfil público creator — `/creator/[username]`, ISR, SEO
