@@ -127,6 +127,7 @@ export default async function ModelDetailPage({ params }: Props) {
             {/* UX-04: Code Examples auto-generated */}
             <CodeExamples
               slug={model.slug}
+              priceUsdc={model.price_per_call > 0 ? model.price_per_call.toString() : null}
               inputExample={model.capabilities?.[0]?.example?.input ?? null}
             />
 
