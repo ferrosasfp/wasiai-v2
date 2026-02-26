@@ -16,10 +16,31 @@ vi.mock('@/features/storage/services/storageProvider', () => ({
   })),
 }))
 
+/**
+ * Crea un Supabase query builder completamente thenable y encadenable.
+ * Soporta: select, eq, neq, delete, insert, update, single, maybeSingle, count.
+ * Awaitable en cualquier punto de la cadena.
+ */
+function makeBuilder(defaultResult: unknown = { data: null, error: null, count: 0 }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const b: any = {}
+  for (const m of ['select', 'eq', 'neq', 'filter', 'order', 'limit', 'range', 'delete', 'insert', 'update', 'upsert']) {
+    b[m] = vi.fn(() => b)
+  }
+  b.single      = vi.fn().mockResolvedValue(defaultResult)
+  b.maybeSingle = vi.fn().mockResolvedValue(defaultResult)
+  // thenable — permite `await builder` directamente
+  b.then = (resolve: Parameters<Promise<unknown>['then']>[0], reject: Parameters<Promise<unknown>['then']>[1]) =>
+    Promise.resolve(defaultResult).then(resolve, reject)
+  return b
+}
+
 const mockSupabase = {
   auth: {
     getUser: vi.fn(),
   },
+  // Cada llamada a from() retorna un builder NUEVO para evitar conflictos entre cadenas
+  from: vi.fn(() => makeBuilder({ data: null, error: null, count: 0 })),
 }
 
 vi.mock('@/lib/supabase/server', () => ({

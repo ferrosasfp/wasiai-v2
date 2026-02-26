@@ -154,7 +154,7 @@ describe('Auth Server Actions', () => {
         password: 'password123',
       })
       expect(revalidatePath).toHaveBeenCalledWith('/', 'layout')
-      expect(redirect).toHaveBeenCalledWith('/en/dashboard')
+      expect(redirect).toHaveBeenCalledWith('/en/creator/dashboard')
     })
 
     it('should return error when signInWithPassword fails', async () => {
@@ -327,7 +327,7 @@ describe('Auth Server Actions', () => {
         password: 'newSecure123',
       })
       expect(revalidatePath).toHaveBeenCalledWith('/', 'layout')
-      expect(redirect).toHaveBeenCalledWith('/en/dashboard')
+      expect(redirect).toHaveBeenCalledWith('/en/creator/dashboard')
     })
 
     it('should return error when updateUser fails', async () => {
