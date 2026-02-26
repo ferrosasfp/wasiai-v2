@@ -1,24 +1,13 @@
-export interface WasiAIConfig {
-  /** WasiAI API key (starts with `wasi_`) */
+export interface WasiAIOptions {
   apiKey: string
-  /** Override the base URL (useful for tests or self-hosted deployments) */
   baseUrl?: string
 }
 
-export interface InvokeOptions {
-  /** Text input for the agent */
-  input: string
-  /** Request timeout in milliseconds (default: 30000) */
-  timeout?: number
-}
-
 export interface InvokeResult {
-  /** The agent's output */
-  output: string
-  /** Time taken by the agent in milliseconds */
+  output: unknown
+  agentSlug: string
+  callId: string
   latencyMs: number
-  /** On-chain payment receipt identifier */
-  receiptId: string
 }
 
 export interface Agent {
@@ -26,18 +15,19 @@ export interface Agent {
   name: string
   description: string
   category: string
-  /** Price per call in USDC (as a string for precision, e.g. "0.02") */
-  priceUsdc: string
-  inputExample?: string
+  priceUsdc: number
+  currency: string
+  endpoint: string
 }
 
-export interface ListOptions {
-  /** Filter by category (e.g. "nlp", "vision") */
+export interface AgentList {
+  agents: Agent[]
+  total: number
+  page: number
+  hasMore: boolean
+}
+
+export interface AgentListOptions {
+  page?: number
   category?: string
-  /** Full-text search term */
-  search?: string
-  /** Maximum number of results (default: 20) */
-  limit?: number
-  /** Pagination offset */
-  offset?: number
 }

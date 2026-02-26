@@ -1,0 +1,20 @@
+[project]
+name = "wasiai"
+version = "0.1.0"
+description = "Official Python SDK for WasiAI — The Home of AI Agents"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+license = { text = "MIT" }
+keywords = ["wasiai", "ai", "agents", "sdk"]
+
+[project.optional-dependencies]
+dev = ["pytest", "mypy"]
+
+[project.urls]
+Homepage = "https://wasiai-v2.vercel.app"
+Repository = "https://github.com/ferrosasfp/wasiai-v2"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

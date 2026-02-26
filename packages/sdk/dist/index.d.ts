@@ -1,76 +1,66 @@
-interface WasiAIConfig {
-    /** WasiAI API key (starts with `wasi_`) */
+interface WasiAIOptions {
     apiKey: string;
-    /** Override the base URL (useful for tests or self-hosted deployments) */
     baseUrl?: string;
 }
-interface InvokeOptions {
-    /** Text input for the agent */
-    input: string;
-    /** Request timeout in milliseconds (default: 30000) */
-    timeout?: number;
-}
 interface InvokeResult {
-    /** The agent's output */
-    output: string;
-    /** Time taken by the agent in milliseconds */
+    output: unknown;
+    agentSlug: string;
+    callId: string;
     latencyMs: number;
-    /** On-chain payment receipt identifier */
-    receiptId: string;
 }
 interface Agent {
     slug: string;
     name: string;
     description: string;
     category: string;
-    /** Price per call in USDC (as a string for precision, e.g. "0.02") */
-    priceUsdc: string;
-    inputExample?: string;
+    priceUsdc: number;
+    currency: string;
+    endpoint: string;
 }
-interface ListOptions {
-    /** Filter by category (e.g. "nlp", "vision") */
+interface AgentList {
+    agents: Agent[];
+    total: number;
+    page: number;
+    hasMore: boolean;
+}
+interface AgentListOptions {
+    page?: number;
     category?: string;
-    /** Full-text search term */
-    search?: string;
-    /** Maximum number of results (default: 20) */
-    limit?: number;
-    /** Pagination offset */
-    offset?: number;
 }
 
-declare class WasiAI {
-    private readonly baseUrl;
-    private readonly apiKey;
-    constructor(config: WasiAIConfig);
-    /**
-     * Invoke an agent by slug.
-     * Automatically handles timeout, rate-limit, and payment errors.
-     */
-    invoke(slug: string, options: InvokeOptions): Promise<InvokeResult>;
-    /**
-     * List available agents, optionally filtered by category or search term.
-     */
-    list(options?: ListOptions): Promise<Agent[]>;
-    /**
-     * Get agent details by slug. Returns `null` if the agent is not found.
-     */
-    get(slug: string): Promise<Agent | null>;
+declare class HttpClient {
+    readonly baseUrl: string;
+    readonly apiKey: string;
+    constructor(options: WasiAIOptions);
+    request<T>(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>, auth?: boolean): Promise<T>;
+}
+
+declare class AgentsResource {
+    private readonly http;
+    constructor(http: HttpClient);
+    list(opts?: AgentListOptions): Promise<AgentList>;
+    get(slug: string): Promise<Agent>;
 }
 
 declare class WasiAIError extends Error {
-    constructor(msg: string);
+    readonly statusCode?: number | undefined;
+    constructor(message: string, statusCode?: number | undefined);
 }
-declare class RateLimitError extends WasiAIError {
-    constructor();
-}
-declare class InsufficientFundsError extends WasiAIError {
-    constructor();
+declare class InsufficientBudgetError extends WasiAIError {
+    constructor(message?: string);
 }
 declare class AgentNotFoundError extends WasiAIError {
     constructor(slug: string);
 }
-declare class TimeoutError extends WasiAIError {
-    constructor();
+declare class RateLimitError extends WasiAIError {
+    constructor(message?: string);
 }
 
-export { type Agent, AgentNotFoundError, InsufficientFundsError, type InvokeOptions, type InvokeResult, type ListOptions, RateLimitError, TimeoutError, WasiAI, type WasiAIConfig, WasiAIError };
+declare class WasiAI {
+    readonly agents: AgentsResource;
+    private readonly http;
+    constructor(options: WasiAIOptions);
+    invoke(slug: string, input: Record<string, unknown>): Promise<InvokeResult>;
+}
+
+export { type Agent, type AgentList, type AgentListOptions, AgentNotFoundError, AgentsResource, InsufficientBudgetError, type InvokeResult, RateLimitError, WasiAI, WasiAIError, type WasiAIOptions };

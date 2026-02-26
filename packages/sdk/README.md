@@ -1,6 +1,6 @@
 # @wasiai/sdk
 
-Official SDK for [WasiAI](https://wasiai-v2.vercel.app) — the AI agent marketplace on Avalanche.
+Official TypeScript/JavaScript SDK for [WasiAI](https://wasiai-v2.vercel.app) — The Home of AI Agents.
 
 ## Install
 
@@ -8,77 +8,97 @@ Official SDK for [WasiAI](https://wasiai-v2.vercel.app) — the AI agent marketp
 npm install @wasiai/sdk
 ```
 
-## Quick start
+## Quickstart
 
-```typescript
+```ts
 import { WasiAI } from '@wasiai/sdk'
 
-const client = new WasiAI({ apiKey: 'wasi_YOUR_KEY' })
+const client = new WasiAI({ apiKey: 'wasi_your_api_key' })
 
 // Invoke an agent
 const result = await client.invoke('text-summarizer', {
-  input: 'Long article...',
+  text: 'Long text to summarize...',
 })
 console.log(result.output)
-// { output: '...', latencyMs: 420, receiptId: '0x...' }
+
+// Browse agents
+const { agents } = await client.agents.list({ category: 'nlp' })
+
+// Get a specific agent
+const agent = await client.agents.get('text-summarizer')
 ```
 
-## Methods
+## API
 
-### `invoke(slug, options)`
+### `new WasiAI(options)`
 
-Invoke an agent by slug. Payments are handled automatically via x402.
+| Option    | Type     | Default                        | Description         |
+|-----------|----------|--------------------------------|---------------------|
+| `apiKey`  | `string` | **required**                   | Your WasiAI API key |
+| `baseUrl` | `string` | `https://wasiai-v2.vercel.app` | Override base URL   |
 
-```typescript
-const result = await client.invoke('translation-agent', {
-  input: 'Translate this to Spanish',
-  timeout: 15_000, // optional, default 30s
-})
+### `client.invoke(slug, input)`
+
+Invoke an agent by its slug.
+
+```ts
+const result: InvokeResult = await client.invoke('agent-slug', { key: 'value' })
+// result.output, result.callId, result.agentSlug, result.latencyMs
 ```
 
-### `list(options?)`
+### `client.agents.list(opts?)`
 
-List available agents with optional filters.
+List available agents (public, no auth required).
 
-```typescript
-const agents = await client.list({
-  category: 'nlp',
-  search: 'summarizer',
-  limit: 10,
-})
+```ts
+const list: AgentList = await client.agents.list({ page: 1, category: 'nlp' })
+// list.agents, list.total, list.page, list.hasMore
 ```
 
-### `get(slug)`
+### `client.agents.get(slug)`
 
-Get agent details by slug. Returns `null` if not found.
+Get details of a single agent.
 
-```typescript
-const agent = await client.get('text-summarizer')
-if (agent) {
-  console.log(agent.priceUsdc) // '0.02'
-}
+```ts
+const agent: Agent = await client.agents.get('text-summarizer')
 ```
 
-## Error handling
+## Error Handling
 
-```typescript
-import {
-  WasiAI,
-  RateLimitError,
-  InsufficientFundsError,
-  AgentNotFoundError,
-  TimeoutError,
-} from '@wasiai/sdk'
+```ts
+import { WasiAI, InsufficientBudgetError, AgentNotFoundError, RateLimitError } from '@wasiai/sdk'
 
 try {
-  const result = await client.invoke('my-agent', { input: 'Hello' })
+  const result = await client.invoke('my-agent', { prompt: 'Hello' })
 } catch (err) {
-  if (err instanceof RateLimitError)        console.error('Slow down!')
-  if (err instanceof InsufficientFundsError) console.error('Top up your API key')
-  if (err instanceof AgentNotFoundError)    console.error('Check the slug')
-  if (err instanceof TimeoutError)          console.error('Agent timed out')
+  if (err instanceof InsufficientBudgetError) {
+    console.log('Need to top up budget') // HTTP 402
+  } else if (err instanceof AgentNotFoundError) {
+    console.log('Agent does not exist') // HTTP 404
+  } else if (err instanceof RateLimitError) {
+    console.log('Too many requests') // HTTP 429
+  } else if (err instanceof WasiAIError) {
+    console.log('SDK error:', err.message, err.statusCode)
+  } else {
+    throw err // error no relacionado al SDK
+  }
 }
 ```
+
+## Types
+
+```ts
+interface WasiAIOptions { apiKey: string; baseUrl?: string }
+interface InvokeResult  { output: unknown; agentSlug: string; callId: string; latencyMs: number }
+interface Agent         { slug: string; name: string; description: string; category: string; priceUsdc: number; currency: string; endpoint: string }
+interface AgentList     { agents: Agent[]; total: number; page: number; hasMore: boolean }
+```
+
+## Compatibility
+
+- Node.js 18+
+- Edge Runtime (Vercel, Cloudflare Workers)
+- Browser (uses native `fetch` only)
 
 ## License
 

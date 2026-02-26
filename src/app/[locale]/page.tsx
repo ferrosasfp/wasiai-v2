@@ -8,6 +8,7 @@ export const revalidate = 300
 import { getModels } from '@/features/models/services/models.service'
 import { ModelCard } from '@/features/models/components/ModelCard'
 import { CategoryFilter } from '@/features/models/components/CategoryFilter'
+import { HeroDualCard } from '@/features/home/components/HeroDualCard'
 import type { ModelCategory } from '@/features/models/types/models.types'
 
 const PAGE_SIZE = 12
@@ -52,50 +53,19 @@ export default async function HomePage({ params, searchParams }: Props) {
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="bg-white border-b border-gray-100 px-6 py-16">
-        <div className="mx-auto max-w-4xl text-center">
-
-          {/* Badge */}
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-avax-50 border border-avax-100 px-4 py-1.5 text-sm text-avax-600 font-medium">
-            <span>⚡</span>
-            <span>{t('badge')}</span>
-          </div>
-
-          {/* Headline */}
-          <h1 className="text-5xl font-extrabold tracking-tight text-gray-900 mb-4">
-            {t('heroTitle')}
-            <br />
-            <span className="text-avax-500">{t('heroSubtitle')}</span>
-          </h1>
-
-          <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto">
-            {t('heroDescription')}
-          </p>
-
-          {/* Dual CTA */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
-            <Link
-              href={`/${locale}/publish`}
-              className="inline-flex items-center gap-2 bg-avax-500 text-white font-semibold px-6 py-3 rounded-xl hover:bg-avax-600 transition-colors"
-            >
-              {t('ctaCreator')}
-            </Link>
-            <Link
-              href="#agents"
-              className="inline-flex items-center gap-2 border border-gray-200 text-gray-700 font-semibold px-6 py-3 rounded-xl hover:border-avax-300 hover:text-avax-600 transition-colors"
-            >
-              {t('ctaConsumer')}
-            </Link>
-          </div>
-
-          {/* Stats pills */}
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-400">
-            <span>⚡ {t('statPayments')}</span>
-            <span>💰 {t('statMinCall')}</span>
-            <span>🏠 {t('statToCreators')}</span>
-            <span>🔗 {t('statIdentity')}</span>
-          </div>
-
-        </div>
+        <HeroDualCard
+          locale={locale}
+          headline={t('hero.headline')}
+          subtitleCreator={t('hero.subtitle.creator')}
+          subtitleConsumer={t('hero.subtitle.consumer')}
+          ctaCreator={t('hero.cta.creator')}
+          ctaConsumer={t('hero.cta.consumer')}
+          tagline={t('hero.tagline')}
+          tabCreator={t('hero.tab.creator')}
+          tabConsumer={t('hero.tab.consumer')}
+          badge={t('badge')}
+          tabLabel={t('hero.tab.label')}
+        />
       </section>
 
       {/* ── Stats bar ────────────────────────────────────────────────────── */}
@@ -104,19 +74,19 @@ export default async function HomePage({ params, searchParams }: Props) {
           <div className="flex flex-wrap justify-center gap-8 text-center text-sm text-gray-500">
             <div>
               <span className="block text-2xl font-extrabold text-avax-500">x402</span>
-              Native payments
+              {t('statPayments')}
             </div>
             <div>
               <span className="block text-2xl font-extrabold text-gray-900">$0.02</span>
-              Min. per call
+              {t('statMinCall')}
             </div>
             <div>
               <span className="block text-2xl font-extrabold text-gray-900">90%</span>
-              To creators
+              {t('statToCreators')}
             </div>
             <div>
               <span className="block text-2xl font-extrabold text-avax-500">ERC-8004</span>
-              Agent identity
+              {t('statIdentity')}
             </div>
           </div>
         </div>
@@ -152,18 +122,18 @@ export default async function HomePage({ params, searchParams }: Props) {
               {(search || category) ? (
                 <div className="mt-4 flex flex-wrap justify-center gap-3">
                   <Link href={`/${locale}`} className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition">
-                    Clear filters
+                    {t('clearFilters')}
                   </Link>
                   {!search && category && (
                     <Link href={`/${locale}`} className="rounded-full bg-avax-50 px-4 py-2 text-sm font-medium text-avax-600 hover:bg-avax-100 transition">
-                      Browse all categories
+                      {t('browseAllCategories')}
                     </Link>
                   )}
                 </div>
               ) : (
                 <div className="mt-4 flex flex-wrap justify-center gap-3">
                   <Link href={`/${locale}/publish`} className="rounded-full bg-avax-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition">
-                    Be the first to publish →
+                    {t('beFirst')}
                   </Link>
                 </div>
               )}
@@ -220,9 +190,9 @@ export default async function HomePage({ params, searchParams }: Props) {
         <div className="mx-auto max-w-4xl">
           <div className="mb-10 text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-avax-500/20 px-4 py-1.5 text-sm text-avax-300">
-              <span>🤖</span><span>Coinbase AgentKit compatible</span>
+              <span>🤖</span><span>{t('agentKitBadge')}</span>
             </div>
-            <h2 className="text-3xl font-bold">Built for the Agentic Economy</h2>
+            <h2 className="text-3xl font-bold">{t('builtForAgents')}</h2>
             <p className="mt-3 max-w-xl mx-auto text-gray-400">
               {t('builtSubtitle')}
             </p>
@@ -230,7 +200,7 @@ export default async function HomePage({ params, searchParams }: Props) {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
             <div className="rounded-xl bg-gray-800 p-4">
-              <p className="mb-2 text-xs font-semibold text-gray-400">1. Check budget</p>
+              <p className="mb-2 text-xs font-semibold text-gray-400">{t('step1Label')}</p>
               <pre className="overflow-auto text-xs text-green-400">{`GET /api/v1/agent-keys/me
 x-agent-key: wasi_xxx
 
@@ -247,7 +217,7 @@ x-agent-key: wasi_xxx
      invoke_url }]`}</pre>
             </div>
             <div className="rounded-xl bg-gray-800 p-4">
-              <p className="mb-2 text-xs font-semibold text-gray-400">3. Invoke & pay</p>
+              <p className="mb-2 text-xs font-semibold text-gray-400">{t('step3Label')}</p>
               <pre className="overflow-auto text-xs text-green-400">{`POST /api/v1/models/
   {slug}/invoke
 x-agent-key: wasi_xxx
@@ -262,7 +232,7 @@ x-agent-key: wasi_xxx
               href={`/${locale}/agent-keys`}
               className="rounded-full bg-avax-500 px-6 py-2.5 font-semibold hover:bg-avax-600 transition"
             >
-              Get Agent Key →
+              {t('getAgentKey')}
             </Link>
             <a
               href="https://github.com/coinbase/agentkit"
@@ -270,7 +240,7 @@ x-agent-key: wasi_xxx
               rel="noopener noreferrer"
               className="rounded-full border border-gray-600 px-6 py-2.5 font-semibold text-gray-300 hover:border-gray-400 transition"
             >
-              AgentKit Docs ↗
+              {t('agentKitDocs')}
             </a>
           </div>
         </div>

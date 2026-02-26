@@ -10,6 +10,7 @@ const NAV_PATHS = [
   { path: '/publish',           label: 'Publish'     },
   { path: '/creator/dashboard', label: 'Dashboard'   },
   { path: '/agent-keys',        label: 'Agent Keys'  },
+  { path: '/docs',              label: 'Docs'        },
 ]
 
 interface WasiNavBarProps {

@@ -1,34 +1,34 @@
 export class WasiAIError extends Error {
-  constructor(msg: string) {
-    super(msg)
+  constructor(
+    message: string,
+    public readonly statusCode?: number,
+  ) {
+    super(message)
     this.name = 'WasiAIError'
+    Object.setPrototypeOf(this, new.target.prototype)
   }
 }
 
-export class RateLimitError extends WasiAIError {
-  constructor() {
-    super('Rate limit exceeded')
-    this.name = 'RateLimitError'
-  }
-}
-
-export class InsufficientFundsError extends WasiAIError {
-  constructor() {
-    super('Insufficient funds in API key')
-    this.name = 'InsufficientFundsError'
+export class InsufficientBudgetError extends WasiAIError {
+  constructor(message = 'Insufficient budget to invoke agent') {
+    super(message, 402)
+    this.name = 'InsufficientBudgetError'
+    Object.setPrototypeOf(this, new.target.prototype)
   }
 }
 
 export class AgentNotFoundError extends WasiAIError {
   constructor(slug: string) {
-    super(`Agent "${slug}" not found`)
+    super(`Agent not found: ${slug}`, 404)
     this.name = 'AgentNotFoundError'
+    Object.setPrototypeOf(this, new.target.prototype)
   }
 }
 
-export class TimeoutError extends WasiAIError {
-  constructor() {
-    super('Request timed out')
-    this.name = 'TimeoutError'
+export class RateLimitError extends WasiAIError {
+  constructor(message = 'Rate limit exceeded') {
+    super(message, 429)
+    this.name = 'RateLimitError'
+    Object.setPrototypeOf(this, new.target.prototype)
   }
 }

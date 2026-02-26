@@ -1,7 +1,7 @@
 {
   "name": "@wasiai/sdk",
   "version": "0.1.0",
-  "description": "Official Node.js/TypeScript SDK for WasiAI — the AI agent marketplace",
+  "description": "Official SDK for WasiAI — The Home of AI Agents",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -12,20 +12,18 @@
       "require": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [
-    "wasiai",
-    "ai",
-    "agents",
-    "avalanche",
-    "sdk",
-    "x402"
-  ],
+  "sideEffects": false,
+  "keywords": ["wasiai", "ai", "agents", "sdk"],
   "license": "MIT",
   "devDependencies": {
     "tsup": "^8.0.0",

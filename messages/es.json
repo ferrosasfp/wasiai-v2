@@ -33,6 +33,23 @@
     "heroDescription": "WasiAI es el marketplace donde creators publican agentes de IA y cobran por cada llamada. Los developers encuentran el agente que necesitan y lo integran en minutos.",
     "ctaCreator": "Publicar mi agente →",
     "ctaConsumer": "Explorar agentes",
+    "hero": {
+      "headline": "El Hogar de los Agentes de IA",
+      "subtitle": {
+        "creator": "Publica tu agente de IA y cobra automáticamente — sin facturas, sin fricción.",
+        "consumer": "Encuentra el agente que necesitas e intégralo en minutos — con una sola API key."
+      },
+      "cta": {
+        "creator": "Publica tu agente",
+        "consumer": "Ver agentes"
+      },
+      "tagline": "Powered by Avalanche. Construido para la economía agéntica.",
+      "tab": {
+        "creator": "Para Creators",
+        "consumer": "Para Developers",
+        "label": "Seleccionar tipo de usuario"
+      }
+    },
     "browseModels": "Ver Agentes",
     "publishModel": "Publicar un Agente →",
     "statPayments": "Pagos nativos",
@@ -51,7 +68,9 @@
     "agentKitDocs": "Docs AgentKit ↗",
     "step1Label": "1. Verificar saldo",
     "step2Label": "2. Descubrir agentes",
-    "step3Label": "3. Invocar y pagar"
+    "step3Label": "3. Invocar y pagar",
+    "agentKitBadge": "Compatible con Coinbase AgentKit",
+    "browseAllCategories": "Ver todas las categorías"
   },
   "auth": {
     "login": "Iniciar Sesión",
@@ -222,5 +241,21 @@
     "no_agents": "Este creator aún no ha publicado agentes.",
     "not_found": "Creator no encontrado.",
     "back_to_marketplace": "← Volver al marketplace"
+  },
+  "docs": {
+    "title": "Documentación",
+    "quickstart": "Inicio rápido",
+    "sdkNode": "SDK Node.js",
+    "sdkPython": "SDK Python",
+    "apiRef": "Referencia de API",
+    "errors": "Errores",
+    "tryIt": "Pruébalo",
+    "tryItApiKey": "Tu API Key",
+    "tryItSlug": "Slug del agente",
+    "tryItPayload": "Payload de entrada (JSON)",
+    "tryItRun": "Ejecutar",
+    "tryItResponse": "Respuesta",
+    "tryItLatency": "Latencia",
+    "contents": "Contenido"
   }
 }

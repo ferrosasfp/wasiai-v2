@@ -1,10 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
-  WasiAIError,
-  RateLimitError,
-  InsufficientFundsError,
   AgentNotFoundError,
-  TimeoutError,
+  InsufficientBudgetError,
+  RateLimitError,
+  WasiAIError,
 } from '../src/errors'
 
 describe('WasiAIError (base)', () => {
@@ -22,6 +21,11 @@ describe('WasiAIError (base)', () => {
     const err = new WasiAIError('something went wrong')
     expect(err.message).toBe('something went wrong')
   })
+
+  it('statusCode is set when provided', () => {
+    const err = new WasiAIError('bad', 500)
+    expect(err.statusCode).toBe(500)
+  })
 })
 
 describe('RateLimitError', () => {
@@ -37,26 +41,34 @@ describe('RateLimitError', () => {
     expect(new RateLimitError().name).toBe('RateLimitError')
   })
 
+  it('has statusCode 429', () => {
+    expect(new RateLimitError().statusCode).toBe(429)
+  })
+
   it('has a descriptive message', () => {
     expect(new RateLimitError().message.length).toBeGreaterThan(0)
   })
 })
 
-describe('InsufficientFundsError', () => {
+describe('InsufficientBudgetError', () => {
   it('extends WasiAIError', () => {
-    expect(new InsufficientFundsError()).toBeInstanceOf(WasiAIError)
+    expect(new InsufficientBudgetError()).toBeInstanceOf(WasiAIError)
   })
 
   it('extends Error', () => {
-    expect(new InsufficientFundsError()).toBeInstanceOf(Error)
+    expect(new InsufficientBudgetError()).toBeInstanceOf(Error)
   })
 
-  it('has name InsufficientFundsError', () => {
-    expect(new InsufficientFundsError().name).toBe('InsufficientFundsError')
+  it('has name InsufficientBudgetError', () => {
+    expect(new InsufficientBudgetError().name).toBe('InsufficientBudgetError')
+  })
+
+  it('has statusCode 402', () => {
+    expect(new InsufficientBudgetError().statusCode).toBe(402)
   })
 
   it('has a descriptive message', () => {
-    expect(new InsufficientFundsError().message.length).toBeGreaterThan(0)
+    expect(new InsufficientBudgetError().message.length).toBeGreaterThan(0)
   })
 })
 
@@ -73,25 +85,11 @@ describe('AgentNotFoundError', () => {
     expect(new AgentNotFoundError('some-slug').name).toBe('AgentNotFoundError')
   })
 
+  it('has statusCode 404', () => {
+    expect(new AgentNotFoundError('some-slug').statusCode).toBe(404)
+  })
+
   it('includes the slug in message', () => {
     expect(new AgentNotFoundError('text-summarizer').message).toContain('text-summarizer')
-  })
-})
-
-describe('TimeoutError', () => {
-  it('extends WasiAIError', () => {
-    expect(new TimeoutError()).toBeInstanceOf(WasiAIError)
-  })
-
-  it('extends Error', () => {
-    expect(new TimeoutError()).toBeInstanceOf(Error)
-  })
-
-  it('has name TimeoutError', () => {
-    expect(new TimeoutError().name).toBe('TimeoutError')
-  })
-
-  it('has a descriptive message', () => {
-    expect(new TimeoutError().message.length).toBeGreaterThan(0)
   })
 })

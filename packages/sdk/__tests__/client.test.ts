@@ -1,10 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { WasiAI } from '../src/client'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { WasiAI } from '../src/index'
 import {
-  RateLimitError,
-  InsufficientFundsError,
   AgentNotFoundError,
-  TimeoutError,
+  InsufficientBudgetError,
+  RateLimitError,
   WasiAIError,
 } from '../src/errors'
 
@@ -17,32 +16,34 @@ function makeClient() {
 }
 
 function mockFetchOk(body: unknown, status = 200): void {
-  global.fetch = vi.fn().mockResolvedValueOnce({
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
     ok: status >= 200 && status < 300,
     status,
+    statusText: String(status),
     json: async () => body,
-  } as Response)
+  }))
 }
 
 function mockFetchStatus(status: number): void {
-  global.fetch = vi.fn().mockResolvedValueOnce({
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
     ok: false,
     status,
-    json: async () => ({ error: 'error' }),
-  } as Response)
+    statusText: String(status),
+    json: async () => ({ message: `Error ${status}` }),
+  }))
 }
 
 // ─── setup ──────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  vi.resetAllMocks()
+  vi.unstubAllGlobals()
 })
 
 // ─── constructor ─────────────────────────────────────────────────────────────
 
 describe('WasiAI constructor', () => {
-  it('throws WasiAIError if apiKey is empty', () => {
-    expect(() => new WasiAI({ apiKey: '' })).toThrow(WasiAIError)
+  it('throws if apiKey is empty', () => {
+    expect(() => new WasiAI({ apiKey: '' })).toThrow('apiKey is required')
   })
 })
 
@@ -50,35 +51,35 @@ describe('WasiAI constructor', () => {
 
 describe('invoke() — happy path', () => {
   it('returns InvokeResult on 200', async () => {
-    const expected = { output: 'hello', latencyMs: 100, receiptId: '0xabc' }
+    const expected = { output: 'hello', agentSlug: 'my-agent', callId: 'c1', latencyMs: 100 }
     mockFetchOk(expected)
 
     const client = makeClient()
-    const result = await client.invoke('my-agent', { input: 'hi' })
+    const result = await client.invoke('my-agent', { text: 'hi' })
 
     expect(result.output).toBe('hello')
     expect(result.latencyMs).toBe(100)
-    expect(result.receiptId).toBe('0xabc')
+    expect(result.callId).toBe('c1')
   })
 
   it('sends X-API-Key header', async () => {
-    mockFetchOk({ output: 'ok', latencyMs: 1, receiptId: '0x1' })
+    mockFetchOk({ output: 'ok', agentSlug: 'agent', callId: 'c1', latencyMs: 1 })
     const client = makeClient()
-    await client.invoke('agent', { input: 'test' })
+    await client.invoke('agent', { text: 'test' })
 
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-    const headers = callArgs[1].headers as Record<string, string>
+    const callArgs = vi.mocked(fetch).mock.calls[0]
+    const headers = (callArgs[1] as RequestInit).headers as Record<string, string>
     expect(headers['X-API-Key']).toBe(TEST_API_KEY)
   })
 
   it('POSTs to /api/v1/agents/<slug>/invoke', async () => {
-    mockFetchOk({ output: 'ok', latencyMs: 1, receiptId: '0x1' })
+    mockFetchOk({ output: 'ok', agentSlug: 'text-summarizer', callId: 'c1', latencyMs: 1 })
     const client = makeClient()
-    await client.invoke('text-summarizer', { input: 'test' })
+    await client.invoke('text-summarizer', { text: 'test' })
 
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(callArgs[0]).toContain('/api/v1/agents/text-summarizer/invoke')
-    expect(callArgs[1].method).toBe('POST')
+    const callArgs = vi.mocked(fetch).mock.calls[0]
+    expect(callArgs[0] as string).toContain('/api/v1/agents/text-summarizer/invoke')
+    expect((callArgs[1] as RequestInit).method).toBe('POST')
   })
 })
 
@@ -88,140 +89,102 @@ describe('invoke() — error cases', () => {
   it('throws RateLimitError on 429', async () => {
     mockFetchStatus(429)
     const client = makeClient()
-    await expect(client.invoke('agent', { input: 'test' })).rejects.toBeInstanceOf(RateLimitError)
+    await expect(client.invoke('agent', {})).rejects.toBeInstanceOf(RateLimitError)
   })
 
-  it('throws InsufficientFundsError on 402', async () => {
+  it('throws InsufficientBudgetError on 402', async () => {
     mockFetchStatus(402)
     const client = makeClient()
-    await expect(client.invoke('agent', { input: 'test' })).rejects.toBeInstanceOf(InsufficientFundsError)
+    await expect(client.invoke('agent', {})).rejects.toBeInstanceOf(InsufficientBudgetError)
   })
 
   it('throws AgentNotFoundError on 404', async () => {
     mockFetchStatus(404)
     const client = makeClient()
-    await expect(client.invoke('agent', { input: 'test' })).rejects.toBeInstanceOf(AgentNotFoundError)
-  })
-
-  it('throws TimeoutError on AbortError', async () => {
-    const abortError = new Error('The operation was aborted')
-    abortError.name = 'AbortError'
-    global.fetch = vi.fn().mockRejectedValueOnce(abortError)
-    const client = makeClient()
-    await expect(client.invoke('agent', { input: 'test' })).rejects.toBeInstanceOf(TimeoutError)
+    await expect(client.invoke('agent', {})).rejects.toBeInstanceOf(AgentNotFoundError)
   })
 
   it('throws WasiAIError on generic non-ok status', async () => {
     mockFetchStatus(500)
     const client = makeClient()
-    await expect(client.invoke('agent', { input: 'test' })).rejects.toBeInstanceOf(WasiAIError)
+    await expect(client.invoke('agent', {})).rejects.toBeInstanceOf(WasiAIError)
   })
 })
 
-// ─── list() happy path ────────────────────────────────────────────────────────
+// ─── agents.list() ────────────────────────────────────────────────────────────
 
-describe('list() — happy path', () => {
-  it('returns array of agents', async () => {
-    const agents = [{ slug: 'agent-1', name: 'Agent 1', description: '', category: 'nlp', priceUsdc: '0.01' }]
-    mockFetchOk(agents)
+describe('agents.list() — happy path', () => {
+  it('returns AgentList', async () => {
+    const agentList = {
+      agents: [{ slug: 'agent-1', name: 'Agent 1', description: '', category: 'nlp', priceUsdc: 0.01, currency: 'USDC', endpoint: '/api/v1/agents/agent-1/invoke' }],
+      total: 1,
+      page: 1,
+      hasMore: false,
+    }
+    mockFetchOk(agentList)
     const client = makeClient()
-    const result = await client.list()
-    expect(result).toEqual(agents)
-  })
-
-  it('also handles { agents: [...] } shape', async () => {
-    const agents = [{ slug: 'agent-2', name: 'Agent 2', description: '', category: 'vision', priceUsdc: '0.02' }]
-    mockFetchOk({ agents })
-    const client = makeClient()
-    const result = await client.list()
-    expect(result).toEqual(agents)
+    const result = await client.agents.list()
+    expect(result.agents).toHaveLength(1)
   })
 
   it('does NOT send X-API-Key header (public endpoint)', async () => {
-    mockFetchOk([])
+    mockFetchOk({ agents: [], total: 0, page: 1, hasMore: false })
     const client = makeClient()
-    await client.list()
+    await client.agents.list()
 
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-    // list() only passes URL, no init object with headers — or headers without X-API-Key
+    const callArgs = vi.mocked(fetch).mock.calls[0]
     const init = callArgs[1] as RequestInit | undefined
     if (init?.headers) {
       const headers = init.headers as Record<string, string>
       expect(headers['X-API-Key']).toBeUndefined()
-    } else {
-      // No headers at all — that's correct
-      expect(true).toBe(true)
     }
   })
 
   it('GETs /api/v1/agents', async () => {
-    mockFetchOk([])
+    mockFetchOk({ agents: [], total: 0, page: 1, hasMore: false })
     const client = makeClient()
-    await client.list()
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(callArgs[0]).toContain('/api/v1/agents')
+    await client.agents.list()
+    const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string
+    expect(calledUrl).toContain('/api/v1/agents')
   })
 
   it('throws WasiAIError on non-ok response', async () => {
     mockFetchStatus(503)
     const client = makeClient()
-    await expect(client.list()).rejects.toBeInstanceOf(WasiAIError)
+    await expect(client.agents.list()).rejects.toBeInstanceOf(WasiAIError)
   })
 })
 
-// ─── get() happy path ─────────────────────────────────────────────────────────
+// ─── agents.get() ─────────────────────────────────────────────────────────────
 
-describe('get() — happy path', () => {
+describe('agents.get() — happy path', () => {
   it('returns Agent on 200', async () => {
-    const agent = { slug: 'test', name: 'Test', description: 'desc', category: 'nlp', priceUsdc: '0.01' }
+    const agent = { slug: 'test', name: 'Test', description: 'desc', category: 'nlp', priceUsdc: 0.01, currency: 'USDC', endpoint: '/api/v1/agents/test/invoke' }
     mockFetchOk(agent)
     const client = makeClient()
-    const result = await client.get('test')
-    expect(result).toEqual(agent)
+    const result = await client.agents.get('test')
+    expect(result.slug).toBe('test')
   })
 
-  it('returns null on 404', async () => {
+  it('throws AgentNotFoundError on 404', async () => {
     mockFetchStatus(404)
-    global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      json: async () => null,
-    } as unknown as Response)
-
     const client = makeClient()
-    const result = await client.get('nonexistent')
-    expect(result).toBeNull()
-  })
-
-  it('does NOT send X-API-Key header (public endpoint)', async () => {
-    const agent = { slug: 'test', name: 'Test', description: '', category: 'nlp', priceUsdc: '0.01' }
-    mockFetchOk(agent)
-    const client = makeClient()
-    await client.get('test')
-
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-    const init = callArgs[1] as RequestInit | undefined
-    if (init?.headers) {
-      const headers = init.headers as Record<string, string>
-      expect(headers['X-API-Key']).toBeUndefined()
-    } else {
-      expect(true).toBe(true)
-    }
+    await expect(client.agents.get('nonexistent')).rejects.toBeInstanceOf(AgentNotFoundError)
   })
 
   it('GETs /api/v1/agents/<slug>', async () => {
-    const agent = { slug: 'my-agent', name: 'My Agent', description: '', category: 'nlp', priceUsdc: '0.01' }
+    const agent = { slug: 'my-agent', name: 'My Agent', description: '', category: 'nlp', priceUsdc: 0.01, currency: 'USDC', endpoint: '/api/v1/agents/my-agent/invoke' }
     mockFetchOk(agent)
     const client = makeClient()
-    await client.get('my-agent')
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(callArgs[0]).toContain('/api/v1/agents/my-agent')
+    await client.agents.get('my-agent')
+    const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string
+    expect(calledUrl).toContain('/api/v1/agents/my-agent')
   })
 
   it('throws WasiAIError on non-ok, non-404 response', async () => {
     mockFetchStatus(500)
     const client = makeClient()
-    await expect(client.get('agent')).rejects.toBeInstanceOf(WasiAIError)
+    await expect(client.agents.get('agent')).rejects.toBeInstanceOf(WasiAIError)
   })
 })
 
@@ -243,66 +206,31 @@ describe('CRÍTICO — API key must NOT appear in error messages', () => {
 
   it('RateLimitError message does not contain wasi_', async () => {
     mockFetchStatus(429)
-    try {
-      await clientWithKey().invoke('agent', { input: 'test' })
-    } catch (err) {
-      assertNoKeyInMessage(err)
-    }
+    try { await clientWithKey().invoke('agent', {}) } catch (err) { assertNoKeyInMessage(err) }
   })
 
-  it('InsufficientFundsError message does not contain wasi_', async () => {
+  it('InsufficientBudgetError message does not contain wasi_', async () => {
     mockFetchStatus(402)
-    try {
-      await clientWithKey().invoke('agent', { input: 'test' })
-    } catch (err) {
-      assertNoKeyInMessage(err)
-    }
+    try { await clientWithKey().invoke('agent', {}) } catch (err) { assertNoKeyInMessage(err) }
   })
 
   it('AgentNotFoundError message does not contain wasi_', async () => {
     mockFetchStatus(404)
-    try {
-      await clientWithKey().invoke('agent', { input: 'test' })
-    } catch (err) {
-      assertNoKeyInMessage(err)
-    }
-  })
-
-  it('TimeoutError message does not contain wasi_', async () => {
-    const abortError = new Error('aborted')
-    abortError.name = 'AbortError'
-    global.fetch = vi.fn().mockRejectedValueOnce(abortError)
-    try {
-      await clientWithKey().invoke('agent', { input: 'test' })
-    } catch (err) {
-      assertNoKeyInMessage(err)
-    }
+    try { await clientWithKey().invoke('agent', {}) } catch (err) { assertNoKeyInMessage(err) }
   })
 
   it('WasiAIError (generic) message does not contain wasi_', async () => {
     mockFetchStatus(500)
-    try {
-      await clientWithKey().invoke('agent', { input: 'test' })
-    } catch (err) {
-      assertNoKeyInMessage(err)
-    }
+    try { await clientWithKey().invoke('agent', {}) } catch (err) { assertNoKeyInMessage(err) }
   })
 
-  it('list() WasiAIError message does not contain wasi_', async () => {
+  it('agents.list() WasiAIError message does not contain wasi_', async () => {
     mockFetchStatus(503)
-    try {
-      await clientWithKey().list()
-    } catch (err) {
-      assertNoKeyInMessage(err)
-    }
+    try { await clientWithKey().agents.list() } catch (err) { assertNoKeyInMessage(err) }
   })
 
-  it('get() WasiAIError message does not contain wasi_', async () => {
+  it('agents.get() WasiAIError message does not contain wasi_', async () => {
     mockFetchStatus(500)
-    try {
-      await clientWithKey().get('agent')
-    } catch (err) {
-      assertNoKeyInMessage(err)
-    }
+    try { await clientWithKey().agents.get('agent') } catch (err) { assertNoKeyInMessage(err) }
   })
 })
