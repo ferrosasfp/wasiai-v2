@@ -149,7 +149,28 @@ Verifica:
 
 ---
 
+## Fase 2.5 — Story File (OBLIGATORIO, no saltear)
+
+### SM: Create Story
+Antes de tocar código, el Scrum Master genera un story file por cada HU:
+
+```
+/bmad-agent-bmm-sm → CS (Create Story)
+→ genera: .nexus/docs/sdd/story-HU-X.X.md
+```
+
+El story file es **autocontenido**: ACs verificables, schema exacto, rutas, patrones del codebase, DoD checklist. El Dev puede implementar desde ese archivo sin contexto adicional.
+
+**Sin story file aprobado → no se empieza a codear.**
+
+---
+
 ## Fase 3 — Implementación
+
+### Dev: Dev Story
+```
+/bmad-agent-bmm-dev → DS (Dev Story) → lee story-HU-X.X.md → implementa
+```
 
 ### Orden de implementación (siempre este orden)
 1. Migration de DB (si hay cambio de schema)

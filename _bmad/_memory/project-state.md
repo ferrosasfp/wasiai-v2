@@ -75,6 +75,38 @@ Ver `.nexus/docs/architecture/` para documentos completos.
 
 ---
 
+## 🚨 Flujo OBLIGATORIO por HU — NO hay atajos
+
+```
+IDEA
+ → S0: HU + ACs + Scope + Riesgos
+ → ⛔ GATE 1: Fer aprueba explícitamente (HU_APPROVED)
+ → S1: SDD (rutas, schema, on-chain, UI, DoD)
+ → Implementation Readiness Check (formal, workflow)
+ → ⛔ GATE 2: Fer aprueba explícitamente (SPEC_APPROVED)
+ → SM → Create Story → story-HU-X.X.md (OBLIGATORIO)
+ → Dev → Dev Story (desde el story file, no desde conversación)
+ → Adversarial Review formal
+ → Code Review formal (Dev → CR)
+ → QA → E2E tests desde ACs
+ → npm run build (0 errores) + forge test si aplica
+ → git push origin master master:main
+```
+
+### Errores que NO repetir
+1. "Go" de Fer al ver el scope ≠ HU_APPROVED ni SPEC_APPROVED
+2. Saltar el story file del SM (el SDD NO lo reemplaza)
+3. Implementation Readiness "mental" — ejecutar el workflow
+4. Mezclar roles en una sesión sin activar el agente correcto
+5. Code Review nunca ejecutado — hacerlo antes de cerrar sprint
+
+### Cadencia semanal (activa desde Sprint 3)
+- Lunes: SM → Sprint Planning → sprint-status.yaml
+- Miércoles: SM → Sprint Status
+- Viernes: SM → Retrospectiva
+
+---
+
 ## Deuda técnica documentada
 
 - `base_model`, `auth_header`, `http_method` no persisten en DB al recargar draft (solo React state)
