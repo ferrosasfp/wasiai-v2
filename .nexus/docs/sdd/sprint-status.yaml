@@ -45,8 +45,9 @@ development_status:
   # HU-2.1 tiene SDD borrador (.nexus/docs/sdd/HU-2.1-sdk-nodejs.md)
   # pero NO tiene story file del SM → backlog hasta que SM genere story-HU-2.1.md
   epic-2: in-progress
+  # Sprint 3: HU-2.1 done. Remaining: HU-2.2, 2.3, 2.4
 
-  2-1-sdk-node-js-typescript: in-progress
+  2-1-sdk-node-js-typescript: done
   2-2-sdk-python: backlog
   2-3-documentacion-interactiva: backlog
   2-4-cli-wasiai: backlog
