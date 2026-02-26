@@ -1,0 +1,127 @@
+# generated: 2026-02-26
+# project: WasiAI
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: .nexus/docs/sdd
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: SM story file created en .nexus/docs/sdd/story-HU-X.X.md
+#   - in-progress: Developer actively working
+#   - review: Ready for code review
+#   - done: Story completed, merged, tested
+#
+# IMPORTANTE: El SDD (spec) NO equivale al story file del SM.
+# El story file lo genera: SM → Create Story → story-HU-X.X.md
+# Sin story file → status es backlog, no ready-for-dev.
+
+generated: "2026-02-26"
+project: WasiAI
+project_key: NOKEY
+tracking_system: file-system
+story_location: .nexus/docs/sdd
+
+development_status:
+
+  # ─── ÉPICA 1: Creators Reales ───────────────────────────────────────────
+  epic-1: done
+
+  1-1-onboarding-sin-friccion: done
+  1-2-formulario-multi-paso: done
+  1-3-test-de-endpoint-en-tiempo-real: done
+  1-4-creator-analytics: done
+  1-5-perfil-publico-del-creator: done
+
+  epic-1-retrospective: done
+
+  # ─── ÉPICA 2: SDK @wasiai/sdk ───────────────────────────────────────────
+  # HU-2.1 tiene SDD borrador (.nexus/docs/sdd/HU-2.1-sdk-nodejs.md)
+  # pero NO tiene story file del SM → backlog hasta que SM genere story-HU-2.1.md
+  epic-2: backlog
+
+  2-1-sdk-node-js-typescript: backlog
+  2-2-sdk-python: backlog
+  2-3-documentacion-interactiva: backlog
+  2-4-cli-wasiai: backlog
+
+  epic-2-retrospective: optional
+
+  # ─── ÉPICA 3: Free Trial ────────────────────────────────────────────────
+  epic-3: in-progress
+
+  3-1-una-llamada-gratuita-por-usuario-por-agente: done
+  3-2-playground-comparativo: backlog
+
+  epic-3-retrospective: optional
+
+  # ─── ÉPICA 4: Discovery ─────────────────────────────────────────────────
+  epic-4: backlog
+
+  4-1-busqueda-semantica: backlog
+  4-2-filtros-avanzados: backlog
+  4-3-ejemplos-de-input-output-curados: backlog
+  4-4-reputacion-con-datos-reales: backlog
+  4-5-colecciones-curadas-y-featured-agents: backlog
+
+  epic-4-retrospective: optional
+
+  # ─── ÉPICA 5: Agent-to-Agent Routing ────────────────────────────────────
+  epic-5: backlog
+
+  5-1-post-apiv1compose-pipeline-secuencial: backlog
+  5-2-ejecucion-paralela-de-agentes: backlog
+  5-3-routing-inteligente: backlog
+  5-4-ui-visual-de-pipelines: backlog
+
+  epic-5-retrospective: optional
+
+  # ─── ÉPICA 6: Mainnet Avalanche ─────────────────────────────────────────
+  epic-6: backlog
+
+  6-1-auditoria-de-seguridad-del-contrato: backlog
+  6-2-deploy-contrato-en-mainnet: backlog
+  6-3-migrar-agentes-demo-a-mainnet: backlog
+  6-4-monitoring-del-operator-wallet: backlog
+
+  epic-6-retrospective: optional
+
+  # ─── ÉPICA 7: Integraciones ──────────────────────────────────────────────
+  epic-7: backlog
+
+  7-1-plugin-langchain: backlog
+  7-2-plugin-llamaindex: backlog
+  7-3-ejemplo-agentkit-coinbase: backlog
+  7-4-documentacion-mcp: backlog
+
+  epic-7-retrospective: optional
+
+  # ─── ÉPICA 8: Transparencia ──────────────────────────────────────────────
+  epic-8: backlog
+
+  8-1-auditoria-publica-del-contrato: backlog
+  8-2-dashboard-publico-transparency: backlog
+  8-3-notificaciones: backlog
+  8-4-rate-limiting-configurable-por-creator: backlog
+
+  epic-8-retrospective: optional
+
+  # ─── ÉPICA 9: UX Improvements ───────────────────────────────────────────
+  # 9.4 y 9.6 tienen SDD borrador pero NO story file del SM → backlog
+  epic-9: backlog
+
+  9-1-empty-state-de-busqueda: backlog
+  9-2-preview-live-en-publish: backlog
+  9-3-editor-de-capabilities-sin-json-crudo: backlog
+  9-4-code-examples-auto-generados: backlog
+  9-5-indicador-de-saldo-de-api-key-en-navbar: backlog
+  9-6-hero-copy-especifico-por-usuario: backlog
+  9-7-i18n-copias-reales-de-wasiai: backlog
+
+  epic-9-retrospective: optional
