@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -42,13 +42,22 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   const [userEmail, setUserEmail] = useState<string | null>(initialEmail)
   // No loading state if we already have the email from the server
   const [loading,   setLoading]   = useState(initialEmail === null)
+  // WAS-58: Ref to capture initialEmail for the auth effect without adding it as dep
+  const initialEmailRef = useRef(initialEmail)
 
   useEffect(() => {
     const supabase = createClient()
 
-    // Only subscribe to future auth changes (login/logout/token refresh)
-    // Initial state already comes from the server via initialEmail prop
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Subscribe to auth changes (login/logout/token refresh)
+    // WAS-58: Skip INITIAL_SESSION if initialEmail was already provided by SSR
+    // to prevent a race condition where a stale client session overrides the
+    // server-validated email, causing ApiKeyBalance to disappear.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' && initialEmailRef.current !== null) {
+        // SSR already provided a valid email — ignore client INITIAL_SESSION
+        setLoading(false)
+        return
+      }
       setUserEmail(session?.user?.email ?? null)
       setLoading(false)
     })

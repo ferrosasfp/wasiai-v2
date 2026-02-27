@@ -5,6 +5,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useState, useEffect } from 'react'
 import type { UserRole } from '@/hooks/useUserRole'
 
 interface MobileBottomNavProps {
@@ -16,19 +17,42 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
   const pathname = usePathname()
   const t = useTranslations('mobileNav')
 
+  // WAS-54: Track hash to differentiate Home vs Explorar on same route
+  const [hash, setHash] = useState<string>(() =>
+    typeof window !== 'undefined' ? window.location.hash : ''
+  )
+
+  useEffect(() => {
+    function handleHashChange() {
+      setHash(window.location.hash)
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange)
+    }
+  }, [])
+
   // Destinos condicionales por rol (prop desde SSR — sin flash)
   const dashboardHref =
     userRole === 'creator'  ? `/${locale}/creator/dashboard` :
     userRole === 'consumer' ? `/${locale}/dashboard` :
                               `/${locale}/login`
 
-  const profileHref = dashboardHref  // MVP: mismo destino (deuda técnica DT-NAV-01)
+  // WAS-57: profileHref uses same role-based logic as dashboardHref (MVP — DT-NAV-01)
+  const profileHref = dashboardHref
 
-  // Tab activo por pathname
+  const isExploreHash = hash === '#agents'
+
+  // Tab activo por pathname + hash
   function isActive(href: string): boolean {
-    if (href.includes('#')) return false  // Tab Explorar: nunca "activo" (es un anchor)
+    if (href.includes('#agents')) {
+      // WAS-54: Explorar activo cuando el hash es #agents
+      return pathname === `/${locale}` && isExploreHash
+    }
     if (href === `/${locale}` || href === `/${locale}/`) {
-      return pathname === `/${locale}` || pathname === `/${locale}/`
+      // WAS-54: Home activo solo cuando en / SIN el hash #agents
+      return (pathname === `/${locale}` || pathname === `/${locale}/`) && !isExploreHash
     }
     return pathname.startsWith(href.split('?')[0])
   }

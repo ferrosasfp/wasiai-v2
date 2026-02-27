@@ -142,7 +142,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
               cta={{ label: t('publishAgent'), href: `/${locale}/publish` }}
             />
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>
@@ -220,7 +220,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
               subtitle={t('noCallsSubtitle')}
             />
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>

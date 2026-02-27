@@ -59,12 +59,12 @@ export async function GET(req: NextRequest) {
 
   if (!profile) return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
 
-  // Obtener agentes activos del creator
+  // WAS-56: Obtener TODOS los agentes del creator (sin filtrar por status activo)
+  // para que analytics muestre datos aunque el agente esté en draft/pending/etc.
   const { data: agentsData } = await svc
     .from('agents')
     .select('id, name')
     .eq('creator_id', profile.id)
-    .eq('status', 'active')
 
   const agents: AgentRow[] = agentsData ?? []
 
