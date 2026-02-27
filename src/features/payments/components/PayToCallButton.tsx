@@ -17,7 +17,11 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const t = useTranslations('payToCall')
   const { connect }    = useConnect()
   const { disconnect } = useDisconnect()
-  const connectors     = useConnectors()
+  const allConnectors  = useConnectors()
+  const connectors     = allConnectors.filter((c, i, arr) =>
+    arr.findIndex(x => x.name === c.name) === i &&
+    c.name !== 'Injected'
+  )
   const [input, setInput] = useState('')
   const [showWalletModal, setShowWalletModal] = useState(false)
 
@@ -106,7 +110,12 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
                 }}
                 className="w-full flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50 transition"
               >
-                <span className="text-lg">🦊</span>
+                {connector.icon ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={connector.icon} alt={connector.name} className="w-6 h-6 rounded-full" />
+                ) : (
+                  <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">W</span>
+                )}
                 <span className="font-medium text-gray-800">{connector.name}</span>
               </button>
             ))}

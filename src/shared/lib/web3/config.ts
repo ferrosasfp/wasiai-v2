@@ -7,9 +7,8 @@ export const wagmiConfig = createConfig({
   ssr: true, // Prevents wagmi hydration mismatches in Next.js App Router
   multiInjectedProviderDiscovery: true, // EIP-6963: discover each wallet separately
   connectors: [
-    injected(),                              // Core, Rabby, etc.
-    injected({ target: 'metaMask' }),        // MetaMask explícito
-    coinbaseWallet({ appName: 'WasiAI' }),   // Coinbase Wallet
+    injected(),                            // EIP-6963: descubre MetaMask, Core Wallet, Rabby, etc.
+    coinbaseWallet({ appName: 'WasiAI' }), // Coinbase Wallet SDK
   ],
   transports: Object.fromEntries(
     supportedChains.map((chain) => [
