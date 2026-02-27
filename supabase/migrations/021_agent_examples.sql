@@ -23,9 +23,11 @@ CREATE POLICY "agent_examples_public_read"
   USING (true);
 
 -- Solo el creator dueño puede escribir (INSERT, UPDATE, DELETE)
-CREATE POLICY "agent_examples_creator_write"
+-- WITH CHECK explícito para evitar ambigüedad en políticas FOR ALL
+CREATE POLICY "Creator write"
   ON agent_examples FOR ALL
-  USING (creator_id = auth.uid());
+  USING (creator_id = auth.uid())
+  WITH CHECK (creator_id = auth.uid());
 
 -- Índice primario: ordenar ejemplos de un agente
 CREATE INDEX idx_agent_examples_agent_id

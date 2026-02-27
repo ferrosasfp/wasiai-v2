@@ -3,8 +3,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const MAX_EXAMPLES = 5
-
 // GET — listar ejemplos del agente (solo el creator dueño)
 export async function GET(
   _req: NextRequest,
@@ -55,20 +53,7 @@ export async function POST(
 
   if (!agent) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Verificar límite de 5 ejemplos (enforced en API, no en DB)
-  const { count } = await supabase
-    .from('agent_examples')
-    .select('id', { count: 'exact', head: true })
-    .eq('agent_id', agentId)
-
-  if ((count ?? 0) >= MAX_EXAMPLES) {
-    return NextResponse.json(
-      { error: 'Maximum 5 examples per agent' },
-      { status: 422 }
-    )
-  }
-
-  // Parsear y validar body
+  // Parsear y validar body (antes del INSERT para fail-fast)
   const body = await req.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
@@ -85,18 +70,22 @@ export async function POST(
   if (label && label.trim().length > 60)
     return NextResponse.json({ error: 'label exceeds 60 chars' }, { status: 400 })
 
-  const { data, error } = await supabase
-    .from('agent_examples')
-    .insert({
-      agent_id:   agentId,
-      creator_id: user.id,
-      input:      input.trim(),
-      output:     output.trim(),
-      label:      label?.trim() ?? null,
-    })
-    .select()
-    .single()
+  // B-01 fix: INSERT atómico via RPC — el conteo y el INSERT son una sola operación
+  // Si ya hay 5 ejemplos, la función retorna NULL (WHERE COUNT < 5 falla) → 409 Conflict
+  const { data, error } = await supabase.rpc('insert_agent_example', {
+    p_agent_id:   agentId,
+    p_creator_id: user.id,
+    p_input:      input.trim(),
+    p_output:     output.trim(),
+    p_label:      label?.trim() ?? null,
+  })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) {
+    return NextResponse.json(
+      { error: 'Maximum 5 examples per agent' },
+      { status: 409 }
+    )
+  }
   return NextResponse.json({ example: data }, { status: 201 })
 }

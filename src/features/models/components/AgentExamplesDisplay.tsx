@@ -4,14 +4,15 @@
 // AC-8: Si no hay ejemplos → retorna null (sección invisible)
 
 import { getTranslations } from 'next-intl/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 interface AgentExamplesDisplayProps {
   agentId: string
 }
 
 export async function AgentExamplesDisplay({ agentId }: AgentExamplesDisplayProps) {
-  const supabase = createServiceClient()
+  // M-02: usar cliente anon (no service role) — datos públicos, RLS aplica correctamente
+  const supabase = await createClient()
   const t = await getTranslations('examples')
 
   const { data: examples, error } = await supabase

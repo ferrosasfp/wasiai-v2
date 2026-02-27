@@ -23,6 +23,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
   // Ref to avoid setState after unmount (pattern from CreatorAnalytics)
   const activeRef = useRef(true)
 
+  // M-04: fetchExamples unificado — usado tanto en useEffect inicial como en callbacks
   const fetchExamples = useCallback(async () => {
     const res = await fetch(`/api/creator/agents/${agentId}/examples`)
     if (res.ok) {
@@ -34,17 +35,9 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
 
   useEffect(() => {
     activeRef.current = true
-    const run = async () => {
-      const res = await fetch(`/api/creator/agents/${agentId}/examples`)
-      if (res.ok) {
-        const { examples: data } = await res.json()
-        if (activeRef.current) setExamples(data)
-      }
-      if (activeRef.current) setLoading(false)
-    }
-    run()
+    fetchExamples()
     return () => { activeRef.current = false }
-  }, [agentId])
+  }, [fetchExamples])
 
   const canAdd = examples.length < MAX_EXAMPLES
 

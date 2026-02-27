@@ -39,7 +39,6 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
     [locale, tNav]
   )
 
-  const [menuOpen,  setMenuOpen]  = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(initialEmail)
   // No loading state if we already have the email from the server
   const [loading,   setLoading]   = useState(initialEmail === null)
@@ -190,82 +189,11 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             <WalletConnectButton locale={locale} />
           </div>
 
-          {/* Mobile hamburger — HU-MOBILE-NAV: oculto, reemplazado por bottom nav */}
-          <button
-            type="button"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-hidden="true"
-            className="hidden"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
-              {menuOpen
-                ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                : <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />}
-            </svg>
-          </button>
+
         </div>
       </div>
 
-      {/* Mobile menu — HU-MOBILE-NAV: eliminado del render, reemplazado por bottom nav */}
-      {false && menuOpen && (
-        <div id="mobile-menu" className="border-t border-gray-100 sm:hidden">
-          <div className="space-y-1 px-4 py-3">
-            {NAV_LINKS.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMenuOpen(false)}
-                aria-current={isActive(href) ? 'page' : undefined}
-                className={`block rounded-lg px-3 py-2 text-sm font-medium ${
-                  isActive(href)
-                    ? 'bg-avax-50 text-avax-600'
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
-            {/* Language switcher — mobile */}
-            <div className="pt-2">
-              <LanguageSwitcher />
-            </div>
-            {/* Wallet connect — mobile */}
-            <div className="pt-2 border-t border-gray-100">
-              <WalletConnectButton locale={locale} />
-            </div>
-            <div className="mt-3 border-t border-gray-100 pt-3">
-              {userEmail ? (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500 truncate max-w-[200px]">{userEmail}</span>
-                  <button
-                    onClick={handleSignout}
-                    aria-label="Sign out of your account"
-                    className="text-sm font-medium text-red-600 hover:text-red-700"
-                  >
-                    {tAuth('signout')}
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-3">
-                  {/* T-18: Locale-aware mobile login/signup links */}
-                  <Link
-                    href={`/${locale}/login`}
-                    className="flex-1 rounded-lg border border-gray-200 py-2 text-center text-sm font-medium text-gray-700"
-                  >
-                    {tAuth('login')}
-                  </Link>
-                  <Link
-                    href={`/${locale}/signup`}
-                    className="flex-1 rounded-lg bg-avax-500 py-2 text-center text-sm font-semibold text-white"
-                  >
-                    {tAuth('signup')}
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+
     </nav>
   )
 }
