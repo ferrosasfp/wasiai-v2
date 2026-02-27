@@ -6,9 +6,9 @@ import { createClient } from '@/lib/supabase/server'
 // PATCH — editar ejemplo
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; exId: string }> }
+  { params }: { params: Promise<{ slug: string; exId: string }> }
 ) {
-  const { id: agentId, exId } = await params
+  const { slug: agentId, exId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -51,9 +51,9 @@ export async function PATCH(
 // DELETE — eliminar ejemplo
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string; exId: string }> }
+  { params }: { params: Promise<{ slug: string; exId: string }> }
 ) {
-  const { id: agentId, exId } = await params
+  const { slug: agentId, exId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
