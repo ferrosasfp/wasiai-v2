@@ -52,6 +52,12 @@
 
 ---
 
+## 🔴 P1 — Sprint 5 (prioridad máxima)
+
+- [ ] **HU-3.3** Free Trial controlado por creator — agregar `free_trial_enabled` (default: false) y `free_trial_limit` (default: 1) en tabla `agents`. Toggle en dashboard del creator. Trial solo se ejecuta si el creator lo activó explícitamente. Hoy los trials están ON para todos sin consentimiento del creator — esto lo corrige. Migration 018 requerida.
+
+---
+
 ## 🔴 P1 — Seguridad y correctness ✅ COMPLETADO (2026-02-25)
 
 - [x] **HAL-017** Monitoreo pending_recordings > 1h → alerta operativa en retry-recordings cron

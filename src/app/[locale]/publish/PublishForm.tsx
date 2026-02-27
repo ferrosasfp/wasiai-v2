@@ -76,7 +76,19 @@ export default function PublishForm({ initialDraft, from }: Props) {
       })
       const json = await res.json() as Record<string, unknown>
       if (!res.ok) {
-        setErrors((json.fields as Record<string, string>) ?? { name: (json.error as string) ?? 'Error al guardar' })
+        if (json.fields) {
+          setErrors(json.fields as Record<string, string>)
+        } else if (json.details && Array.isArray(json.details)) {
+          // Map Zod validation issues to field errors
+          const fieldErrors: Record<string, string> = {}
+          for (const issue of json.details as Array<{ path: string[]; message: string }>) {
+            const field = issue.path[0] ?? 'name'
+            fieldErrors[field] = issue.message
+          }
+          setErrors(fieldErrors)
+        } else {
+          setErrors({ name: (json.error as string) ?? 'Error al guardar' })
+        }
         return
       }
       if (!draftSlug && json.slug) setDraftSlug(json.slug as string)
