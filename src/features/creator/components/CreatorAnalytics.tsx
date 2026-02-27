@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { SummaryCards } from './analytics/SummaryCards'
 import { CallsChart } from './analytics/CallsChart'
@@ -54,41 +54,45 @@ export function CreatorAnalytics({ agents }: Props) {
   const t = useTranslations('analytics')
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
   const [state, setState] = useState<State>({ status: 'loading', data: null })
-  // Ref to track active fetch — avoids setState on unmounted component
-  const activeRef = useRef(true)
 
   useEffect(() => {
-    activeRef.current = true
-    const url = selectedAgentId
-      ? `/api/creator/analytics?agent_id=${selectedAgentId}`
-      : '/api/creator/analytics'
+    let cancelled = false
 
-    fetch(url)
-      .then(r => {
-        if (!r.ok) throw new Error('Failed')
-        return r.json() as Promise<AnalyticsData>
-      })
-      .then(d => {
-        if (activeRef.current) setState({ status: 'success', data: d })
-      })
-      .catch((err) => {
-        // Fix D: loguear el error para identificar la causa en production logs
+    const fetchData = async () => {
+      setState({ status: 'loading', data: null })
+      try {
+        const url = selectedAgentId
+          ? `/api/creator/analytics?agentId=${selectedAgentId}`
+          : '/api/creator/analytics'
+        const r = await fetch(url)
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const data = await r.json() as AnalyticsData
+        if (!cancelled) setState({ status: 'success', data })
+      } catch (err) {
         console.error('[CreatorAnalytics] fetch error:', err)
-        if (activeRef.current) setState({ status: 'error', data: null })
-      })
+        if (!cancelled) setState({ status: 'error', data: null })
+      }
+    }
+
+    fetchData()
 
     // Auto-refresh every 5 minutes
-    const interval = setInterval(() => {
-      fetch(url)
-        .then(r => r.json() as Promise<AnalyticsData>)
-        .then(d => {
-          if (activeRef.current) setState({ status: 'success', data: d })
-        })
-        .catch(() => null)
+    const url = selectedAgentId
+      ? `/api/creator/analytics?agentId=${selectedAgentId}`
+      : '/api/creator/analytics'
+    const interval = setInterval(async () => {
+      try {
+        const r = await fetch(url)
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const data = await r.json() as AnalyticsData
+        if (!cancelled) setState({ status: 'success', data })
+      } catch {
+        // silent — keep showing last known data on refresh failure
+      }
     }, 5 * 60 * 1000)
 
     return () => {
-      activeRef.current = false
+      cancelled = true
       clearInterval(interval)
     }
   }, [selectedAgentId])
