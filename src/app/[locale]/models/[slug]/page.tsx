@@ -5,6 +5,8 @@ import { ModelCallSection } from '@/features/models/components/ModelCallSection'
 import { AgentRating } from '@/features/reputation/components/AgentRating'
 import { AgentTrialPlayground } from '@/features/agents/components/AgentTrialPlayground'
 import { CodeExamples } from '@/features/models/components/CodeExamples'
+import { ReputationMetrics } from '@/features/models/components/ReputationMetrics'
+import { AgentExamplesDisplay } from '@/features/models/components/AgentExamplesDisplay'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 
@@ -130,6 +132,9 @@ export default async function ModelDetailPage({ params }: Props) {
               )}
             </div>
 
+            {/* HU-4.3: Ejemplos Input/Output — invisible si no hay ejemplos (retorna null) */}
+            <AgentExamplesDisplay agentId={model.id} />
+
             {/* HU-3.3: Trial Playground solo si el creator lo activó — ausente del DOM si no */}
             {model.free_trial_enabled ? (
               <AgentTrialPlayground slug={model.slug} isAuthenticated={isAuthenticated} />
@@ -243,6 +248,9 @@ X-PAYMENT: <x402-eip712-signed-payload>
                 <span className="font-medium text-green-600">90%</span>
               </div>
             </div>
+
+            {/* HU-4.4: Métricas de reputación con datos reales */}
+            <ReputationMetrics agentId={model.id} />
 
             {/* ERC-8004 Reputation */}
             <AgentRating

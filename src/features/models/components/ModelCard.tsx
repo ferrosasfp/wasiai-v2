@@ -21,10 +21,12 @@ interface ModelCardProps {
   locale: string
   /** Position index in the grid — first 3 are above the fold and get priority loading */
   index?: number
+  /** HU-4.4: Badge de reputación (opcional) — pasado como ReactNode desde Server Components */
+  reputationBadge?: React.ReactNode
 }
 
 // P-03: Memoized to avoid unnecessary re-renders in grid lists
-export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: ModelCardProps) {
+export const ModelCard = memo(function ModelCard({ model, locale, index = 0, reputationBadge }: ModelCardProps) {
   const remaining = Math.max(0, model.total_calls ?? 0)
 
   return (
@@ -101,9 +103,13 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: M
             </span>
           )}
         </div>
-        <div className="flex items-baseline gap-1 shrink-0">
-          <span className="text-sm font-bold text-gray-900">${(model.price_per_call ?? 0).toFixed(2)}</span>
-          <span className="text-xs text-gray-400">USDC</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* HU-4.4: Badge compacto de uptime — pasado como prop desde Server Components */}
+          {reputationBadge}
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-bold text-gray-900">${(model.price_per_call ?? 0).toFixed(2)}</span>
+            <span className="text-xs text-gray-400">USDC</span>
+          </div>
         </div>
       </div>
 

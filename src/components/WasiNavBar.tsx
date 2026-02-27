@@ -184,14 +184,18 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             )}
           </div>
 
-          {/* Mobile hamburger */}
+          {/* Mobile: WalletConnectButton — solo visible en mobile (sm:hidden) */}
+          {/* HU-MOBILE-NAV: Header mobile muestra solo logo + WalletConnectButton */}
+          <div className="flex items-center gap-2 sm:hidden">
+            <WalletConnectButton locale={locale} />
+          </div>
+
+          {/* Mobile hamburger — HU-MOBILE-NAV: oculto, reemplazado por bottom nav */}
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-expanded={menuOpen}
-            aria-controls="mobile-menu"
-            aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            className="inline-flex items-center justify-center rounded-lg p-2 text-gray-600 hover:bg-gray-50 sm:hidden"
+            aria-hidden="true"
+            className="hidden"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
               {menuOpen
@@ -202,8 +206,8 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {menuOpen && (
+      {/* Mobile menu — HU-MOBILE-NAV: eliminado del render, reemplazado por bottom nav */}
+      {false && menuOpen && (
         <div id="mobile-menu" className="border-t border-gray-100 sm:hidden">
           <div className="space-y-1 px-4 py-3">
             {NAV_LINKS.map(({ href, label }) => (

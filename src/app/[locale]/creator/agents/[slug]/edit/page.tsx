@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EditAgentForm } from './EditAgentForm'
+import { AgentExamples } from '@/features/creator/components/AgentExamples'
 
 interface EditAgentPageProps {
   params: Promise<{ locale: string; slug: string }>
@@ -23,5 +24,15 @@ export default async function EditAgentPage({ params }: EditAgentPageProps) {
 
   if (!agent) notFound()
 
-  return <EditAgentForm agent={agent} locale={locale} />
+  return (
+    <div className="space-y-8">
+      <EditAgentForm agent={agent} locale={locale} />
+      {/* HU-4.3: Sección de ejemplos Input/Output curados */}
+      <div className="mx-auto max-w-2xl px-4">
+        <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
+          <AgentExamples agentId={agent.id} />
+        </div>
+      </div>
+    </div>
+  )
 }

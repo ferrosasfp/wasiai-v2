@@ -80,3 +80,24 @@ export interface CreateModelInput {
   endpoint_url: string
   capabilities?: ModelCapability[]
 }
+
+// HU-4.3: Tipos para Agent Examples
+export interface AgentExample {
+  id: string
+  agent_id: string
+  creator_id: string
+  label: string | null
+  input: string
+  output: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export type AgentExampleCreate = {
+  label?: string | null
+  input: string
+  output: string
+}
+
+export type AgentExampleUpdate = Partial<AgentExampleCreate>

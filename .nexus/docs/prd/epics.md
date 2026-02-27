@@ -142,6 +142,48 @@ El creator puede proteger su endpoint de abuso.
 
 ---
 
+## Epic 10: Mobile UX
+
+> Sin mobile nav estándar, la dApp se siente a medias en el dispositivo donde más se usa crypto.
+
+### Story 10.1: Bottom navigation bar en mobile (HU-MOBILE-NAV)
+
+**Historia de usuario:**
+> Como usuario de WasiAI en mobile, quiero una barra de navegación inferior estándar de dApp con acceso rápido a Home, Explorar, Publicar, Dashboard y Perfil, para navegar con el pulgar sin depender del drawer hamburguesa.
+
+**Criticidad:** P0 — UX estándar dApp mobile. El drawer hamburguesa actual no es patrón de mercado.
+
+**Acceptance Criteria:**
+1. En viewports < 640px (mobile), la barra inferior reemplaza al drawer hamburguesa. La barra tiene 5 tabs: 🏠 Home (`/`), 🔍 Explorar (`/explore`), ➕ central FAB (`/publish`), 📊 Dashboard (condicional), 👤 Perfil.
+2. El botón ➕ central es un FAB elevado (shadow, z-50) con color AVAX red `#E84142`, circular, mayor que los demás tabs.
+3. Al hacer clic en ➕, navega a `/[locale]/publish`.
+4. Tab activo: color AVAX red `#E84142`. Tab inactivo: gris (`text-gray-500`).
+5. La barra respeta el safe area de iOS: `padding-bottom: env(safe-area-inset-bottom)`.
+6. El header en mobile se simplifica: solo muestra el logo de WasiAI y el botón de wallet (WalletConnectButton). Los demás elementos del header actual desaparecen en mobile.
+7. En desktop (≥ 640px), la navbar existente permanece sin cambios. La barra inferior NO aparece en desktop.
+8. Tab Dashboard: si el usuario tiene rol creator (`creator_profiles` row exists) → navega a `/creator/dashboard`. Si es consumer → navega a `/dashboard` (saldo de API key). Si no está autenticado → navega a `/auth`.
+9. Tab Perfil: navega a `/[locale]/profile`. Si no está autenticado → navega a `/auth`.
+10. Traducciones en es/en para todos los labels de la barra.
+
+**Scope (archivos a crear/modificar):**
+- `src/components/MobileBottomNav.tsx` — nuevo componente client-side con los 5 tabs
+- `src/components/WasiNavBar.tsx` — simplificar en mobile: header solo logo + wallet; ocultar menú hamburguesa
+- `src/app/[locale]/layout.tsx` — incluir `<MobileBottomNav />` debajo del `<main>` (fuera del scroll)
+- `src/messages/en.json` / `src/messages/es.json` — claves `mobileNav.*`
+- `src/hooks/useIsCreator.ts` — hook para verificar si el usuario tiene perfil de creator (o reusar existente)
+
+**Dependencias:** WAS-45 (WalletConnectButton ya existe desde Sprint 7 ✅)
+
+**Estimación:** M
+
+**Riesgos:**
+- Safe area en PWA/Safari iOS requiere `viewport-fit=cover` en meta tag — verificar que ya existe en layout.tsx
+- El FAB central puede solaparse con el contenido si hay elementos con position fixed — revisar z-index stack
+- `useIsCreator` requiere query a Supabase — debe ser lazy/cached para no impactar performance de navegación
+- Posible conflicto con el botón de cookies o modales que usan position fixed en la parte inferior
+
+---
+
 ## Epic 9: UX Improvements
 
 > Mejoras de conversión y retención en paralelo con épicas principales.
@@ -169,9 +211,10 @@ Reemplazar copy del template NexusFactory con copy real en es/en.
 
 ---
 
-## Sprint 7 — Wallet UX & Marketplace Polish
+## Sprint 7 — Wallet UX & Marketplace Polish ✅ DONE
 
 > Sprint de calidad: corregir el bug crítico de pago, estandarizar wallet UX en navbar, y completar las mejoras de marketplace más solicitadas.
+> **Estado:** COMPLETADO — QA aprobado 2026-02-27. 6/6 historias APROBADAS.
 
 ---
 

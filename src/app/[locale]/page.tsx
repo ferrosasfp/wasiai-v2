@@ -7,6 +7,7 @@ export const revalidate = 300
 
 import { getModels } from '@/features/models/services/models.service'
 import { ModelCard } from '@/features/models/components/ModelCard'
+import { ReputationBadge } from '@/features/models/components/ReputationBadge'
 import { FilterPanel } from '@/features/models/components/FilterPanel'
 import { EmptySearchState } from '@/features/models/components/EmptySearchState'
 import { HeroDualCard } from '@/features/home/components/HeroDualCard'
@@ -176,7 +177,17 @@ export default async function HomePage({ params, searchParams }: Props) {
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {models.map((model, i) => (
-                  <ModelCard key={model.id} model={model} locale={locale} index={i} />
+                  <ModelCard
+                    key={model.id}
+                    model={model}
+                    locale={locale}
+                    index={i}
+                    reputationBadge={
+                      <Suspense fallback={null}>
+                        <ReputationBadge agentId={model.id} />
+                      </Suspense>
+                    }
+                  />
                 ))}
               </div>
 

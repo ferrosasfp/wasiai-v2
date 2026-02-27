@@ -1,5 +1,13 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
+
+// HU-MOBILE-NAV: viewport-fit=cover — PASO 1 CRÍTICO
+// Sin esto, env(safe-area-inset-bottom) retorna 0 en iOS
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
 
 const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'
 

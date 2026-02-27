@@ -67,7 +67,7 @@ development_status:
   epic-4: in-progress
 
   4-1-busqueda-semantica: done          # sprint 6 — full-text search RPC
-  4-2-filtros-avanzados: backlog
+  4-2-filtros-avanzados: done               # sprint 7 ✅
   4-3-ejemplos-de-input-output-curados: backlog
   4-4-reputacion-con-datos-reales: backlog
   4-5-colecciones-curadas-y-featured-agents: backlog
@@ -117,8 +117,8 @@ development_status:
   # ─── ÉPICA 9: UX Improvements ───────────────────────────────────────────
   epic-9: in-progress
 
-  9-1-empty-state-de-busqueda: backlog
-  9-2-preview-live-en-publish: backlog
+  9-1-empty-state-de-busqueda: done         # sprint 7 ✅
+  9-2-preview-live-en-publish: done         # sprint 7 ✅
   9-3-editor-de-capabilities-sin-json-crudo: done  # sprint 5 — CapabilitiesEditor
   9-4-code-examples-auto-generados: done            # sprint 3/4
   9-5-indicador-de-saldo-de-api-key-en-navbar: done # sprint 6 — ApiKeyBalance
@@ -134,10 +134,19 @@ development_status:
   i18n-01-traduccion-completa: done     # sprint 6
   i18n-02-publish-i18n: done           # sprint 5
 
-  # Sprint 7 — en planning
-  was-45-wallet-connect-navbar: backlog    # P1 — wallet btn en WasiNavBar
-  was-46-pay-button-connect-wallet: backlog # P0 — BUG pay sin wallet conectada
-  was-47-ver-agentes-scroll: backlog       # P3 — scroll home → agents
+  # Sprint 7 — COMPLETADO 2026-02-27 ✅
+  was-45-wallet-connect-navbar: done       # P1 — wallet btn en WasiNavBar
+  was-46-pay-button-connect-wallet: done   # P0 — BUG pay sin wallet conectada
+  was-47-ver-agentes-scroll: done          # P3 — scroll home → agents
+  hu-9-1-empty-state-busqueda: done        # P2 — QA aprobado sprint 7
+  hu-9-2-preview-live-publish: done        # P2 — QA aprobado sprint 7
+  hu-4-2-filtros-avanzados: done           # P2 — QA aprobado sprint 7
+
+  # Sprint 8 — en planning
+  hu-mobile-nav: backlog                   # P0 — bottom nav bar mobile
+  hu-3-2-playground-comparativo: backlog   # P1 — comparar agentes lado a lado
+  hu-4-4-reputacion-datos-reales: backlog  # P1 — ratings reales en fichas
+  hu-4-3-ejemplos-input-output: backlog    # P2 — creator sube ejemplos de uso
 
   epic-9-retrospective: optional
 
@@ -233,3 +242,74 @@ sprint_7:
     - "Adversarial review completado antes de cada commit"
     - "Traducciones en en/es para toda nueva UI visible"
     - "git push origin master master:main"
+
+  result: done
+  qa_report: ".nexus/docs/sprint-reviews/sprint-7-qa-report.md"
+  qa_verdict: "✅ SPRINT APROBADO — 6/6 historias APROBADAS"
+
+# ─── SPRINT 8 PLANNING ──────────────────────────────────────────────────────
+sprint_8:
+  sprint: 8
+  start_date: "2026-03-07"
+  end_date: "2026-03-14"
+  theme: "Mobile UX & Discovery Quality"
+  status: planning  # → in-progress cuando Fer dé HU_APPROVED
+
+  stories:
+    hu-mobile-nav:
+      title: "Bottom navigation bar en mobile (HU-MOBILE-NAV)"
+      priority: P0
+      size: M
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-10
+      depends_on: [was-45-wallet-connect-navbar]
+      notes: "La HU más crítica del sprint. Reemplaza drawer hamburguesa. FAB central → /publish."
+
+    hu-3-2-playground-comparativo:
+      title: "Playground comparativo — comparar múltiples agentes lado a lado"
+      priority: P1
+      size: L
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-3
+      depends_on: [hu-mobile-nav]
+      notes: "Depende de mobile nav para que la UI sea usable en mobile"
+
+    hu-4-4-reputacion-datos-reales:
+      title: "Reputación con datos reales — uptime, latencia p50/p95, error rate"
+      priority: P1
+      size: M
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-4
+      depends_on: []
+      notes: "Reemplaza 👍/👎 por métricas reales. Datos ya existen en agent_calls."
+
+    hu-4-3-ejemplos-input-output-curados:
+      title: "Ejemplos input/output curados — creator sube ejemplos reales de uso"
+      priority: P2
+      size: M
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-4
+      depends_on: []
+      notes: "Aumenta conversión: consumer ve exactamente qué hace el agente"
+
+  success_criteria:
+    - "HU-MOBILE-NAV: Usuario mobile navega con pulgar — sin drawer hamburguesa"
+    - "HU-3.2: Consumer puede comparar 2+ agentes en paralelo desde un solo panel"
+    - "HU-4.4: Cada ficha de agente muestra uptime, latencia y error rate reales"
+    - "HU-4.3: Creator puede agregar hasta 5 ejemplos de input/output a su agente"
+
+  dod_global:
+    - "0 errores TypeScript en npm run build"
+    - "0 warnings ESLint"
+    - "Adversarial review completado antes de cada commit"
+    - "Traducciones en en/es para toda nueva UI visible"
+    - "git push origin master master:main"
+    - "safe-area-inset testeado en Safari iOS (viewport-fit=cover)"

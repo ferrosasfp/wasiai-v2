@@ -482,5 +482,33 @@
       "multimodal": "Multimodal",
       "code": "Code"
     }
+  },
+  "mobileNav": {
+    "home": "Home",
+    "explore": "Explore",
+    "publish": "Publish",
+    "dashboard": "Dashboard",
+    "profile": "Profile"
+  },
+  "reputation": {
+    "title": "Reliability",
+    "uptime": "Uptime (24h)",
+    "latencyP50": "Latency p50",
+    "latencyP95": "Latency p95",
+    "latencyAvg": "Avg latency",
+    "errorRate": "Error rate",
+    "noData": "—",
+    "insufficientData": "Insufficient data",
+    "basedOn": "Based on {n} calls"
+  },
+  "examples": {
+    "title": "Usage examples",
+    "add": "Add example",
+    "inputLabel": "Input",
+    "outputLabel": "Expected output",
+    "tagLabel": "Label (optional)",
+    "maxReached": "Maximum 5 examples per agent",
+    "example": "Example",
+    "noExamples": "No examples yet"
   }
 }
