@@ -22,7 +22,8 @@
     "notFoundMessage": "La página que buscas no existe.",
     "goHome": "Ir al marketplace",
     "tryAgain": "Intentar de nuevo",
-    "somethingWentWrong": "Algo salió mal"
+    "somethingWentWrong": "Algo salió mal",
+    "saving": "Guardando…"
   },
   "home": {
     "title": "WasiAI — El Marketplace de la Economía Agéntica",
@@ -165,6 +166,40 @@
       "back": "Atrás",
       "publish": "Publicar agente",
       "publishing": "Publicando..."
+    },
+    "capabilityExampleInput": "Ejemplo de Entrada",
+    "capabilityExampleOutput": "Ejemplo de Salida",
+    "removeCapability": "Eliminar capability",
+    "capabilityNumber": "Capability {n}",
+    "capabilityLimit": "Máximo 10 capabilities",
+    "noCapabilities": "Sin capabilities definidas. Agrega al menos una para mejor descubrimiento.",
+    "errorRequired": "Campo obligatorio",
+    "descriptionHint": "Mínimo 10 caracteres",
+    "step1": {
+      "title": "Información básica",
+      "subtitle": "Nombre, descripción y categoría de tu agente",
+      "agentName": "Nombre del agente",
+      "errorNameMin": "El nombre debe tener al menos 3 caracteres",
+      "errorDescriptionMin": "La descripción debe tener al menos 10 caracteres",
+      "selectCategory": "Selecciona una categoría",
+      "uploadingIPFS": "Subiendo a IPFS…",
+      "dropHint": "Click o arrastra aquí"
+    },
+    "step2": {
+      "title": "Producto",
+      "subtitle": "Precio, modelo base y capacidades",
+      "revenueHint": "Ganas el 90% por cada llamada · WasiAI toma el 10%",
+      "baseModel": "Modelo base",
+      "capabilitiesLabel": "Capacidades",
+      "capabilitiesHint": "JSON array · opcional",
+      "errorCapabilitiesArray": "Debe ser un array JSON",
+      "errorCapabilitiesJson": "JSON inválido",
+      "errorPriceMin": "El precio debe ser mayor a 0",
+      "optional": "(opcional)"
+    },
+    "form": {
+      "errorSaving": "Error al guardar",
+      "errorPublishing": "Error al publicar — intenta de nuevo"
     }
   },
   "dashboard": {
@@ -194,7 +229,8 @@
       "subtitle": "Tus datos básicos para tu perfil público",
       "namePlaceholder": "Tu nombre o alias",
       "bioPlaceholder": "Describe qué tipo de agentes construyes (opcional)",
-      "cta": "Continuar"
+      "cta": "Continuar",
+      "errorSavingProfile": "Error al guardar perfil"
     },
     "step2": {
       "title": "Publica tu primer agente",
@@ -249,6 +285,7 @@
     "sdkPython": "SDK Python",
     "apiRef": "Referencia de API",
     "errors": "Errores",
+    "mcpIntegration": "Integración MCP",
     "tryIt": "Pruébalo",
     "tryItApiKey": "Tu API Key",
     "tryItSlug": "Slug del agente",

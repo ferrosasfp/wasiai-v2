@@ -16,6 +16,7 @@ interface Props {
 
 export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
   const t = useTranslations('publish')
+  const tCommon = useTranslations('common')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { upload, uploading, error: uploadError } = useFileUpload()
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({})
@@ -30,13 +31,19 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
   function handleNext() {
     const errs: Record<string, string> = {}
     if (!data.name || data.name.trim().length < 3) {
-      errs.name = 'El nombre debe tener al menos 3 caracteres'
+      errs.name = t('step1.errorNameMin')
+    }
+    if (!data.description || data.description.trim().length < 10) {
+      errs.description = t('step1.errorDescriptionMin')
     }
     if (!data.category) {
-      errs.category = 'Selecciona una categoría'
+      errs.category = t('step1.selectCategory')
     }
     if (Object.keys(errs).length > 0) {
       setLocalErrors(errs)
+      const firstField = Object.keys(errs)[0]
+      const el = document.querySelector(`[data-field="${firstField}"]`) as HTMLElement | null
+      el?.focus()
       return
     }
     setLocalErrors({})
@@ -49,14 +56,14 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
   return (
     <div className="space-y-6 rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Información básica</h2>
-        <p className="mt-1 text-sm text-gray-500">Nombre, descripción y categoría de tu agente</p>
+        <h2 className="text-xl font-bold text-gray-900">{t('step1.title')}</h2>
+        <p className="mt-1 text-sm text-gray-500">{t('step1.subtitle')}</p>
       </div>
 
       {/* Cover image */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Imagen de portada <span className="font-normal text-gray-400">(opcional · máx 5MB)</span>
+          {t('coverImage')} <span className="font-normal text-gray-400">({t('coverImageHint')})</span>
         </label>
         <div
           onClick={() => fileInputRef.current?.click()}
@@ -80,11 +87,11 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
               </button>
             </>
           ) : uploading ? (
-            <p className="animate-pulse text-sm text-avax-500">Subiendo a IPFS…</p>
+            <p className="animate-pulse text-sm text-avax-500">{t('step1.uploadingIPFS')}</p>
           ) : (
             <div className="text-center">
               <p className="text-2xl">🖼️</p>
-              <p className="mt-1 text-sm text-gray-500">Click o arrastra aquí</p>
+              <p className="mt-1 text-sm text-gray-500">{t('step1.dropHint')}</p>
               <p className="text-xs text-gray-400">PNG, JPG, WebP, GIF</p>
             </div>
           )}
@@ -104,30 +111,38 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
       {/* Name */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Nombre del agente <span className="text-red-400">*</span>
+          {t('step1.agentName')} <span className="text-red-400">*</span>
         </label>
         <input
           type="text"
+          data-field="name"
           value={data.name ?? ''}
           onChange={e => {
             onChange('name', e.target.value)
             if (localErrors.name) setLocalErrors(prev => { const e = { ...prev }; delete e.name; return e })
           }}
           placeholder="Ej: Traductor Español GPT"
-          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
+          className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100 ${allErrors.name ? 'border-red-400' : 'border-gray-200'}`}
         />
         {allErrors.name && <p className="mt-1 text-xs text-red-500">{allErrors.name}</p>}
       </div>
 
       {/* Description */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Descripción</label>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          {t('description')} <span className="text-red-500">*</span>
+          <span className="ml-2 font-normal text-gray-400 text-xs">{t('descriptionHint')}</span>
+        </label>
         <textarea
+          data-field="description"
           value={data.description ?? ''}
-          onChange={e => onChange('description', e.target.value)}
-          placeholder="Describe qué hace tu agente, qué inputs acepta y qué outputs devuelve..."
+          onChange={e => {
+            onChange('description', e.target.value)
+            if (localErrors.description) setLocalErrors(prev => { const e = { ...prev }; delete e.description; return e })
+          }}
+          placeholder="Describe qué hace tu agente…"
           rows={4}
-          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
+          className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100 ${allErrors.description ? 'border-red-400' : 'border-gray-200'}`}
         />
         {allErrors.description && <p className="mt-1 text-xs text-red-500">{allErrors.description}</p>}
       </div>
@@ -135,9 +150,10 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
       {/* Category */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Categoría <span className="text-red-400">*</span>
+          {t('category')} <span className="text-red-400">*</span>
         </label>
         <select
+          data-field="category"
           value={data.category ?? ''}
           onChange={e => {
             onChange('category', e.target.value)
@@ -145,7 +161,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
           }}
           className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none"
         >
-          <option value="" disabled>Selecciona una categoría</option>
+          <option value="" disabled>{t('step1.selectCategory')}</option>
           {MODEL_CATEGORIES.map(c => (
             <option key={c} value={c}>{c}</option>
           ))}
@@ -161,7 +177,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
           disabled={(saving ?? false) || uploading}
           className="rounded-xl bg-avax-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition disabled:opacity-50"
         >
-          {saving ? 'Guardando…' : t('cta.next')} →
+          {saving ? tCommon('saving') : t('cta.next')} →
         </button>
       </div>
     </div>

@@ -57,6 +57,10 @@ export const createModelSchema = z.object({
 
   // HU-1.2: status field for draft support
   status: z.enum(['draft', 'active']).optional().default('active'),
+
+  // HU-3.3: free trial fields
+  free_trial_enabled: z.boolean().optional().default(false),
+  free_trial_limit: z.number().int().min(1).max(10).optional().default(1),
 })
 
 export type CreateModelInput = z.infer<typeof createModelSchema>

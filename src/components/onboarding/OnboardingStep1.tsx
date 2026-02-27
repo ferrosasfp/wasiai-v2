@@ -10,8 +10,9 @@ interface Props {
 }
 
 export function OnboardingStep1({ displayName, bio }: Props) {
-  const t      = useTranslations('onboarding.step1')
-  const router = useRouter()
+  const t       = useTranslations('onboarding.step1')
+  const tCommon = useTranslations('common')
+  const router  = useRouter()
 
   const [name, setName]       = useState(displayName)
   const [bioVal, setBioVal]   = useState(bio)
@@ -40,7 +41,7 @@ export function OnboardingStep1({ displayName, bio }: Props) {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error al guardar perfil')
+      if (!res.ok) throw new Error(data.error ?? t('errorSavingProfile'))
 
       router.refresh()
     } catch (err) {
@@ -96,7 +97,7 @@ export function OnboardingStep1({ displayName, bio }: Props) {
           disabled={loading || !name.trim()}
           className="w-full rounded-xl bg-avax-500 py-3 font-semibold text-white hover:bg-avax-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? 'Guardando…' : t('cta')}
+          {loading ? tCommon('saving') : t('cta')}
         </button>
       </form>
     </div>

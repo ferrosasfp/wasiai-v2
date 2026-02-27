@@ -9,6 +9,7 @@
  * endpoint which returns 404/503 accordingly — no double DB lookup here.
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -30,9 +31,33 @@ export async function POST(
   const apiKey = request.headers.get('X-API-Key') ?? request.headers.get('x-api-key')
 
   if (!apiKey) {
+    // HU-3.3: Verificar si el agente tiene free trial activo antes de responder
+    const svc = createServiceClient()
+    const { data: agentMeta } = await svc
+      .from('agents')
+      .select('free_trial_enabled')
+      .eq('slug', slug)
+      .eq('status', 'active')
+      .single()
+
+    if (!agentMeta?.free_trial_enabled) {
+      return NextResponse.json(
+        {
+          error:   'payment_required',
+          message: 'Free trial not available for this agent. An API key with funds is required.',
+        },
+        { status: 402, headers: CORS },
+      )
+    }
+
+    // Trial disponible — guiar al cliente al endpoint correcto
     return NextResponse.json(
-      { error: 'unauthorized', message: 'Missing X-API-Key header' },
-      { status: 401, headers: CORS },
+      {
+        error:          'use_trial_endpoint',
+        message:        'Use POST /api/v1/agents/{slug}/trial for free trial invocations.',
+        trial_endpoint: `/api/v1/agents/${slug}/trial`,
+      },
+      { status: 402, headers: CORS },
     )
   }
 

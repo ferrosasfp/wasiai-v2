@@ -7,8 +7,9 @@ const SECTION_KEYS = [
   { id: 'quickstart',    key: 'quickstart'  },
   { id: 'sdk-node',      key: 'sdkNode'     },
   { id: 'sdk-python',    key: 'sdkPython'   },
-  { id: 'api-reference', key: 'apiRef'      },
-  { id: 'errors',        key: 'errors'      },
+  { id: 'api-reference',   key: 'apiRef'         },
+  { id: 'mcp-integration', key: 'mcpIntegration' },
+  { id: 'errors',          key: 'errors'         },
 ] as const
 
 interface NavListProps {

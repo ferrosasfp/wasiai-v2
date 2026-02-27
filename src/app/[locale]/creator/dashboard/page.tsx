@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import React, { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
@@ -6,6 +6,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 // A-02: Sub-component with Suspense for streaming — async blockchain call isolated
 import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection'
 import { AgentActions } from './_components/AgentActions'
+import { FreeTrialToggle } from './_components/FreeTrialToggle'
 import { PendingEarningsBanner } from '@/components/PendingEarningsBanner'
 import { CreatorAnalytics } from '@/features/creator/components/CreatorAnalytics'
 
@@ -19,6 +20,8 @@ interface ModelRow {
   total_calls: number
   total_revenue: number
   created_at: string
+  free_trial_enabled: boolean
+  free_trial_limit: number
 }
 
 interface CallRow {
@@ -56,7 +59,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
   // P-01 + A-02: Fetch models only; earnings/wallet fetched inside EarningsSection (Suspense)
   const { data: models } = await supabase
     .from('agents')
-    .select('id, name, slug, category, status, price_per_call, total_calls, total_revenue, created_at')
+    .select('id, name, slug, category, status, price_per_call, total_calls, total_revenue, created_at, free_trial_enabled, free_trial_limit')
     .eq('creator_id', user.id)
     .order('total_calls', { ascending: false })
 
@@ -152,7 +155,8 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {safeModels.map((model) => (
-                    <tr key={model.id} className="hover:bg-gray-50/50 transition">
+                    <React.Fragment key={model.id}>
+                    <tr className="hover:bg-gray-50/50 transition">
                       <td className="px-6 py-4">
                         <Link
                           href={`/models/${model.slug}`}
@@ -186,6 +190,16 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                         />
                       </td>
                     </tr>
+                    <tr>
+                      <td colSpan={7} className="px-6 pb-4">
+                        <FreeTrialToggle
+                          slug={model.slug}
+                          initialEnabled={model.free_trial_enabled ?? false}
+                          initialLimit={model.free_trial_limit ?? 1}
+                        />
+                      </td>
+                    </tr>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

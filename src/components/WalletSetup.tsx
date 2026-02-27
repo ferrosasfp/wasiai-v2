@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 interface Props {
   initialWallet: string | null
@@ -9,6 +10,7 @@ interface Props {
 
 export function WalletSetup({ initialWallet }: Props) {
   const router = useRouter()
+  const t = useTranslations('common')
   const [wallet, setWallet]   = useState(initialWallet ?? '')
   const [editing, setEditing] = useState(!initialWallet)
   const [loading, setLoading] = useState(false)
@@ -80,7 +82,7 @@ export function WalletSetup({ initialWallet }: Props) {
           disabled={loading || wallet.length < 42}
           className="rounded-lg bg-avax-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-avax-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {loading ? 'Guardando…' : 'Guardar'}
+          {loading ? t('saving') : t('save')}
         </button>
         {initialWallet && (
           <button

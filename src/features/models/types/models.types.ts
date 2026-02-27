@@ -47,6 +47,10 @@ export interface Model {
   mcp_description: string | null
   cover_image: string | null  // IPFS URL via Pinata
 
+  // HU-3.3: Free trial controlado por creator
+  free_trial_enabled: boolean
+  free_trial_limit: number
+
   // joined
   creator?: CreatorProfile
 }

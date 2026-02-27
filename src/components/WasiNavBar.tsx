@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 
 const NAV_PATHS = [
   { path: '',                   label: 'Marketplace' },
@@ -122,6 +123,11 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             ))}
           </div>
 
+          {/* Language switcher — desktop */}
+          <div className="hidden sm:flex shrink-0">
+            <LanguageSwitcher />
+          </div>
+
           {/* Auth actions */}
           <div className="hidden items-center gap-3 sm:flex shrink-0">
             {loading ? (
@@ -193,6 +199,10 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                 {label}
               </Link>
             ))}
+            {/* Language switcher — mobile */}
+            <div className="pt-2">
+              <LanguageSwitcher />
+            </div>
             <div className="mt-3 border-t border-gray-100 pt-3">
               {userEmail ? (
                 <div className="flex items-center justify-between">

@@ -61,6 +61,12 @@ export default async function ModelDetailPage({ params }: Props) {
                     {model.is_featured && (
                       <span className="rounded-full bg-avax-50 px-3 py-0.5 text-xs font-semibold text-avax-600">Featured</span>
                     )}
+                    {/* HU-3.3: Badge Free Trial — solo si el creator lo activó */}
+                    {model.free_trial_enabled && (
+                      <span className="rounded-full bg-green-50 border border-green-200 px-3 py-0.5 text-xs font-semibold text-green-700">
+                        🎁 Free Trial
+                      </span>
+                    )}
                     <span className="rounded-full bg-gray-100 px-3 py-0.5 text-xs font-medium text-gray-600 capitalize">
                       {model.category}
                     </span>
@@ -121,8 +127,10 @@ export default async function ModelDetailPage({ params }: Props) {
               )}
             </div>
 
-            {/* HU-3.1: Free Trial Playground */}
-            <AgentTrialPlayground slug={model.slug} isAuthenticated={isAuthenticated} />
+            {/* HU-3.3: Trial Playground solo si el creator lo activó — ausente del DOM si no */}
+            {model.free_trial_enabled ? (
+              <AgentTrialPlayground slug={model.slug} isAuthenticated={isAuthenticated} />
+            ) : null}
 
             {/* UX-04: Code Examples auto-generated */}
             <CodeExamples

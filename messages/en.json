@@ -22,7 +22,8 @@
     "notFoundMessage": "The page you're looking for doesn't exist.",
     "goHome": "Go to marketplace",
     "tryAgain": "Try again",
-    "somethingWentWrong": "Something went wrong"
+    "somethingWentWrong": "Something went wrong",
+    "saving": "Saving…"
   },
   "home": {
     "title": "WasiAI — The Agentic Economy Marketplace",
@@ -165,6 +166,40 @@
       "back": "Back",
       "publish": "Publish agent",
       "publishing": "Publishing..."
+    },
+    "capabilityExampleInput": "Example Input",
+    "capabilityExampleOutput": "Example Output",
+    "removeCapability": "Remove capability",
+    "capabilityNumber": "Capability {n}",
+    "capabilityLimit": "Maximum 10 capabilities",
+    "noCapabilities": "No capabilities defined. Add at least one for better discovery.",
+    "errorRequired": "Required field",
+    "descriptionHint": "Minimum 10 characters",
+    "step1": {
+      "title": "Basic Information",
+      "subtitle": "Name, description and category of your agent",
+      "agentName": "Agent name",
+      "errorNameMin": "Name must be at least 3 characters",
+      "errorDescriptionMin": "Description must be at least 10 characters",
+      "selectCategory": "Select a category",
+      "uploadingIPFS": "Uploading to IPFS…",
+      "dropHint": "Click or drag here"
+    },
+    "step2": {
+      "title": "Product",
+      "subtitle": "Price, base model and capabilities",
+      "revenueHint": "You earn 90% per call · WasiAI takes 10%",
+      "baseModel": "Base model",
+      "capabilitiesLabel": "Capabilities",
+      "capabilitiesHint": "JSON array · optional",
+      "errorCapabilitiesArray": "Must be a JSON array",
+      "errorCapabilitiesJson": "Invalid JSON",
+      "errorPriceMin": "Price must be greater than 0",
+      "optional": "(optional)"
+    },
+    "form": {
+      "errorSaving": "Error saving",
+      "errorPublishing": "Error publishing — please try again"
     }
   },
   "dashboard": {
@@ -194,7 +229,8 @@
       "subtitle": "Your basic info for your public profile",
       "namePlaceholder": "Your name or alias",
       "bioPlaceholder": "Describe what kind of agents you build (optional)",
-      "cta": "Continue"
+      "cta": "Continue",
+      "errorSavingProfile": "Error saving profile"
     },
     "step2": {
       "title": "Publish your first agent",
@@ -249,6 +285,7 @@
     "sdkPython": "SDK Python",
     "apiRef": "API Reference",
     "errors": "Errors",
+    "mcpIntegration": "MCP Integration",
     "tryIt": "Try it",
     "tryItApiKey": "Your API Key",
     "tryItSlug": "Agent slug",

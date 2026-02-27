@@ -39,21 +39,38 @@ export async function GET(
   const svc = createServiceClient()
   const { data: agent } = await svc
     .from('agents')
-    .select('id')
+    .select('id, free_trial_enabled, free_trial_limit')   // HU-3.3
     .eq('slug', slug)
     .eq('status', 'active')
     .single()
 
   if (!agent) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
+  // HU-3.3: Guard — creator desactivó el trial
+  if (!agent.free_trial_enabled) {
+    return NextResponse.json(
+      { error: 'trial_disabled', message: 'Free trial not available for this agent.' },
+      { status: 403 },
+    )
+  }
+
   const { data: trial } = await svc
     .from('agent_trials')
-    .select('used_at')
+    .select('times_used, used_at')   // HU-3.3: añadir times_used
     .eq('user_id', user.id)
     .eq('agent_id', agent.id)
     .single()
 
-  return NextResponse.json({ used: !!trial, usedAt: trial?.used_at ?? null })
+  const timesUsed       = trial?.times_used ?? 0
+  const trialsRemaining = Math.max(0, agent.free_trial_limit - timesUsed)
+
+  return NextResponse.json({
+    used:            timesUsed >= agent.free_trial_limit,
+    trialsUsed:      timesUsed,
+    trialsRemaining,
+    limit:           agent.free_trial_limit,
+    usedAt:          trial?.used_at ?? null,
+  })
 }
 
 export async function POST(
@@ -81,12 +98,20 @@ export async function POST(
   const svc = createServiceClient()
   const { data: agent } = await svc
     .from('agents')
-    .select('id, endpoint_url, name')
+    .select('id, endpoint_url, name, free_trial_enabled, free_trial_limit')  // HU-3.3
     .eq('slug', slug)
     .eq('status', 'active')
     .single()
 
   if (!agent) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+  // HU-3.3: Guard — creator desactivó el trial
+  if (!agent.free_trial_enabled) {
+    return NextResponse.json(
+      { error: 'trial_disabled', message: 'Free trial not available for this agent.' },
+      { status: 403 },
+    )
+  }
 
   // 5. SSRF check
   try {
@@ -95,20 +120,15 @@ export async function POST(
     return NextResponse.json({ error: 'invalid_endpoint' }, { status: 400 })
   }
 
-  // 6. Check trial ya usado
-  const { data: existing } = await svc
-    .from('agent_trials')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('agent_id', agent.id)
-    .single()
-
-  if (existing) return NextResponse.json({ error: 'already_used' }, { status: 409 })
-
-  // 7. Registrar trial (idempotente — ON CONFLICT DO NOTHING via unique constraint)
-  await svc
-    .from('agent_trials')
-    .upsert({ user_id: user.id, agent_id: agent.id }, { onConflict: 'user_id,agent_id', ignoreDuplicates: true })
+  // 6-7. HU-3.3: Atómico — use_trial RPC (evita race condition TOCTOU)
+  const { data: result } = await svc.rpc('use_trial', {
+    p_user_id:  user.id,
+    p_agent_id: agent.id,
+    p_limit:    agent.free_trial_limit,
+  })
+  if (result === -1) {
+    return NextResponse.json({ error: 'trial_exhausted', limit: agent.free_trial_limit }, { status: 409 })
+  }
 
   // 8. Llamar al agente con timeout de 8s
   const controller = new AbortController()

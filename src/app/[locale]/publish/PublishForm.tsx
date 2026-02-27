@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import type { CreateModelDraft, ModelCapability } from '@/lib/schemas/model.schema'
 import { StepIndicator } from '@/components/publish/StepIndicator'
 import { AgentCardPreview } from '@/components/publish/AgentCardPreview'
@@ -40,6 +41,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
+  const t = useTranslations('publish')
 
   const [step, setStep] = useState<1 | 2 | 3>(inferStep(initialDraft))
   const [data, setData] = useState<FormData>(() => {
@@ -82,12 +84,12 @@ export default function PublishForm({ initialDraft, from }: Props) {
           // Map Zod validation issues to field errors
           const fieldErrors: Record<string, string> = {}
           for (const issue of json.details as Array<{ path: string[]; message: string }>) {
-            const field = issue.path[0] ?? 'name'
+            const field = issue.path[0] ?? '_form'
             fieldErrors[field] = issue.message
           }
           setErrors(fieldErrors)
         } else {
-          setErrors({ name: (json.error as string) ?? 'Error al guardar' })
+          setErrors({ name: (json.error as string) ?? t('form.errorSaving') })
         }
         return
       }
@@ -113,7 +115,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
       })
       if (!res.ok) {
         const json = await res.json() as Record<string, unknown>
-        setErrors((json.fields as Record<string, string>) ?? { price_per_call: (json.error as string) ?? 'Error al guardar' })
+        setErrors((json.fields as Record<string, string>) ?? { price_per_call: (json.error as string) ?? t('form.errorSaving') })
         return
       }
       setStep(3)
@@ -135,7 +137,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
       })
       if (!patchRes.ok) {
         const json = await patchRes.json() as Record<string, unknown>
-        setErrors((json.fields as Record<string, string>) ?? { endpoint_url: (json.error as string) ?? 'Error al guardar' })
+        setErrors((json.fields as Record<string, string>) ?? { endpoint_url: (json.error as string) ?? t('form.errorSaving') })
         return
       }
       // Activar
@@ -145,7 +147,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
         body: JSON.stringify({ status: 'active' }),
       })
       if (!statusRes.ok) {
-        setErrors({ endpoint_url: 'Error al publicar — intenta de nuevo' })
+        setErrors({ endpoint_url: t('form.errorPublishing') })
         return
       }
       // Redirect

@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CreateModelDraft } from '@/lib/schemas/model.schema'
+import { CapabilitiesEditor } from '@/features/publish/CapabilitiesEditor'
+import type { CapabilitiesEditorRef } from '@/features/publish/CapabilitiesEditor'
 
 interface Props {
   data: Partial<CreateModelDraft>
@@ -15,43 +17,17 @@ interface Props {
 
 export function Step2Product({ data, onChange, errors, onNext, onBack, saving }: Props) {
   const t = useTranslations('publish')
+  const tCommon = useTranslations('common')
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({})
-
-  // Capabilities as JSON text for the textarea
-  const [capabilitiesText, setCapabilitiesText] = useState<string>(() => {
-    if (!data.capabilities || (data.capabilities as unknown[]).length === 0) return ''
-    try { return JSON.stringify(data.capabilities, null, 2) } catch { return '' }
-  })
-  const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null)
-
-  function handleCapabilitiesBlur() {
-    if (!capabilitiesText.trim()) {
-      onChange('capabilities', [])
-      setCapabilitiesError(null)
-      return
-    }
-    try {
-      const parsed: unknown = JSON.parse(capabilitiesText)
-      if (!Array.isArray(parsed)) {
-        setCapabilitiesError('Debe ser un array JSON')
-        return
-      }
-      onChange('capabilities', parsed)
-      setCapabilitiesError(null)
-    } catch {
-      setCapabilitiesError('JSON inválido')
-    }
-  }
+  const capabilitiesEditorRef = useRef<CapabilitiesEditorRef>(null)
 
   function handleNext() {
     const errs: Record<string, string> = {}
     if (!data.price_per_call || data.price_per_call <= 0) {
-      errs.price_per_call = 'El precio debe ser mayor a 0'
+      errs.price_per_call = t('step2.errorPriceMin')
     }
-    if (capabilitiesText.trim() && capabilitiesError) {
-      errs.capabilities = capabilitiesError
-    }
-    if (Object.keys(errs).length > 0) {
+    const capsValid = capabilitiesEditorRef.current?.validate() ?? true
+    if (Object.keys(errs).length > 0 || !capsValid) {
       setLocalErrors(errs)
       return
     }
@@ -64,14 +40,14 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
   return (
     <div className="space-y-6 rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Producto</h2>
-        <p className="mt-1 text-sm text-gray-500">Precio, modelo base y capacidades</p>
+        <h2 className="text-xl font-bold text-gray-900">{t('step2.title')}</h2>
+        <p className="mt-1 text-sm text-gray-500">{t('step2.subtitle')}</p>
       </div>
 
       {/* Price per call */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Precio por llamada (USDC) <span className="text-red-400">*</span>
+          {t('pricePerCall')} <span className="text-red-400">*</span>
         </label>
         <div className="flex items-center overflow-hidden rounded-xl border border-gray-200 focus-within:border-avax-400 focus-within:ring-2 focus-within:ring-avax-100">
           <span className="border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-400">$</span>
@@ -93,14 +69,14 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
           <p className="mt-1 text-xs text-red-500">{allErrors.price_per_call}</p>
         )}
         <p className="mt-1 text-xs text-gray-400">
-          Ganas el 90% por cada llamada · WasiAI toma el 10%
+          {t('step2.revenueHint')}
         </p>
       </div>
 
       {/* Base model */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Modelo base <span className="font-normal text-gray-400">(opcional)</span>
+          {t('step2.baseModel')} <span className="font-normal text-gray-400">{t('step2.optional')}</span>
         </label>
         <input
           type="text"
@@ -111,22 +87,17 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
         />
       </div>
 
-      {/* Capabilities JSON textarea */}
+      {/* Capabilities — editor visual */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Capacidades <span className="font-normal text-gray-400">(JSON array · opcional)</span>
+          {t('step2.capabilitiesLabel')}{' '}
+          <span className="font-normal text-gray-400">{t('step2.optional')}</span>
         </label>
-        <textarea
-          value={capabilitiesText}
-          onChange={e => setCapabilitiesText(e.target.value)}
-          onBlur={handleCapabilitiesBlur}
-          placeholder={'[\n  { "name": "summarize", "description": "...", "inputType": "text", "outputType": "text" }\n]'}
-          rows={5}
-          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 font-mono text-xs focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
+        <CapabilitiesEditor
+          ref={capabilitiesEditorRef}
+          value={(data.capabilities as unknown[]) ?? []}
+          onChange={(caps) => onChange('capabilities', caps)}
         />
-        {(capabilitiesError ?? allErrors.capabilities) && (
-          <p className="mt-1 text-xs text-red-500">{capabilitiesError ?? allErrors.capabilities}</p>
-        )}
       </div>
 
       {/* Actions */}
@@ -144,7 +115,7 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
           disabled={saving ?? false}
           className="rounded-xl bg-avax-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition disabled:opacity-50"
         >
-          {saving ? 'Guardando…' : t('cta.next')} →
+          {saving ? tCommon('saving') : t('cta.next')} →
         </button>
       </div>
     </div>

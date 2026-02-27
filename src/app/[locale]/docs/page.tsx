@@ -3,6 +3,7 @@ import { QuickstartSection } from '@/features/docs/content/quickstart'
 import { SdkNodeSection } from '@/features/docs/content/sdk-node'
 import { SdkPythonSection } from '@/features/docs/content/sdk-python'
 import { ApiReferenceSection } from '@/features/docs/content/api-reference'
+import { McpSection } from '@/features/docs/content/mcp'
 import { ErrorsSection } from '@/features/docs/content/errors'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
@@ -35,6 +36,9 @@ export default function DocsPage() {
       </div>
       <div className="border-t border-gray-100 pt-8">
         <ApiReferenceSection />
+      </div>
+      <div className="border-t border-gray-100 pt-8">
+        <McpSection />
       </div>
       <div className="border-t border-gray-100 pt-8">
         <ErrorsSection />
