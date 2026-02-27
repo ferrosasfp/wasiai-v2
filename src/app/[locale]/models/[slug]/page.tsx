@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { setRequestLocale } from 'next-intl/server'
+import { setRequestLocale, getTranslations } from 'next-intl/server'
 import { getModelBySlug } from '@/features/models/services/models.service'
 import { ModelCallSection } from '@/features/models/components/ModelCallSection'
 import { AgentRating } from '@/features/reputation/components/AgentRating'
@@ -20,6 +20,9 @@ interface Props {
 export default async function ModelDetailPage({ params }: Props) {
   const { locale, slug } = await params
   setRequestLocale(locale)
+  const tMarket   = await getTranslations('marketplace')
+  const tAnalytics = await getTranslations('analytics')
+  const tDetail   = await getTranslations('modelDetail')
 
   const [model, supabase] = await Promise.all([
     getModelBySlug(slug),
@@ -41,7 +44,7 @@ export default async function ModelDetailPage({ params }: Props) {
           href={`/${locale}`}
           className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition"
         >
-          ← Back to marketplace
+          {tDetail('backToMarketplace')}
         </Link>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -59,7 +62,7 @@ export default async function ModelDetailPage({ params }: Props) {
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-bold text-gray-900">{model.name}</h1>
                     {model.is_featured && (
-                      <span className="rounded-full bg-avax-50 px-3 py-0.5 text-xs font-semibold text-avax-600">Featured</span>
+                      <span className="rounded-full bg-avax-50 px-3 py-0.5 text-xs font-semibold text-avax-600">{tDetail('featured')}</span>
                     )}
                     {/* HU-3.3: Badge Free Trial — solo si el creator lo activó */}
                     {model.free_trial_enabled && (
@@ -86,7 +89,7 @@ export default async function ModelDetailPage({ params }: Props) {
 
             {/* Capabilities */}
             <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-              <h2 className="mb-4 font-semibold text-gray-900">Capabilities & Schema</h2>
+              <h2 className="mb-4 font-semibold text-gray-900">{tDetail('capabilitiesSchema')}</h2>
 
               {model.capabilities && model.capabilities.length > 0 ? (
                 <div className="space-y-3">
@@ -118,7 +121,7 @@ export default async function ModelDetailPage({ params }: Props) {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 py-6 px-4 text-center">
-                  <p className="text-sm text-gray-500">No capabilities defined.</p>
+                  <p className="text-sm text-gray-500">{tDetail('noCapabilities')}</p>
                   <p className="mt-1 text-xs text-gray-400">
                     Input: <code className="font-mono">{"{ \"input\": \"string\" }"}</code> ·
                     Output: model-specific JSON
@@ -145,7 +148,7 @@ export default async function ModelDetailPage({ params }: Props) {
               <h2 className="mb-4 font-semibold text-gray-100">🤖 Agent API</h2>
 
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Option A — Agent Key (budget-based)
+                {tDetail('optionA')}
               </p>
               <pre className="mb-4 overflow-auto rounded-xl bg-black/30 p-4 text-sm text-green-400">{`POST ${invokeUrl}
 x-agent-key: wasi_your_key_here
@@ -154,7 +157,7 @@ Content-Type: application/json
 { "input": "your input" }`}</pre>
 
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Option B — x402 Direct Payment (Avalanche USDC)
+                {tDetail('optionB')}
               </p>
               <pre className="overflow-auto rounded-xl bg-black/30 p-4 text-sm text-green-400">{`# 1. Probe — receive 402 with payment instructions
 POST ${invokeUrl}
@@ -170,7 +173,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
                   href={`/${locale}/agent-keys`}
                   className="rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold hover:bg-avax-400 transition"
                 >
-                  Get Agent Key →
+                  {tDetail('getAgentKey')}
                 </Link>
                 <a
                   href={`${APP_URL}/api/v1/models/${model.slug}/invoke`}
@@ -178,7 +181,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
                   rel="noopener noreferrer"
                   className="rounded-xl border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-300 hover:border-gray-400 transition"
                 >
-                  Model Spec (JSON) ↗
+                  {tDetail('modelSpecJson')}
                 </a>
               </div>
             </div>
@@ -194,7 +197,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
             {model.creator && (
               <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Creator
+                  {tDetail('creator')}
                 </h3>
                 <Link
                   href={`/${locale}/creator/${model.creator.username}`}
@@ -220,23 +223,23 @@ X-PAYMENT: <x402-eip712-signed-payload>
             {/* Quick stats */}
             <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100 space-y-2 text-sm">
               <div className="flex justify-between text-gray-500">
-                <span>Protocol</span>
+                <span>{tMarket('protocol')}</span>
                 <span className="font-medium text-gray-800">x402</span>
               </div>
               <div className="flex justify-between text-gray-500">
-                <span>Network</span>
+                <span>{tMarket('network')}</span>
                 <span className="font-medium text-gray-800 capitalize">{model.chain}</span>
               </div>
               <div className="flex justify-between text-gray-500">
-                <span>Currency</span>
+                <span>{tMarket('currency')}</span>
                 <span className="font-medium text-gray-800">{model.currency}</span>
               </div>
               <div className="flex justify-between text-gray-500">
-                <span>Total calls</span>
+                <span>{tAnalytics('total_calls')}</span>
                 <span className="font-medium text-gray-800">{model.total_calls.toLocaleString('en-US')}</span>
               </div>
               <div className="flex justify-between text-gray-500">
-                <span>Creator earns</span>
+                <span>{tMarket('creatorEarns')}</span>
                 <span className="font-medium text-green-600">90%</span>
               </div>
             </div>

@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getPublicClient } from '@/shared/lib/web3/client'
 import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
+import { buildDailySeries, buildEmptyDailySeries } from '@/features/creator/lib/analytics'
 import { formatUnits } from 'viem'
 import { z } from 'zod'
 
@@ -138,36 +139,58 @@ export async function GET(req: NextRequest) {
   // Daily series — agrupar por día en JS
   const dailySeries = buildDailySeries(rawSeries as CallDateRow[] | null)
 
-  // ─── Alertas por agente ───────────────────────────────────────────────────
+  // ─── Alertas por agente (batch: 3 queries totales en vez de 3N) ──────────
   const alerts: Array<{ type: string; agentId: string; agentName: string; message: string }> = []
 
-  for (const agent of agents.filter(a => agentIds.includes(a.id))) {
+  const filteredAgents = agents.filter(a => agentIds.includes(a.id))
+
+  if (filteredAgents.length > 0) {
+    // 3 queries batch con IN(agentIds) — agrupar por agent_id en JS
     const [
-      { count: agentCalls24h },
-      { count: agentErrors24h },
-      { count: agentCalls7d },
+      { data: calls24hRows },
+      { data: errors24hRows },
+      { data: calls7dRows },
     ] = await Promise.all([
-      svc.from('agent_calls').select('id', { count: 'exact', head: true }).eq('agent_id', agent.id).gte('called_at', since24h),
-      svc.from('agent_calls').select('id', { count: 'exact', head: true }).eq('agent_id', agent.id).eq('status', 'error').gte('called_at', since24h),
-      svc.from('agent_calls').select('id', { count: 'exact', head: true }).eq('agent_id', agent.id).gte('called_at', since7d),
+      svc.from('agent_calls').select('agent_id').in('agent_id', agentIds).gte('called_at', since24h),
+      svc.from('agent_calls').select('agent_id').in('agent_id', agentIds).eq('status', 'error').gte('called_at', since24h),
+      svc.from('agent_calls').select('agent_id').in('agent_id', agentIds).gte('called_at', since7d),
     ])
 
-    if ((agentCalls24h ?? 0) > 0 && (agentErrors24h ?? 0) / (agentCalls24h ?? 1) > 0.2) {
-      alerts.push({
-        type: 'high_error_rate',
-        agentId: agent.id,
-        agentName: agent.name,
-        message: `Tu agente "${agent.name}" tiene alta tasa de error. Revisa tu endpoint.`,
-      })
+    // Agrupar conteos por agent_id en memoria
+    const countByAgentId = (rows: { agent_id: string }[] | null): Record<string, number> => {
+      const map: Record<string, number> = {}
+      for (const row of rows ?? []) {
+        map[row.agent_id] = (map[row.agent_id] ?? 0) + 1
+      }
+      return map
     }
 
-    if ((agentCalls7d ?? 0) === 0) {
-      alerts.push({
-        type: 'no_activity',
-        agentId: agent.id,
-        agentName: agent.name,
-        message: `"${agent.name}" sin actividad en 7 días. ¿Tu agente está activo?`,
-      })
+    const calls24hMap  = countByAgentId(calls24hRows  as { agent_id: string }[] | null)
+    const errors24hMap = countByAgentId(errors24hRows as { agent_id: string }[] | null)
+    const calls7dMap   = countByAgentId(calls7dRows   as { agent_id: string }[] | null)
+
+    for (const agent of filteredAgents) {
+      const agentCalls24h  = calls24hMap[agent.id]  ?? 0
+      const agentErrors24h = errors24hMap[agent.id] ?? 0
+      const agentCalls7d   = calls7dMap[agent.id]   ?? 0
+
+      if (agentCalls24h > 0 && agentErrors24h / agentCalls24h > 0.2) {
+        alerts.push({
+          type: 'high_error_rate',
+          agentId: agent.id,
+          agentName: agent.name,
+          message: `Tu agente "${agent.name}" tiene alta tasa de error. Revisa tu endpoint.`,
+        })
+      }
+
+      if (agentCalls7d === 0) {
+        alerts.push({
+          type: 'no_activity',
+          agentId: agent.id,
+          agentName: agent.name,
+          message: `"${agent.name}" sin actividad en 7 días. ¿Tu agente está activo?`,
+        })
+      }
     }
   }
 
@@ -206,24 +229,4 @@ export async function GET(req: NextRequest) {
   })
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
 
-function buildEmptyDailySeries() {
-  return Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000)
-    return { date: d.toISOString().slice(0, 10), calls: 0 }
-  })
-}
-
-function buildDailySeries(rows: CallDateRow[] | null) {
-  const dailyMap = new Map<string, number>()
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-    dailyMap.set(d.toISOString().slice(0, 10), 0)
-  }
-  for (const row of rows ?? []) {
-    const key = row.called_at.slice(0, 10)
-    if (dailyMap.has(key)) dailyMap.set(key, (dailyMap.get(key) ?? 0) + 1)
-  }
-  return Array.from(dailyMap.entries()).map(([date, calls]) => ({ date, calls }))
-}

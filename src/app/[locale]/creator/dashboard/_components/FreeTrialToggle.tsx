@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface FreeTrialToggleProps {
   slug: string
@@ -13,6 +14,7 @@ export function FreeTrialToggle({
   initialEnabled,
   initialLimit,
 }: FreeTrialToggleProps) {
+  const t = useTranslations('freeTrial')
   const [enabled, setEnabled]        = useState(initialEnabled)
   const [limit, setLimit]            = useState(initialLimit)
   const [toast, setToast]            = useState<string | null>(null)
@@ -40,21 +42,21 @@ export function FreeTrialToggle({
 
       if (res.ok) {
         lastGood.current = { enabled: nextEnabled, limit: nextLimit }
-        const msg = nextEnabled ? 'Free trial activado ✓' : 'Free trial desactivado'
+        const msg = nextEnabled ? t('activated') : t('deactivated')
         setToast(msg)
         setTimeout(() => setToast(null), 3000)
       } else {
         // Revert optimista al último estado bueno conocido
         setEnabled(lastGood.current.enabled)
         setLimit(lastGood.current.limit)
-        setToast('Error al guardar. Intenta de nuevo.')
+        setToast(t('errorSaving'))
         setTimeout(() => setToast(null), 4000)
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
       setEnabled(lastGood.current.enabled)
       setLimit(lastGood.current.limit)
-      setToast('Error al guardar. Intenta de nuevo.')
+      setToast(t('errorSaving'))
       setTimeout(() => setToast(null), 4000)
     }
   }
@@ -81,9 +83,9 @@ export function FreeTrialToggle({
       {/* Header con toggle */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-gray-900">Free Trial</p>
+          <p className="text-sm font-medium text-gray-900">{t('label')}</p>
           <p className="text-xs text-gray-500 max-w-xs">
-            Permite que usuarios prueben tu agente gratis antes de requerir fondos.
+            {t('description')}
           </p>
         </div>
 
@@ -92,7 +94,7 @@ export function FreeTrialToggle({
           type="button"
           role="switch"
           aria-checked={enabled}
-          aria-label="Activar free trial"
+          aria-label={t('label')}
           onClick={handleToggle}
           disabled={isPending}
           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-avax-500 focus:ring-offset-2 disabled:opacity-50 ${
@@ -114,7 +116,7 @@ export function FreeTrialToggle({
             htmlFor={`trial-limit-${slug}`}
             className="block text-xs font-medium text-gray-700"
           >
-            Invocaciones gratuitas por usuario
+            {t('limitLabel')}
           </label>
           <input
             id={`trial-limit-${slug}`}
@@ -128,9 +130,7 @@ export function FreeTrialToggle({
             className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-avax-500 focus:outline-none focus:ring-1 focus:ring-avax-500 disabled:opacity-50"
           />
           <p className="text-xs text-gray-400">
-            Los usuarios pueden probar tu agente hasta{' '}
-            <span className="font-medium text-gray-600">{limit}</span>{' '}
-            {limit === 1 ? 'vez' : 'veces'} sin API key con fondos. (min 1, max 10)
+            {t('limitHint', { limit, times: limit === 1 ? t('timeSingular') : t('timePlural') })}
           </p>
         </div>
       )}
@@ -139,7 +139,7 @@ export function FreeTrialToggle({
       {toast && (
         <p
           className={`text-xs font-medium ${
-            toast.includes('Error') ? 'text-red-600' : 'text-green-600'
+            toast === t('errorSaving') ? 'text-red-600' : 'text-green-600'
           }`}
           role="status"
           aria-live="polite"

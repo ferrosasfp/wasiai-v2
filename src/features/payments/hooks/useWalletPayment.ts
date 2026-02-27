@@ -1,0 +1,252 @@
+import { useState, useCallback, useRef } from 'react'
+import { useAccount, useWalletClient, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useChainGuard } from './useChainGuard'
+import { useUsdcBalance } from './useUsdcBalance'
+import {
+  FUJI_CHAIN_ID,
+  USDC_FUJI_ADDRESS,
+  WASIAI_OPERATOR_ADDRESS,
+  USDC_EIP712_CONFIG,
+} from '@/shared/lib/web3/fuji'
+import type {
+  PaymentFlowState,
+  PaymentFlowContext,
+  X402Requirements,
+  X402PaymentHeader,
+} from '../types/payment-flow.types'
+
+const USDC_ABI_APPROVE = [
+  {
+    name: 'approve',
+    type: 'function' as const,
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'value',   type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
+interface UseWalletPaymentOptions {
+  slug:        string
+  input:       string
+  priceUsdc:   number
+}
+
+export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOptions) {
+  const [flowState, setFlowState] = useState<PaymentFlowState>('idle')
+  const [result,    setResult]    = useState<string>()
+  const [txHash,    setTxHash]    = useState<`0x${string}`>()
+  const [errorMsg,  setErrorMsg]  = useState<string>()
+  const [approveTx, setApproveTx] = useState<`0x${string}`>()
+
+  // Guardar requirements del probe para el flujo fallback
+  const requirementsRef = useRef<X402Requirements | null>(null)
+
+  const { address }              = useAccount()
+  const { data: walletClient }   = useWalletClient()
+  const { isConnected, isCorrectChain, currentChainName, switchToFuji } = useChainGuard()
+  const { usdcBalance, hasEnoughBalance, isLoading: balanceLoading } = useUsdcBalance(priceUsdc)
+  const { writeContractAsync }   = useWriteContract()
+  const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTx })
+
+  /** Deriva el estado del flujo a partir del contexto wagmi */
+  function deriveState(): PaymentFlowState {
+    // Estados en vuelo tienen prioridad — nunca los interrumpas con condiciones externas
+    if (
+      flowState === 'signing_eip3009' ||
+      flowState === 'calling'         ||
+      flowState === 'approving'
+    ) {
+      return flowState
+    }
+    if (!isConnected)       return 'no_wallet'
+    if (!isCorrectChain)    return 'wrong_network'
+    if (!hasEnoughBalance)  return 'insufficient_balance'
+    return flowState  // 'idle', 'eip3009_failed', 'success', 'error', etc.
+  }
+
+  const pay = useCallback(async () => {
+    if (!walletClient || !address) return
+    setErrorMsg(undefined)
+
+    // ── Probe del endpoint ──────────────────────────────────────────
+    setFlowState('calling')
+    let probeRes: Response
+    try {
+      probeRes = await fetch(`/api/v1/models/${slug}/invoke`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ input }),
+      })
+    } catch {
+      setErrorMsg('Error de red. Verifica tu conexión e intenta de nuevo.')
+      setFlowState('error')
+      return
+    }
+
+    if (probeRes.status !== 402) {
+      const data = await probeRes.json() as { result?: string; error?: string }
+      if (probeRes.ok) {
+        setResult(typeof data.result === 'string' ? data.result : JSON.stringify(data.result))
+        setFlowState('success')
+      } else {
+        setErrorMsg(data.error ?? 'Error inesperado del servidor.')
+        setFlowState('error')
+      }
+      return
+    }
+
+    const requirements: X402Requirements = await probeRes.json() as X402Requirements
+    requirementsRef.current = requirements
+    const amountWei = BigInt(requirements.maxAmountRequired)
+
+    // ── Intento EIP-3009 / EIP-712 ─────────────────────────────────
+    setFlowState('signing_eip3009')
+    try {
+      const nonce       = crypto.getRandomValues(new Uint8Array(32))
+      const nonceHex    = ('0x' + Array.from(nonce).map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`
+      const validBefore = Math.floor(Date.now() / 1000) + 300  // 5 min
+
+      const signature = await walletClient.signTypedData({
+        domain: {
+          name:              USDC_EIP712_CONFIG.name,
+          version:           USDC_EIP712_CONFIG.version,
+          chainId:           FUJI_CHAIN_ID,
+          verifyingContract: requirements.asset,  // viene del server
+        },
+        types: {
+          TransferWithAuthorization: [
+            { name: 'from',        type: 'address' },
+            { name: 'to',          type: 'address' },
+            { name: 'value',       type: 'uint256' },
+            { name: 'validAfter',  type: 'uint256' },
+            { name: 'validBefore', type: 'uint256' },
+            { name: 'nonce',       type: 'bytes32'  },
+          ],
+        },
+        primaryType: 'TransferWithAuthorization',
+        message: {
+          from:        address,
+          to:          requirements.payTo,
+          value:       amountWei,
+          validAfter:  0n,
+          validBefore: BigInt(validBefore),
+          nonce:       nonceHex,
+        },
+      })
+
+      const paymentHeader: X402PaymentHeader = {
+        x402Version: 1,
+        scheme:      'exact',
+        network:     requirements.network,
+        payload: {
+          signature,
+          authorization: {
+            from:        address,
+            to:          requirements.payTo,
+            value:       amountWei.toString(),
+            validAfter:  '0',
+            validBefore: validBefore.toString(),
+            nonce:       nonceHex,
+          },
+        },
+      }
+
+      setFlowState('calling')
+      const paidRes = await fetch(`/api/v1/models/${slug}/invoke`, {
+        method:  'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-PAYMENT':    btoa(JSON.stringify(paymentHeader)),
+        },
+        body: JSON.stringify({ input }),
+      })
+
+      const paidData = await paidRes.json() as { result?: string; error?: string; meta?: { tx_hash?: `0x${string}` } }
+      if (paidRes.ok) {
+        setResult(typeof paidData.result === 'string' ? paidData.result : JSON.stringify(paidData.result))
+        setTxHash(paidData.meta?.tx_hash)
+        setFlowState('success')
+      } else {
+        setErrorMsg(paidData.error ?? 'Error procesando el pago.')
+        setFlowState('error')
+      }
+
+    } catch (err: unknown) {
+      const code    = (err as { code?: number })?.code
+      const message = (err as { message?: string })?.message ?? ''
+
+      if (code === 4001) {
+        // Rechazo explícito del usuario → NO ofrecer fallback
+        setErrorMsg('Cancelaste la operación. Puedes intentar de nuevo.')
+        setFlowState('error')
+        return
+      }
+
+      // Incompatibilidad técnica (METHOD_NOT_FOUND, etc.) → ofrecer fallback
+      const isTechnicalFailure =
+        message.includes('METHOD_NOT_FOUND') ||
+        message.includes('not supported') ||
+        code === -32601
+
+      if (isTechnicalFailure) {
+        setFlowState('eip3009_failed')  // FallbackApproveFlow aparece
+      } else {
+        setErrorMsg('Error al firmar la autorización. Intenta de nuevo.')
+        setFlowState('error')
+      }
+    }
+  }, [walletClient, address, slug, input])
+
+  /** Ejecutar fallback approve → lo llama FallbackApproveFlow al confirmar */
+  const executeApprove = useCallback(async (amountWei: bigint) => {
+    if (!address) return
+    setFlowState('approving')
+    try {
+      const hash = await writeContractAsync({
+        address:      USDC_FUJI_ADDRESS,
+        abi:          USDC_ABI_APPROVE,
+        functionName: 'approve',
+        args:         [WASIAI_OPERATOR_ADDRESS, amountWei],
+        chainId:      FUJI_CHAIN_ID,
+      })
+      setApproveTx(hash)
+      setTxHash(hash)
+    } catch (err: unknown) {
+      const code = (err as { code?: number })?.code
+      if (code === 4001) {
+        setErrorMsg('Cancelaste la aprobación. Puedes intentar de nuevo.')
+      } else {
+        setErrorMsg('Error al ejecutar la aprobación on-chain.')
+      }
+      setFlowState('eip3009_failed')  // vuelve a mostrar el fallback
+    }
+  }, [address, writeContractAsync])
+
+  const currentFlowState = deriveState()
+
+  const ctx: PaymentFlowContext = {
+    state:             currentFlowState,
+    address,
+    chainId:           undefined,
+    chainName:         currentChainName,
+    usdcBalance,
+    hasEnoughBalance,
+    fallbackAvailable: flowState === 'eip3009_failed',
+    result,
+    txHash,
+    errorMessage:      errorMsg,
+  }
+
+  return {
+    ctx,
+    balanceLoading,
+    approveConfirmed,
+    switchToFuji,
+    pay,
+    executeApprove,
+    reset: () => { setFlowState('idle'); setErrorMsg(undefined) },
+  }
+}

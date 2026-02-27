@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
 interface AgentKey {
   id: string
@@ -37,6 +38,7 @@ interface DepositModalProps {
 }
 
 function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps) {
+  const t = useTranslations('agentKeys')
   const [amount, setAmount]     = useState(10)
   const [status, setStatus]     = useState<'idle' | 'signing' | 'submitting' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -180,7 +182,7 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Add USDC to Key</h2>
+            <h2 className="text-lg font-bold text-gray-900">{t('deposit.title')}</h2>
             <p className="text-sm text-gray-500">{keyName}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
@@ -189,7 +191,7 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
         {/* On-chain balance display */}
         {balance !== null && (
           <div className="mb-4 rounded-xl bg-blue-50 px-4 py-3">
-            <p className="text-xs text-blue-600 font-medium">Current on-chain balance</p>
+            <p className="text-xs text-blue-600 font-medium">{t('deposit.balanceLabel')}</p>
             <p className="text-lg font-bold text-blue-800">${balance.toFixed(4)} USDC</p>
           </div>
         )}
@@ -197,7 +199,7 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
         {status === 'success' ? (
           <div className="space-y-3 text-center">
             <div className="text-4xl">✅</div>
-            <p className="font-semibold text-green-700">USDC deposited successfully!</p>
+            <p className="font-semibold text-green-700">{t('deposit.success')}</p>
             {txHash && (
               <p className="text-xs text-gray-500 font-mono break-all">
                 Tx: {txHash.slice(0, 20)}...{txHash.slice(-8)}
@@ -207,14 +209,14 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
               onClick={onClose}
               className="mt-2 w-full rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600"
             >
-              Done
+              {t('deposit.done')}
             </button>
           </div>
         ) : (
           <div className="space-y-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Amount to deposit (USDC)
+                {t('deposit.amountLabel')}
               </label>
               <input
                 type="number"
@@ -226,7 +228,7 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
                 disabled={status !== 'idle' && status !== 'error'}
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none disabled:opacity-60"
               />
-              <p className="mt-1 text-xs text-gray-400">Min $1 · Max $1,000</p>
+              <p className="mt-1 text-xs text-gray-400">{t('deposit.amountHint')}</p>
             </div>
 
             {errorMsg && (
@@ -237,9 +239,9 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
 
             {/* Info box */}
             <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-xs text-gray-500 space-y-1">
-              <p>• Signs a gasless ERC-3009 authorization (no ETH needed)</p>
-              <p>• USDC transferred directly from your wallet to the contract</p>
-              <p>• Each API call deducts the agent price from your on-chain balance</p>
+              <p>• {t('deposit.info1')}</p>
+              <p>• {t('deposit.info2')}</p>
+              <p>• {t('deposit.info3')}</p>
             </div>
 
             <button
@@ -247,9 +249,9 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
               disabled={status === 'signing' || status === 'submitting'}
               className="w-full rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 disabled:opacity-50 transition"
             >
-              {status === 'signing'    ? '⏳ Waiting for signature...' :
-               status === 'submitting' ? '⏳ Submitting on-chain...' :
-               `Fund Key — $${amount} USDC`}
+              {status === 'signing'    ? t('deposit.signing') :
+               status === 'submitting' ? t('deposit.submitting') :
+               `${t('deposit.fundKey')} — $${amount} USDC`}
             </button>
           </div>
         )}
@@ -269,6 +271,8 @@ interface CloseKeyModalProps {
 }
 
 function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKeyModalProps) {
+  const t = useTranslations('agentKeys')
+  const tCommon = useTranslations('common')
   const [status, setStatus]     = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [result, setResult]     = useState<{ txHash: string | null; refundedUsdc: number } | null>(null)
@@ -298,7 +302,7 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Close API Key</h2>
+            <h2 className="text-lg font-bold text-gray-900">{t('close.title')}</h2>
             <p className="text-sm text-gray-500">{keyName}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
@@ -307,17 +311,17 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
         {status === 'success' && result ? (
           <div className="space-y-3">
             <div className="text-center text-4xl">✅</div>
-            <p className="text-center font-semibold text-green-700">Key closed successfully</p>
+            <p className="text-center font-semibold text-green-700">{t('close.success')}</p>
             {result.refundedUsdc > 0 ? (
               <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
-                <p className="font-medium">${result.refundedUsdc.toFixed(4)} USDC moved to your Earnings</p>
+                <p className="font-medium">{t('close.refunded', { amount: result.refundedUsdc.toFixed(4) })}</p>
                 <p className="mt-1 text-xs text-green-600">
-                  You can claim your earnings from the{' '}
-                  <Link href="/creator/dashboard" className="underline">Creator Dashboard →</Link>
+                  {t('close.claimHint')}{' '}
+                  <Link href="/creator/dashboard" className="underline">→</Link>
                 </p>
               </div>
             ) : (
-              <p className="text-center text-sm text-gray-500">No remaining balance to refund.</p>
+              <p className="text-center text-sm text-gray-500">{t('close.noRefund')}</p>
             )}
             {result.txHash && (
               <p className="text-center text-xs text-gray-400 font-mono break-all">
@@ -328,19 +332,19 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
               onClick={onClose}
               className="w-full rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600"
             >
-              Done
+              {t('close.done')}
             </button>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-              <p className="font-medium">This will permanently revoke the key.</p>
+              <p className="font-medium">{t('close.warning')}</p>
               <ul className="mt-2 space-y-1 text-xs text-amber-700 list-disc list-inside">
-                <li>All pending calls will be settled to creators</li>
+                <li>{t('close.warn1')}</li>
                 {balance > 0 && (
-                  <li>Remaining <strong>${balance.toFixed(4)} USDC</strong> will move to your Earnings</li>
+                  <li>{t('close.warn2', { amount: balance.toFixed(4) })}</li>
                 )}
-                <li>Your agent will stop working immediately</li>
+                <li>{t('close.warn3')}</li>
               </ul>
             </div>
 
@@ -355,14 +359,14 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
                 onClick={onClose}
                 className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button
                 onClick={handleClose}
                 disabled={status === 'loading'}
                 className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
               >
-                {status === 'loading' ? '⏳ Closing...' : 'Close Key'}
+                {status === 'loading' ? t('close.closing') : t('close.confirmBtn')}
               </button>
             </div>
           </div>
@@ -375,6 +379,8 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AgentKeysPage() {
+  const t = useTranslations('agentKeys')
+  const tCommon = useTranslations('common')
   const [keys, setKeys]         = useState<AgentKey[]>([])
   const [loading, setLoading]   = useState(true)
   const [creating, setCreating] = useState(false)
@@ -424,16 +430,14 @@ export default function AgentKeysPage() {
       <div className="mx-auto max-w-3xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Agent Keys</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              API keys para que tus agentes de IA llamen modelos WasiAI de forma autónoma.
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
+            <p className="mt-1 text-sm text-gray-500">{t('subtitle')}</p>
           </div>
           <button
             onClick={() => setShowForm(true)}
             className="rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition"
           >
-            + New Key
+            {t('newKey')}
           </button>
         </div>
 
@@ -443,8 +447,8 @@ export default function AgentKeysPage() {
             <div className="flex items-start gap-3">
               <span className="text-2xl">🔑</span>
               <div className="flex-1">
-                <p className="font-semibold text-green-800">Key creada — ¡guárdala ahora!</p>
-                <p className="text-sm text-green-600">Esta key no volverá a mostrarse.</p>
+                <p className="font-semibold text-green-800">{t('keyCreated')}</p>
+                <p className="text-sm text-green-600">{t('keyOnce')}</p>
                 <div className="mt-3 flex items-center gap-2">
                   <code className="flex-1 rounded-lg bg-white border border-green-200 px-3 py-2 text-sm font-mono text-gray-800 break-all">
                     {newKey.raw_key}
@@ -453,13 +457,13 @@ export default function AgentKeysPage() {
                     onClick={() => copyKey(newKey.raw_key!)}
                     className="shrink-0 rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
                   >
-                    {copied ? '✓' : 'Copy'}
+                    {copied ? '✓' : tCommon('copy')}
                   </button>
                 </div>
               </div>
             </div>
             <button onClick={() => setNewKey(null)} className="mt-3 text-xs text-green-600 hover:underline">
-              La guardé, cerrar
+              {t('acknowledged')}
             </button>
           </div>
         )}
@@ -467,18 +471,16 @@ export default function AgentKeysPage() {
         {/* Create form */}
         {showForm && (
           <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-            <h2 className="mb-1 font-semibold text-gray-900">Nueva Agent Key</h2>
-            <p className="mb-4 text-xs text-gray-400">
-              Tu key comienza vacía. Añade USDC para activarla.
-            </p>
+            <h2 className="mb-1 font-semibold text-gray-900">{t('newKeyTitle')}</h2>
+            <p className="mb-4 text-xs text-gray-400">{t('newKeyHint')}</p>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Nombre de la key</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t('keyName')}</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                  placeholder="Mi agente de trading"
+                  placeholder={t('keyNamePlaceholder')}
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none"
                   required
                 />
@@ -489,14 +491,14 @@ export default function AgentKeysPage() {
                   disabled={creating}
                   className="rounded-xl bg-avax-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 disabled:opacity-50"
                 >
-                  {creating ? 'Creando...' : 'Crear Key'}
+                  {creating ? t('creating') : t('createKey')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
                   className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
                 >
-                  Cancelar
+                  {tCommon('cancel')}
                 </button>
               </div>
             </form>
@@ -506,16 +508,16 @@ export default function AgentKeysPage() {
         {/* Keys list */}
         <div className="rounded-2xl bg-white shadow-sm border border-gray-100">
           {loading ? (
-            <div className="py-12 text-center text-gray-400">Cargando...</div>
+            <div className="py-12 text-center text-gray-400">{tCommon('loading')}</div>
           ) : keys.length === 0 ? (
             <div className="py-12 text-center">
               <div className="text-4xl mb-3">🤖</div>
-              <p className="text-gray-500 text-sm">Sin agent keys todavía</p>
+              <p className="text-gray-500 text-sm">{t('noKeys')}</p>
               <button
                 onClick={() => setShowForm(true)}
                 className="mt-4 rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600"
               >
-                Crear tu primera key
+                {t('createFirst')}
               </button>
             </div>
           ) : (
@@ -533,18 +535,18 @@ export default function AgentKeysPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-gray-900">{key.name}</span>
                           {!key.is_active && (
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">Revocada</span>
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">{t('revoked')}</span>
                           )}
                           {key.is_active && key.budget_usdc === 0 && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600">Sin fondos</span>
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600">{t('noFunds')}</span>
                           )}
                         </div>
                         <div className="mt-1 flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                          <span>Total depositado: <strong className="text-gray-600">${Number(key.budget_usdc).toFixed(2)}</strong></span>
-                          <span>Gastado: <strong className="text-gray-600">${Number(key.spent_usdc).toFixed(3)}</strong></span>
-                          <span>Disponible: <strong className="text-avax-600">${available.toFixed(3)}</strong></span>
+                          <span>{t('totalDeposited')}: <strong className="text-gray-600">${Number(key.budget_usdc).toFixed(2)}</strong></span>
+                          <span>{t('spent')}: <strong className="text-gray-600">${Number(key.spent_usdc).toFixed(3)}</strong></span>
+                          <span>{t('available')}: <strong className="text-avax-600">${available.toFixed(3)}</strong></span>
                           {key.last_used_at && (
-                            <span>Último uso: {new Date(key.last_used_at).toLocaleDateString('es')}</span>
+                            <span>{t('lastUsed')}: {new Date(key.last_used_at).toLocaleDateString()}</span>
                           )}
                         </div>
                         {/* Budget bar */}
@@ -563,15 +565,15 @@ export default function AgentKeysPage() {
                           <button
                             onClick={() => setDepositKey({ id: key.id, name: key.name })}
                             className="rounded-lg border border-avax-200 bg-avax-50 px-3 py-1.5 text-xs font-medium text-avax-700 hover:bg-avax-100 transition"
-                            title="Añadir USDC on-chain"
+                            title={t('addUsdc')}
                           >
-                            + Añadir USDC
+                            {t('addUsdc')}
                           </button>
                           <button
                             onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
                             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
                           >
-                            Cerrar Key
+                            {t('closeKey')}
                           </button>
                         </div>
                       )}
@@ -588,22 +590,19 @@ export default function AgentKeysPage() {
           <div className="flex items-start gap-3">
             <span className="text-lg">ℹ️</span>
             <div className="text-xs text-blue-700">
-              <p className="font-medium mb-1">Salida de emergencia garantizada</p>
-              <p>
-                Si WasiAI dejara de operar por más de 30 días, podrás recuperar tu USDC
-                directamente desde el contrato sin nuestra intervención.
-              </p>
+              <p className="font-medium mb-1">{t('emergencyTitle')}</p>
+              <p>{t('emergencyDesc')}</p>
               <p className="mt-1 font-mono text-blue-600 break-all">
-                Contrato: {MARKETPLACE_ADDRESS || '(dirección no configurada — ver NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI)'}
+                {t('contract')}: {MARKETPLACE_ADDRESS || '(dirección no configurada — ver NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI)'}
               </p>
-              <p className="mt-1">Función: <code className="bg-blue-100 px-1 rounded">emergencyWithdrawKey(bytes32 keyId)</code></p>
+              <p className="mt-1">{t('function')}: <code className="bg-blue-100 px-1 rounded">emergencyWithdrawKey(bytes32 keyId)</code></p>
             </div>
           </div>
         </div>
 
         {/* Usage example */}
         <div className="mt-4 rounded-2xl bg-gray-900 p-5 text-white">
-          <p className="mb-3 text-sm font-semibold text-gray-300">Uso en tu agente:</p>
+          <p className="mb-3 text-sm font-semibold text-gray-300">{t('usageTitle')}:</p>
           <pre className="overflow-auto text-sm text-green-400">{`POST /api/v1/models/gpt-translator/invoke
 x-agent-key: wasi_your_key_here
 Content-Type: application/json

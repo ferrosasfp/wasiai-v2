@@ -1,12 +1,14 @@
 import { createConfig, http } from 'wagmi'
-import { injected } from 'wagmi/connectors'
+import { injected, coinbaseWallet } from 'wagmi/connectors'
 import { supportedChains, defaultChain } from './chains'
 
 export const wagmiConfig = createConfig({
   chains: supportedChains,
   ssr: true, // Prevents wagmi hydration mismatches in Next.js App Router
   connectors: [
-    injected(), // MetaMask, Core, etc.
+    injected(),                              // Core, Rabby, etc.
+    injected({ target: 'metaMask' }),        // MetaMask explícito
+    coinbaseWallet({ appName: 'WasiAI' }),   // Coinbase Wallet
   ],
   transports: Object.fromEntries(
     supportedChains.map((chain) => [

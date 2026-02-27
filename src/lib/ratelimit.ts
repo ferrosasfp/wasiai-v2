@@ -25,10 +25,13 @@ let _register: Ratelimit | null = null
 let _keys:     Ratelimit | null = null
 let _upload:   Ratelimit | null = null
 
+let _search: Ratelimit | null = null
+
 export function getInvokeLimit()   { return _invoke   ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(60, '1 m'),  prefix: 'rl:invoke' }) }
 export function getRegisterLimit() { return _register ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(5,  '1 h'),  prefix: 'rl:register' }) }
 export function getKeysLimit()     { return _keys     ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(10, '1 h'),  prefix: 'rl:keys' }) }
 export function getUploadLimit()   { return _upload   ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(20, '1 h'),  prefix: 'rl:upload' }) }
+export function getSearchLimit()   { return _search   ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(30, '1 m'),  prefix: 'rl:search' }) }
 
 /** Extract the best available identifier from a request */
 export function getIdentifier(request: NextRequest, userId?: string): string {

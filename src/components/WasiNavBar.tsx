@@ -3,15 +3,17 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { ApiKeyBalance } from '@/features/layout/components/ApiKeyBalance'
 
 const NAV_PATHS = [
-  { path: '',                   label: 'Marketplace' },
-  { path: '/publish',           label: 'Publish'     },
-  { path: '/creator/dashboard', label: 'Dashboard'   },
-  { path: '/agent-keys',        label: 'Agent Keys'  },
-  { path: '/docs',              label: 'Docs'        },
+  { path: '',                   tKey: 'marketplace' as const },
+  { path: '/publish',           tKey: 'publish' as const,     label: undefined     },
+  { path: '/creator/dashboard', tKey: 'dashboard' as const   },
+  { path: '/agent-keys',        tKey: 'agentKeys' as const,   label: undefined     },
+  { path: '/docs',              tKey: 'docs' as const        },
 ]
 
 interface WasiNavBarProps {
@@ -23,10 +25,17 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   // Extract locale from pathname (e.g. /en/publish → 'en')
   const locale = pathname.split('/')[1] || 'en'
 
+  const tNav  = useTranslations('nav')
+  const tAuth = useTranslations('auth')
+
   // P-08: Memoize NAV_LINKS — only recomputes when locale changes
-  const NAV_LINKS = useMemo(
-    () => NAV_PATHS.map(({ path, label }) => ({ href: `/${locale}${path}`, label })),
-    [locale],
+  // tNav is stable per locale (next-intl guarantees it), so [locale] is the correct dep.
+  const NAV_LINKS = useMemo(() =>
+    NAV_PATHS.map(({ path, tKey, label }) => ({
+      href: `/${locale}${path}`,
+      label: tKey ? tNav(tKey) : (label ?? ''),
+    })),
+    [locale, tNav]
   )
 
   const [menuOpen,  setMenuOpen]  = useState(false)
@@ -128,6 +137,13 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             <LanguageSwitcher />
           </div>
 
+          {/* API Key Balance — solo si hay sesión (desktop) */}
+          {userEmail && (
+            <div className="hidden sm:flex shrink-0">
+              <ApiKeyBalance enabled={!!userEmail} locale={locale} />
+            </div>
+          )}
+
           {/* Auth actions */}
           <div className="hidden items-center gap-3 sm:flex shrink-0">
             {loading ? (
@@ -140,7 +156,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                   aria-label="Sign out of your account"
                   className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
                 >
-                  Sign out
+                  {tAuth('signout')}
                 </button>
               </>
             ) : (
@@ -150,13 +166,13 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                   href={`/${locale}/login`}
                   className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
                 >
-                  Log in
+                  {tAuth('login')}
                 </Link>
                 <Link
                   href={`/${locale}/signup`}
                   className="rounded-lg bg-avax-500 px-4 py-1.5 text-sm font-semibold text-white hover:bg-avax-600 transition"
                 >
-                  Sign up
+                  {tAuth('signup')}
                 </Link>
               </>
             )}
@@ -212,7 +228,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                     aria-label="Sign out of your account"
                     className="text-sm font-medium text-red-600 hover:text-red-700"
                   >
-                    Sign out
+                    {tAuth('signout')}
                   </button>
                 </div>
               ) : (
@@ -222,13 +238,13 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                     href={`/${locale}/login`}
                     className="flex-1 rounded-lg border border-gray-200 py-2 text-center text-sm font-medium text-gray-700"
                   >
-                    Log in
+                    {tAuth('login')}
                   </Link>
                   <Link
                     href={`/${locale}/signup`}
                     className="flex-1 rounded-lg bg-avax-500 py-2 text-center text-sm font-semibold text-white"
                   >
-                    Sign up
+                    {tAuth('signup')}
                   </Link>
                 </div>
               )}

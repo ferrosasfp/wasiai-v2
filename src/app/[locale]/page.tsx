@@ -9,6 +9,7 @@ import { getModels } from '@/features/models/services/models.service'
 import { ModelCard } from '@/features/models/components/ModelCard'
 import { CategoryFilter } from '@/features/models/components/CategoryFilter'
 import { HeroDualCard } from '@/features/home/components/HeroDualCard'
+import { SearchBar } from '@/features/models/components/SearchBar'
 import type { ModelCategory } from '@/features/models/types/models.types'
 
 const PAGE_SIZE = 12
@@ -105,7 +106,7 @@ export default async function HomePage({ params, searchParams }: Props) {
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Suspense>
-                <SearchInput defaultValue={search} category={category} placeholder={tc('search')} />
+                <SearchBar mode="server" defaultValue={search} category={category} placeholder={tc('search')} aria-label="Buscar modelos y agentes" />
               </Suspense>
               <Suspense>
                 <CategoryFilter />
@@ -249,18 +250,4 @@ x-agent-key: wasi_xxx
   )
 }
 
-// ── Search input ──────────────────────────────────────────────────────────────
-function SearchInput({ defaultValue, category, placeholder }: { defaultValue?: string; category?: string; placeholder: string }) {
-  return (
-    <form method="GET" className="flex items-center gap-2">
-      {category && <input type="hidden" name="category" value={category} />}
-      <input
-        type="search"
-        name="search"
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm focus:border-avax-400 focus:outline-none sm:w-52"
-      />
-    </form>
-  )
-}
+

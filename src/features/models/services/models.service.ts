@@ -23,7 +23,7 @@ export async function getModels({
 
   if (category) query = query.eq('category', category)
   if (search) {
-    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+    query = query.textSearch('search_vector', search, { type: 'websearch' })
   }
 
   const { data, error, count } = await query

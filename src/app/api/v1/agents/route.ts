@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of truth
+import { getSearchLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 // WasiAI handles x402 settlement natively — no external facilitator
 const SITE_URL  = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
@@ -32,6 +33,44 @@ export async function GET(request: NextRequest) {
   const slim       = searchParams.get('slim') === 'true' // PERF-05: lightweight mode
 
   const supabase = await createClient()
+
+  // Full-text search via RPC when q is present and meaningful
+  if (q && q.length >= 2) {
+    const rlResp = await checkRateLimit(getSearchLimit(), getIdentifier(request))
+    if (rlResp) return rlResp
+
+    const { data: searchData, error: searchError } = await supabase.rpc('search_agents', {
+      search_query:      q,
+      filter_category:   category ?? null,
+      filter_agent_type: null,
+      result_limit:      limit,
+      result_offset:     offset,
+    })
+
+    if (searchError) {
+      return NextResponse.json({ error: searchError.message }, { status: 500 })
+    }
+
+    const agents = (searchData ?? []) as Record<string, unknown>[]
+
+    return NextResponse.json({
+      schema: 'wasiai/agents/v1',
+      total:  agents.length,
+      limit,
+      offset,
+      agents: agents.map(agent => ({
+        slug:        agent.slug,
+        name:        agent.name,
+        description: agent.description,
+        category:    agent.category,
+        agent_type:  (agent.agent_type as string) ?? 'model',
+        ts_rank:     agent.rank,
+        price_per_call: agent.price_per_call,
+        currency:    'USDC',
+        invoke_url:  `${SITE_URL}/api/v1/models/${agent.slug}/invoke`,
+      })),
+    }, { headers: { 'Access-Control-Allow-Origin': '*' } })
+  }
 
   const CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -53,7 +92,6 @@ export async function GET(request: NextRequest) {
 
     if (category)  slimQuery = slimQuery.eq('category', category)
     if (agentType) slimQuery = slimQuery.eq('agent_type', agentType)
-    if (q)         slimQuery = slimQuery.or(`name.ilike.%${q}%,description.ilike.%${q}%`)
     if (maxPrice)  slimQuery = slimQuery.lte('price_per_call', parseFloat(maxPrice))
 
     const { data: slimData, count: slimCount } = await slimQuery
@@ -99,7 +137,6 @@ export async function GET(request: NextRequest) {
 
   if (category)  query = query.eq('category',   category)
   if (agentType) query = query.eq('agent_type', agentType)
-  if (q)         query = query.or(`name.ilike.%${q}%,description.ilike.%${q}%`)
   if (maxPrice)  query = query.lte('price_per_call', parseFloat(maxPrice))
 
   const { data, error, count } = await query

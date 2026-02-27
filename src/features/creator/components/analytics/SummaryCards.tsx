@@ -1,3 +1,7 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
+
 interface AnalyticsSummary {
   totalCalls: number
   calls24h: number
@@ -31,6 +35,7 @@ function totalEarnings(pending: string, onchain: string | null): string {
 }
 
 export function SummaryCards({ summary }: Props) {
+  const t = useTranslations('analytics')
   const {
     totalCalls, calls24h, avgLatencyMs,
     uptime24h, pendingEarningsUsdc, onchainEarningsUsdc,
@@ -40,19 +45,19 @@ export function SummaryCards({ summary }: Props) {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {/* Calls 24h */}
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <p className="text-xs text-gray-500 font-medium">Llamadas (24h)</p>
+        <p className="text-xs text-gray-500 font-medium">{t('calls_24h')}</p>
         <p className="mt-1 text-2xl font-bold text-gray-900">{calls24h.toLocaleString()}</p>
       </div>
 
       {/* Total Calls */}
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <p className="text-xs text-gray-500 font-medium">Total llamadas</p>
+        <p className="text-xs text-gray-500 font-medium">{t('total_calls')}</p>
         <p className="mt-1 text-2xl font-bold text-gray-900">{totalCalls.toLocaleString()}</p>
       </div>
 
       {/* Avg Latency */}
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <p className="text-xs text-gray-500 font-medium">Latencia avg</p>
+        <p className="text-xs text-gray-500 font-medium">{t('avg_latency')}</p>
         <p className={`mt-1 text-2xl font-bold ${latencyColor(avgLatencyMs)}`}>
           {avgLatencyMs > 0 ? `${avgLatencyMs}ms` : '—'}
         </p>
@@ -60,7 +65,7 @@ export function SummaryCards({ summary }: Props) {
 
       {/* Uptime 24h */}
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <p className="text-xs text-gray-500 font-medium">Uptime (24h)</p>
+        <p className="text-xs text-gray-500 font-medium">{t('uptime')}</p>
         <p className={`mt-1 text-2xl font-bold ${uptime24h !== null ? uptimeColor(uptime24h) : 'text-gray-400'}`}>
           {uptime24h !== null ? `${(uptime24h * 100).toFixed(1)}%` : '—'}
         </p>
@@ -68,7 +73,7 @@ export function SummaryCards({ summary }: Props) {
 
       {/* Earnings */}
       <div className="rounded-xl border border-[#E84142]/20 bg-[#E84142]/5 p-4 shadow-sm">
-        <p className="text-xs text-gray-500 font-medium">Earnings USDC</p>
+        <p className="text-xs text-gray-500 font-medium">{t('earnings')} USDC</p>
         <p className="mt-1 text-2xl font-bold text-[#E84142]">
           ${totalEarnings(pendingEarningsUsdc, onchainEarningsUsdc)}
         </p>

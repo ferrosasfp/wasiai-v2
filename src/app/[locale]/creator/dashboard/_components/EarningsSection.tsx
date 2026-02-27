@@ -6,6 +6,7 @@
  *       The blockchain RPC call is isolated here — if it's slow/fails,
  *       the rest of the dashboard still renders immediately.
  */
+import { getTranslations } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
 import { getPendingEarnings } from '@/lib/contracts/marketplaceClient'
 import { WithdrawButton } from '../WithdrawButton'
@@ -17,6 +18,7 @@ interface EarningsSectionProps {
 }
 
 export async function EarningsSection({ userId }: EarningsSectionProps) {
+  const t = await getTranslations('dashboard')
   const supabase = await createClient()
 
   const { data: profile } = await supabase
@@ -39,7 +41,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="inline-block h-2 w-2 rounded-full bg-avax-500" />
-            <h2 className="font-semibold text-gray-900">On-chain Earnings</h2>
+            <h2 className="font-semibold text-gray-900">{t('onchainEarnings')}</h2>
           </div>
           <p className="text-sm text-gray-500">
             Your USDC earnings accumulated in{' '}

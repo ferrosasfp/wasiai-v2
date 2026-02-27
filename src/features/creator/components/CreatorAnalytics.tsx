@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 import { SummaryCards } from './analytics/SummaryCards'
 import { CallsChart } from './analytics/CallsChart'
 import { AlertBanner } from './analytics/AlertBanner'
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export function CreatorAnalytics({ agents }: Props) {
+  const t = useTranslations('analytics')
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
   const [state, setState] = useState<State>({ status: 'loading', data: null })
   // Ref to track active fetch — avoids setState on unmounted component
@@ -86,14 +88,13 @@ export function CreatorAnalytics({ agents }: Props) {
     return () => {
       activeRef.current = false
       clearInterval(interval)
-      activeRef.current = true
     }
   }, [selectedAgentId])
 
   return (
     <section className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="font-semibold text-gray-900">Analytics</h2>
+        <h2 className="font-semibold text-gray-900">{t('title')}</h2>
 
         {/* Agent dropdown — only show if 2+ agents */}
         {agents.length > 1 && (
@@ -102,7 +103,7 @@ export function CreatorAnalytics({ agents }: Props) {
             onChange={e => setSelectedAgentId(e.target.value)}
             className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#E84142]/30"
           >
-            <option value="">Todos los agentes</option>
+            <option value="">{t('all_agents')}</option>
             {agents.map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
@@ -120,7 +121,7 @@ export function CreatorAnalytics({ agents }: Props) {
 
       {state.status === 'error' && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Error cargando analytics. Intenta recargar la página.
+          {t('errorLoading')}
         </div>
       )}
 
@@ -138,9 +139,7 @@ export function CreatorAnalytics({ agents }: Props) {
           {/* Empty state */}
           {state.data.summary.totalCalls === 0 && (
             <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 py-8 text-center">
-              <p className="text-sm text-gray-500">
-                Aún no hay llamadas. Comparte tu agente o intégralo via API.
-              </p>
+              <p className="text-sm text-gray-500">{t('empty_state')}</p>
             </div>
           )}
         </>

@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { PayToCallButton } from '@/features/payments/components/PayToCallButton'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { Model } from '../types/models.types'
@@ -11,6 +12,8 @@ interface Props {
 const TREASURY = process.env.NEXT_PUBLIC_WASIAI_TREASURY
 
 export function ModelCallSection({ model }: Props) {
+  const tAnalytics = useTranslations('analytics')
+  const tMarket = useTranslations('marketplace')
   if (!TREASURY) {
     return (
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-700">
@@ -35,11 +38,11 @@ export function ModelCallSection({ model }: Props) {
       <div className="mb-5 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-xl bg-gray-50 px-3 py-2 text-center">
           <p className="font-semibold text-gray-900">{model.total_calls.toLocaleString('en-US')}</p>
-          <p className="text-xs text-gray-400">Total calls</p>
+          <p className="text-xs text-gray-400">{tAnalytics('total_calls')}</p>
         </div>
         <div className="rounded-xl bg-gray-50 px-3 py-2 text-center">
           <p className="font-semibold text-gray-900 capitalize">{model.chain}</p>
-          <p className="text-xs text-gray-400">Network</p>
+          <p className="text-xs text-gray-400">{tMarket('network')}</p>
         </div>
       </div>
 

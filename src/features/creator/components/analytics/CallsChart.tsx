@@ -52,7 +52,7 @@ export function CallsChart({ series }: Props) {
               >
                 <div
                   className="w-full rounded-sm bg-[#E84142] opacity-80 hover:opacity-100 transition-opacity cursor-default"
-                  style={{ height: `${heightPx}px` }}
+                  style={{ height: `${heightPx}px`, minWidth: '2px' }}
                 />
               </div>
             )

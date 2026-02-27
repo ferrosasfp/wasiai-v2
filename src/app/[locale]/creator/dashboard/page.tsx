@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { getTranslations } from 'next-intl/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 // WithdrawButton and WalletSetup are used inside EarningsSection sub-component
 // A-02: Sub-component with Suspense for streaming — async blockchain call isolated
@@ -37,6 +38,7 @@ interface CallRow {
 
 export default async function CreatorDashboardPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
+  const t = await getTranslations('dashboard')
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale ?? 'en'}/login`)
@@ -90,7 +92,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Creator Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-gray-500">{user.email}</p>
         </div>
 
@@ -101,11 +103,11 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
 
         {/* Stats cards */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatCard label="Total Models" value={safeModels.length.toString()} icon="📦" />
-          <StatCard label="Active" value={activeModels.toString()} icon="✅" />
-          <StatCard label="Total Calls" value={totalCalls.toLocaleString('en-US')} icon="⚡" />
+          <StatCard label={t('totalAgents')} value={safeModels.length.toString()} icon="📦" />
+          <StatCard label={t('active')} value={activeModels.toString()} icon="✅" />
+          <StatCard label={t('totalCalls')} value={totalCalls.toLocaleString('en-US')} icon="⚡" />
           <StatCard
-            label="Revenue"
+            label={t('revenue')}
             value={`$${totalRevenue.toFixed(2)}`}
             icon="💰"
             highlight
@@ -120,37 +122,37 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
         {/* HU-1.4: Creator Analytics */}
         <CreatorAnalytics agents={safeModels.map(m => ({ id: m.id, name: m.name }))} />
 
-        {/* Models table */}
+        {/* Agents table */}
         <section>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Your Models</h2>
+            <h2 className="font-semibold text-gray-900">{t('yourAgents')}</h2>
             <Link
               href={`/${locale}/publish`}
               className="rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600 transition"
             >
-              + Publish Model
+              {t('publishAgent')}
             </Link>
           </div>
 
           {safeModels.length === 0 ? (
             <EmptyState
               icon="📭"
-              title="No models yet"
-              subtitle="Publish your first model to start earning."
-              cta={{ label: 'Publish Model', href: '/publish' }}
+              title={t('noAgents')}
+              subtitle={t('noAgentsSubtitle')}
+              cta={{ label: t('publishAgent'), href: `/${locale}/publish` }}
             />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>
-                    <th className="px-6 py-3 text-left">Model</th>
-                    <th className="px-6 py-3 text-left">Category</th>
-                    <th className="px-6 py-3 text-right">Price</th>
-                    <th className="px-6 py-3 text-right">Calls</th>
-                    <th className="px-6 py-3 text-right">Revenue</th>
-                    <th className="px-6 py-3 text-center">Status</th>
-                    <th className="px-6 py-3 text-center">Actions</th>
+                    <th className="px-6 py-3 text-left">{t('colAgent')}</th>
+                    <th className="px-6 py-3 text-left">{t('colCategory')}</th>
+                    <th className="px-6 py-3 text-right">{t('colPrice')}</th>
+                    <th className="px-6 py-3 text-right">{t('colCalls')}</th>
+                    <th className="px-6 py-3 text-right">{t('colRevenue')}</th>
+                    <th className="px-6 py-3 text-center">{t('colStatus')}</th>
+                    <th className="px-6 py-3 text-center">{t('colActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -209,25 +211,25 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
 
         {/* Recent calls */}
         <section>
-          <h2 className="mb-4 font-semibold text-gray-900">Recent Calls</h2>
+          <h2 className="mb-4 font-semibold text-gray-900">{t('recentCalls')}</h2>
 
           {recentCalls.length === 0 ? (
             <EmptyState
               icon="⚡"
-              title="No calls yet"
-              subtitle="Calls to your models will appear here in real time."
+              title={t('noCalls')}
+              subtitle={t('noCallsSubtitle')}
             />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>
-                    <th className="px-6 py-3 text-left">Model</th>
-                    <th className="px-6 py-3 text-left">Caller</th>
-                    <th className="px-6 py-3 text-right">Amount</th>
-                    <th className="px-6 py-3 text-right">Latency</th>
-                    <th className="px-6 py-3 text-center">Status</th>
-                    <th className="px-6 py-3 text-right">Time</th>
+                    <th className="px-6 py-3 text-left">{t('colAgent')}</th>
+                    <th className="px-6 py-3 text-left">{t('colCaller')}</th>
+                    <th className="px-6 py-3 text-right">{t('colAmount')}</th>
+                    <th className="px-6 py-3 text-right">{t('colLatency')}</th>
+                    <th className="px-6 py-3 text-center">{t('colStatus')}</th>
+                    <th className="px-6 py-3 text-right">{t('colTime')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -242,7 +244,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                             ? 'bg-violet-100 text-violet-700'
                             : 'bg-blue-100 text-blue-700'
                         }`}>
-                          {call.caller_type === 'agent' ? '🤖 agent' : '👤 human'}
+                          {call.caller_type === 'agent' ? t('callerAgent') : t('callerHuman')}
                         </span>
                       </td>
                       <td className="px-6 py-3 text-right text-green-600">
@@ -268,7 +270,7 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
         {/* Agent API quick-start */}
         <section className="rounded-2xl bg-gray-900 p-6 text-white">
           <p className="mb-2 text-sm font-semibold text-gray-300">
-            🤖 Other agents discover and pay your models automatically:
+            {t('apiQuickStartLabel')}
           </p>
           <pre className="overflow-auto rounded-xl bg-black/30 p-4 text-sm text-green-400">{`# Discovery
 GET ${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'}/api/v1/models?category=nlp
@@ -282,7 +284,7 @@ Content-Type: application/json
             href={`/${locale}/agent-keys`}
             className="mt-4 inline-block rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600 transition"
           >
-            Manage Agent Keys →
+            {t('manageAgentKeys')}
           </Link>
         </section>
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { createModelSchema, MODEL_CATEGORIES } from '@/lib/schemas/model.schema'
 
 // Agent row shape returned from Supabase select('*')
@@ -33,6 +34,8 @@ const updateSchema = createModelSchema
 
 export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
   const router = useRouter()
+  const t = useTranslations('editAgent')
+  const tCommon = useTranslations('common')
 
   const [form, setForm] = useState({
     name: agent.name,
@@ -72,14 +75,14 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Unknown error' }))
-        setErrors({ form: data.error ?? 'Failed to update agent' })
+        setErrors({ form: data.error ?? t('errorUpdate') })
         return
       }
 
       setSuccess(true)
       router.push(`/${locale}/creator/dashboard`)
     } catch {
-      setErrors({ form: 'Network error — please try again' })
+      setErrors({ form: t('errorNetwork') })
     } finally {
       setLoading(false)
     }
@@ -90,8 +93,8 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="text-5xl mb-4">✅</div>
-          <h1 className="text-2xl font-bold text-gray-900">Agent Updated!</h1>
-          <p className="mt-2 text-gray-500">Redirecting to dashboard…</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('updated')}</h1>
+          <p className="mt-2 text-gray-500">{t('redirecting')}</p>
         </div>
       </div>
     )
@@ -105,9 +108,9 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
             href={`/${locale}/creator/dashboard`}
             className="text-sm text-gray-500 hover:text-avax-600 transition"
           >
-            ← Back to Dashboard
+            {t('backToDashboard')}
           </Link>
-          <h1 className="mt-2 text-3xl font-bold text-gray-900">Edit Agent</h1>
+          <h1 className="mt-2 text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="mt-1 text-gray-500 text-sm">
             <span className="font-mono text-gray-400">{agent.slug}</span>
           </p>
@@ -120,7 +123,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
           {/* Name */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Model Name
+              {t('agentName')}
             </label>
             <input
               type="text"
@@ -135,7 +138,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
           {/* Category + Price */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Category</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">{t('category')}</label>
               <select
                 value={form.category}
                 onChange={e => handleChange('category', e.target.value)}
@@ -149,7 +152,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Price per call (USDC)
+                {t('pricePerCall')}
               </label>
               <div className="flex items-center rounded-xl border border-gray-200 overflow-hidden">
                 <span className="bg-gray-50 px-3 py-2.5 text-sm text-gray-400 border-r border-gray-200">$</span>
@@ -170,7 +173,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
 
           {/* Endpoint */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">API Endpoint</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">{t('apiEndpoint')}</label>
             <input
               type="url"
               value={form.endpoint_url}
@@ -185,7 +188,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
 
           {/* Description */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Description</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">{t('description')}</label>
             <textarea
               value={form.description}
               onChange={e => handleChange('description', e.target.value)}
@@ -209,13 +212,13 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-avax-500 py-3 font-semibold text-white hover:bg-avax-600 transition disabled:opacity-50"
             >
-              {loading ? 'Saving…' : 'Save Changes →'}
+              {loading ? t('saving') : t('saveChanges')}
             </button>
             <Link
               href={`/${locale}/creator/dashboard`}
               className="rounded-xl border border-gray-200 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
             >
-              Cancel
+              {tCommon('cancel')}
             </Link>
           </div>
         </form>
