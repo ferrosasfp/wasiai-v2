@@ -339,7 +339,11 @@
     "dashboard": "Dashboard",
     "docs": "Docs",
     "publish": "Publish",
-    "agentKeys": "Agent Keys"
+    "agentKeys": "Agent Keys",
+    "mainNavLabel": "Main navigation",
+    "homeLabel": "WasiAI — go to homepage",
+    "loadingUser": "Loading user...",
+    "signOutLabel": "Sign out of your account"
   },
   "agentKeys": {
     "title": "Agent Keys",
@@ -499,7 +503,8 @@
     "errorRate": "Error rate",
     "noData": "—",
     "insufficientData": "Insufficient data",
-    "basedOn": "Based on {n} calls"
+    "basedOn": "Based on {n} calls",
+    "approx": "(approx)"
   },
   "examples": {
     "title": "Usage examples",
@@ -509,6 +514,19 @@
     "tagLabel": "Label (optional)",
     "maxReached": "Maximum 5 examples per agent",
     "example": "Example",
-    "noExamples": "No examples yet"
+    "noExamples": "No examples yet",
+    "loading": "Loading examples...",
+    "confirmDelete": "Delete this example?",
+    "unknownError": "Unknown error",
+    "editing": "Editing example",
+    "saveChanges": "Save changes",
+    "saving": "Saving...",
+    "maxInputChars": "(max. 500 chars)",
+    "maxOutputChars": "(max. 1000 chars)",
+    "inputPlaceholder": "e.g.: Analyze the sentiment of the following text: ...",
+    "outputPlaceholder": "e.g.: { \"sentiment\": \"positive\", \"score\": 0.92, ... }",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel"
   }
 }

@@ -35,6 +35,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
 
   useEffect(() => {
     activeRef.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchExamples()
     return () => { activeRef.current = false }
   }, [fetchExamples])
@@ -59,7 +60,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
 
     if (!res.ok) {
       const { error: msg } = await res.json()
-      setError(msg ?? 'Error desconocido')
+      setError(msg ?? t('unknownError'))
     } else {
       setForm({ label: '', input: '', output: '' })
       setEditingId(null)
@@ -69,7 +70,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
   }
 
   async function handleDelete(exId: string) {
-    if (!confirm('¿Eliminar este ejemplo?')) return
+    if (!confirm(t('confirmDelete'))) return
     await fetch(`/api/creator/agents/${agentId}/examples/${exId}`, { method: 'DELETE' })
     await fetchExamples()
   }
@@ -86,7 +87,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
   }
 
   if (loading) {
-    return <div className="py-4 text-sm text-gray-400">Cargando ejemplos...</div>
+    return <div className="py-4 text-sm text-gray-400">{t('loading')}</div>
   }
 
   return (
@@ -110,14 +111,14 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
                 onClick={() => handleEdit(ex)}
                 className="text-xs text-blue-600 hover:underline"
               >
-                Editar
+                {t('edit')}
               </button>
               <button
                 type="button"
                 onClick={() => handleDelete(ex.id)}
                 className="text-xs text-red-600 hover:underline"
               >
-                Eliminar
+                {t('delete')}
               </button>
             </div>
           </div>
@@ -138,7 +139,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
       {(canAdd || editingId) && (
         <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-dashed border-gray-300 p-4">
           <h4 className="text-sm font-medium text-gray-700">
-            {editingId ? 'Editando ejemplo' : t('add')}
+            {editingId ? t('editing') : t('add')}
           </h4>
 
           <input
@@ -152,7 +153,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
 
           <div>
             <label className="block text-xs text-gray-500 mb-1">
-              {t('inputLabel')} <span className="text-gray-400">(máx. 500 chars)</span>
+              {t('inputLabel')} <span className="text-gray-400">{t('maxInputChars')}</span>
             </label>
             <textarea
               value={form.input}
@@ -160,7 +161,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
               maxLength={500}
               rows={3}
               required
-              placeholder="Ej: Analiza el sentimiento del siguiente texto: ..."
+              placeholder={t('inputPlaceholder')}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-right text-[10px] text-gray-400">{form.input.length}/500</p>
@@ -168,7 +169,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
 
           <div>
             <label className="block text-xs text-gray-500 mb-1">
-              {t('outputLabel')} <span className="text-gray-400">(máx. 1000 chars)</span>
+              {t('outputLabel')} <span className="text-gray-400">{t('maxOutputChars')}</span>
             </label>
             <textarea
               value={form.output}
@@ -176,7 +177,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
               maxLength={1000}
               rows={4}
               required
-              placeholder='Ej: { "sentiment": "positive", "score": 0.92, ... }'
+              placeholder={t('outputPlaceholder')}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-right text-[10px] text-gray-400">{form.output.length}/1000</p>
@@ -192,7 +193,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
               disabled={submitting}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition"
             >
-              {submitting ? 'Guardando...' : editingId ? 'Guardar cambios' : t('add')}
+              {submitting ? t('saving') : editingId ? t('saveChanges') : t('add')}
             </button>
             {editingId && (
               <button
@@ -200,7 +201,7 @@ export function AgentExamples({ agentId }: AgentExamplesProps) {
                 onClick={handleCancelEdit}
                 className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition"
               >
-                Cancelar
+                {t('cancel')}
               </button>
             )}
           </div>

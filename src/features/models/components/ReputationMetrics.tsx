@@ -75,7 +75,7 @@ export async function ReputationMetrics({ agentId }: ReputationMetricsProps) {
             <span className="font-semibold text-gray-900">
               {fmt(rep.p50Ms, ' ms')}
               {rep.usingFallback && rep.p50Ms !== null && (
-                <span className="text-xs text-gray-400 ml-1">(aprox)</span>
+                <span className="text-xs text-gray-400 ml-1">{t('approx')}</span>
               )}
             </span>
           </div>

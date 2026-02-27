@@ -72,7 +72,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   return (
     <nav
       className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-sm"
-      aria-label="Main navigation"
+      aria-label={tNav('mainNavLabel')}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between gap-4">
@@ -81,7 +81,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
           {/* T-18: Use locale-aware path instead of hardcoded /en */}
           <Link
             href={`/${locale}`}
-            aria-label="WasiAI — go to homepage"
+            aria-label={tNav('homeLabel')}
             className="flex items-center gap-2 shrink-0"
           >
             {/* Icon mark — outer house (territory) + inner agent network (house within house) */}
@@ -152,13 +152,13 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
           {/* Auth actions */}
           <div className="hidden items-center gap-3 sm:flex shrink-0">
             {loading ? (
-              <div className="h-4 w-24 animate-pulse rounded bg-gray-100" aria-label="Loading user..." />
+              <div className="h-4 w-24 animate-pulse rounded bg-gray-100" aria-label={tNav('loadingUser')} />
             ) : userEmail ? (
               <>
                 <span className="max-w-[160px] truncate text-xs text-gray-500" title={userEmail}>{userEmail}</span>
                 <button
                   onClick={handleSignout}
-                  aria-label="Sign out of your account"
+                  aria-label={tNav('signOutLabel')}
                   className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
                 >
                   {tAuth('signout')}

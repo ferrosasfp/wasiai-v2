@@ -339,7 +339,11 @@
     "dashboard": "Dashboard",
     "docs": "Docs",
     "publish": "Publicar",
-    "agentKeys": "Agent Keys"
+    "agentKeys": "Agent Keys",
+    "mainNavLabel": "Navegación principal",
+    "homeLabel": "WasiAI — ir al inicio",
+    "loadingUser": "Cargando usuario...",
+    "signOutLabel": "Cerrar sesión de tu cuenta"
   },
   "agentKeys": {
     "title": "Claves de Agente",
@@ -499,7 +503,8 @@
     "errorRate": "Tasa de error",
     "noData": "—",
     "insufficientData": "Datos insuficientes",
-    "basedOn": "Basado en {n} llamadas"
+    "basedOn": "Basado en {n} llamadas",
+    "approx": "(aprox)"
   },
   "examples": {
     "title": "Ejemplos de uso",
@@ -509,6 +514,19 @@
     "tagLabel": "Etiqueta (opcional)",
     "maxReached": "Máximo 5 ejemplos por agente",
     "example": "Ejemplo",
-    "noExamples": "Sin ejemplos aún"
+    "noExamples": "Sin ejemplos aún",
+    "loading": "Cargando ejemplos...",
+    "confirmDelete": "¿Eliminar este ejemplo?",
+    "unknownError": "Error desconocido",
+    "editing": "Editando ejemplo",
+    "saveChanges": "Guardar cambios",
+    "saving": "Guardando...",
+    "maxInputChars": "(máx. 500 chars)",
+    "maxOutputChars": "(máx. 1000 chars)",
+    "inputPlaceholder": "Ej: Analiza el sentimiento del siguiente texto: ...",
+    "outputPlaceholder": "Ej: { \"sentiment\": \"positive\", \"score\": 0.92, ... }",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "cancel": "Cancelar"
   }
 }
