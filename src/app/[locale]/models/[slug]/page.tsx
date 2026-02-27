@@ -103,7 +103,7 @@ export default async function ModelDetailPage({ params }: Props) {
                           </div>
                           <div className="rounded-lg bg-avax-50 p-2">
                             <p className="mb-1 font-medium text-avax-500">Output</p>
-                            <p className="font-mono text-avax-700">{cap.example.output}</p>
+                            <p className="font-mono text-avax-700">{typeof cap.example.output === 'object' ? JSON.stringify(cap.example.output, null, 2) : String(cap.example.output)}</p>
                           </div>
                         </div>
                       )}

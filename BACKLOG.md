@@ -54,7 +54,9 @@
 
 ## 🔴 P1 — Sprint 5 (prioridad máxima)
 
-- [ ] **HU-3.3** Free Trial controlado por creator — agregar `free_trial_enabled` (default: false) y `free_trial_limit` (default: 1) en tabla `agents`. Toggle en dashboard del creator. Trial solo se ejecuta si el creator lo activó explícitamente. Hoy los trials están ON para todos sin consentimiento del creator — esto lo corrige. Migration 018 requerida.
+- [ ] **HU-3.3** Free Trial controlado por creator
+- [ ] **UX-08** Validación de formulario /publish alineada
+- [ ] **UX-09** Editor visual de capabilities en /publish — reemplazar JSON crudo por formulario con campos Name, Description, InputType, OutputType, Example Input/Output. Agregar/eliminar capabilities con botones. — descripción obligatoria con `*` rojo en Step 1, validación frontend antes de llamar al servidor, mensajes de error en el campo correcto. Opción A: hacerla required con min 10 chars visible desde el formulario. — agregar `free_trial_enabled` (default: false) y `free_trial_limit` (default: 1) en tabla `agents`. Toggle en dashboard del creator. Trial solo se ejecuta si el creator lo activó explícitamente. Hoy los trials están ON para todos sin consentimiento del creator — esto lo corrige. Migration 018 requerida.
 
 ---
 
