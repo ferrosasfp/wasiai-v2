@@ -5,6 +5,7 @@ import { supportedChains, defaultChain } from './chains'
 export const wagmiConfig = createConfig({
   chains: supportedChains,
   ssr: true, // Prevents wagmi hydration mismatches in Next.js App Router
+  multiInjectedProviderDiscovery: true, // EIP-6963: discover each wallet separately
   connectors: [
     injected(),                              // Core, Rabby, etc.
     injected({ target: 'metaMask' }),        // MetaMask explícito

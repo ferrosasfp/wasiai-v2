@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useConnect, useDisconnect } from 'wagmi'
-import { injected } from 'wagmi/connectors'
+import { useConnect, useDisconnect, useConnectors } from 'wagmi'
 import { useTranslations } from 'next-intl'
 import type { Model } from '@/features/models/types/models.types'
 import { useWalletPayment }    from '../hooks/useWalletPayment'
@@ -18,7 +17,9 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const t = useTranslations('payToCall')
   const { connect }    = useConnect()
   const { disconnect } = useDisconnect()
+  const connectors     = useConnectors()
   const [input, setInput] = useState('')
+  const [showWalletModal, setShowWalletModal] = useState(false)
 
   const {
     ctx,
@@ -47,7 +48,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
     }
   }, [ctx.state, ctx.result]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleConnect = () => connect({ connector: injected() })
+  const handleConnect = () => setShowWalletModal(true)
   const handleDisconnect = () => {
     disconnect()
     reset()
@@ -91,6 +92,34 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
 
   return (
     <div className="space-y-3">
+      {/* Wallet selector modal */}
+      {showWalletModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowWalletModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-72 space-y-3" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-gray-700">Selecciona tu wallet</p>
+            {connectors.map(connector => (
+              <button
+                key={connector.uid}
+                onClick={() => {
+                  connect({ connector })
+                  setShowWalletModal(false)
+                }}
+                className="w-full flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50 transition"
+              >
+                <span className="text-lg">🦊</span>
+                <span className="font-medium text-gray-800">{connector.name}</span>
+              </button>
+            ))}
+            <button
+              onClick={() => setShowWalletModal(false)}
+              className="w-full text-xs text-gray-400 hover:text-gray-600 pt-1"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Wallet status bar — always visible */}
       <WalletStatusBar
         flowState={ctx.state}
@@ -167,7 +196,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
               </a>
             )}
           </div>
-          <pre className="whitespace-pre-wrap font-mono text-xs text-gray-700">
+          <pre className="whitespace-pre-wrap font-mono text-xs text-gray-700 overflow-auto max-h-64">
             {ctx.result}
           </pre>
         </div>
