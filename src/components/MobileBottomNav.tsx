@@ -17,21 +17,18 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
   const pathname = usePathname()
   const t = useTranslations('mobileNav')
 
-  // WAS-54: Track hash to differentiate Home vs Explorar on same route
-  const [hash, setHash] = useState<string>(() =>
-    typeof window !== 'undefined' ? window.location.hash : ''
-  )
+  // WAS-54/WAS-65: Track hash client-only — never read during SSR to avoid hydration mismatch
+  const [mountedHash, setMountedHash] = useState<{ ready: boolean; value: string }>({ ready: false, value: '' })
 
   useEffect(() => {
-    function handleHashChange() {
-      setHash(window.location.hash)
-    }
-
-    window.addEventListener('hashchange', handleHashChange)
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange)
-    }
+    const update = () => setMountedHash({ ready: true, value: window.location.hash })
+    update()
+    window.addEventListener('hashchange', update)
+    return () => window.removeEventListener('hashchange', update)
   }, [])
+
+  const mounted = mountedHash.ready
+  const hash = mountedHash.value
 
   // Destinos condicionales por rol (prop desde SSR — sin flash)
   const dashboardHref =
@@ -47,6 +44,14 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
 
   // Tab activo por pathname + hash
   function isActive(href: string): boolean {
+    // WAS-65: antes del mount, ningún tab de hash está activo — evita hydration mismatch
+    if (!mounted) {
+      if (href.includes('#agents')) return false
+      if (href === `/${locale}` || href === `/${locale}/`) {
+        return pathname === `/${locale}` || pathname === `/${locale}/`
+      }
+      return pathname.startsWith(href.split('?')[0].split('#')[0])
+    }
     if (href.includes('#agents')) {
       // WAS-54: Explorar activo cuando el hash es #agents
       return pathname === `/${locale}` && isExploreHash
