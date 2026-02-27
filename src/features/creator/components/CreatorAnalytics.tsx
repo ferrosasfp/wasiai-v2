@@ -71,7 +71,9 @@ export function CreatorAnalytics({ agents }: Props) {
       .then(d => {
         if (activeRef.current) setState({ status: 'success', data: d })
       })
-      .catch(() => {
+      .catch((err) => {
+        // Fix D: loguear el error para identificar la causa en production logs
+        console.error('[CreatorAnalytics] fetch error:', err)
         if (activeRef.current) setState({ status: 'error', data: null })
       })
 
@@ -121,11 +123,11 @@ export function CreatorAnalytics({ agents }: Props) {
 
       {state.status === 'error' && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {t('errorLoading')}
+          {t('errorLoading') || 'Error cargando analytics. Intenta recargar la página.'}
         </div>
       )}
 
-      {state.status === 'success' && state.data && (
+      {state.status === 'success' && state.data?.summary && (
         <>
           {/* Alertas */}
           {state.data.alerts.length > 0 && <AlertBanner alerts={state.data.alerts} />}

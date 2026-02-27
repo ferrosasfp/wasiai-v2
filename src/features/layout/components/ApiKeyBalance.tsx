@@ -108,8 +108,8 @@ export function ApiKeyBalance({ enabled, locale }: ApiKeyBalanceProps) {
   // No montar nada si no hay sesión
   if (!enabled) return null
 
-  // ── Estado: fetch inicial → skeleton ──────────────────────────────────────
-  if (isInitialLoading) {
+  // ── Estado: cargando (fetch inicial O polling) → skeleton ─────────────────
+  if (isInitialLoading || uiStatus === 'loading') {
     return (
       <div
         className="h-7 w-20 animate-pulse rounded-full bg-gray-100"
