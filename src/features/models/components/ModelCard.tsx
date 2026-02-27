@@ -25,7 +25,7 @@ interface ModelCardProps {
 
 // P-03: Memoized to avoid unnecessary re-renders in grid lists
 export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: ModelCardProps) {
-  const remaining = Math.max(0, model.total_calls)
+  const remaining = Math.max(0, model.total_calls ?? 0)
 
   return (
     <Link
@@ -52,7 +52,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: M
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold text-gray-900 group-hover:text-avax-600 transition-colors truncate">
-              {model.name}
+              {model.name ?? 'Sin nombre'}
             </h3>
             {model.creator && (
               <p className="text-xs text-gray-500 truncate">@{model.creator.username}</p>
@@ -102,7 +102,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0 }: M
           )}
         </div>
         <div className="flex items-baseline gap-1 shrink-0">
-          <span className="text-sm font-bold text-gray-900">${model.price_per_call}</span>
+          <span className="text-sm font-bold text-gray-900">${(model.price_per_call ?? 0).toFixed(2)}</span>
           <span className="text-xs text-gray-400">USDC</span>
         </div>
       </div>

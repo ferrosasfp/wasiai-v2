@@ -1,48 +1,45 @@
-sprint: 4
-semana: "2026-02-26 → 2026-02-28"
-estado: in_progress
+sprint: 7
+semana: "2026-02-27 → 2026-02-29"
+estado: planning
 
 objetivo: >
-  Máximo impacto de producto enfocado en Build Games.
-  AgentKit example (compromiso jueces), UX-04 (conversión developers),
-  y Agent-to-Agent Routing (diferenciador técnico único).
+  Wallet UX completa (connect/disconnect en navbar, pay button funcional),
+  Mainnet deploy Avalanche C-Chain (Build Games semana 2), y fixes UX menores.
 
 historias:
-  - id: UX-04
-    titulo: "Código de ejemplo auto-generado en ficha del agente"
+  - id: WAS-46
+    titulo: "BUG — Pay button debe disparar connect wallet"
+    prioridad: 0
+    estado: backlog
+    notas: "P0. Sin wallet conectada el botón no hace nada. Bloqueante para conversión."
+
+  - id: WAS-45
+    titulo: "Wallet connect/disconnect en WasiNavBar"
     prioridad: 1
-    estado: pending_s0
-    notas: "Rápida, alto impacto. Convierte visitantes en usuarios."
+    estado: backlog
+    notas: "P1. Estándar dApp. Va junto con WAS-46."
 
-  - id: HU-7.3
-    titulo: "AgentKit example (Coinbase)"
-    prioridad: 2
-    estado: pending_s0
-    notas: "Compromiso público con jueces Build Games. Script funcional en /examples/agentkit-demo."
+  - id: HU-6.2
+    titulo: "Mainnet deploy — WasiAIMarketplace en Avalanche C-Chain"
+    prioridad: 1
+    estado: backlog
+    notas: "Build Games semana 2. NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET vacío."
 
-  - id: HU-5.1
-    titulo: "Agent-to-Agent Routing (POST /api/v1/compose)"
+  - id: WAS-47
+    titulo: "Botón 'Ver agentes' scroll a sección de agentes en Home"
     prioridad: 3
-    estado: pending_s0
-    notas: "El diferenciador técnico real. Pipeline secuencial con x402 por paso."
+    estado: backlog
+    notas: "P3. Quick win, especialmente en mobile."
 
 criterios_exito:
-  - "UX-04: ficha de agente muestra curl/Node/Python copiable"
-  - "HU-7.3: script AgentKit funcional que invoca agente WasiAI vía x402"
-  - "HU-5.1: POST /api/v1/compose ejecuta pipeline secuencial con pagos"
+  - "WAS-46: clic en Pay sin wallet → abre modal de conexión"
+  - "WAS-45: botón connect/disconnect visible en navbar en todas las páginas"
+  - "HU-6.2: contrato desplegado en mainnet, CHAIN_ID=43114, agentes migrados"
+  - "WAS-47: scroll suave a grid de agentes al clic en 'Ver agentes'"
 
 kpis_build_games:
   agentes_reales: 0/10
   creadores_onboardeados: 0/5
   mainnet_deploy: false
-  agentkit_example: false
-  routing_api: false
-
-metodologia:
-  reglas_activas:
-    - "S0 → HU_APPROVED explícito antes de S1"
-    - "S1 + Readiness Check → SPEC_APPROVED explícito antes de Story File"
-    - "SM genera story-HU-X.X.md antes de Dev"
-    - "Dev → Adversarial Review → Code Review → QA por ACs → push"
-    - "Gates: solo HU_APPROVED y SPEC_APPROVED exactos activan el gate"
-    - "Sin excepciones. Sin atajos."
+  agentkit_example: true   # /examples/agentkit-wasiai ✅
+  routing_api: true         # POST /api/v1/compose ✅

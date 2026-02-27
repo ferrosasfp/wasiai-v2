@@ -153,7 +153,9 @@
     },
     "preview": {
       "label": "Vista previa",
-      "pricePlaceholder": "— USDC/call"
+      "pricePlaceholder": "— USDC/call",
+      "show": "Ver preview",
+      "hide": "Ocultar preview"
     },
     "draftModal": {
       "title": "Tienes un borrador sin publicar",
@@ -452,5 +454,33 @@
     "modelSpecJson": "Spec del Modelo (JSON) ↗",
     "optionA": "Opción A — Agent Key (basado en presupuesto)",
     "optionB": "Opción B — Pago Directo x402 (Avalanche USDC)"
+  },
+  "wallet": {
+    "connectWallet": "Conectar Wallet",
+    "disconnect": "Desconectar",
+    "selectWallet": "Selecciona tu wallet",
+    "cancel": "Cancelar",
+    "wrongNetwork": "Red incorrecta"
+  },
+  "emptySearch": {
+    "noResults": "No encontramos agentes para '{search}'",
+    "suggestion": "Prueba con otras palabras o quita algunos filtros.",
+    "alsoTryClearCategory": "También puedes quitar el filtro de categoría.",
+    "viewAll": "Ver todos los agentes",
+    "popularAgents": "Agentes populares"
+  },
+  "filters": {
+    "category": "Categoría",
+    "agentType": "Tipo de Agente",
+    "maxPrice": "Precio máx",
+    "clearFilters": "Limpiar filtros",
+    "all": "Todos",
+    "types": {
+      "llm": "LLM",
+      "rag": "RAG",
+      "tool": "Herramienta",
+      "multimodal": "Multimodal",
+      "code": "Código"
+    }
   }
 }

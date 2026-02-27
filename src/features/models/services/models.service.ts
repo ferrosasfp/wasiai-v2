@@ -1,14 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import type { Model, ModelCategory, CreateModelInput } from '../types/models.types'
 
+export type AgentTypeFilter = 'llm' | 'rag' | 'tool' | 'multimodal' | 'code'
+
 export async function getModels({
   category,
   search,
+  agent_type,
+  max_price,
   limit = 12,
   offset = 0,
 }: {
   category?: ModelCategory
   search?: string
+  agent_type?: AgentTypeFilter | string
+  max_price?: number
   limit?: number
   offset?: number
 } = {}): Promise<{ models: Model[]; total: number }> {
@@ -22,6 +28,10 @@ export async function getModels({
     .range(offset, offset + limit - 1)
 
   if (category) query = query.eq('category', category)
+  if (agent_type) query = query.eq('agent_type', agent_type)
+  if (max_price !== undefined && !isNaN(max_price)) {
+    query = query.lte('price_per_call', max_price)
+  }
   if (search) {
     query = query.textSearch('search_vector', search, { type: 'websearch' })
   }

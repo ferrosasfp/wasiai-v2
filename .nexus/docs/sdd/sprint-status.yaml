@@ -48,8 +48,8 @@ development_status:
   # Sprint 3: HU-2.1 done. Remaining: HU-2.2, 2.3, 2.4
 
   2-1-sdk-node-js-typescript: done
-  2-2-sdk-python: backlog
-  2-3-documentacion-interactiva: backlog
+  2-2-sdk-python: done
+  2-3-documentacion-interactiva: done   # sprint 3 — /docs quickstart, sdk, api-ref, errors, mcp
   2-4-cli-wasiai: backlog
 
   epic-2-retrospective: optional
@@ -59,13 +59,14 @@ development_status:
 
   3-1-una-llamada-gratuita-por-usuario-por-agente: done
   3-2-playground-comparativo: backlog
+  3-3-free-trial-controlado-por-creator: done  # sprint 5
 
   epic-3-retrospective: optional
 
   # ─── ÉPICA 4: Discovery ─────────────────────────────────────────────────
-  epic-4: backlog
+  epic-4: in-progress
 
-  4-1-busqueda-semantica: backlog
+  4-1-busqueda-semantica: done          # sprint 6 — full-text search RPC
   4-2-filtros-avanzados: backlog
   4-3-ejemplos-de-input-output-curados: backlog
   4-4-reputacion-con-datos-reales: backlog
@@ -74,9 +75,9 @@ development_status:
   epic-4-retrospective: optional
 
   # ─── ÉPICA 5: Agent-to-Agent Routing ────────────────────────────────────
-  epic-5: backlog
+  epic-5: in-progress
 
-  5-1-post-apiv1compose-pipeline-secuencial: backlog
+  5-1-post-apiv1compose-pipeline-secuencial: done  # sprint 4 — POST /api/v1/compose
   5-2-ejecucion-paralela-de-agentes: backlog
   5-3-routing-inteligente: backlog
   5-4-ui-visual-de-pipelines: backlog
@@ -87,19 +88,19 @@ development_status:
   epic-6: backlog
 
   6-1-auditoria-de-seguridad-del-contrato: backlog
-  6-2-deploy-contrato-en-mainnet: backlog
+  6-2-deploy-contrato-en-mainnet: backlog        # BUILD GAMES — CRÍTICO
   6-3-migrar-agentes-demo-a-mainnet: backlog
   6-4-monitoring-del-operator-wallet: backlog
 
   epic-6-retrospective: optional
 
   # ─── ÉPICA 7: Integraciones ──────────────────────────────────────────────
-  epic-7: backlog
+  epic-7: in-progress
 
   7-1-plugin-langchain: backlog
   7-2-plugin-llamaindex: backlog
-  7-3-ejemplo-agentkit-coinbase: backlog
-  7-4-documentacion-mcp: backlog
+  7-3-ejemplo-agentkit-coinbase: done   # sprint 4 — /examples/agentkit-wasiai
+  7-4-documentacion-mcp: done           # sprint 5 — /docs página MCP
 
   epic-7-retrospective: optional
 
@@ -114,15 +115,121 @@ development_status:
   epic-8-retrospective: optional
 
   # ─── ÉPICA 9: UX Improvements ───────────────────────────────────────────
-  # 9.4 y 9.6 tienen SDD borrador pero NO story file del SM → backlog
   epic-9: in-progress
 
   9-1-empty-state-de-busqueda: backlog
   9-2-preview-live-en-publish: backlog
-  9-3-editor-de-capabilities-sin-json-crudo: backlog
-  9-4-code-examples-auto-generados: done
-  9-5-indicador-de-saldo-de-api-key-en-navbar: backlog
-  9-6-hero-copy-especifico-por-usuario: done
-  9-7-i18n-copias-reales-de-wasiai: backlog
+  9-3-editor-de-capabilities-sin-json-crudo: done  # sprint 5 — CapabilitiesEditor
+  9-4-code-examples-auto-generados: done            # sprint 3/4
+  9-5-indicador-de-saldo-de-api-key-en-navbar: done # sprint 6 — ApiKeyBalance
+  9-6-hero-copy-especifico-por-usuario: done        # sprint 3
+  9-7-i18n-copias-reales-de-wasiai: done            # sprint 6 — 417 keys EN/ES
+
+  # UX extras implementados
+  ux-08-validacion-publish: done        # sprint 5
+  ux-09-capabilities-editor: done       # sprint 5
+  ux-10-language-switcher: done         # sprint 5
+  hu-pay-1-multi-wallet-evm: done       # sprint 6 — wagmi + EIP-6963
+  ux-06-creator-analytics-chart: done   # sprint 6 — CallsChart
+  i18n-01-traduccion-completa: done     # sprint 6
+  i18n-02-publish-i18n: done           # sprint 5
+
+  # Sprint 7 — en planning
+  was-45-wallet-connect-navbar: backlog    # P1 — wallet btn en WasiNavBar
+  was-46-pay-button-connect-wallet: backlog # P0 — BUG pay sin wallet conectada
+  was-47-ver-agentes-scroll: backlog       # P3 — scroll home → agents
 
   epic-9-retrospective: optional
+
+# ─── SPRINT 7 PLANNING ──────────────────────────────────────────────────────
+# Sprint: 7
+# Semana: 2026-02-27 → 2026-03-06
+# Tema: Wallet UX & Marketplace Polish
+# SM: Bob (BMAD)
+# Estado: PLANNING — pendiente HU_APPROVED de Fer
+
+sprint_7:
+  sprint: 7
+  start_date: "2026-02-27"
+  end_date: "2026-03-06"
+  theme: "Wallet UX & Marketplace Polish"
+  status: planning  # → in-progress cuando Fer dé HU_APPROVED
+
+  stories:
+    was-46-pay-button-connect-wallet:
+      title: "BUG: Botón Pay conecta wallet cuando no hay wallet conectada"
+      priority: P0
+      size: XS
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-9
+      depends_on: [was-45-wallet-connect-navbar]
+      notes: "Bug crítico de conversión — sin wallet el botón Pay no hace nada"
+
+    was-45-wallet-connect-navbar:
+      title: "Wallet connect/disconnect en WasiNavBar (estándar dApp)"
+      priority: P1
+      size: S
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-9
+      depends_on: []
+      notes: "WAS-46 reutiliza el componente WalletConnectModal que se extrae aquí"
+
+    was-47-ver-agentes-scroll:
+      title: "Botón 'Ver agentes' en Home hace scroll a sección de agentes"
+      priority: P3
+      size: XS
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-9
+      depends_on: []
+
+    hu-9-1-empty-state-busqueda:
+      title: "Empty state cuando búsqueda retorna 0 resultados"
+      priority: P2
+      size: S
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-9
+      depends_on: []
+
+    hu-9-2-preview-live-publish:
+      title: "Preview live en /publish (creator ve la card en tiempo real)"
+      priority: P2
+      size: M
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-9
+      depends_on: []
+
+    hu-4-2-filtros-avanzados:
+      title: "Filtros avanzados en marketplace (tipo agente, precio max, categoría)"
+      priority: P2
+      size: M
+      status: backlog
+      gate_hu_approved: pending
+      gate_spec_approved: pending
+      epic: epic-4
+      depends_on: []
+      notes: "API /api/v1/agents ya soporta category, agent_type, max_price, q — solo UI"
+
+  success_criteria:
+    - "WAS-46: Usuario sin wallet puede pagar — el botón inicia connect flow automáticamente"
+    - "WAS-45: Wallet visible en navbar en todas las páginas — estado global compartido"
+    - "WAS-47: CTA del hero lleva al usuario a la sección de agentes sin fricción"
+    - "HU-9.1: 0 resultados de búsqueda muestra empty state con sugerencias, no pantalla vacía"
+    - "HU-9.2: Creator ve preview de su card mientras llena el formulario de publicación"
+    - "HU-4.2: Usuarios pueden filtrar por tipo de agente y precio máximo combinados"
+
+  dod_global:
+    - "0 errores TypeScript en npm run build"
+    - "0 warnings ESLint"
+    - "Adversarial review completado antes de cada commit"
+    - "Traducciones en en/es para toda nueva UI visible"
+    - "git push origin master master:main"

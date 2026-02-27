@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { ApiKeyBalance } from '@/features/layout/components/ApiKeyBalance'
+import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
 
 const NAV_PATHS = [
   { path: '',                   tKey: 'marketplace' as const },
@@ -144,6 +145,11 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             </div>
           )}
 
+          {/* Wallet connect — desktop */}
+          <div className="hidden sm:flex shrink-0">
+            <WalletConnectButton locale={locale} />
+          </div>
+
           {/* Auth actions */}
           <div className="hidden items-center gap-3 sm:flex shrink-0">
             {loading ? (
@@ -218,6 +224,10 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             {/* Language switcher — mobile */}
             <div className="pt-2">
               <LanguageSwitcher />
+            </div>
+            {/* Wallet connect — mobile */}
+            <div className="pt-2 border-t border-gray-100">
+              <WalletConnectButton locale={locale} />
             </div>
             <div className="mt-3 border-t border-gray-100 pt-3">
               {userEmail ? (

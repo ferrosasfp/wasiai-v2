@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import type { CreateModelDraft, ModelCapability } from '@/lib/schemas/model.schema'
 import { StepIndicator } from '@/components/publish/StepIndicator'
-import { AgentCardPreview } from '@/components/publish/AgentCardPreview'
+import { PublishPreview } from '@/features/publish/components/PublishPreview'
 import { Step1Basic } from '@/components/publish/Step1Basic'
 import { Step2Product } from '@/components/publish/Step2Product'
 import { Step3Technical } from '@/components/publish/Step3Technical'
@@ -245,7 +245,13 @@ export default function PublishForm({ initialDraft, from }: Props) {
             )}
           </div>
           <div className="lg:sticky lg:top-8">
-            <AgentCardPreview data={previewData} />
+            <PublishPreview
+            locale={locale}
+            formData={{ ...previewData, slug: draftSlug ?? undefined }}
+            previewLabel={t('preview.label')}
+            showLabel={t('preview.show')}
+            hideLabel={t('preview.hide')}
+          />
           </div>
         </div>
       </div>

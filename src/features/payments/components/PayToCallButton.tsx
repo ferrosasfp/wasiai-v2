@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useConnect, useDisconnect, useConnectors } from 'wagmi'
+import { useState, useEffect, useRef } from 'react'
+import { useAccount, useDisconnect } from 'wagmi'
+import { WalletConnectModal } from './WalletConnectModal'
 import { useTranslations } from 'next-intl'
 import type { Model } from '@/features/models/types/models.types'
 import { useWalletPayment }    from '../hooks/useWalletPayment'
@@ -15,13 +16,9 @@ interface PayToCallButtonProps {
 
 export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const t = useTranslations('payToCall')
-  const { connect }    = useConnect()
   const { disconnect } = useDisconnect()
-  const allConnectors  = useConnectors()
-  const connectors     = allConnectors.filter((c, i, arr) =>
-    arr.findIndex(x => x.name === c.name) === i &&
-    c.name !== 'Injected'
-  )
+  const { address } = useAccount()
+  const pendingPayRef = useRef(false)
   const [input, setInput] = useState('')
   const [showWalletModal, setShowWalletModal] = useState(false)
 
@@ -45,6 +42,14 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
     }
   }, [approveConfirmed]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-pay after wallet connects (WAS-46)
+  useEffect(() => {
+    if (address && pendingPayRef.current) {
+      pendingPayRef.current = false
+      pay()
+    }
+  }, [address]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Notify parent on success
   useEffect(() => {
     if (ctx.state === 'success' && ctx.result) {
@@ -53,6 +58,19 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   }, [ctx.state, ctx.result]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConnect = () => setShowWalletModal(true)
+
+  function handlePayClick() {
+    if (!address) {
+      setShowWalletModal(true)
+      return
+    }
+    pay()
+  }
+
+  function handleWalletConnected() {
+    pendingPayRef.current = true
+  }
+
   const handleDisconnect = () => {
     disconnect()
     reset()
@@ -96,38 +114,12 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
 
   return (
     <div className="space-y-3">
-      {/* Wallet selector modal */}
-      {showWalletModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowWalletModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-72 space-y-3" onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-semibold text-gray-700">Selecciona tu wallet</p>
-            {connectors.map(connector => (
-              <button
-                key={connector.uid}
-                onClick={() => {
-                  connect({ connector })
-                  setShowWalletModal(false)
-                }}
-                className="w-full flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50 transition"
-              >
-                {connector.icon ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={connector.icon} alt={connector.name} className="w-6 h-6 rounded-full" />
-                ) : (
-                  <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">W</span>
-                )}
-                <span className="font-medium text-gray-800">{connector.name}</span>
-              </button>
-            ))}
-            <button
-              onClick={() => setShowWalletModal(false)}
-              className="w-full text-xs text-gray-400 hover:text-gray-600 pt-1"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Wallet selector modal (WAS-46: uses shared WalletConnectModal from WAS-45) */}
+      <WalletConnectModal
+        open={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+        onConnected={handleWalletConnected}
+      />
 
       {/* Wallet status bar — always visible */}
       <WalletStatusBar
@@ -152,7 +144,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
 
       {/* CTA */}
       <button
-        onClick={pay}
+        onClick={handlePayClick}
         disabled={isDisabled}
         className={`w-full rounded-xl py-3 font-semibold text-white transition disabled:opacity-60 ${
           ctx.state === 'success' ? 'bg-green-600 hover:bg-green-700' :

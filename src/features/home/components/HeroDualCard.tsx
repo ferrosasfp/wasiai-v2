@@ -106,9 +106,20 @@ export function HeroDualCard({
           <p className="text-base font-medium text-gray-800 mb-4 leading-relaxed">
             {subtitleConsumer}
           </p>
-          <Link
-            href={`/${locale}`}
-            onClick={(e) => e.stopPropagation()}
+          <a
+            href={`/${locale}#agents`}
+            onClick={(e) => {
+              e.stopPropagation()
+              // Si ya estamos en home → scroll suave (no navegación)
+              const isHome =
+                window.location.pathname === `/${locale}` ||
+                window.location.pathname === `/${locale}/`
+              if (isHome) {
+                e.preventDefault()
+                document.getElementById('agents')?.scrollIntoView({ behavior: 'smooth' })
+              }
+              // Si no es home → href="/${locale}#agents" navega normalmente al anchor
+            }}
             className={`inline-flex items-center gap-2 font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm ${
               isConsumer
                 ? 'bg-avax-500 text-white hover:bg-avax-600'
@@ -116,7 +127,7 @@ export function HeroDualCard({
             }`}
           >
             {ctaConsumer} →
-          </Link>
+          </a>
         </div>
 
         {/* Creator card */}

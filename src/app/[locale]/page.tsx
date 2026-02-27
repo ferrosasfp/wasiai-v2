@@ -7,7 +7,8 @@ export const revalidate = 300
 
 import { getModels } from '@/features/models/services/models.service'
 import { ModelCard } from '@/features/models/components/ModelCard'
-import { CategoryFilter } from '@/features/models/components/CategoryFilter'
+import { FilterPanel } from '@/features/models/components/FilterPanel'
+import { EmptySearchState } from '@/features/models/components/EmptySearchState'
 import { HeroDualCard } from '@/features/home/components/HeroDualCard'
 import { SearchBar } from '@/features/models/components/SearchBar'
 import type { ModelCategory } from '@/features/models/types/models.types'
@@ -16,25 +17,38 @@ const PAGE_SIZE = 12
 
 interface Props {
   params: Promise<{ locale: string }>
-  searchParams: Promise<{ category?: string; search?: string; page?: string }>
+  searchParams: Promise<{ category?: string; search?: string; page?: string; agent_type?: string; max_price?: string }>
 }
 
 export default async function HomePage({ params, searchParams }: Props) {
   const { locale } = await params
-  const { category, search, page: pageStr } = await searchParams
+  const { category, search, page: pageStr, agent_type, max_price } = await searchParams
   setRequestLocale(locale)
   const t  = await getTranslations('home')
   const tc = await getTranslations('common')
+  const tEmptySearch = await getTranslations('emptySearch')
 
   const page   = Math.max(1, parseInt(pageStr ?? '1', 10))
   const offset = (page - 1) * PAGE_SIZE
 
+  const maxPriceParsed = max_price ? parseFloat(max_price) : undefined
+  const maxPriceValue = (maxPriceParsed !== undefined && !isNaN(maxPriceParsed))
+    ? maxPriceParsed
+    : undefined
+
   const { models, total } = await getModels({
     category: category as ModelCategory | undefined,
     search,
+    agent_type,
+    max_price: maxPriceValue,
     limit: PAGE_SIZE,
     offset,
   })
+
+  // HU-9.1: Cargar sugeridos SOLO si búsqueda activa retorna 0 resultados
+  const suggestedModels = (models.length === 0 && search)
+    ? (await getModels({ limit: 4, offset: 0 })).models
+    : []
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const hasNext    = page < totalPages
@@ -42,9 +56,11 @@ export default async function HomePage({ params, searchParams }: Props) {
 
   function pageHref(p: number) {
     const q = new URLSearchParams()
-    if (category) q.set('category', category)
-    if (search)   q.set('search', search)
-    if (p > 1)    q.set('page', String(p))
+    if (category)   q.set('category', category)
+    if (search)     q.set('search', search)
+    if (agent_type) q.set('agent_type', agent_type)
+    if (max_price)  q.set('max_price', max_price)
+    if (p > 1)      q.set('page', String(p))
     const qs = q.toString()
     return `/${locale}${qs ? `?${qs}` : ''}`
   }
@@ -109,36 +125,53 @@ export default async function HomePage({ params, searchParams }: Props) {
                 <SearchBar mode="server" defaultValue={search} category={category} placeholder={tc('search')} aria-label="Buscar modelos y agentes" />
               </Suspense>
               <Suspense>
-                <CategoryFilter />
+                <FilterPanel />
               </Suspense>
             </div>
           </div>
 
           {models.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-gray-200 py-16 text-center">
-              <p className="text-4xl mb-4">🔍</p>
-              <p className="text-gray-600 font-medium text-lg">
-                {search || category ? t('noModelsFiltered') : t('noModels')}
-              </p>
-              {(search || category) ? (
-                <div className="mt-4 flex flex-wrap justify-center gap-3">
-                  <Link href={`/${locale}`} className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition">
-                    {t('clearFilters')}
-                  </Link>
-                  {!search && category && (
+            search ? (
+              // HU-9.1: Empty state rico cuando hay búsqueda activa sin resultados
+              <EmptySearchState
+                search={search}
+                category={category}
+                locale={locale}
+                suggestedModels={suggestedModels}
+                clearHref={`/${locale}`}
+                texts={{
+                  noResults: tEmptySearch('noResults', { search }),
+                  suggestion: tEmptySearch('suggestion'),
+                  alsoTryClearCategory: category ? tEmptySearch('alsoTryClearCategory') : undefined,
+                  viewAll: tEmptySearch('viewAll'),
+                  popularAgents: tEmptySearch('popularAgents'),
+                }}
+              />
+            ) : (
+              // Mantener el empty state ACTUAL para marketplace vacío (sin búsqueda)
+              <div className="rounded-2xl border-2 border-dashed border-gray-200 py-16 text-center">
+                <p className="text-4xl mb-4">🔍</p>
+                <p className="text-gray-600 font-medium text-lg">
+                  {category ? t('noModelsFiltered') : t('noModels')}
+                </p>
+                {category ? (
+                  <div className="mt-4 flex flex-wrap justify-center gap-3">
+                    <Link href={`/${locale}`} className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition">
+                      {t('clearFilters')}
+                    </Link>
                     <Link href={`/${locale}`} className="rounded-full bg-avax-50 px-4 py-2 text-sm font-medium text-avax-600 hover:bg-avax-100 transition">
                       {t('browseAllCategories')}
                     </Link>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-4 flex flex-wrap justify-center gap-3">
-                  <Link href={`/${locale}/publish`} className="rounded-full bg-avax-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition">
-                    {t('beFirst')}
-                  </Link>
-                </div>
-              )}
-            </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex flex-wrap justify-center gap-3">
+                    <Link href={`/${locale}/publish`} className="rounded-full bg-avax-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition">
+                      {t('beFirst')}
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )
           ) : (
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
