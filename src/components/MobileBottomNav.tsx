@@ -39,8 +39,9 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
     userRole === 'consumer' ? `/${locale}/dashboard` :
                               `/${locale}/login`
 
-  // WAS-57: profileHref uses same role-based logic as dashboardHref (MVP — DT-NAV-01)
-  const profileHref = dashboardHref
+  // WAS-57: profileHref → /profile (página dedicada con wallet, agent keys, docs, idioma, auth)
+  // Ya no es un alias del dashboard — tiene su propio destino real
+  const profileHref = `/${locale}/profile`
 
   const isExploreHash = hash === '#agents'
 
@@ -54,7 +55,7 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
       // WAS-54: Home activo solo cuando en / SIN el hash #agents
       return (pathname === `/${locale}` || pathname === `/${locale}/`) && !isExploreHash
     }
-    return pathname.startsWith(href.split('?')[0])
+    return pathname.startsWith(href.split('?')[0].split('#')[0])
   }
 
   const tabs = [

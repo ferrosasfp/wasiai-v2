@@ -143,7 +143,8 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
             />
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
-              <table className="w-full text-sm">
+              {/* WAS-55: min-w fuerza overflow real en mobile — sin esto w-full comprime la tabla */}
+              <table className="w-full min-w-[640px] text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-6 py-3 text-left">{t('colAgent')}</th>
@@ -221,7 +222,8 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
             />
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
-              <table className="w-full text-sm">
+              {/* WAS-55: min-w fuerza overflow real en mobile */}
+              <table className="w-full min-w-[560px] text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-6 py-3 text-left">{t('colAgent')}</th>

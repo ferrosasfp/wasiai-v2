@@ -146,12 +146,13 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             <LanguageSwitcher />
           </div>
 
-          {/* API Key Balance — solo si hay sesión (desktop) */}
-          {userEmail && (
-            <div className="hidden sm:flex shrink-0">
-              <ApiKeyBalance enabled={!!userEmail} locale={locale} />
-            </div>
-          )}
+          {/* WAS-58: ApiKeyBalance siempre montado — enabled controla el fetch interno.
+               Eliminamos el guard externo {userEmail && ...} que causaba race conditions:
+               si userEmail tardaba en llegar del cliente, el componente nunca se montaba
+               y cuando llegaba, React lo montaba de nuevo perdiendo el estado de loading. */}
+          <div className="hidden sm:flex shrink-0">
+            <ApiKeyBalance enabled={!!userEmail} locale={locale} />
+          </div>
 
           {/* Wallet connect — desktop */}
           <div className="hidden sm:flex shrink-0">

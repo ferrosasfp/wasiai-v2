@@ -17,7 +17,9 @@ import { buildDailySeries, buildEmptyDailySeries } from '@/features/creator/lib/
 import { formatUnits } from 'viem'
 import { z } from 'zod'
 
-export const revalidate = 300
+// WAS-56: force-dynamic — esta route usa cookies (auth) y nunca debe ser cacheada.
+// revalidate=300 causaba que Next.js sirviera respuestas stale/vacías en algunos deploys.
+export const dynamic = 'force-dynamic'
 
 const QuerySchema = z.object({
   agent_id: z.string().uuid().optional(),
