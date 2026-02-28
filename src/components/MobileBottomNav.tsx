@@ -63,12 +63,21 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
     return pathname.startsWith(href.split('?')[0].split('#')[0])
   }
 
+  // WAS-new: limpiar hash al navegar a Home para que isActive() no confunda Home con Explorar
+  function handleHomeClick() {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname)
+      setMountedHash({ ready: true, value: '' })
+    }
+  }
+
   const tabs = [
     {
       key: 'home',
       label: t('home'),
       href: `/${locale}`,
       isFAB: false,
+      onClick: handleHomeClick,
       icon: (
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
@@ -77,6 +86,7 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
     },
     {
       key: 'explore',
+      onClick: undefined,
       label: t('explore'),
       href: `/${locale}#agents`,
       isFAB: false,
@@ -88,6 +98,7 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
     },
     {
       key: 'publish',
+      onClick: undefined,
       label: t('publish'),
       href: `/${locale}/publish`,
       isFAB: true,
@@ -99,6 +110,7 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
     },
     {
       key: 'dashboard',
+      onClick: undefined,
       label: t('dashboard'),
       href: dashboardHref,
       isFAB: false,
@@ -110,6 +122,7 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
     },
     {
       key: 'profile',
+      onClick: undefined,
       label: t('profile'),
       href: profileHref,
       isFAB: false,
@@ -155,6 +168,7 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
               href={tab.href}
               aria-label={tab.label}
               className={`flex flex-col items-center gap-0.5 py-1 px-3 min-w-0 ${color} transition-colors`}
+              onClick={tab.onClick}
             >
               {tab.icon}
               <span className="text-[10px] font-medium truncate">{tab.label}</span>
