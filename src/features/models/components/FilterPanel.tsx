@@ -7,8 +7,6 @@ const AGENT_TYPES = [
   { value: 'llm',        label: 'LLM',        icon: '🧠' },
   { value: 'rag',        label: 'RAG',         icon: '📚' },
   { value: 'tool',       label: 'Tool',        icon: '🔧' },
-  { value: 'multimodal', label: 'Multimodal',  icon: '🎭' },
-  { value: 'code',       label: 'Code',        icon: '💻' },
 ]
 
 const CATEGORIES = [
