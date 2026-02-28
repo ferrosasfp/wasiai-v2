@@ -1,579 +1,450 @@
 // src/app/api/v1/compose/route.ts
-// HU-5.1 — Agent-to-Agent Routing (POST /api/v1/compose)
+// HU-5.1 — Agent Compose API (POST /api/v1/compose)
 // Next.js 14 App Router | createServiceClient | viem v2 | no ethers | no hardcodes
 //
-// ADAPTACIONES vs story file:
-//   - agent_keys (no api_keys) — schema real del proyecto
-//   - is_active + budget_usdc/spent_usdc (no status/balance)
-//   - validateEndpointUrl() de @/lib/security/validateEndpointUrl (throws, no boolean)
-//   - Firma ECDSA directa con privateKeyToAccount (no getOperatorClient)
-//   - createHash('sha256') de 'crypto' (mismo patrón que invoke/route.ts)
+// Interface: agent_slug + pass_output (story spec)
+// Rate limit: getComposeLimit() de @/lib/ratelimit (rl:compose, 10/1m)
+// Receipts: signReceipt() por step de @/lib/receipts/signReceipt
+// DB: agent_calls con pipeline_id + step_index, pipeline_executions para tracking
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createHash } from 'crypto'
-import { createServiceClient } from '@/lib/supabase/server'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
-import { privateKeyToAccount } from 'viem/accounts'
-import { keccak256, encodePacked, toBytes } from 'viem'
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID }    from 'crypto'
+import { createServiceClient }       from '@/lib/supabase/server'
+import { validateEndpointUrl }       from '@/lib/security/validateEndpointUrl'
+import { getComposeLimit }           from '@/lib/ratelimit'
+import { signReceipt }               from '@/lib/receipts/signReceipt'
+import { keyHashToBytes32 }          from '@/lib/contracts/marketplaceClient'
 
-// ─── Config desde env vars (no hardcodes) ────────────────────────────────────
-const STEP_TIMEOUT_MS = parseInt(
-  process.env.COMPOSE_STEP_TIMEOUT_MS?.trim() ?? '8000',
-  10,
-)
-const MAX_STEP_OUTPUT_BYTES = parseInt(
-  process.env.COMPOSE_MAX_STEP_OUTPUT_BYTES?.trim() ?? '102400',
-  10,
-)
+// ── Constantes (env-driven, no hardcodes) ────────────────────────────────────
+const MAX_STEPS       = 5
+const STEP_TIMEOUT_MS = parseInt(process.env.COMPOSE_STEP_TIMEOUT_MS?.trim() ?? '8000', 10)
 
-// ─── Rate limit: wasiai:compose, 10 req/min por key ──────────────────────────
-let _composeRatelimit: Ratelimit | null = null
-function getComposeRatelimit(): Ratelimit {
-  return (_composeRatelimit ??= new Ratelimit({
-    redis: new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    }),
-    limiter: Ratelimit.slidingWindow(10, '60 s'),
-    prefix: 'wasiai:compose',
-    analytics: false,
-  }))
+// ── Tipos ────────────────────────────────────────────────────────────────────
+interface ComposeStep {
+  agent_slug:   string
+  input?:       string
+  pass_output?: boolean
 }
 
-// ─── Tipos internos ───────────────────────────────────────────────────────────
-interface PipelineStep {
-  agent_id: string
-  input: string | Record<string, unknown>
+interface ComposeRequest {
+  steps: ComposeStep[]
 }
 
-interface StepResult {
-  step: number
-  agent_id: string
-  input: string
-  output: string
-  latency_ms: number
-  cost_usdc: string
+interface StepReceipt {
+  step:              number
+  agent_slug:        string
+  cost_usdc:         string
+  receipt_signature: string
+  call_id:           string
+}
+
+interface ComposeResponse {
+  pipeline_id:     string
+  steps_executed:  number
+  total_cost_usdc: string
+  result:          unknown
+  receipts:        StepReceipt[]
+}
+
+interface PipelineFailedResponse {
+  error:            string
+  code:             'step_failed'
+  failed_step:      number
+  reason:           string
+  steps_executed:   number
+  partial_receipts: StepReceipt[]
 }
 
 interface AgentRow {
-  id: string
-  status: string
+  id:             string
+  slug:           string
+  name:           string
   price_per_call: number
-  endpoint_url: string
+  endpoint_url:   string
+  status:         string
 }
 
-// ─── Handler principal ────────────────────────────────────────────────────────
-export async function POST(req: NextRequest): Promise<NextResponse> {
+interface KeyRow {
+  id:          string
+  key_hash:    string
+  is_active:   boolean
+  budget_usdc: number
+  spent_usdc:  number
+}
+
+// ── Handler principal ────────────────────────────────────────────────────────
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const supabase = createServiceClient()
 
-  // ── [1] Parse & Validate body ─────────────────────────────────────────────
-  let body: { steps?: unknown }
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  // ── [0] RATE LIMIT ────────────────────────────────────────────────────────
+  const rawKey  = request.headers.get('x-api-key')?.trim() ?? ''
+  const keyHash = rawKey
+    ? createHash('sha256').update(rawKey).digest('hex')
+    : 'anonymous'
+
+  const limiter    = getComposeLimit()
+  const identifier = `key:${keyHash.slice(0, 24)}`
+  const { success, limit, reset } = await limiter.limit(identifier)
+
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', code: 'rate_limited', limit, remaining: 0, reset_at: new Date(reset).toISOString() },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit':     String(limit),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset':     String(reset),
+          'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
+        },
+      },
+    )
   }
 
-  const rawSteps = body?.steps
-  if (!Array.isArray(rawSteps) || rawSteps.length < 2 || rawSteps.length > 10) {
+  // ── [1] AUTH ──────────────────────────────────────────────────────────────
+  if (!rawKey) {
     return NextResponse.json(
-      { error: 'steps must be an array of 2–10 elements' },
+      { error: 'Invalid or inactive API key', code: 'invalid_key' },
+      { status: 401 },
+    )
+  }
+
+  const { data: keyRow, error: keyError } = await supabase
+    .from('agent_keys')
+    .select('id, key_hash, is_active, budget_usdc, spent_usdc')
+    .eq('key_hash', keyHash)
+    .eq('is_active', true)
+    .single<KeyRow>()
+
+  if (keyError || !keyRow) {
+    return NextResponse.json(
+      { error: 'Invalid or inactive API key', code: 'invalid_key' },
+      { status: 401 },
+    )
+  }
+
+  // ── [2] PARSE + VALIDAR BODY ──────────────────────────────────────────────
+  let body: ComposeRequest
+  try {
+    body = await request.json() as ComposeRequest
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON body', code: 'validation_error' },
       { status: 400 },
     )
   }
 
-  const steps: PipelineStep[] = []
-  for (let i = 0; i < rawSteps.length; i++) {
-    const s = rawSteps[i]
-    if (!s || typeof s !== 'object') {
-      return NextResponse.json(
-        { error: `Step ${i + 1} is invalid` },
-        { status: 400 },
-      )
-    }
-    const { agent_id, input } = s as Record<string, unknown>
-    if (typeof agent_id !== 'string' || !isValidUUID(agent_id)) {
-      return NextResponse.json(
-        { error: `Step ${i + 1}: agent_id must be a valid UUID` },
-        { status: 400 },
-      )
-    }
-    if (input === undefined || input === null) {
-      return NextResponse.json(
-        { error: `Step ${i + 1}: input is required` },
-        { status: 400 },
-      )
-    }
-    if (i === 0 && input === '$prev') {
-      return NextResponse.json(
-        { error: 'Step 1 cannot use "$prev" (no previous output)' },
-        { status: 400 },
-      )
-    }
-    steps.push({ agent_id, input: input as string | Record<string, unknown> })
-  }
-
-  // ── [2] Auth: validar API key ─────────────────────────────────────────────
-  const apiKey = req.headers.get('x-api-key')?.trim()
-  if (!apiKey) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const keyHash = createHash('sha256').update(apiKey).digest('hex')
-
-  const { data: keyRow, error: keyError } = await supabase
-    .from('agent_keys')
-    .select('id, is_active, budget_usdc, spent_usdc, owner_id')
-    .eq('key_hash', keyHash)
-    .single()
-
-  if (keyError || !keyRow) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  if (!keyRow.is_active) {
-    return NextResponse.json({ error: 'API key is inactive' }, { status: 403 })
-  }
-
-  const keyId: string = keyRow.id
-
-  // ── [3] Rate limit (por keyId) ────────────────────────────────────────────
-  const { success: rlSuccess } = await getComposeRatelimit().limit(keyId)
-  if (!rlSuccess) {
+  const validationError = validateSteps(body?.steps)
+  if (validationError) {
     return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again in 60 seconds.' },
-      { status: 429 },
+      { error: validationError, code: 'validation_error' },
+      { status: 400 },
     )
   }
 
-  // ── [4] Pre-flight: validar agentes ──────────────────────────────────────
-  const agentIds = steps.map((s) => s.agent_id)
-  const { data: agentRows, error: agentError } = await supabase
+  const steps = body.steps
+
+  // ── [3] RESOLVER AGENTES (1 query batch) ─────────────────────────────────
+  const slugs = [...new Set(steps.map(s => s.agent_slug))]
+  const { data: agentsData } = await supabase
     .from('agents')
-    .select('id, status, price_per_call, endpoint_url')
-    .in('id', agentIds)
+    .select('id, slug, name, price_per_call, endpoint_url, status')
+    .in('slug', slugs)
+    .eq('status', 'active')
 
-  if (agentError) {
-    return NextResponse.json(
-      { error: 'Internal error validating agents' },
-      { status: 500 },
-    )
-  }
-
-  const foundAgents = new Map<string, AgentRow>(
-    (agentRows ?? []).map((a: AgentRow) => [a.id, a]),
+  const agentMap = new Map<string, AgentRow>(
+    (agentsData ?? []).map((a: AgentRow) => [a.slug, a]),
   )
 
-  const invalidAgents: string[] = []
-  for (const id of agentIds) {
-    const agent = foundAgents.get(id)
-    if (!agent || agent.status !== 'active') {
-      invalidAgents.push(id)
+  for (let i = 0; i < steps.length; i++) {
+    if (!agentMap.has(steps[i].agent_slug)) {
+      return NextResponse.json(
+        { error: 'Agent not found', code: 'agent_not_found', step: i, slug: steps[i].agent_slug },
+        { status: 404 },
+      )
     }
   }
-  if (invalidAgents.length > 0) {
-    return NextResponse.json(
-      { error: 'Invalid agents', invalid_agents: invalidAgents },
-      { status: 422 },
-    )
-  }
 
-  // ── [5] Pre-flight: verificar saldo ──────────────────────────────────────
-  const estimatedCost = steps.reduce((sum, s) => {
-    const agent = foundAgents.get(s.agent_id)!
-    return sum + (agent.price_per_call ?? 0)
-  }, 0)
+  // ── [4] PREFLIGHT DE SALDO ────────────────────────────────────────────────
+  const totalRequired = steps.reduce(
+    (acc, s) => acc + (agentMap.get(s.agent_slug)?.price_per_call ?? 0),
+    0,
+  )
+  const available = keyRow.budget_usdc - keyRow.spent_usdc
 
-  const currentBalance: number =
-    (keyRow.budget_usdc ?? 0) - (keyRow.spent_usdc ?? 0)
-
-  if (currentBalance < estimatedCost) {
+  if (available < totalRequired) {
     return NextResponse.json(
       {
-        error: 'Insufficient balance',
-        required: estimatedCost.toFixed(6),
-        available: currentBalance.toFixed(6),
-        currency: 'USDC',
+        error:          'Insufficient balance',
+        code:           'insufficient_balance',
+        required_usdc:  totalRequired.toFixed(6),
+        available_usdc: available.toFixed(6),
       },
       { status: 402 },
     )
   }
 
-  // ── [6] Crear pipeline_execution provisional ─────────────────────────────
-  const pipelineId = randomUUID()
-  const startTs = Date.now()
+  // ── [5] SSRF PREFLIGHT (todos los endpoints antes de ejecutar) ────────────
+  for (let i = 0; i < steps.length; i++) {
+    const agent = agentMap.get(steps[i].agent_slug)!
+    try {
+      validateEndpointUrl(agent.endpoint_url)
+    } catch {
+      return NextResponse.json(
+        {
+          error:            `Pipeline failed at step ${i}`,
+          code:             'step_failed',
+          failed_step:      i,
+          reason:           'SSRF_BLOCKED',
+          steps_executed:   0,
+          partial_receipts: [],
+        } satisfies PipelineFailedResponse,
+        { status: 422 },
+      )
+    }
+  }
 
+  // ── [6] LOOP SECUENCIAL ───────────────────────────────────────────────────
+  const pipelineId = randomUUID()
+  const receipts: StepReceipt[] = []
+  let lastOutput: string | null = null
+
+  // Crear pipeline_executions provisional para tracking
   await supabase.from('pipeline_executions').insert({
-    id: pipelineId,
-    key_id: keyId,
+    id:              pipelineId,
+    key_id:          keyRow.id,
     steps_requested: steps.length,
     steps_completed: 0,
     total_cost_usdc: 0,
-    status: 'failed', // provisional — se actualiza al terminar
-  })
+    status:          'failed',
+  }).then(() => {}, () => {/* best-effort */})
 
-  structuredLog('pipeline_start', {
-    pipeline_id: pipelineId,
-    key_id: keyId,
-    steps_count: steps.length,
-  })
+  try {
+    for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+      const step  = steps[stepIndex]
+      const agent = agentMap.get(step.agent_slug)!
 
-  // ── [7] Loop de ejecución secuencial ─────────────────────────────────────
-  const stepResults: StepResult[] = []
-  let prevOutput = ''
-  let totalCost = 0
+      // [6a] Construir input del step
+      let stepInput: string
+      if (stepIndex === 0) {
+        stepInput = step.input ?? ''
+      } else if (step.pass_output) {
+        stepInput = lastOutput ?? ''
+      } else {
+        stepInput = step.input ?? ''
+      }
 
-  for (let i = 0; i < steps.length; i++) {
-    const stepNum = i + 1
-    const stepDef = steps[i]
-
-    // [7a] Resolver input ($prev)
-    const resolvedInput = resolvePrev(stepDef.input, prevOutput)
-    const resolvedInputStr =
-      typeof resolvedInput === 'string'
-        ? resolvedInput
-        : JSON.stringify(resolvedInput)
-
-    // [7b] Re-leer precio actual del agente (no cachear del pre-flight)
-    const { data: freshAgent, error: freshAgentError } = await supabase
-      .from('agents')
-      .select('price_per_call, endpoint_url, status')
-      .eq('id', stepDef.agent_id)
-      .single()
-
-    if (freshAgentError || !freshAgent || freshAgent.status !== 'active') {
-      await abortPipeline(
-        supabase, pipelineId, stepNum, stepResults, totalCost,
-        `Agent ${stepDef.agent_id} is no longer active`,
+      // [6b] Deducir saldo atómicamente ANTES del fetch (uso de deduct_key_balance para atomicidad)
+      const { data: deductOk, error: deductError } = await supabase.rpc(
+        'deduct_key_balance',
+        { p_key_id: keyRow.id, p_amount: agent.price_per_call },
       )
-      return buildPartialResponse(
-        pipelineId, stepNum, stepResults, totalCost,
-        `Agent ${stepDef.agent_id} is no longer active`, 502, steps.length,
-      )
-    }
 
-    const pricePerCall: number = freshAgent.price_per_call ?? 0
-    const endpointUrl: string = freshAgent.endpoint_url
-
-    // [7c] SSRF protection
-    try {
-      validateEndpointUrl(endpointUrl)
-    } catch (ssrfErr) {
-      await abortPipeline(
-        supabase, pipelineId, stepNum, stepResults, totalCost,
-        `Agent ${stepDef.agent_id} endpoint URL failed SSRF validation: ${String(ssrfErr)}`,
-      )
-      return buildPartialResponse(
-        pipelineId, stepNum, stepResults, totalCost,
-        `Agent ${stepDef.agent_id} endpoint URL is invalid`, 502, steps.length,
-      )
-    }
-
-    // [7d] Fetch al agente externo con timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), STEP_TIMEOUT_MS)
-    const stepStart = Date.now()
-
-    let agentResponseBody: unknown
-    try {
-      const agentRes = await fetch(endpointUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Pipeline-Id': pipelineId,
-          'X-Pipeline-Step': String(stepNum),
-        },
-        body: JSON.stringify({ input: resolvedInput }),
-        signal: controller.signal,
-        redirect: 'error',
-      })
-      clearTimeout(timeoutId)
-
-      if (!agentRes.ok) {
-        const latencyMs = Date.now() - stepStart
-        structuredLog('pipeline_step', {
-          pipeline_id: pipelineId,
-          step: stepNum,
-          agent_id: stepDef.agent_id,
-          latency_ms: latencyMs,
-          status: 'error',
-          http_status: agentRes.status,
-        })
-        await abortPipeline(
-          supabase, pipelineId, stepNum, stepResults, totalCost,
-          `Agent ${stepDef.agent_id} returned ${agentRes.status}`,
-        )
-        return buildPartialResponse(
-          pipelineId, stepNum, stepResults, totalCost,
-          `Agent ${stepDef.agent_id} returned ${agentRes.status}`, 502, steps.length,
+      if (deductError || deductOk === false) {
+        return NextResponse.json(
+          {
+            error:            `Pipeline failed at step ${stepIndex}`,
+            code:             'step_failed',
+            failed_step:      stepIndex,
+            reason:           'Insufficient balance (race condition detected)',
+            steps_executed:   stepIndex,
+            partial_receipts: receipts,
+          } satisfies PipelineFailedResponse,
+          { status: 422 },
         )
       }
 
-      // NO propagar headers del agente externo al caller
-      const rawAgentText = await agentRes.text()
-      try { agentResponseBody = JSON.parse(rawAgentText) } catch { agentResponseBody = rawAgentText }
-    } catch (err: unknown) {
-      clearTimeout(timeoutId)
-      const latencyMs = Date.now() - stepStart
-      const isTimeout = err instanceof Error && err.name === 'AbortError'
-      const errMsg = isTimeout
-        ? `Step ${stepNum} timed out after ${STEP_TIMEOUT_MS}ms`
-        : `Step ${stepNum} fetch error: ${String(err)}`
+      // [6c] Llamar al agente externo
+      const startMs = Date.now()
+      let stepOutput: unknown
+      let stepStatus: 'success' | 'error' = 'success'
+      let stepErrorReason = ''
 
-      structuredLog('pipeline_step', {
-        pipeline_id: pipelineId,
-        step: stepNum,
-        agent_id: stepDef.agent_id,
-        latency_ms: latencyMs,
-        status: isTimeout ? 'timeout' : 'error',
+      try {
+        const res = await fetch(agent.endpoint_url, {
+          method:  'POST',
+          headers: {
+            'Content-Type':   'application/json',
+            'X-Pipeline-Id':  pipelineId,
+            'X-Pipeline-Step': String(stepIndex),
+          },
+          body:    JSON.stringify({ input: stepInput }),
+          signal:  AbortSignal.timeout(STEP_TIMEOUT_MS),
+          redirect: 'error',
+        })
+
+        if (res.ok) {
+          const ct = res.headers.get('content-type') ?? ''
+          stepOutput = ct.includes('application/json') ? await res.json() : await res.text()
+        } else {
+          stepStatus      = 'error'
+          stepErrorReason = `Upstream ${res.status}`
+          stepOutput      = { error: stepErrorReason }
+        }
+      } catch (err) {
+        stepStatus      = 'error'
+        stepErrorReason = err instanceof Error && err.name === 'TimeoutError'
+          ? 'TIMEOUT'
+          : `Upstream unreachable: ${String(err)}`
+        stepOutput = { error: stepErrorReason }
+      }
+
+      const latencyMs = Date.now() - startMs
+
+      // [6d] Log en agent_calls con pipeline_id + step_index
+      let callId = ''
+      try {
+        const { data: callRecord } = await supabase
+          .from('agent_calls')
+          .insert({
+            agent_id:    agent.id,
+            caller_type: 'agent',
+            amount_paid: agent.price_per_call,
+            tx_hash:     null,
+            status:      stepStatus,
+            latency_ms:  latencyMs,
+            key_id:      keyRow.id,
+            is_trial:    false,
+            pipeline_id: pipelineId,
+            step_index:  stepIndex,
+          })
+          .select('id')
+          .single()
+        callId = callRecord?.id ?? ''
+      } catch {
+        // best-effort — no abortar el pipeline por fallo de log
+      }
+
+      // [6e] Firmar receipt del step (best-effort)
+      let signature = ''
+      try {
+        const receiptTimestamp = Math.floor(Date.now() / 1000)
+        signature = await signReceipt({
+          keyId:      keyHashToBytes32(keyRow.key_hash),
+          callId,
+          agentSlug:  agent.slug,
+          amountUsdc: agent.price_per_call,
+          timestamp:  receiptTimestamp,
+        })
+        // Guardar signature en DB (fire-and-forget)
+        supabase
+          .from('agent_calls')
+          .update({ receipt_signature: signature })
+          .eq('id', callId)
+          .then(undefined, () => {/* best-effort */})
+      } catch {
+        // sign failed — continuar sin abortar
+      }
+
+      // [6f] Evaluar resultado del step
+      if (stepStatus === 'error') {
+        // Actualizar pipeline_executions como parcial/fallido
+        supabase
+          .from('pipeline_executions')
+          .update({
+            status:          receipts.length === 0 ? 'failed' : 'partial',
+            steps_completed: stepIndex,
+            total_cost_usdc: receipts.reduce((acc, r) => acc + parseFloat(r.cost_usdc), 0),
+            failed_at_step:  stepIndex + 1,
+            error_detail:    stepErrorReason,
+            completed_at:    new Date().toISOString(),
+          })
+          .eq('id', pipelineId)
+          .then(undefined, () => {/* best-effort */})
+
+        return NextResponse.json(
+          {
+            error:            `Pipeline failed at step ${stepIndex}`,
+            code:             'step_failed',
+            failed_step:      stepIndex,
+            reason:           stepErrorReason,
+            steps_executed:   stepIndex,
+            partial_receipts: receipts,
+          } satisfies PipelineFailedResponse,
+          { status: 422 },
+        )
+      }
+
+      // Step exitoso — acumular
+      lastOutput = typeof stepOutput === 'string'
+        ? stepOutput
+        : JSON.stringify(stepOutput)
+
+      receipts.push({
+        step:              stepIndex,
+        agent_slug:        agent.slug,
+        cost_usdc:         agent.price_per_call.toFixed(6),
+        receipt_signature: signature,
+        call_id:           callId,
       })
-      await abortPipeline(supabase, pipelineId, stepNum, stepResults, totalCost, errMsg)
-      return buildPartialResponse(
-        pipelineId, stepNum, stepResults, totalCost,
-        errMsg, isTimeout ? 504 : 502, steps.length,
-      )
+
+      // Incrementar stats del agente (fire-and-forget)
+      supabase
+        .rpc('increment_agent_stats', { p_agent_id: agent.id, p_amount: agent.price_per_call })
+        .then(undefined, () => {/* best-effort */})
     }
-
-    const latencyMs = Date.now() - stepStart
-
-    // [7e] Extraer output
-    const rawOutput = extractOutput(agentResponseBody)
-
-    // Verificar tamaño del output
-    const outputBytes = new TextEncoder().encode(rawOutput).length
-    if (outputBytes > MAX_STEP_OUTPUT_BYTES) {
-      await abortPipeline(
-        supabase, pipelineId, stepNum, stepResults, totalCost,
-        `Step ${stepNum} output exceeds size limit`,
-      )
-      return NextResponse.json(
-        {
-          pipeline_id: pipelineId,
-          error: `Step ${stepNum} output exceeds size limit (${Math.round(MAX_STEP_OUTPUT_BYTES / 1024)}KB)`,
-        },
-        { status: 413 },
-      )
-    }
-
-    prevOutput = rawOutput
-
-    // [7f] Descuento atómico de saldo (deduct_key_balance RPC)
-    const { data: deductOk, error: deductError } = await supabase.rpc(
-      'deduct_key_balance',
-      { p_key_id: keyId, p_amount: pricePerCall },
-    )
-
-    if (deductError || deductOk === false) {
-      await abortPipeline(
-        supabase, pipelineId, stepNum, stepResults, totalCost,
-        'Insufficient balance mid-pipeline',
-      )
-      return buildPartialResponse(
-        pipelineId, stepNum, stepResults, totalCost,
-        'Insufficient balance mid-pipeline', 402, steps.length,
-      )
-    }
-
-    totalCost += pricePerCall
-
-    // [7g] Registrar agent_call individual
-    await supabase.from('agent_calls').insert({
-      agent_id: stepDef.agent_id,
-      caller_type: 'agent',
-      key_id: keyId,
-      pipeline_id: pipelineId,
-      status: 'success',
-      latency_ms: latencyMs,
-      amount_paid: pricePerCall,
-      is_trial: false,
-    })
-
-    const stepResult: StepResult = {
-      step: stepNum,
-      agent_id: stepDef.agent_id,
-      input: resolvedInputStr,
-      output: rawOutput,
-      latency_ms: latencyMs,
-      cost_usdc: pricePerCall.toFixed(6),
-    }
-    stepResults.push(stepResult)
-
-    structuredLog('pipeline_step', {
-      pipeline_id: pipelineId,
-      step: stepNum,
-      agent_id: stepDef.agent_id,
-      latency_ms: latencyMs,
-      status: 'success',
-      cost_usdc: pricePerCall,
-    })
+  } catch (unexpectedErr) {
+    // Error inesperado — actualizar pipeline como fallido y re-throw
+    supabase
+      .from('pipeline_executions')
+      .update({ status: 'failed', completed_at: new Date().toISOString() })
+      .eq('id', pipelineId)
+      .then(undefined, () => {/* best-effort */})
+    throw unexpectedErr
   }
 
-  // ── [8] Firma ECDSA del receipt ───────────────────────────────────────────
-  const timestamp = Math.floor(Date.now() / 1000)
-  const receiptSignature = await signPipelineReceipt(
-    pipelineId,
-    keyId,
-    totalCost.toFixed(6),
-    timestamp,
-  )
+  // ── [7] RESPONSE FINAL ────────────────────────────────────────────────────
+  const totalCost = receipts.reduce((acc, r) => acc + parseFloat(r.cost_usdc), 0)
 
-  // ── [9] Actualizar pipeline_execution ────────────────────────────────────
-  await supabase
+  // Actualizar pipeline_executions como exitoso
+  supabase
     .from('pipeline_executions')
     .update({
-      status: 'success',
+      status:          'success',
       steps_completed: steps.length,
       total_cost_usdc: totalCost,
-      receipt_signature: receiptSignature,
-      completed_at: new Date().toISOString(),
+      completed_at:    new Date().toISOString(),
     })
     .eq('id', pipelineId)
-
-  structuredLog('pipeline_complete', {
-    pipeline_id: pipelineId,
-    status: 'success',
-    steps_completed: steps.length,
-    total_cost_usdc: totalCost,
-    total_latency_ms: Date.now() - startTs,
-  })
-
-  // ── [10] Responder 200 ────────────────────────────────────────────────────
-  return NextResponse.json({
-    pipeline_id: pipelineId,
-    steps_completed: steps.length,
-    steps_total: steps.length,
-    status: 'success',
-    result: prevOutput,
-    steps: stepResults,
-    total_cost_usdc: totalCost.toFixed(6),
-    receipt_signature: receiptSignature,
-  })
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Sustituye "$prev" (string exacto o valores en objeto) por prevOutput */
-function resolvePrev(
-  input: string | Record<string, unknown>,
-  prevOutput: string,
-): string | Record<string, unknown> {
-  if (typeof input === 'string') {
-    return input === '$prev' ? prevOutput : input
-  }
-  const resolved: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(input)) {
-    resolved[k] = typeof v === 'string' && v === '$prev' ? prevOutput : v
-  }
-  return resolved
-}
-
-/** Extrae el output de la respuesta del agente externo */
-function extractOutput(body: unknown): string {
-  if (typeof body === 'string') return body
-  if (body && typeof body === 'object') {
-    const obj = body as Record<string, unknown>
-    if ('response' in obj) {
-      const r = obj['response']
-      return typeof r === 'string' ? r : JSON.stringify(r)
-    }
-    return JSON.stringify(obj)
-  }
-  return String(body)
-}
-
-/** Firma ECDSA del receipt del pipeline usando viem v2 */
-async function signPipelineReceipt(
-  pipelineId: string,
-  keyId: string,
-  totalCostUsdc: string,
-  timestamp: number,
-): Promise<string> {
-  const operatorKey = process.env.OPERATOR_PRIVATE_KEY?.trim()
-  if (!operatorKey) throw new Error('OPERATOR_PRIVATE_KEY not set')
-
-  const key = operatorKey.startsWith('0x') ? operatorKey : `0x${operatorKey}`
-  const account = privateKeyToAccount(key as `0x${string}`)
-
-  const messageHash = keccak256(
-    encodePacked(
-      ['string', 'string', 'string', 'uint256'],
-      [pipelineId, keyId, totalCostUsdc, BigInt(timestamp)],
-    ),
-  )
-
-  return account.signMessage({ message: { raw: toBytes(messageHash) } })
-}
-
-/** Actualiza pipeline_executions como abortado y loguea */
-async function abortPipeline(
-  supabase: ReturnType<typeof createServiceClient>,
-  pipelineId: string,
-  failedAtStep: number,
-  stepResults: StepResult[],
-  totalCost: number,
-  errorDetail: string,
-): Promise<void> {
-  const status = stepResults.length === 0 ? 'failed' : 'partial'
-  await supabase
-    .from('pipeline_executions')
-    .update({
-      status,
-      steps_completed: stepResults.length,
-      failed_at_step: failedAtStep,
-      total_cost_usdc: totalCost,
-      error_detail: errorDetail,
-      completed_at: new Date().toISOString(),
-    })
-    .eq('id', pipelineId)
-
-  structuredLog('pipeline_abort', {
-    pipeline_id: pipelineId,
-    failed_at_step: failedAtStep,
-    steps_completed: stepResults.length,
-    reason: errorDetail,
-  })
-}
-
-/** Construye el response de error parcial */
-function buildPartialResponse(
-  pipelineId: string,
-  failedAtStep: number,
-  stepResults: StepResult[],
-  totalCost: number,
-  error: string,
-  httpStatus: number,
-  stepsTotal: number,
-): NextResponse {
-  const resultSoFar =
-    stepResults.length > 0
-      ? stepResults[stepResults.length - 1].output
-      : undefined
+    .then(undefined, () => {/* best-effort */})
 
   return NextResponse.json(
     {
-      pipeline_id: pipelineId,
-      status: stepResults.length === 0 ? 'failed' : 'partial',
-      failed_at_step: failedAtStep,
-      steps_completed: stepResults.length,
-      steps_total: stepsTotal,
-      error,
-      ...(resultSoFar !== undefined ? { result_so_far: resultSoFar } : {}),
-      steps: stepResults,
+      pipeline_id:     pipelineId,
+      steps_executed:  steps.length,
       total_cost_usdc: totalCost.toFixed(6),
-    },
-    { status: httpStatus },
+      result:          parseOutputSafe(lastOutput),
+      receipts,
+    } satisfies ComposeResponse,
+    { status: 200 },
   )
 }
 
-/** Log estructurado JSON */
-function structuredLog(event: string, data: Record<string, unknown>): void {
-  console.log(JSON.stringify({ event, ...data, ts: new Date().toISOString() }))
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Valida el array de steps; retorna string de error o null si válido */
+export function validateSteps(steps: unknown): string | null {
+  if (!Array.isArray(steps))      return 'steps must be an array'
+  if (steps.length < 1)           return 'steps must have at least 1 element'
+  if (steps.length > MAX_STEPS)   return `Max ${MAX_STEPS} steps per pipeline`
+
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i] as ComposeStep
+    if (!s.agent_slug || typeof s.agent_slug !== 'string') {
+      return `Step ${i}: agent_slug is required`
+    }
+    if (s.input !== undefined && s.pass_output === true) {
+      return `Step ${i}: input and pass_output are mutually exclusive`
+    }
+    if (i === 0 && s.pass_output === true) {
+      return 'Step 0 cannot use pass_output (no previous output exists)'
+    }
+  }
+  return null
 }
 
-/** UUID v4 validation */
-function isValidUUID(str: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str)
+/** Parsea output de forma segura (intenta JSON.parse, si falla devuelve string) */
+export function parseOutputSafe(raw: string | null): unknown {
+  if (raw === null) return null
+  try { return JSON.parse(raw) } catch { return raw }
 }

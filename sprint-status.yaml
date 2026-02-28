@@ -1,45 +1,76 @@
-sprint: 7
-semana: "2026-02-27 → 2026-02-29"
+sprint: 9
+semana: "2026-02-27 → 2026-03-05"
 estado: planning
 
 objetivo: >
-  Wallet UX completa (connect/disconnect en navbar, pay button funcional),
-  Mainnet deploy Avalanche C-Chain (Build Games semana 2), y fixes UX menores.
+  Estabilizar la experiencia core del producto: arreglar visualización de saldo USDC en navbar,
+  restablecer analytics (vacío en web y mobile), y corregir UX/navigation bugs en mobile.
+  Sprint de calidad antes de retomar features grandes.
 
 historias:
-  - id: WAS-46
-    titulo: "BUG — Pay button debe disparar connect wallet"
-    prioridad: 0
-    estado: backlog
-    notas: "P0. Sin wallet conectada el botón no hace nada. Bloqueante para conversión."
-
-  - id: WAS-45
-    titulo: "Wallet connect/disconnect en WasiNavBar"
+  - id: WAS-63
+    titulo: "BUG — Navbar desktop elementos borrosos (saldo USDC no visible)"
     prioridad: 1
+    estimacion: S
+    sdd_mode: bugfix
+    pipeline: full
     estado: backlog
-    notas: "P1. Estándar dApp. Va junto con WAS-46."
+    notas: "P1. Saldo USDC invisible bloquea confianza del usuario. Arrancar aquí."
 
-  - id: HU-6.2
-    titulo: "Mainnet deploy — WasiAIMarketplace en Avalanche C-Chain"
+  - id: WAS-64
+    titulo: "BUG — Analytics completamente vacío en web y mobile"
     prioridad: 1
+    estimacion: M
+    sdd_mode: bugfix
+    pipeline: full
     estado: backlog
-    notas: "Build Games semana 2. NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET vacío."
+    notas: "P1. Verificar primero si es env var (PostHog/Mixpanel key en Vercel) antes de codear."
 
-  - id: WAS-47
-    titulo: "Botón 'Ver agentes' scroll a sección de agentes en Home"
-    prioridad: 3
+  - id: WAS-65
+    titulo: "BUG — Mobile tab Home resaltado cuando se está en Explorar"
+    prioridad: 2
+    estimacion: S
+    sdd_mode: patch
+    pipeline: quick_flow
     estado: backlog
-    notas: "P3. Quick win, especialmente en mobile."
+    notas: "P2. UX nav bug. Quick Flow."
+
+  - id: WAS-66
+    titulo: "BUG — Categorías duplicadas en filtros marketplace"
+    prioridad: 2
+    estimacion: S
+    sdd_mode: patch
+    pipeline: quick_flow
+    estado: backlog
+    notas: "P2. Quick Flow. Revisar dedup en query o en el componente de filtros."
+
+  - id: WAS-67
+    titulo: "BUG — Contenido cortado por bottom nav (falta padding)"
+    prioridad: 2
+    estimacion: S
+    sdd_mode: patch
+    pipeline: quick_flow
+    estado: backlog
+    notas: "P2. Quick Fix. Añadir pb-[altura_bottom_nav] al layout mobile."
+
+diferidos_sprint_10:
+  - id: HU-3.2
+    titulo: "Playground comparativo de agentes"
+    razon: "Feature L — sprint 9 es de estabilidad. Preparar F0 al final de esta semana."
+
+  - id: WAS-51
+    titulo: "Tether USDT multi-token support"
+    razon: "Feature L, riesgo alto. Requiere sprint limpio post-estabilización."
+
+  - id: WAS-52
+    titulo: "Chainlink Price Feeds"
+    razon: "Feature L, dependencia de infra. Diferido intencionalmente."
 
 criterios_exito:
-  - "WAS-46: clic en Pay sin wallet → abre modal de conexión"
-  - "WAS-45: botón connect/disconnect visible en navbar en todas las páginas"
-  - "HU-6.2: contrato desplegado en mainnet, CHAIN_ID=43114, agentes migrados"
-  - "WAS-47: scroll suave a grid de agentes al clic en 'Ver agentes'"
+  - "WAS-63: Saldo USDC visible y nítido en navbar desktop en todos los breakpoints"
+  - "WAS-64: Analytics muestra datos reales (o empty state) en web y mobile; no pantalla en blanco"
+  - "WAS-65: Tab Home en mobile NO resaltado cuando usuario está en Explorar"
+  - "WAS-66: Cada categoría aparece una sola vez en filtros del marketplace"
+  - "WAS-67: Contenido con bottom nav tiene padding suficiente; nada cortado"
 
-kpis_build_games:
-  agentes_reales: 0/10
-  creadores_onboardeados: 0/5
-  mainnet_deploy: false
-  agentkit_example: true   # /examples/agentkit-wasiai ✅
-  routing_api: true         # POST /api/v1/compose ✅
+planning_doc: ".nexus/docs/sprint-reviews/sprint-9-planning.md"

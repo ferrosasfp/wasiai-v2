@@ -8,7 +8,7 @@
 CREATE TABLE IF NOT EXISTS pipeline_executions (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   key_id            UUID NOT NULL REFERENCES agent_keys(id) ON DELETE RESTRICT,
-  steps_requested   SMALLINT NOT NULL CHECK (steps_requested BETWEEN 2 AND 10),
+  steps_requested   SMALLINT NOT NULL CHECK (steps_requested BETWEEN 1 AND 5),
   steps_completed   SMALLINT NOT NULL DEFAULT 0,
   total_cost_usdc   NUMERIC(18, 6) NOT NULL DEFAULT 0,
   status            TEXT NOT NULL CHECK (status IN ('success', 'partial', 'failed')),
@@ -21,7 +21,11 @@ CREATE TABLE IF NOT EXISTS pipeline_executions (
 
 -- FK opcional en agent_calls para trazabilidad de pipeline
 ALTER TABLE agent_calls
-  ADD COLUMN IF NOT EXISTS pipeline_id UUID REFERENCES pipeline_executions(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS pipeline_id  UUID    REFERENCES pipeline_executions(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS step_index   INTEGER DEFAULT NULL;
+
+COMMENT ON COLUMN agent_calls.pipeline_id IS 'UUID del pipeline compose; NULL para llamadas individuales vía /invoke';
+COMMENT ON COLUMN agent_calls.step_index  IS '0-based índice del step dentro del pipeline; NULL para /invoke';
 
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_pipeline_executions_key_id
@@ -32,6 +36,11 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_executions_created_at
 
 CREATE INDEX IF NOT EXISTS idx_agent_calls_pipeline_id
   ON agent_calls(pipeline_id)
+  WHERE pipeline_id IS NOT NULL;
+
+-- Índice compuesto para ordenar steps de un pipeline por orden de ejecución
+CREATE INDEX IF NOT EXISTS idx_agent_calls_pipeline_step
+  ON agent_calls(pipeline_id, step_index)
   WHERE pipeline_id IS NOT NULL;
 
 -- RLS

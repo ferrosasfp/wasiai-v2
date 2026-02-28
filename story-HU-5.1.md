@@ -1,955 +1,874 @@
-# Story HU-5.1 — Agent-to-Agent Routing (POST /api/v1/compose)
+# Story File — HU-5.1: Agent Compose API (Pipeline Secuencial con Pago x402)
 
-**Sprint:** 3  
-**Épica:** E5 — Compose API  
-**Estado:** READY FOR DEV  
-**Prioridad:** P2  
-**Generado:** 2026-02-26  
-**Autor:** SM Agent (BMAD v6)  
-**Aprobaciones:** HU_APPROVED ✅ | SPEC_APPROVED ✅
+> **Artefacto S2 — Scrum Master**
+> Épica 5 — Agent-to-Agent Routing
+> Fecha: 2026-02-28
+> Estado: LISTO PARA DEV
+> Gates: HU_APPROVED ✅ | SPEC_APPROVED ✅
+>
+> ⚠️ ESTE ARCHIVO ES AUTOCONTENIDO — el Dev NO necesita leer ningún otro documento.
+> Todo el código, las decisiones de arquitectura, y las instrucciones están aquí.
 
 ---
 
 ## Historia de Usuario
 
-**Como** developer o agente autónomo con una API key válida y saldo USDC suficiente,  
-**quiero** enviar un pipeline de agentes secuencial en un solo request (`POST /api/v1/compose`),  
-**para** encadenar capacidades de múltiples agentes IA —donde el output de cada uno alimenta el input del siguiente— pagando automáticamente vía x402 por cada paso, sin tener que orquestar manualmente las invocaciones ni los pagos.
+**Como** agente autónomo (o developer con API key),
+**quiero** invocar un pipeline de múltiples agentes IA en una sola llamada HTTP,
+**para que** WasiAI orqueste y pague cada paso automáticamente on-chain, sin que yo necesite saber cuántos agentes intermedios existen ni gestionar los pagos individuales.
 
 ---
 
-## Acceptance Criteria
+## Contexto de Negocio (resumen ejecutivo)
 
-### AC-1 — Endpoint y autenticación
-- [ ] `POST /api/v1/compose` existe y responde
-- [ ] Requiere header `X-API-Key: <key>` válida; sin key → `401`
-- [ ] Key con `status != 'active'` → `403`
-- [ ] Rate limit: 10 pipelines/min por key (Upstash Redis prefix `wasiai:compose`) → `429`
+WasiAI tiene x402 funcionando para invocar **un** agente. El Compose es el salto a **agentes que coordinan agentes**.
 
-### AC-2 — Payload de entrada
-- [ ] Body acepta array `steps` de 2–10 elementos; fuera de rango → `400` con mensaje explícito
-- [ ] Cada step tiene `agent_id` (UUID válido) e `input` (string u objeto)
-- [ ] `"$prev"` en `input` del step N>1 se sustituye por el output del step anterior
-- [ ] `"$prev"` en valores de objeto también se sustituye (e.g. `{ "text": "$prev" }`)
-- [ ] Campos desconocidos en body o steps: ignorados silenciosamente
-- [ ] JSON malformado → `400`
-
-### AC-3 — Pre-flight (sin llamadas externas)
-- [ ] Verificar que todos los `agent_id` existen y tienen `status = 'active'` → si no: `422` con `invalid_agents[]`
-- [ ] Calcular costo estimado = `SUM(price_per_call)` de todos los agentes; si `keyBalance < estimado` → `402` con `{ required, available, currency: "USDC" }`
-
-### AC-4 — Ejecución secuencial
-- [ ] Pasos en orden estricto; paso N+1 no inicia hasta que N responde exitosamente
-- [ ] Cada paso invoca `agent.endpoint_url` con el input resuelto
-- [ ] `validateUrl()` antes de cada fetch externo (SSRF)
-- [ ] Timeout por paso = `COMPOSE_STEP_TIMEOUT_MS` (default 8000ms) via `AbortController`
-- [ ] Output extraído de `response` en body del agente; si no existe, body completo como string
-- [ ] Output > `COMPOSE_MAX_STEP_OUTPUT_BYTES` (default 100KB) → `413` con error parcial
-
-### AC-5 — Pagos por paso
-- [ ] Descuento de `price_per_call` **después** de respuesta exitosa del agente (atómico)
-- [ ] UPDATE atómico: `WHERE balance >= price_per_call`; si 0 rows → `402` con resultado parcial
-- [ ] Cada paso completado registrado en `agent_calls` con `pipeline_id`, `is_trial: false`
-- [ ] Paso fallido NO se cobra
-
-### AC-6 — Respuesta exitosa (200)
-- [ ] Body con `pipeline_id`, `steps_completed`, `steps_total`, `status`, `result`, `steps[]`, `total_cost_usdc`, `receipt_signature`
-- [ ] `receipt_signature` = firma ECDSA (viem v2) del operator sobre `keccak256(pipelineId + keyId + totalCostUsdc + timestamp)`
-
-### AC-7 — Errores parciales (502/504)
-- [ ] Agente externo 4xx/5xx → `502` con `failed_at_step`, `steps_completed`, `result_so_far`, cobro parcial
-- [ ] Timeout → `504` con resultado parcial
-- [ ] `pipeline_executions` actualizado con `status='partial'` o `'failed'`
-
-### AC-8 — Seguridad
-- [ ] `createServiceClient()` — nunca `createServerClient()` ni `createClient()`
-- [ ] Cero `NEXT_PUBLIC_` para secrets
-- [ ] Cero hardcodes; todo desde env vars o DB
-- [ ] Headers de respuesta de agente externo NO propagados al caller
-- [ ] Output del agente validado como JSON antes de pasar al siguiente (si no parsea: pasa como string)
-
-### AC-9 — Observabilidad
-- [ ] Cada pipeline tiene `pipeline_id` (UUID v4) en logs y DB
-- [ ] Logs estructurados JSON en cada evento (`pipeline_start`, `pipeline_step`, `pipeline_complete`, `pipeline_abort`)
-- [ ] `pipeline_executions` registra `status`, `steps_completed`, `steps_requested`, `total_cost_usdc`
-
----
-
-## Ruta del archivo
-
-```
-src/app/api/v1/compose/route.ts
-```
-
-**Archivo único de lógica nueva.** Reutiliza libs existentes:
-- `@/lib/supabase/service` → `createServiceClient()`
-- `@/lib/viem` → `getOperatorClient()`
-- `@/lib/ssrf` → `validateUrl()`
-- `@/lib/upstash` → nueva instancia `composeRatelimit`
-
----
-
-## Migration SQL — 017
-
-**Archivo:** `supabase/migrations/017_pipeline_executions.sql`
-
-```sql
--- ============================================================
--- Migration 017: pipeline_executions + pipeline_id en agent_calls
--- Proyecto: WasiAI | Sprint: 3 | HU: 5.1
--- ============================================================
-
--- Tabla principal de ejecución de pipelines
-CREATE TABLE IF NOT EXISTS pipeline_executions (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  key_id            UUID NOT NULL REFERENCES api_keys(id) ON DELETE RESTRICT,
-  steps_requested   SMALLINT NOT NULL CHECK (steps_requested BETWEEN 2 AND 10),
-  steps_completed   SMALLINT NOT NULL DEFAULT 0,
-  total_cost_usdc   NUMERIC(18, 6) NOT NULL DEFAULT 0,
-  status            TEXT NOT NULL CHECK (status IN ('success', 'partial', 'failed')),
-  failed_at_step    SMALLINT,           -- NULL si success
-  error_detail      TEXT,               -- mensaje del error si aplica
-  receipt_signature TEXT,               -- ECDSA hex, NULL si failed antes de completar
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  completed_at      TIMESTAMPTZ
-);
-
--- FK opcional en agent_calls para trazabilidad de pipeline
-ALTER TABLE agent_calls
-  ADD COLUMN IF NOT EXISTS pipeline_id UUID REFERENCES pipeline_executions(id) ON DELETE SET NULL;
-
--- Índices
-CREATE INDEX IF NOT EXISTS idx_pipeline_executions_key_id
-  ON pipeline_executions(key_id);
-
-CREATE INDEX IF NOT EXISTS idx_pipeline_executions_created_at
-  ON pipeline_executions(created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_agent_calls_pipeline_id
-  ON agent_calls(pipeline_id)
-  WHERE pipeline_id IS NOT NULL;
-
--- RLS
-ALTER TABLE pipeline_executions ENABLE ROW LEVEL SECURITY;
-
--- Service role acceso total (endpoint usa createServiceClient)
-CREATE POLICY "service_role_full_access" ON pipeline_executions
-  FOR ALL
-  TO service_role
-  USING (true)
-  WITH CHECK (true);
-
--- Owners de keys pueden leer sus pipelines (futuro dashboard)
-CREATE POLICY "key_owner_read" ON pipeline_executions
-  FOR SELECT
-  USING (
-    key_id IN (
-      SELECT id FROM api_keys WHERE user_id = auth.uid()
-    )
-  );
-```
-
----
-
-## Request / Response Schema
-
-### Request
-
+**Flujo ejemplo:**
 ```
 POST /api/v1/compose
-X-API-Key: wai_sk_xxxxx
-Content-Type: application/json
-```
-
-```json
 {
   "steps": [
-    {
-      "agent_id": "550e8400-e29b-41d4-a716-446655440000",
-      "input": "Resume este contrato legal: El contrato establece que las partes..."
-    },
-    {
-      "agent_id": "550e8400-e29b-41d4-a716-446655440001",
-      "input": "$prev"
-    },
-    {
-      "agent_id": "550e8400-e29b-41d4-a716-446655440002",
-      "input": {
-        "text": "$prev",
-        "format": "json",
-        "language": "es"
-      }
-    }
+    { "agent_slug": "ocr-reader",         "input": "<image_url>" },
+    { "agent_slug": "translator-es",      "pass_output": true },
+    { "agent_slug": "sentiment-analyzer", "pass_output": true }
   ]
 }
+
+→ WasiAI ejecuta en secuencia:
+   Step 0: ocr-reader         → extrae texto  → paga 0.008 USDC on-chain
+   Step 1: translator-es      → traduce texto → paga 0.002 USDC on-chain
+   Step 2: sentiment-analyzer → analiza       → paga 0.001 USDC on-chain
+
+→ Response: output del Step 2 + receipts firmados del pipeline
 ```
-
-**Reglas:**
-- `steps`: array, 2–10 elementos. Requerido.
-- `steps[].agent_id`: UUID v4 válido. Requerido.
-- `steps[].input`: `string | object`. Requerido.
-- `"$prev"` (string exacto): en step N>1, se sustituye por output del step N-1.
-- `"$prev"` en valores de objeto también se sustituye.
-- Step 1 no puede usar `"$prev"` (no hay output previo).
-- Campos extra: ignorados silenciosamente.
-
-### Response exitosa (200 OK)
-
-```json
-{
-  "pipeline_id": "7f3e9c2a-1b4d-4e8f-a6c0-2d5b9f0e3a1c",
-  "steps_completed": 3,
-  "steps_total": 3,
-  "status": "success",
-  "result": "{\"summary\": [\"Punto 1\", \"Punto 2\"]}",
-  "steps": [
-    {
-      "step": 1,
-      "agent_id": "550e8400-e29b-41d4-a716-446655440000",
-      "input": "Resume este contrato legal: El contrato establece que...",
-      "output": "El contrato establece tres obligaciones principales...",
-      "latency_ms": 1240,
-      "cost_usdc": "0.050000"
-    },
-    {
-      "step": 2,
-      "agent_id": "550e8400-e29b-41d4-a716-446655440001",
-      "input": "El contrato establece tres obligaciones principales...",
-      "output": "Puntos clave: 1. Entrega en 30 días. 2. Pago neto 60.",
-      "latency_ms": 980,
-      "cost_usdc": "0.030000"
-    },
-    {
-      "step": 3,
-      "agent_id": "550e8400-e29b-41d4-a716-446655440002",
-      "input": "{\"text\":\"Puntos clave: 1. Entrega en 30 días...\",\"format\":\"json\",\"language\":\"es\"}",
-      "output": "{\"summary\": [\"Punto 1\", \"Punto 2\"]}",
-      "latency_ms": 1510,
-      "cost_usdc": "0.040000"
-    }
-  ],
-  "total_cost_usdc": "0.120000",
-  "receipt_signature": "0xabc123...def456"
-}
-```
-
-### Response error parcial (502 Bad Gateway)
-
-```json
-{
-  "pipeline_id": "7f3e9c2a-1b4d-4e8f-a6c0-2d5b9f0e3a1c",
-  "status": "partial",
-  "failed_at_step": 2,
-  "steps_completed": 1,
-  "steps_total": 3,
-  "error": "Agent 550e8400-e29b-41d4-a716-446655440001 returned 500",
-  "result_so_far": "El contrato establece tres obligaciones principales...",
-  "steps": [
-    {
-      "step": 1,
-      "agent_id": "550e8400-e29b-41d4-a716-446655440000",
-      "output": "El contrato establece tres obligaciones principales...",
-      "latency_ms": 1240,
-      "cost_usdc": "0.050000"
-    }
-  ],
-  "total_cost_usdc": "0.050000"
-}
-```
-
-### Códigos de error
-
-| HTTP | Condición | Body |
-|------|-----------|------|
-| `400` | JSON malformado o steps fuera de rango | `{ "error": "steps must be an array of 2–10 elements" }` |
-| `401` | X-API-Key ausente o no encontrada | `{ "error": "Unauthorized" }` |
-| `402` | Saldo insuficiente pre-flight | `{ "error": "Insufficient balance", "required": "0.12", "available": "0.05", "currency": "USDC" }` |
-| `403` | Key inactiva | `{ "error": "API key is inactive" }` |
-| `413` | Output de step supera límite | `{ "error": "Step 2 output exceeds size limit (100KB)" }` |
-| `422` | Agentes inválidos o inactivos | `{ "error": "Invalid agents", "invalid_agents": ["<uuid>"] }` |
-| `429` | Rate limit excedido | `{ "error": "Rate limit exceeded. Try again in 60 seconds." }` |
-| `502` | Agente externo retornó error | Ver schema error parcial |
-| `504` | Timeout en un step | `{ ..., "error": "Step 2 timed out after 8000ms", "status": "partial" }` |
 
 ---
 
-## Código completo — route.ts
+## Orden de Implementación Obligatorio
+
+```
+1. Migration 017          ← schema primero, siempre
+2. Endpoint compose       ← lógica de orquestación
+3. Rate limit             ← añadir getComposeLimit() a ratelimit.ts
+4. Receipts               ← integrar signReceipt() por step
+5. Tests                  ← unitarios + integración Fuji
+```
+
+No cambiar este orden. Si hay duda, preguntar antes de avanzar.
+
+---
+
+## Archivos a Crear / Modificar
+
+| Acción | Archivo | Notas |
+|---|---|---|
+| CREAR | `supabase/migrations/017_pipeline_compose.sql` | Columnas pipeline_id + step_index |
+| CREAR | `src/app/api/v1/compose/route.ts` | Endpoint principal ~250 líneas |
+| MODIFICAR | `src/lib/ratelimit.ts` | Añadir `getComposeLimit()` (lazy singleton) |
+
+**SIN TOCAR:**
+- `/invoke/route.ts` — no modificar
+- Contratos Solidity — sin cambio on-chain
+- Frontend — fuera de scope
+- Otras migrations — solo 017
+
+---
+
+## PASO 1 — Migration 017
+
+**Archivo:** `supabase/migrations/017_pipeline_compose.sql`
+
+```sql
+-- Migration 017: Add pipeline tracking columns to agent_calls
+-- HU-5.1 — Compose API
+
+ALTER TABLE agent_calls
+  ADD COLUMN IF NOT EXISTS pipeline_id  uuid    DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS step_index   integer DEFAULT NULL;
+
+-- Índice para consultas de auditoría: "dame todos los steps de un pipeline"
+CREATE INDEX IF NOT EXISTS idx_agent_calls_pipeline_id
+  ON agent_calls (pipeline_id)
+  WHERE pipeline_id IS NOT NULL;
+
+-- Índice compuesto para ordenar steps de un pipeline por orden de ejecución
+CREATE INDEX IF NOT EXISTS idx_agent_calls_pipeline_step
+  ON agent_calls (pipeline_id, step_index)
+  WHERE pipeline_id IS NOT NULL;
+
+COMMENT ON COLUMN agent_calls.pipeline_id  IS 'UUID del pipeline compose; NULL para llamadas individuales vía /invoke';
+COMMENT ON COLUMN agent_calls.step_index   IS '0-based índice del step dentro del pipeline; NULL para /invoke';
+```
+
+**Notas críticas:**
+- Columnas nullable — no rompe `/invoke` existente (inserta NULL en ambas)
+- RLS hereda de `agent_calls` (ya activo desde migration 000)
+- No se necesita RPC nueva — el insert del compose pasa `pipeline_id` y `step_index`
+
+**Verificación post-migration:**
+```sql
+-- Debe devolver las columnas pipeline_id y step_index
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'agent_calls'
+  AND column_name IN ('pipeline_id', 'step_index');
+```
+
+---
+
+## PASO 2 — Endpoint Compose
+
+**Archivo:** `src/app/api/v1/compose/route.ts`
+
+### Tipos e Interfaces
 
 ```typescript
-// src/app/api/v1/compose/route.ts
-// HU-5.1 — Agent-to-Agent Routing
-// GOLDEN PATH: Next.js 14 App Router | createServiceClient | viem v2 | no ethers | no hardcodes
-
-import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/service'
-import { getOperatorClient } from '@/lib/viem'
-import { validateUrl } from '@/lib/ssrf'
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
-import { keccak256, encodePacked } from 'viem'
-import { randomUUID } from 'crypto'
-
-// ─── Config desde env vars (no hardcodes) ────────────────────────
-const STEP_TIMEOUT_MS = parseInt(
-  process.env.COMPOSE_STEP_TIMEOUT_MS?.trim() ?? '8000',
-  10
-)
-const MAX_STEP_OUTPUT_BYTES = parseInt(
-  process.env.COMPOSE_MAX_STEP_OUTPUT_BYTES?.trim() ?? '102400',
-  10
-)
-
-// ─── Rate limit: wasiai:compose, 10 req/min por key ──────────────
-const composeRatelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '60 s'),
-  prefix: 'wasiai:compose',
-  analytics: false,
-})
-
-// ─── Tipos internos ───────────────────────────────────────────────
-interface PipelineStep {
-  agent_id: string
-  input: string | Record<string, unknown>
+// ── Request types
+interface ComposeStep {
+  agent_slug:   string
+  input?:       string   // input explícito para este step
+  pass_output?: boolean  // si true, usa output del step anterior como input
 }
 
-interface StepResult {
-  step: number
-  agent_id: string
-  input: string
-  output: string
-  latency_ms: number
-  cost_usdc: string
+interface ComposeRequest {
+  steps: ComposeStep[]   // min: 1, max: 5
 }
 
+// ── Response types
+interface StepReceipt {
+  step:              number
+  agent_slug:        string
+  cost_usdc:         string        // e.g. "0.008000"
+  receipt_signature: string        // firma ECDSA del operator
+  call_id:           string        // UUID del agent_call en DB
+}
+
+interface ComposeResponse {
+  pipeline_id:      string
+  steps_executed:   number
+  total_cost_usdc:  string
+  result:           unknown
+  receipts:         StepReceipt[]
+}
+
+interface PipelineFailedResponse {
+  error:            string
+  code:             'step_failed'
+  failed_step:      number
+  reason:           string
+  steps_executed:   number
+  partial_receipts: StepReceipt[]
+}
+
+// ── Agent row from DB
 interface AgentRow {
-  id: string
-  status: string
-  price_per_call: number
-  endpoint_url: string
+  id:              string
+  slug:            string
+  name:            string
+  price_per_call:  number
+  endpoint_url:    string
+  status:          string
 }
 
-// ─── Handler principal ────────────────────────────────────────────
-export async function POST(req: NextRequest): Promise<NextResponse> {
+// ── Key row from DB
+interface KeyRow {
+  id:          string
+  key_hash:    string
+  is_active:   boolean
+  budget_usdc: number
+  spent_usdc:  number
+}
+```
+
+### Imports y Constantes
+
+```typescript
+import { NextRequest, NextResponse }  from 'next/server'
+import { createHash }                  from 'crypto'
+import { createServiceClient }         from '@/lib/supabase/server'
+import { validateEndpointUrl }         from '@/lib/security/validateEndpointUrl'
+import { getComposeLimit }             from '@/lib/ratelimit'
+import { signReceipt }                 from '@/lib/receipts/signReceipt'
+import { keyHashToBytes32 }            from '@/lib/contracts/marketplaceClient'
+import { logger }                      from '@/lib/logger'
+// NO ethers.js — solo viem v2 (ya migrado en HAL-010)
+// NO NEXT_PUBLIC_ para secrets
+
+const MAX_STEPS    = 5
+const STEP_TIMEOUT = 8_000  // ms por step
+```
+
+### Función Principal POST
+
+```typescript
+export async function POST(request: NextRequest) {
   const supabase = createServiceClient()
 
-  // ── [1] Parse & Validate body ──────────────────────────────────
-  let body: { steps?: unknown }
-  try {
-    body = await req.json()
-  } catch {
+  // ── [0] RATE LIMIT
+  const rawKey = request.headers.get('X-Api-Key') ?? ''
+  const keyHash = rawKey
+    ? createHash('sha256').update(rawKey).digest('hex')
+    : 'anonymous'
+
+  const limiter = getComposeLimit()
+  const identifier = `key:${keyHash.slice(0, 24)}`
+  const { success, limit, remaining, reset } = await limiter.limit(identifier)
+
+  if (!success) {
     return NextResponse.json(
-      { error: 'Invalid JSON body' },
-      { status: 400 }
+      { error: 'Rate limit exceeded', code: 'rate_limited', limit, remaining: 0, reset_at: new Date(reset).toISOString() },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit':     String(limit),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset':     String(reset),
+          'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
+        },
+      }
     )
   }
 
-  const rawSteps = body?.steps
-  if (!Array.isArray(rawSteps) || rawSteps.length < 2 || rawSteps.length > 10) {
+  // ── [1] AUTH
+  if (!rawKey) {
     return NextResponse.json(
-      { error: 'steps must be an array of 2–10 elements' },
-      { status: 400 }
+      { error: 'Invalid or inactive API key', code: 'invalid_key' },
+      { status: 401 }
     )
   }
 
-  const steps: PipelineStep[] = []
-  for (let i = 0; i < rawSteps.length; i++) {
-    const s = rawSteps[i]
-    if (!s || typeof s !== 'object') {
-      return NextResponse.json(
-        { error: `Step ${i + 1} is invalid` },
-        { status: 400 }
-      )
-    }
-    const { agent_id, input } = s as Record<string, unknown>
-    if (typeof agent_id !== 'string' || !isValidUUID(agent_id)) {
-      return NextResponse.json(
-        { error: `Step ${i + 1}: agent_id must be a valid UUID` },
-        { status: 400 }
-      )
-    }
-    if (input === undefined || input === null) {
-      return NextResponse.json(
-        { error: `Step ${i + 1}: input is required` },
-        { status: 400 }
-      )
-    }
-    // $prev en step 1 no tiene sentido (no hay output previo)
-    if (i === 0 && input === '$prev') {
-      return NextResponse.json(
-        { error: 'Step 1 cannot use "$prev" (no previous output)' },
-        { status: 400 }
-      )
-    }
-    steps.push({ agent_id, input: input as string | Record<string, unknown> })
-  }
-
-  // ── [2] Auth: validar API key ──────────────────────────────────
-  const apiKey = req.headers.get('x-api-key')?.trim()
-  if (!apiKey) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Comparar con hash SHA-256 de la key (mismo patrón que HU-1.1)
-  const keyHash = await hashApiKey(apiKey)
   const { data: keyRow, error: keyError } = await supabase
-    .from('api_keys')
-    .select('id, status, balance, user_id')
+    .from('agent_keys')
+    .select('id, key_hash, is_active, budget_usdc, spent_usdc')
     .eq('key_hash', keyHash)
-    .single()
+    .eq('is_active', true)
+    .single<KeyRow>()
 
   if (keyError || !keyRow) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  if (keyRow.status !== 'active') {
-    return NextResponse.json({ error: 'API key is inactive' }, { status: 403 })
-  }
-
-  const keyId: string = keyRow.id
-
-  // ── [3] Rate limit (por keyId, no IP) ─────────────────────────
-  const { success: rlSuccess } = await composeRatelimit.limit(keyId)
-  if (!rlSuccess) {
     return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again in 60 seconds.' },
-      { status: 429 }
+      { error: 'Invalid or inactive API key', code: 'invalid_key' },
+      { status: 401 }
     )
   }
 
-  // ── [4] Pre-flight: validar agentes ───────────────────────────
-  const agentIds = steps.map((s) => s.agent_id)
-  const { data: agentRows, error: agentError } = await supabase
-    .from('agents')
-    .select('id, status, price_per_call, endpoint_url')
-    .in('id', agentIds)
-
-  if (agentError) {
-    return NextResponse.json({ error: 'Internal error validating agents' }, { status: 500 })
+  // ── [2] PARSE + VALIDAR BODY
+  let body: ComposeRequest
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON body', code: 'validation_error' },
+      { status: 400 }
+    )
   }
 
-  const foundAgents = new Map<string, AgentRow>(
-    (agentRows ?? []).map((a: AgentRow) => [a.id, a])
+  const validationError = validateSteps(body.steps)
+  if (validationError) {
+    return NextResponse.json(
+      { error: validationError, code: 'validation_error' },
+      { status: 400 }
+    )
+  }
+
+  const steps = body.steps
+
+  // ── [3] RESOLVER AGENTES (1 query batch)
+  const slugs = [...new Set(steps.map(s => s.agent_slug))]
+  const { data: agentsData } = await supabase
+    .from('agents')
+    .select('id, slug, name, price_per_call, endpoint_url, status')
+    .in('slug', slugs)
+    .eq('status', 'active')
+
+  const agentMap = new Map<string, AgentRow>(
+    (agentsData ?? []).map(a => [a.slug, a as AgentRow])
   )
 
-  const invalidAgents: string[] = []
-  for (const id of agentIds) {
-    const agent = foundAgents.get(id)
-    if (!agent || agent.status !== 'active') {
-      invalidAgents.push(id)
+  for (let i = 0; i < steps.length; i++) {
+    if (!agentMap.has(steps[i].agent_slug)) {
+      return NextResponse.json(
+        { error: 'Agent not found', code: 'agent_not_found', step: i, slug: steps[i].agent_slug },
+        { status: 404 }
+      )
     }
   }
-  if (invalidAgents.length > 0) {
-    return NextResponse.json(
-      { error: 'Invalid agents', invalid_agents: invalidAgents },
-      { status: 422 }
-    )
-  }
 
-  // ── [5] Pre-flight: verificar saldo ───────────────────────────
-  // Precio se lee por agent_id en orden del pipeline (puede haber duplicados)
-  const estimatedCost = steps.reduce((sum, s) => {
-    const agent = foundAgents.get(s.agent_id)!
-    return sum + (agent.price_per_call ?? 0)
-  }, 0)
+  // ── [4] PREFLIGHT DE SALDO
+  const totalRequired = steps.reduce((acc, s) => acc + (agentMap.get(s.agent_slug)?.price_per_call ?? 0), 0)
+  const available = keyRow.budget_usdc - keyRow.spent_usdc
 
-  const currentBalance: number = keyRow.balance ?? 0
-  if (currentBalance < estimatedCost) {
+  if (available < totalRequired) {
     return NextResponse.json(
       {
-        error: 'Insufficient balance',
-        required: estimatedCost.toFixed(6),
-        available: currentBalance.toFixed(6),
-        currency: 'USDC',
+        error:          'Insufficient balance',
+        code:           'insufficient_balance',
+        required_usdc:  totalRequired.toFixed(6),
+        available_usdc: available.toFixed(6),
       },
       { status: 402 }
     )
   }
 
-  // ── [6] Crear pipeline_execution provisional ──────────────────
-  const pipelineId = randomUUID()
-  const startTs = Date.now()
-
-  await supabase.from('pipeline_executions').insert({
-    id: pipelineId,
-    key_id: keyId,
-    steps_requested: steps.length,
-    steps_completed: 0,
-    total_cost_usdc: 0,
-    status: 'failed', // provisional — se actualiza al terminar
-  })
-
-  structuredLog('pipeline_start', {
-    pipeline_id: pipelineId,
-    key_id: keyId,
-    steps_count: steps.length,
-  })
-
-  // ── [7] Loop de ejecución secuencial ──────────────────────────
-  const stepResults: StepResult[] = []
-  let prevOutput = ''
-  let totalCost = 0
-
+  // ── [5] SSRF PREFLIGHT (todos los endpoints antes de ejecutar)
   for (let i = 0; i < steps.length; i++) {
-    const stepNum = i + 1
-    const stepDef = steps[i]
-
-    // [7a] Resolver input ($prev)
-    const resolvedInput = resolvePrev(stepDef.input, prevOutput)
-    const resolvedInputStr =
-      typeof resolvedInput === 'string'
-        ? resolvedInput
-        : JSON.stringify(resolvedInput)
-
-    // [7b] Re-leer precio actual del agente desde DB (no cachear del pre-flight)
-    const { data: freshAgent, error: freshAgentError } = await supabase
-      .from('agents')
-      .select('price_per_call, endpoint_url, status')
-      .eq('id', stepDef.agent_id)
-      .single()
-
-    if (freshAgentError || !freshAgent || freshAgent.status !== 'active') {
-      await abortPipeline(supabase, pipelineId, stepNum, stepResults, totalCost,
-        `Agent ${stepDef.agent_id} is no longer active`)
-      return buildPartialResponse(pipelineId, stepNum, stepResults, totalCost,
-        `Agent ${stepDef.agent_id} is no longer active`, 502)
-    }
-
-    const pricePerCall: number = freshAgent.price_per_call ?? 0
-    const endpointUrl: string = freshAgent.endpoint_url
-
-    // [7c] SSRF protection
-    const isSafe = await validateUrl(endpointUrl)
-    if (!isSafe) {
-      await abortPipeline(supabase, pipelineId, stepNum, stepResults, totalCost,
-        `Agent ${stepDef.agent_id} endpoint URL failed SSRF validation`)
-      return buildPartialResponse(pipelineId, stepNum, stepResults, totalCost,
-        `Agent ${stepDef.agent_id} endpoint URL is invalid`, 502)
-    }
-
-    // [7d] Fetch al agente externo con timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), STEP_TIMEOUT_MS)
-    const stepStart = Date.now()
-
-    let agentResponseBody: unknown
+    const agent = agentMap.get(steps[i].agent_slug)!
     try {
-      const agentRes = await fetch(endpointUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Pipeline-Id': pipelineId,
-          'X-Pipeline-Step': String(stepNum),
-        },
-        body: JSON.stringify({ input: resolvedInput }),
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
+      validateEndpointUrl(agent.endpoint_url)
+    } catch {
+      return NextResponse.json(
+        {
+          error:            `Pipeline failed at step ${i}`,
+          code:             'step_failed',
+          failed_step:      i,
+          reason:           'SSRF_BLOCKED',
+          steps_executed:   0,
+          partial_receipts: [],
+        } satisfies PipelineFailedResponse,
+        { status: 422 }
+      )
+    }
+  }
 
-      if (!agentRes.ok) {
-        const latencyMs = Date.now() - stepStart
-        structuredLog('pipeline_step', {
-          pipeline_id: pipelineId, step: stepNum,
-          agent_id: stepDef.agent_id, latency_ms: latencyMs,
-          status: 'error', http_status: agentRes.status,
-        })
-        await abortPipeline(supabase, pipelineId, stepNum, stepResults, totalCost,
-          `Agent ${stepDef.agent_id} returned ${agentRes.status}`)
-        return buildPartialResponse(pipelineId, stepNum, stepResults, totalCost,
-          `Agent ${stepDef.agent_id} returned ${agentRes.status}`, 502)
+  // ── [6] REDIS LOCK (race condition mitigation)
+  // Importar redis client desde @/lib/ratelimit o @/lib/redis
+  const redis = getRedisClient()
+  const lockKey = `compose:lock:${keyRow.id}`
+  const acquired = await redis.set(lockKey, '1', { nx: true, ex: 30 })
+
+  if (!acquired) {
+    return NextResponse.json(
+      { error: 'Concurrent pipeline in progress for this key', code: 'key_locked' },
+      { status: 409 }
+    )
+  }
+
+  // ── [7] LOOP SECUENCIAL
+  const pipelineId = crypto.randomUUID()
+  const receipts: StepReceipt[] = []
+  let lastOutput: string | null = null
+
+  try {
+    for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+      const step  = steps[stepIndex]
+      const agent = agentMap.get(step.agent_slug)!
+
+      // [7a] Construir input del step
+      let stepInput: string
+      if (stepIndex === 0) {
+        stepInput = step.input ?? ''
+      } else if (step.pass_output) {
+        stepInput = lastOutput ?? ''
+      } else {
+        stepInput = step.input ?? ''
       }
 
-      // NO propagar headers del agente externo al caller
-      agentResponseBody = await agentRes.json().catch(() => agentRes.text())
-
-    } catch (err: unknown) {
-      clearTimeout(timeoutId)
-      const latencyMs = Date.now() - stepStart
-      const isTimeout = err instanceof Error && err.name === 'AbortError'
-      const errMsg = isTimeout
-        ? `Step ${stepNum} timed out after ${STEP_TIMEOUT_MS}ms`
-        : `Step ${stepNum} fetch error: ${String(err)}`
-
-      structuredLog('pipeline_step', {
-        pipeline_id: pipelineId, step: stepNum,
-        agent_id: stepDef.agent_id, latency_ms: latencyMs,
-        status: isTimeout ? 'timeout' : 'error',
+      // [7b] Deducir saldo atómicamente ANTES del fetch
+      const { error: spendError } = await supabase.rpc('increment_agent_key_spend', {
+        p_key_id: keyRow.id,
+        p_amount: agent.price_per_call,
       })
-      await abortPipeline(supabase, pipelineId, stepNum, stepResults, totalCost, errMsg)
-      return buildPartialResponse(pipelineId, stepNum, stepResults, totalCost,
-        errMsg, isTimeout ? 504 : 502)
+
+      if (spendError) {
+        logger.warn({ spendError, stepIndex, pipelineId }, 'Spend RPC failed — possible race condition')
+        return NextResponse.json(
+          {
+            error:            `Pipeline failed at step ${stepIndex}`,
+            code:             'step_failed',
+            failed_step:      stepIndex,
+            reason:           'Insufficient balance (race condition detected)',
+            steps_executed:   stepIndex,
+            partial_receipts: receipts,
+          } satisfies PipelineFailedResponse,
+          { status: 422 }
+        )
+      }
+
+      // [7c] Llamar al agente externo
+      const startMs = Date.now()
+      let stepOutput: unknown
+      let stepStatus: 'success' | 'error' = 'success'
+      let stepErrorReason = ''
+
+      try {
+        const res = await fetch(agent.endpoint_url, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ input: stepInput }),
+          signal:  AbortSignal.timeout(STEP_TIMEOUT),
+        })
+
+        if (res.ok) {
+          const ct = res.headers.get('content-type') ?? ''
+          stepOutput = ct.includes('application/json') ? await res.json() : await res.text()
+        } else {
+          stepStatus = 'error'
+          stepErrorReason = `Upstream ${res.status}`
+          stepOutput = { error: stepErrorReason }
+        }
+      } catch (err) {
+        stepStatus = 'error'
+        stepErrorReason = err instanceof Error && err.name === 'TimeoutError'
+          ? 'TIMEOUT'
+          : `Upstream unreachable: ${String(err)}`
+        stepOutput = { error: stepErrorReason }
+      }
+
+      const latencyMs = Date.now() - startMs
+
+      // [7d] Logging del step
+      let callId = ''
+      try {
+        const { data: callRecord } = await supabase
+          .from('agent_calls')
+          .insert({
+            agent_id:    agent.id,
+            caller_type: 'agent',
+            amount_paid: agent.price_per_call,
+            tx_hash:     null,
+            status:      stepStatus,
+            latency_ms:  latencyMs,
+            key_id:      keyRow.id,
+            agent_slug:  agent.slug,
+            is_trial:    false,
+            pipeline_id: pipelineId,
+            step_index:  stepIndex,
+          })
+          .select('id')
+          .single()
+        callId = callRecord?.id ?? ''
+      } catch (logErr) {
+        logger.warn({ logErr, stepIndex, pipelineId }, 'logCall failed — continuing pipeline')
+      }
+
+      // [7e] Firmar receipt del step (best-effort)
+      let signature = ''
+      try {
+        const receiptTimestamp = Math.floor(Date.now() / 1000)
+        signature = await signReceipt({
+          keyId:      keyHashToBytes32(keyRow.key_hash),
+          callId,
+          agentSlug:  agent.slug,
+          amountUsdc: agent.price_per_call,
+          timestamp:  receiptTimestamp,
+        })
+        // Guardar signature en DB (fire-and-forget)
+        supabase
+          .from('agent_calls')
+          .update({ receipt_signature: signature })
+          .eq('id', callId)
+          .then()
+          .catch(e => logger.warn({ e }, 'receipt_signature update failed'))
+      } catch (sigErr) {
+        logger.warn({ sigErr, stepIndex }, 'signReceipt failed — pipeline continues')
+      }
+
+      // [7f] Evaluar resultado del step
+      if (stepStatus === 'error') {
+        return NextResponse.json(
+          {
+            error:            `Pipeline failed at step ${stepIndex}`,
+            code:             'step_failed',
+            failed_step:      stepIndex,
+            reason:           stepErrorReason,
+            steps_executed:   stepIndex,    // steps 0..stepIndex-1 fueron exitosos
+            partial_receipts: receipts,
+          } satisfies PipelineFailedResponse,
+          { status: 422 }
+        )
+      }
+
+      // Step exitoso — acumular
+      lastOutput = typeof stepOutput === 'string'
+        ? stepOutput
+        : JSON.stringify(stepOutput)
+
+      receipts.push({
+        step:              stepIndex,
+        agent_slug:        agent.slug,
+        cost_usdc:         agent.price_per_call.toFixed(6),
+        receipt_signature: signature,
+        call_id:           callId,
+      })
+
+      // [7g] Incrementar stats del agente (fire-and-forget)
+      supabase
+        .rpc('increment_agent_stats', { p_agent_id: agent.id, p_amount: agent.price_per_call })
+        .then()
+        .catch(e => logger.warn({ e }, 'increment_agent_stats failed'))
     }
-
-    const latencyMs = Date.now() - stepStart
-
-    // [7e] Extraer output
-    const rawOutput = extractOutput(agentResponseBody)
-
-    // Verificar tamaño del output
-    const outputBytes = new TextEncoder().encode(rawOutput).length
-    if (outputBytes > MAX_STEP_OUTPUT_BYTES) {
-      await abortPipeline(supabase, pipelineId, stepNum, stepResults, totalCost,
-        `Step ${stepNum} output exceeds size limit`)
-      return NextResponse.json(
-        { error: `Step ${stepNum} output exceeds size limit (${Math.round(MAX_STEP_OUTPUT_BYTES / 1024)}KB)` },
-        { status: 413 }
-      )
-    }
-
-    prevOutput = rawOutput
-
-    // [7f] Descuento atómico de saldo (UPDATE ... WHERE balance >= price)
-    const { data: updateData, error: updateError } = await supabase.rpc(
-      'deduct_key_balance',
-      { p_key_id: keyId, p_amount: pricePerCall }
-    )
-
-    // Si la función RPC no existe, usar UPDATE directo con count check:
-    // const { count } = await supabase
-    //   .from('api_keys')
-    //   .update({ balance: supabase.rpc('balance - ' + pricePerCall) })
-    //   .eq('id', keyId)
-    //   .gte('balance', pricePerCall)
-    // if (count === 0) { ... }
-
-    if (updateError || updateData === false) {
-      // Saldo insuficiente en mitad del pipeline
-      await abortPipeline(supabase, pipelineId, stepNum, stepResults, totalCost,
-        'Insufficient balance mid-pipeline')
-      const partialResp = buildPartialResponse(
-        pipelineId, stepNum, stepResults, totalCost,
-        'Insufficient balance mid-pipeline', 402
-      )
-      return partialResp
-    }
-
-    totalCost += pricePerCall
-
-    // [7g] Registrar agent_call individual
-    await supabase.from('agent_calls').insert({
-      agent_id: stepDef.agent_id,
-      key_id: keyId,
-      pipeline_id: pipelineId,
-      status: 'success',
-      latency_ms: latencyMs,
-      cost_usdc: pricePerCall,
-      is_trial: false,
-    })
-
-    const stepResult: StepResult = {
-      step: stepNum,
-      agent_id: stepDef.agent_id,
-      input: resolvedInputStr,
-      output: rawOutput,
-      latency_ms: latencyMs,
-      cost_usdc: pricePerCall.toFixed(6),
-    }
-    stepResults.push(stepResult)
-
-    structuredLog('pipeline_step', {
-      pipeline_id: pipelineId, step: stepNum,
-      agent_id: stepDef.agent_id, latency_ms: latencyMs,
-      status: 'success', cost_usdc: pricePerCall,
-    })
+  } finally {
+    // Liberar lock siempre, pase lo que pase
+    await redis.del(lockKey)
   }
 
-  // ── [8] Firma ECDSA del receipt ────────────────────────────────
-  const timestamp = Math.floor(Date.now() / 1000)
-  const receiptSignature = await signPipelineReceipt(
-    pipelineId,
-    keyId,
-    totalCost.toFixed(6),
-    timestamp
-  )
-
-  // ── [9] Actualizar pipeline_execution ─────────────────────────
-  await supabase
-    .from('pipeline_executions')
-    .update({
-      status: 'success',
-      steps_completed: steps.length,
-      total_cost_usdc: totalCost,
-      receipt_signature: receiptSignature,
-      completed_at: new Date().toISOString(),
-    })
-    .eq('id', pipelineId)
-
-  structuredLog('pipeline_complete', {
-    pipeline_id: pipelineId,
-    status: 'success',
-    steps_completed: steps.length,
-    total_cost_usdc: totalCost,
-    total_latency_ms: Date.now() - startTs,
-  })
-
-  // ── [10] Responder 200 ─────────────────────────────────────────
-  return NextResponse.json({
-    pipeline_id: pipelineId,
-    steps_completed: steps.length,
-    steps_total: steps.length,
-    status: 'success',
-    result: prevOutput,
-    steps: stepResults,
-    total_cost_usdc: totalCost.toFixed(6),
-    receipt_signature: receiptSignature,
-  })
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────
-
-/** Sustituye "$prev" (string exacto o valores en objeto) por prevOutput */
-function resolvePrev(
-  input: string | Record<string, unknown>,
-  prevOutput: string
-): string | Record<string, unknown> {
-  if (typeof input === 'string') {
-    return input === '$prev' ? prevOutput : input
-  }
-  // objeto: sustituir valores string que sean "$prev"
-  const resolved: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(input)) {
-    resolved[k] = typeof v === 'string' && v === '$prev' ? prevOutput : v
-  }
-  return resolved
-}
-
-/** Extrae el output de la respuesta del agente externo */
-function extractOutput(body: unknown): string {
-  if (typeof body === 'string') return body
-  if (body && typeof body === 'object') {
-    const obj = body as Record<string, unknown>
-    // Si tiene campo "response", usarlo
-    if ('response' in obj) {
-      const r = obj['response']
-      return typeof r === 'string' ? r : JSON.stringify(r)
-    }
-    // Body completo como string
-    return JSON.stringify(obj)
-  }
-  return String(body)
-}
-
-/** Firma ECDSA del receipt del pipeline usando viem v2 */
-async function signPipelineReceipt(
-  pipelineId: string,
-  keyId: string,
-  totalCostUsdc: string,
-  timestamp: number
-): Promise<string> {
-  const operatorClient = getOperatorClient()
-
-  const messageHash = keccak256(
-    encodePacked(
-      ['string', 'string', 'string', 'uint256'],
-      [pipelineId, keyId, totalCostUsdc, BigInt(timestamp)]
-    )
-  )
-
-  const signature = await operatorClient.signMessage({
-    message: { raw: messageHash },
-  })
-
-  return signature // "0x..."
-}
-
-/** Actualiza pipeline_executions como abortado y loguea */
-async function abortPipeline(
-  supabase: ReturnType<typeof createServiceClient>,
-  pipelineId: string,
-  failedAtStep: number,
-  stepResults: StepResult[],
-  totalCost: number,
-  errorDetail: string
-): Promise<void> {
-  const status = stepResults.length === 0 ? 'failed' : 'partial'
-  await supabase
-    .from('pipeline_executions')
-    .update({
-      status,
-      steps_completed: stepResults.length,
-      failed_at_step: failedAtStep,
-      total_cost_usdc: totalCost,
-      error_detail: errorDetail,
-      completed_at: new Date().toISOString(),
-    })
-    .eq('id', pipelineId)
-
-  structuredLog('pipeline_abort', {
-    pipeline_id: pipelineId,
-    failed_at_step: failedAtStep,
-    steps_completed: stepResults.length,
-    reason: errorDetail,
-  })
-}
-
-/** Construye el response de error parcial */
-function buildPartialResponse(
-  pipelineId: string,
-  failedAtStep: number,
-  stepResults: StepResult[],
-  totalCost: number,
-  error: string,
-  httpStatus: number
-): NextResponse {
-  const resultSoFar =
-    stepResults.length > 0
-      ? stepResults[stepResults.length - 1].output
-      : undefined
+  // ── [8] RESPONSE FINAL
+  const totalCost = receipts.reduce((acc, r) => acc + parseFloat(r.cost_usdc), 0)
 
   return NextResponse.json(
     {
-      pipeline_id: pipelineId,
-      status: stepResults.length === 0 ? 'failed' : 'partial',
-      failed_at_step: failedAtStep,
-      steps_completed: stepResults.length,
-      error,
-      ...(resultSoFar !== undefined ? { result_so_far: resultSoFar } : {}),
-      steps: stepResults,
+      pipeline_id:     pipelineId,
+      steps_executed:  steps.length,
       total_cost_usdc: totalCost.toFixed(6),
-    },
-    { status: httpStatus }
+      result:          parseOutputSafe(lastOutput),
+      receipts,
+    } satisfies ComposeResponse,
+    { status: 200 }
   )
 }
+```
 
-/** Log estructurado JSON (no console.log con strings sueltos) */
-function structuredLog(event: string, data: Record<string, unknown>): void {
-  console.log(JSON.stringify({ event, ...data, ts: new Date().toISOString() }))
+### Helpers
+
+```typescript
+// ── Validar el array de steps
+function validateSteps(steps: unknown): string | null {
+  if (!Array.isArray(steps)) return 'steps must be an array'
+  if (steps.length < 1)      return 'steps must have at least 1 element'
+  if (steps.length > MAX_STEPS) return `Max ${MAX_STEPS} steps per pipeline`
+
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i] as ComposeStep
+    if (!s.agent_slug || typeof s.agent_slug !== 'string') {
+      return `Step ${i}: agent_slug is required`
+    }
+    if (s.input !== undefined && s.pass_output === true) {
+      return `Step ${i}: input and pass_output are mutually exclusive`
+    }
+    if (i === 0 && s.pass_output === true) {
+      return 'Step 0 cannot use pass_output (no previous output exists)'
+    }
+  }
+  return null
 }
 
-/** UUID v4 validation */
-function isValidUUID(str: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str)
+// ── Parsear output de forma segura (intenta JSON.parse, si falla devuelve string)
+function parseOutputSafe(raw: string | null): unknown {
+  if (raw === null) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
 }
 
-/** Hash SHA-256 de la API key (mismo patrón que HU-1.1) */
-async function hashApiKey(key: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(key)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+// ── Obtener Redis client (reusar el de Upstash ya configurado)
+// Importar desde @/lib/ratelimit o crear helper propio
+function getRedisClient() {
+  // El mismo Redis de Upstash ya está en el proyecto vía @upstash/redis
+  // Reusar la instancia existente de ratelimit.ts
+  // Si no hay export de redis client, crear:
+  const { Redis } = require('@upstash/redis')
+  return new Redis({
+    url:   process.env.UPSTASH_REDIS_REST_URL!,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  })
 }
 ```
 
-> **NOTA para Dev:** La función RPC `deduct_key_balance` puede no existir. Si no existe, implementar el descuento atómico con UPDATE directo:
->
-> ```sql
-> -- Agregar a migration 017 o crear migration 017b
-> CREATE OR REPLACE FUNCTION deduct_key_balance(p_key_id UUID, p_amount NUMERIC)
-> RETURNS BOOLEAN AS $$
-> DECLARE
->   rows_updated INT;
-> BEGIN
->   UPDATE api_keys
->     SET balance = balance - p_amount
->   WHERE id = p_key_id AND balance >= p_amount;
->   GET DIAGNOSTICS rows_updated = ROW_COUNT;
->   RETURN rows_updated > 0;
-> END;
-> $$ LANGUAGE plpgsql SECURITY DEFINER;
-> ```
+---
+
+## PASO 3 — Rate Limit
+
+**Archivo:** `src/lib/ratelimit.ts` — **AÑADIR** al final del archivo existente (no reemplazar nada):
+
+```typescript
+// ── Compose rate limiter (añadir a ratelimit.ts existente)
+let _compose: Ratelimit | null = null
+
+export function getComposeLimit() {
+  return _compose ??= new Ratelimit({
+    redis:   makeRedis(),          // usa el helper existente del archivo
+    limiter: Ratelimit.slidingWindow(10, '1 m'),
+    prefix:  'rl:compose',
+  })
+}
+```
+
+**Notas:**
+- `makeRedis()` ya existe en `ratelimit.ts` — reutilizar
+- Mismo patrón lazy singleton que los otros limiters del archivo
+- Prefix `rl:compose` distinto de `rl:invoke` para no contaminar métricas
 
 ---
 
-## Definition of Done (checklist completo)
+## PASO 4 — Receipts (ya integrados en el endpoint)
 
-### Código
-- [ ] `src/app/api/v1/compose/route.ts` existe y compila sin errores TypeScript
-- [ ] Cero imports de `ethers` en archivos nuevos
-- [ ] Cero variables `NEXT_PUBLIC_` para secrets
-- [ ] Cero valores hardcodeados (UUIDs, addresses, precios, timeouts)
-- [ ] `createServiceClient()` usado — sin `createClient()` ni `createServerClient()`
-- [ ] `validateUrl()` llamado antes de cada fetch externo
-- [ ] `AbortController` con `COMPOSE_STEP_TIMEOUT_MS` en cada fetch de agente externo
-- [ ] Headers de respuesta del agente externo NO propagados al caller
-- [ ] Output de paso validado contra `COMPOSE_MAX_STEP_OUTPUT_BYTES`
-- [ ] Descuento atómico implementado (función RPC o UPDATE con WHERE balance >= price)
-- [ ] Rate limiting con prefix `wasiai:compose`, sliding window 10 req/60s por `keyId`
-- [ ] Logs estructurados JSON (no strings sueltos en `console.log`)
+Los receipts reutilizan exactamente los mismos helpers que `/invoke`:
 
-### Migration
-- [ ] `supabase/migrations/017_pipeline_executions.sql` existe
-- [ ] Migration es idempotente (`IF NOT EXISTS` en todos los CREATE)
-- [ ] `pipeline_executions` tiene RLS activo con policies `service_role_full_access` y `key_owner_read`
-- [ ] `agent_calls.pipeline_id` columna nullable con FK a `pipeline_executions`
-- [ ] Índices creados en `key_id`, `created_at DESC`, `pipeline_id` (partial)
-- [ ] Función SQL `deduct_key_balance` creada (si se usa RPC approach)
+```typescript
+import { signReceipt }      from '@/lib/receipts/signReceipt'
+import { keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
 
-### Tests manuales (curl / Postman)
-- [ ] Sin `X-API-Key` → `401`
-- [ ] Key inexistente → `401`
-- [ ] Key con `status = 'suspended'` → `403`
-- [ ] `steps` con 1 elemento → `400` con mensaje
-- [ ] `steps` con 11 elementos → `400` con mensaje
-- [ ] `agent_id` inexistente → `422` con `invalid_agents`
-- [ ] Agente inactivo → `422` con `invalid_agents`
-- [ ] Saldo insuficiente pre-flight → `402` con `required/available/currency`
-- [ ] Pipeline de 2 steps exitoso → `200` con `receipt_signature` no nulo y no vacío
-- [ ] `"$prev"` en step 2 resuelto con output real del step 1
-- [ ] `"$prev"` dentro de objeto (`{ "text": "$prev" }`) resuelto correctamente
-- [ ] Agente externo retorna `500` en step 2 → `502` con `steps_completed: 1`, cobro parcial en DB
-- [ ] Timeout simulado (agente que cuelga >8s) → `504` con resultado parcial
-- [ ] URL de agente con IP privada (`192.168.1.1`) → bloqueada por SSRF, pipeline aborta
-- [ ] 11 requests seguidos desde misma key → el 11vo → `429`
-- [ ] `pipeline_executions` tiene registro con `status='success'` después de pipeline exitoso
-- [ ] `agent_calls` tiene `pipeline_id` vinculado en cada step del pipeline exitoso
+// Cada step llama:
+const signature = await signReceipt({
+  keyId:      keyHashToBytes32(keyRow.key_hash),
+  callId:     callId,           // UUID del agent_call del step
+  agentSlug:  agent.slug,
+  amountUsdc: agent.price_per_call,
+  timestamp:  Math.floor(Date.now() / 1000),
+})
+```
 
-### Observabilidad
-- [ ] `pipeline_id` UUID v4 aparece en logs estructurados de cada evento
-- [ ] Logs contienen: `pipeline_start`, `pipeline_step` (por cada step), `pipeline_complete` o `pipeline_abort`
-- [ ] `pipeline_executions` refleja estado final correcto (`success` / `partial` / `failed`)
-
-### Seguridad
-- [ ] URL con IP privada bloqueada (10.x, 192.168.x, 127.x, 169.254.x, ::1)
-- [ ] URL con protocolo `http://` bloqueada (solo HTTPS)
-- [ ] URL con protocolo `file://` bloqueada
-- [ ] `OPERATOR_PRIVATE_KEY` nunca expuesto en response ni logs
-
-### Deploy checklist
-- [ ] Variables de entorno en Vercel: `COMPOSE_STEP_TIMEOUT_MS`, `COMPOSE_MAX_STEP_OUTPUT_BYTES` (opcionales con defaults)
-- [ ] Migration 017 aplicada en Supabase antes de activar el endpoint en producción
-- [ ] Vercel Pro verificado (timeout 60s suficiente para pipeline 25s + overhead)
+**Comportamiento si `signReceipt` falla:**
+- Loggear `warn` pero NO abortar el pipeline
+- `receipt_signature` = `''` para ese step
+- El pago ya ocurrió — no podemos revertirlo
 
 ---
 
-## Notas de implementación
+## PASO 5 — Tests
 
-### 1. Función RPC `deduct_key_balance`
-Si el codebase ya tiene pattern de funciones RPC en Supabase, preferir esa vía para el descuento atómico. Si no, el UPDATE directo con `rowsAffected` también es válido pero requiere manejo cuidadoso. La función SQL proporcionada en el código es la implementación recomendada.
+### Tests unitarios (Vitest, junto al código)
 
-### 2. Hash de API key
-El patrón `hashApiKey()` en el route usa `crypto.subtle` (Web Crypto API, disponible en Edge/Node >=18). Si el codebase ya tiene una función de hash compartida en `@/lib/api-keys.ts` o similar, **usa esa en lugar de reimplementar**. Verificar primero.
+Crear: `src/app/api/v1/compose/route.test.ts`
 
-### 3. `$prev` en objetos anidados
-La implementación actual sustituye solo valores de primer nivel en objetos (`{ "text": "$prev" }`). No hace deep substitution. Si se necesita sustitución profunda en el futuro, es E5.2.
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-### 4. `deduct_key_balance` — race condition
-El UPDATE atómico es la única protección real contra race conditions. El pre-flight es solo una estimación de costo — el balance real puede cambiar entre el pre-flight y la ejecución de cada step (si hay requests paralelos desde la misma key). El UPDATE `WHERE balance >= price` es la garantía definitiva.
+// ── Tests de validateSteps (helper puro, fácil de aislar)
+describe('validateSteps', () => {
+  it('rechaza array vacío', () => {
+    expect(validateSteps([])).toBe('steps must have at least 1 element')
+  })
 
-### 5. Precio re-leído por step
-El precio del agente se re-lee de DB en cada step (no se cachea del pre-flight). Esto previene cobrar un precio obsoleto si el creator actualiza el precio mientras el pipeline está corriendo. El costo estimado del pre-flight puede diferir del costo real; el costo real es la suma de los `price_per_call` leídos en [7b].
+  it('rechaza más de 5 steps', () => {
+    const steps = Array(6).fill({ agent_slug: 'a' })
+    expect(validateSteps(steps)).toBe('Max 5 steps per pipeline')
+  })
 
-### 6. Vercel timeout
-Pipeline timeout = 25s (no configurable en route.ts, es una propiedad del plan Vercel). Con `COMPOSE_STEP_TIMEOUT_MS=8000` y hasta 10 steps, el peor caso es 80s — eso supera el timeout de Vercel Pro (60s). En práctica, 10 steps de 8s cada uno es un caso extremo; el default razonable para la mayoría de pipelines es ≤5 steps × ≤3s = 15s. Considerar documentar que 10 steps a max timeout no está garantizado sin Edge Streaming.
+  it('rechaza step sin agent_slug', () => {
+    expect(validateSteps([{}])).toMatch(/agent_slug is required/)
+  })
 
-### 7. `X-Pipeline-Id` en requests a agentes
-El header `X-Pipeline-Id` que se envía a cada agente externo permite que los agentes (si lo soportan) correlacionen llamadas del mismo pipeline. No es obligatorio para los agentes procesarlo.
+  it('rechaza input + pass_output juntos', () => {
+    const steps = [
+      { agent_slug: 'a' },
+      { agent_slug: 'b', input: 'foo', pass_output: true },
+    ]
+    expect(validateSteps(steps)).toMatch(/mutually exclusive/)
+  })
 
-### 8. Output como string
-Todo output se normaliza a string antes de pasarlo al siguiente step. Si el agente retorna JSON y el siguiente agente espera JSON, el siguiente agente recibirá el JSON como string y deberá parsearlo. Esto es intencional — WasiAI no conoce el tipo de datos de cada agente.
+  it('rechaza pass_output en step 0', () => {
+    expect(validateSteps([{ agent_slug: 'a', pass_output: true }])).toMatch(/Step 0 cannot use pass_output/)
+  })
 
-### 9. `composeRatelimit` — instancia
-La instancia `composeRatelimit` puede vivir en `@/lib/upstash.ts` como export adicional, o en un archivo separado `@/lib/upstash-compose.ts`. Verificar la estructura actual del archivo `@/lib/upstash.ts` antes de decidir dónde ponerla para no romper el singleton existente del rate limiter de trials (prefix `wasiai:trial`).
+  it('acepta pipeline válido de 3 steps', () => {
+    const steps = [
+      { agent_slug: 'ocr',        input: 'hello' },
+      { agent_slug: 'translator', pass_output: true },
+      { agent_slug: 'sentiment',  pass_output: true },
+    ]
+    expect(validateSteps(steps)).toBeNull()
+  })
+})
 
-### 10. `NEXT_PUBLIC_` check
-Antes de hacer commit, correr:
+// ── Tests de parseOutputSafe
+describe('parseOutputSafe', () => {
+  it('parsea JSON válido', () => {
+    expect(parseOutputSafe('{"foo":"bar"}')).toEqual({ foo: 'bar' })
+  })
+
+  it('devuelve string si no es JSON', () => {
+    expect(parseOutputSafe('hello world')).toBe('hello world')
+  })
+
+  it('devuelve null para null', () => {
+    expect(parseOutputSafe(null)).toBeNull()
+  })
+})
+```
+
+### Tests de integración (Fuji testnet)
+
+Crear: `src/app/api/v1/compose/compose.integration.test.ts`
+
+```typescript
+// Tests contra Fuji — requieren agentes mock registrados en la DB
+
+describe('POST /api/v1/compose (Fuji integration)', () => {
+  it('AC-1: 401 sin X-Api-Key', async () => {
+    const res = await fetch('/api/v1/compose', { method: 'POST' })
+    expect(res.status).toBe(401)
+  })
+
+  it('AC-4: 402 con saldo insuficiente', async () => {
+    // Usar key con saldo 0.000001 USDC
+    // Pipeline de 2 agentes que cuestan 0.01 USDC total
+    // Verificar que ningún step se ejecutó
+  })
+
+  it('AC-7: 400 con más de 5 steps', async () => {
+    const res = await fetch('/api/v1/compose', {
+      method: 'POST',
+      headers: { 'X-Api-Key': testKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ steps: Array(6).fill({ agent_slug: 'mock-echo' }) }),
+    })
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/Max 5 steps/)
+  })
+
+  it('AC-8: 429 después de 10 requests en 1 minuto', async () => {
+    // Enviar 11 requests seguidos con la misma key
+    // El 11vo debe devolver 429
+  })
+
+  it('AC-9: SSRF bloqueado → 422 con SSRF_BLOCKED', async () => {
+    // Registrar agente mock con endpoint_url = 'http://localhost/evil'
+    // Verificar que el endpoint devuelve 422 con reason 'SSRF_BLOCKED'
+  })
+
+  it('AC-2 + AC-3 + AC-6: Pipeline de 3 steps con pass_output', async () => {
+    // Pipeline de 3 agentes mock (echo que devuelven input + sufijo)
+    // Verificar:
+    // - result = output del step 2
+    // - receipts.length = 3
+    // - steps_executed = 3
+    // - cada receipt tiene receipt_signature no vacío
+    // - en DB: 3 filas con mismo pipeline_id y step_index 0,1,2
+    // - saldo de la key disminuyó en sum(prices)
+  })
+
+  it('AC-5: Fallo en step 1 de 3 → 422 con steps_executed: 0', async () => {
+    // Agente mock que siempre devuelve 500
+    // Pipeline: [echo, failing-agent, echo]
+    // Verificar: steps_executed=0 (step 0 OK, step 1 falla → 422)
+    //   NOTA: step 0 ya cobrado, no hay reembolso
+  })
+})
+```
+
+---
+
+## Acceptance Criteria (verificables uno a uno)
+
+| ID | Criterio | Verificación |
+|---|---|---|
+| **AC-1** | `POST /api/v1/compose` responde `401` sin `X-Api-Key` o con key inválida | `curl -X POST /api/v1/compose` sin header → `401` |
+| **AC-2** | Pipeline de 3 steps con `pass_output: true`: output de step 0 llega a step 1, output de step 1 llega a step 2 | Test de integración con agentes mock echo |
+| **AC-3** | Cada step ejecutado genera tx en Fuji; `receipts[]` tiene firma ECDSA válida por step; saldo disminuye en `sum(price_usdc)` | Verificar en DB + on-chain después del pipeline |
+| **AC-4** | Con saldo insuficiente → `402` antes de ejecutar cualquier step; saldo no cambia | Usar key con saldo bajo; verificar saldo post-request |
+| **AC-5** | Si step N falla → `422` con `steps_executed: N-1`; steps N+1..fin no ejecutados ni cobrados | Test con agente que devuelve 500 en step 1 de 3 |
+| **AC-6** | Cada step genera fila en `agent_calls` con `pipeline_id`, `step_index`, `status`, `latency_ms` | `SELECT * FROM agent_calls WHERE pipeline_id = $uuid` |
+| **AC-7** | `steps > 5` → `400`; `agent_slug` inexistente → `404`; `pass_output: true` en step 0 → `400` | Tests unitarios de validateSteps |
+| **AC-8** | 11 requests seguidos desde la misma key → el 11vo devuelve `429` con `Retry-After` | Test de rate limit (Upstash sliding window 10/1m) |
+| **AC-9** | `endpoint_url = 'http://localhost/evil'` → `422` con `reason: 'SSRF_BLOCKED'` | Registrar agente mock con URL interna |
+| **AC-10** | Response `200` incluye `pipeline_id`, `steps_executed`, `total_cost_usdc`, `result`, `receipts[]` con schema exacto | Validar JSON response contra TypeScript interface |
+
+---
+
+## Definition of Done
+
+- [ ] **DoD-1** — `supabase/migrations/017_pipeline_compose.sql` aplicada; columnas `pipeline_id` y `step_index` existen en `agent_calls`; índices creados; `/invoke` existente no roto
+- [ ] **DoD-2** — `src/app/api/v1/compose/route.ts` creado; `npm run build` pasa con 0 errores TypeScript en strict mode
+- [ ] **DoD-3** — `getComposeLimit()` añadido a `src/lib/ratelimit.ts`; prefix `rl:compose`; límite `10/1m`
+- [ ] **DoD-4** — Request con `X-Api-Key` inválida o ausente → `401` ✅ (AC-1)
+- [ ] **DoD-5** — Pipeline de 3 steps con `pass_output: true` ejecuta en secuencia; `result` = output del step 2 ✅ (AC-2)
+- [ ] **DoD-6** — Cada step exitoso genera 1 fila en `agent_calls` con `pipeline_id` y `step_index` correctos; `receipts[]` contiene firma ECDSA válida ✅ (AC-3 + AC-6)
+- [ ] **DoD-7** — Con saldo insuficiente → `402` antes de ejecutar cualquier step; saldo no cambia ✅ (AC-4)
+- [ ] **DoD-8** — Step 1 de 3 falla → response `422` con `steps_executed: 0`; step 2 no ejecutado; saldo de step 2 no deducido ✅ (AC-5)
+- [ ] **DoD-9** — `steps.length > 5` → `400`; slug inexistente → `404`; `pass_output: true` en step 0 → `400` ✅ (AC-7)
+- [ ] **DoD-10** — 11 requests seguidos desde la misma key → el 11vo devuelve `429` con `Retry-After` header ✅ (AC-8)
+- [ ] **DoD-11** — Step con `endpoint_url = http://localhost/evil` → `422` con `reason: 'SSRF_BLOCKED'` ✅ (AC-9)
+- [ ] **DoD-12** — Adversarial Review ejecutado (`review-adversarial-general.xml`); 0 issues BLOQUEANTES; Code Review (`code-review/instructions.xml`) pasa; `git push origin master master:main` exitoso
+
+---
+
+## Notas de Implementación (patrones del codebase)
+
+### Sobre `increment_agent_key_spend` RPC
+- Ya existe en Supabase (creado en HAL-011 para `/invoke`)
+- Acepta: `p_key_id UUID`, `p_amount NUMERIC`
+- Es atómica — usa `UPDATE ... RETURNING` sin race conditions
+- Si falla → significa race condition o saldo agotado → abortar pipeline con `422`
+
+### Sobre `signReceipt` y `keyHashToBytes32`
+- En `src/lib/receipts/signReceipt.ts` — ya migrado a viem v2 (HAL-010)
+- En `src/lib/contracts/marketplaceClient.ts`
+- Usar exactamente igual que en `/invoke/route.ts` — no reimplementar
+
+### Sobre `validateEndpointUrl`
+- En `src/lib/security/validateEndpointUrl.ts` (HAL-014/022)
+- Lanza excepción si la URL es interna, loopback, o no HTTP/S
+- Llamar antes del fetch, no dentro del try-catch del fetch
+
+### Sobre el Redis lock
+- Usar `@upstash/redis` directamente (ya es dependency del proyecto)
+- `nx: true` = "set only if not exists" (exclusión mutua)
+- `ex: 30` = expira en 30s (timeout de seguridad si el proceso muere)
+- `finally { await redis.del(lockKey) }` = siempre liberar
+
+### Sobre el timeout de Vercel (25s)
+- 5 steps × 8s timeout por step = 40s teórico (supera el límite)
+- En práctica: agentes rápidos (<3s) completan el pipeline en <15s
+- Para el hackathon es aceptable; HU-5.1b introduce async para pipelines largos
+- Documentar en README del endpoint: "Max pipeline latency ~20s recomendado"
+
+### Sobre agentes mock para el hackathon
+- Si no hay agentes OCR/Translator/Sentiment reales en Fuji, crear endpoints mock internos
+- Ejemplo: `POST /api/v1/mock/echo` — devuelve el input tal cual
+- Registrarlos en el marketplace con `status: 'active'` y `endpoint_url` apuntando al propio servidor
+
+### Sobre el campo `tx_hash` en `agent_calls`
+- Para compose: insertar `null` (no hay tx hash individual por step en este modelo)
+- El settlement on-chain ocurre en lote vía cron — igual que en `/invoke`
+
+### Sobre `caller_type`
+- Para compose: usar `'agent'` (el caller es un agente o developer usando API key)
+- Mismo valor que `/invoke` con API key
+
+---
+
+## Riesgos Conocidos (no bloqueantes)
+
+| Riesgo | Mitigación implementada |
+|---|---|
+| Timeout 25s de Vercel con 5 agentes lentos | 8s por step + documentación; HU-5.1b para async |
+| Race condition en saldo (múltiples pipelines simultáneos) | Redis lock por keyId (sección PASO 2, step [6]) |
+| No-reembolso de steps ya ejecutados | Documentado en response 422; política explícita |
+| Demo sin agentes reales | Crear agentes mock internos antes del hackathon |
+
+---
+
+## Política de No-Reembolso (documentar en API)
+
+Los steps ya ejecutados exitosamente **no se reembolsan** si un step posterior falla:
+1. El agente externo ya procesó y entregó el resultado
+2. El saldo ya fue deducido atómicamente (`increment_agent_key_spend`)
+3. El cron de settlement puede haber procesado el lote
+
+Esto es intencional y debe estar documentado en la documentación pública de la API.
+
+---
+
+## Stack y Restricciones (Nexus Golden Path)
+
+```
+✅ Next.js 14 App Router
+✅ Supabase (createServiceClient — server-side)
+✅ @upstash/ratelimit con Upstash Redis
+✅ viem v2 (signReceipt ya migrado)
+✅ TypeScript strict mode
+
+❌ ethers.js — PROHIBIDO
+❌ NEXT_PUBLIC_ para secrets — PROHIBIDO
+❌ Hardcodes de addresses o amounts — PROHIBIDO
+❌ Datos simulados en producción — PROHIBIDO
+❌ Ejecución paralela — OUT OF SCOPE (HU-5.2)
+❌ Frontend/UI — OUT OF SCOPE (HU-5.4)
+❌ Mainnet — OUT OF SCOPE (HU-6.x)
+```
+
+---
+
+## Comando de Deploy
+
 ```bash
-grep -r "NEXT_PUBLIC_" src/app/api/v1/compose/
+git push origin master master:main
 ```
-Debe retornar vacío.
 
 ---
 
-*Story generado por SM Agent (BMAD v6) — 2026-02-26*  
-*100% autocontenido — el Dev puede implementar desde este archivo sin contexto adicional*
+*Story file generado por San (SM — Scrum Master) | 2026-02-28*
+*Gates: HU_APPROVED ✅ | SPEC_APPROVED ✅*
+*Siguiente: Dev implementa desde este archivo — sin leer ningún otro documento*

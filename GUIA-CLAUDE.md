@@ -46,15 +46,19 @@ Implementa la historia desde el story file: story-[HU].md
 
 ### Adversarial Reviewer — antes del commit
 ```
-Actúa como Adversarial Reviewer de BMAD. Tu trabajo es ENCONTRAR problemas, no confirmar que todo está bien.
-Revisa el código implementado en [archivos] buscando: auth bypass, SSRF, race conditions, API keys expuestas, hardcodes, datos simulados.
+Actúa como Adversarial Reviewer.
+Lee _bmad/core/tasks/review-adversarial-general.xml
+Revisa el diff/código de: [archivos o "git diff"]
 ```
 
 ### Code Reviewer — después del AR
 ```
-Actúa como Code Reviewer de BMAD. Revisa calidad del código en [archivos]:
-TypeScript correcto, sin any, Server vs Client correcto, i18n sin hardcodes, sin lógica duplicada.
+Actúa como Code Reviewer.
+Lee _bmad/bmm/workflows/4-implementation/code-review/instructions.xml
+Revisa el story file: story-HU-X.X.md
 ```
+El CR nativo de BMAD corre `git diff` para verificar qué cambió realmente vs lo que el Dev reporta.
+Verifica cada AC del story file contra el código. Mucho más potente que revisar solo calidad.
 
 ### QA — verificación final
 ```

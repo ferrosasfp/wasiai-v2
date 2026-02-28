@@ -133,6 +133,15 @@ Orden obligatorio:
 
 ## Adversarial Review — El más importante
 
+**Cómo activarlo correctamente (BMAD nativo):**
+```
+Actúa como Adversarial Reviewer.
+Lee _bmad/core/tasks/review-adversarial-general.xml
+y revisa el diff/código de: [archivos o git diff]
+```
+
+BMAD lo ejecuta en modo cínico — asume que hay problemas, busca al menos 10 issues.
+
 Su trabajo es **ENCONTRAR problemas**, no confirmar que todo está bien.
 
 - 🔐 **Auth bypass:** rutas sin auth, escalada de privilegios
@@ -143,6 +152,25 @@ Su trabajo es **ENCONTRAR problemas**, no confirmar que todo está bien.
 - 🧪 **Datos simulados:** mocks o datos falsos en rutas de producción
 
 Formato: **BLOQUEANTE** · **MENOR** · **OK**
+
+---
+
+## Code Review — Después del AR
+
+**Cómo activarlo correctamente (BMAD nativo):**
+```
+Actúa como Code Reviewer.
+Lee _bmad/bmm/workflows/4-implementation/code-review/instructions.xml
+y revisa el story file: story-HU-X.X.md
+```
+
+BMAD CR hace mucho más que revisar calidad — valida el story file completo:
+- Corre `git diff` para verificar qué cambió REALMENTE vs lo que el Dev reporta
+- Verifica cada AC del story file contra el código implementado
+- Detecta tareas marcadas `[x]` que no están realmente implementadas
+- Sincroniza `sprint-status.yaml` automáticamente al terminar
+
+Severidades: **HIGH** (debe corregirse) · **MEDIUM** (debe corregirse) · **LOW** (nice to fix)
 
 ---
 
@@ -172,11 +200,27 @@ Formato: **BLOQUEANTE** · **MENOR** · **OK**
 
 ---
 
+## Cómo activar cada agente BMAD
+
+| Agente | Comando |
+|---|---|
+| PM | `Actúa como PM. Lee _bmad/bmm/agents/pm.md` |
+| Architect | `Actúa como Architect. Lee _bmad/bmm/agents/architect.md` |
+| SM | `Actúa como SM. Lee _bmad/bmm/agents/sm.md` |
+| Dev | `Actúa como Dev. Lee _bmad/bmm/agents/dev.md` |
+| **AR** | `Actúa como AR. Lee _bmad/core/tasks/review-adversarial-general.xml` |
+| **CR** | `Actúa como CR. Lee _bmad/bmm/workflows/4-implementation/code-review/instructions.xml` |
+| QA | `Actúa como QA. Lee _bmad/bmm/agents/qa.md` |
+
+AR y CR referencian sus archivos BMAD nativos — no prompts inventados.
+
+---
+
 ## Errores frecuentes — aprendidos en producción
 
 1. **Implementar sin story file** — el SDD no reemplaza al story
 2. **"Go" como gate** — los gates requieren el texto exacto
-3. **Saltarse el Adversarial Review** — el Code Review es distinto y ambos son obligatorios
+3. **Activar AR/CR con prompts inventados** — usar siempre los archivos BMAD nativos
 4. **Tests verdes ≠ producción segura** — los tests prueban el happy path, el AR prueba los ataques
 5. **Roles mezclados** — el Dev no toma decisiones de arquitectura
 
