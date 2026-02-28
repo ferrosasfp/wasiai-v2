@@ -1,18 +1,19 @@
 ---
 name: nexus-agil
 description: >
-  Metodologia unificada WasiAI para procesar Historias de Usuario (HU) a traves de un pipeline
+  Metodologia stack-agnostic para procesar Historias de Usuario (HU) a traves de un pipeline
   con agentes especializados, gates estrictos, adversarial review y anti-alucinacion.
+  Funciona con cualquier stack: Next.js, Rails, Django, Laravel o cualquier otro.
   Activar cuando el usuario mencione "NexusAgil", "procesa HU", "sprint planning",
   "inicia fase 0", "adversarial review", o "story file".
 ---
 
-# NexusAgil — WasiAI Methodology
+# NexusAgil
 
 > **Unidad de trabajo**: 1 HU por ejecucion.
 > **Principio**: El humano decide QUE. Los agentes ejecutan COMO.
 > **Anti-alucinacion**: Leer codigo real antes de generar. Nunca inventar.
-> **Stack-agnostic**: El Golden Path se define por proyecto en `project-context.md`.
+> **Stack-agnostic**: NexusAgil no asume ningun stack. F0 descubre el proyecto real y genera `project-context.md`.
 
 ---
 
@@ -28,6 +29,135 @@ description: >
 
 ---
 
+## Los 3 Modos de NexusAgil
+
+> Al inicio de cada sesion, si no hay contexto claro, Claude pregunta:
+>
+> **"¿Qué estás construyendo?"**
+> ```
+> 1. FAST    — Un cambio pequeño (fix, estilo, texto, 1-2 archivos)
+> 2. LAUNCH  — Algo nuevo desde cero (MVP, prototipo, nueva app)
+> 3. QUALITY — Feature para produccion (DB, auth, pagos, o usuarios reales)
+> ```
+
+---
+
+### FAST — Cambio trivial
+
+**Para:** fixes, estilos, textos, cambios de 1-2 archivos sin logica nueva ni DB.
+
+**Califica como FAST si cumple TODO:**
+- Maximo 2 archivos
+- Menos de 30 lineas de cambio
+- Sin cambios de DB ni migraciones
+- Sin logica de negocio nueva
+- Sin auth ni pagos involucrados
+
+**Si no cumple alguno → sube automaticamente a LAUNCH o QUALITY.**
+
+**Pipeline FAST (Quick Flow — 4 pasos):**
+```
+1. Triage verifica que califica como FAST
+2. Codebase Grounding minimo (leer el archivo a modificar)
+3. Dev implementa el cambio
+4. Verificacion: typecheck/build pasa
+Push
+```
+
+**Activar:** `"Quick flow: [descripcion]"` / `"Implementa [cambio trivial]"`
+
+---
+
+### LAUNCH — MVP / Prototipo nuevo
+
+**Para:** construir algo nuevo desde cero — MVP, prototipo funcional, nueva feature compleja.
+
+**Usa cuando:**
+- Es un proyecto nuevo o una feature que no existe
+- Tiene multiples componentes (UI + backend + DB)
+- No va a produccion todavia (o es la primera version)
+- Quieres velocidad sin sacrificar estructura
+
+**Pipeline LAUNCH (gates ligeros):**
+```
+F0: Bootstrap — descubrir stack, generar project-context.md
+    |
+F1: Lista de HUs del MVP (el humano las define)
+    |
+GATE: humano escribe LAUNCH_APPROVED
+    |
+F2: Story File directo por HU
+    (sin SDD completo — solo: objetivo, archivos, ACs, waves)
+    |
+F3: Dev implementa por waves con anti-alucinacion
+    |
+QA ligero: build limpio + ACs verificados manualmente
+    |
+Push — iterar
+```
+
+**Lo que tiene LAUNCH (vs FAST):**
+- Codebase Grounding completo (anti-alucinacion real)
+- Story File por HU (Dev nunca improvisa)
+- Gate humano (LAUNCH_APPROVED)
+- QA basico
+
+**Lo que NO tiene LAUNCH (vs QUALITY):**
+- Sin Work Item formal (S0)
+- Sin SDD completo con Constraint Directives
+- Sin Adversarial Review separado
+- Sin Code Review formal
+- Sin QA con evidencia archivo:linea
+
+**Activar:** `"NexusAgil, modo LAUNCH: [descripcion del MVP]"` / `"Construye [algo nuevo]"`
+
+---
+
+### QUALITY — Produccion
+
+**Para:** features que van a usuarios reales, con DB, auth, pagos, o en equipo.
+
+**Usa siempre cuando:**
+- Va a produccion
+- Tiene pagos o auth involucrados
+- Es un equipo de 2+ personas
+- Un bug tiene costo real (datos, dinero, reputacion)
+
+**Pipeline QUALITY (pipeline completo):**
+```
+F0: Contexto (Codebase Grounding)
+F1: Work Item + ACs EARS
+GATE 1: HU_APPROVED
+F2: SDD + Constraint Directives + Readiness Check
+GATE 2: SPEC_APPROVED
+F2.5: Story File autocontenido
+F3: Dev implementa (waves + anti-alucinacion)
+AR: Adversary Review (BLOQUEANTE/MENOR/OK)
+CR: Code Review
+F4: QA con evidencia archivo:linea
+Push
+```
+
+**Activar:** `"NexusAgil, procesa esta HU: [descripcion]"`
+
+---
+
+### Tabla de decision rapida
+
+| Señal | Modo |
+|-------|------|
+| Fix de 1-2 archivos, sin DB | FAST |
+| Cambio de texto o estilo | FAST |
+| MVP nuevo, primera version | LAUNCH |
+| Prototipo para demo/pitch | LAUNCH |
+| Feature que va a usuarios reales | QUALITY |
+| Tiene pagos o auth | QUALITY siempre |
+| Bug critico en produccion | QUALITY (Hotfix) |
+| Equipo de 2+ personas | QUALITY siempre |
+| **Duda** | **QUALITY** |
+
+---
+
 ## Activacion
 
 Activar este workflow cuando el usuario diga:
@@ -36,9 +166,16 @@ Activar este workflow cuando el usuario diga:
 - "Sprint planning" / "Status meeting" / "Retro"
 - "Inicia fase 0" / "Inicia F0" / "Inicia discovery"
 - "Adversarial review" / "Story file"
-- "Quick flow" / "Cambio trivial"
-- "Hotfix" / "Bug en produccion" / "Fix urgente"
-- Cualquier variacion que mencione "NexusAgil", "WasiAI", o "procesa HU"
+- "Quick flow" / "Cambio trivial" → modo FAST
+- "Modo LAUNCH" / "Construye" / "MVP" / "Prototipo" → modo LAUNCH
+- "Hotfix" / "Bug en produccion" / "Fix urgente" → modo QUALITY (Hotfix)
+- Cualquier variacion que mencione "NexusAgil" o "procesa HU"
+
+Si el usuario no especifica modo → Claude pregunta:
+"¿Qué estás construyendo?
+1. FAST — Un cambio pequeño
+2. LAUNCH — Algo nuevo desde cero
+3. QUALITY — Feature para produccion"
 
 ---
 
@@ -175,7 +312,8 @@ Antes de usar cualquier archivo como exemplar, el agente DEBE:
 ### Archivos de referencia obligatorios
 
 Antes de F2, leer al menos:
-- `project-context.md` o equivalente del proyecto — Stack, arquitectura, guardrails
+- `project-context.md` — generado en F0 (Bootstrap si es proyecto nuevo), contiene stack real, arquitectura, guardrails y exemplars
+  Si no existe al llegar aqui: DETENER y ejecutar Bootstrap de Proyecto (F0) primero
 - Archivos de la feature mas similar a la HU actual (2-3 minimo)
 
 ### Lo que NUNCA se debe hacer
@@ -193,11 +331,9 @@ Antes de F2, leer al menos:
 
 ### Proceso
 
-1. **Leer `project-context.md`** (o equivalente) para conocer:
-   - Stack del proyecto (Golden Path)
-   - Arquitectura de carpetas
-   - Comandos de build/test/lint
-   - Guardrails y reglas especificas
+1. **Verificar si existe `project-context.md`**:
+   - **Si existe**: leerlo para conocer stack, arquitectura, comandos, guardrails y exemplars
+   - **Si NO existe**: ejecutar **Bootstrap de Proyecto** (ver seccion siguiente) antes de continuar
 2. **Codebase Grounding inicial**: Explorar la estructura del proyecto con Glob/Grep
 3. **Leer `doc/sdd/_INDEX.md`** para siguiente NNN. Si no existe, crearlo.
 4. **Smart Sizing** — Clasificar la HU:
@@ -212,6 +348,40 @@ Antes de F2, leer al menos:
 
 5. Si SDD_MODE = **patch** → Derivar a Triage (Quick Flow). Ver `references/quick_flow.md`.
 6. Si no es patch → Continuar a F1.
+
+### Bootstrap de Proyecto (ejecutar solo cuando NO existe project-context.md)
+
+NexusAgil es stack-agnostic. No asume ningun framework ni lenguaje.
+Si no hay project-context.md, el Architect descubre el proyecto leyendo el codebase real.
+
+Checklist de descubrimiento (leer en orden):
+
+1. Archivo de dependencias: package.json / Gemfile / requirements.txt / go.mod / pom.xml
+   Extraer: lenguaje principal, framework, dependencias clave
+
+2. Estructura de carpetas (Glob recursivo desde raiz, profundidad 3)
+   Identificar: arquitectura (MVC, feature-first, monorepo, microservicios, etc.)
+
+3. 3-5 archivos representativos del area de negocio principal
+   Extraer: naming conventions, patron de imports, estructura de funciones, manejo de errores
+
+4. Comandos del proyecto: build, test, lint, dev server
+   Fuente: scripts en package.json, Makefile, README, o equivalente del stack
+
+5. Base de datos y ORM si existe
+   Fuente: schema files, migraciones, cliente (Supabase, Prisma, ActiveRecord, SQLAlchemy...)
+
+6. Sistema de auth si existe
+   Fuente: middleware, guards, JWT config, sessions config
+
+7. Guardrails del proyecto si existen
+   Fuente: .eslintrc, .rubocop.yml, linters, convenciones en README
+
+Despues del checklist: generar project-context.md usando references/project_context_template.md
+como base, llenado exclusivamente con lo descubierto. Escribir al disco antes de continuar.
+
+Confirmar al humano: "Contexto generado. Stack: X. Arquitectura: Y. Comandos: Z. Listo para HUs."
+Si hay ambiguedades criticas: preguntar al humano (max 3 preguntas) antes de continuar.
 
 ---
 
