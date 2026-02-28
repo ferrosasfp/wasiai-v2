@@ -5,7 +5,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, startTransition } from 'react'
 import type { UserRole } from '@/hooks/useUserRole'
 
 interface MobileBottomNavProps {
@@ -24,11 +24,10 @@ export function MobileBottomNav({ locale, userRole }: MobileBottomNavProps) {
   // Al montar: determinar sección inicial por hash actual
   useEffect(() => {
     const isHomePath = pathname === `/${locale}` || pathname === `/${locale}/`
-    if (isHomePath) {
-      setHomeSection(window.location.hash === '#agents' ? 'explore' : 'home')
-    } else {
-      setHomeSection(null)
-    }
+    const next = isHomePath
+      ? (window.location.hash === '#agents' ? 'explore' : 'home')
+      : null
+    startTransition(() => setHomeSection(next))
   }, [pathname, locale])
 
   const dashboardHref =
