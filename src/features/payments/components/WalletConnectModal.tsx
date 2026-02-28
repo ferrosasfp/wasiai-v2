@@ -37,9 +37,15 @@ export function WalletConnectModal({ open, onClose, onConnected }: WalletConnect
           <button
             key={connector.uid}
             onClick={() => {
-              connect({ connector })
+              connect(
+                { connector },
+                {
+                  onSuccess: () => {
+                    onConnected?.()
+                  },
+                }
+              )
               onClose()
-              onConnected?.()
             }}
             className="w-full flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50 transition"
           >

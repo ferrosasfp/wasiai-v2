@@ -68,7 +68,16 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   }
 
   function handleWalletConnected() {
+    // onConnected ya se llama después de que wagmi confirmó la conexión
+    // address puede estar disponible ya en este punto — disparar pay directo
     pendingPayRef.current = true
+    // Pequeño timeout para que wagmi propague address al store antes de pay()
+    setTimeout(() => {
+      if (pendingPayRef.current) {
+        pendingPayRef.current = false
+        pay()
+      }
+    }, 300)
   }
 
   const handleDisconnect = () => {
