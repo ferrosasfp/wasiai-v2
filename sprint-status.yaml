@@ -2,36 +2,44 @@ sprint: 6
 periodo: "2026-03-01 → 2026-03-07"
 estado: EN_PROGRESO
 goal: "Un developer externo puede integrar WasiAI en su agente — con LangChain o paralelo — y ejecutar un pipeline de pagos autónomo end-to-end"
-goal_cumplido: false
+goal_cumplido: true
 
-seleccionadas:
+completadas:
   - id: WAS-23
     hu: HU-7.1 Plugin LangChain — WasiAI como Tool nativa
     modo: QUALITY
-    tamaño: L
-    estado: TODO
+    estado: DONE
+    commit: 8889700
+    ar_bloqueantes: 0
+    ar_menores: 1
 
   - id: WAS-20
     hu: HU-5.2 Ejecución paralela de agentes
     modo: QUALITY
-    tamaño: M
-    estado: TODO
+    estado: DONE
+    commit: 8ddeda4
+    ar_bloqueantes: 1
+    ar_menores: 2
 
   - id: WAS-68
     hu: Sentry error tracking
     modo: QUALITY
-    tamaño: S
-    estado: TODO
+    estado: DONE
+    commit: 104b55f
+    ar_bloqueantes: 0
+    ar_menores: 1
 
   - id: deuda-rpm
     hu: PATCH max_rpm/rpd + refactor helper invoke+compose
     modo: FAST
-    tamaño: S
-    estado: TODO
+    estado: DONE
+    commit: a6f97e5
 
-carry_over_desde_sprint5:
+carry_over:
   - id: WAS-42
     hu: AgentKit Example (Coinbase)
-    movido_a: Sprint 7
+    razon: CDP API key requerida — Fer crea en portal.cdp.coinbase.com
 
-proxima_ceremonia: "Miércoles 4 Mar — Status Meeting"
+deuda_tecnica_nueva: []
+
+proxima_ceremonia: "Retro Sprint 6 — viernes 6 Mar"
