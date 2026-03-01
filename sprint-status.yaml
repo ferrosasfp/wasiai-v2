@@ -1,25 +1,44 @@
-sprint: 4
+sprint: 5
 periodo: "2026-02-28 → 2026-02-28"
 estado: CERRADO
-goal: "Pipeline multi-agente pagando por step on-chain en Fuji"
-goal_cumplido: true
+goal: "Creator puede publicar su agente, configurar límites de uso, y el sistema protege la invocación antes de cobrar"
+goal_cumplido: parcial
 
 completadas:
-  - id: WAS-19
-    hu: HU-5.1 Compose API
+  - id: WAS-08
+    hu: UX-08 Validación 422 backend
+    modo: FAST
     estado: DONE
-    commit: e806bb9
-  - id: WAS-69
-    hu: HU-7.6 DeFi Risk 5 agentes
+    commit: ae9b286
+
+  - id: WAS-44
+    hu: HU-8.4 Rate Limiting configurable por creator
+    modo: QUALITY
     estado: DONE
-    repo: github.com/ferrosasfp/wasiai-agents
+    commit: 7347dc6
+    ar_bloqueantes: 1
+    cr_menores: 3
 
 carry_over:
-  - id: WAS-68
-    hu: Sentry error tracking
-    razon: No entró al pipeline — sin story file
+  - id: WAS-42
+    hu: HU-7.3 AgentKit Example (Coinbase)
+    razon: Bloqueado por CDP API key externa — Fer crea cuenta el lunes
+
+canceladas_por_ya_implementadas:
+  - WAS-45 Wallet navbar
+  - WAS-47 Scroll Ver agentes
+  - WAS-48 Mobile bottom nav
+
+hallazgos_proceso:
+  - Gates F2.5 y F3 ejecutados antes de SPEC_APPROVED — corregido en sesión
+  - Backlog auditado: 13 HUs descubiertas como ya implementadas, 7 canceladas por prematuras
 
 deuda_tecnica_nueva:
-  - endpoint_url de agentes apunta a deployment URL dinámico → necesita dominio fijo
+  - descripcion: Duplicación rpm/rpd en invoke + compose — extraíble a helper
+    severidad: MENOR
+    sprint_objetivo: 6
+  - descripcion: PATCH /api/models no guarda max_rpm/max_rpd post-publicación
+    severidad: MENOR
+    sprint_objetivo: 6
 
-proxima_ceremonia: "Lunes 2 Mar 2026 — Retro Sprint 4 + Planning Sprint 5"
+proxima_ceremonia: "Retrospectiva Sprint 5 — ahora"
