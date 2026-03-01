@@ -1,6 +1,6 @@
 sprint: 6
 periodo: "2026-03-01 → 2026-03-07"
-estado: EN_PROGRESO
+estado: REVIEW_APPROVED
 goal: "Un developer externo puede integrar WasiAI en su agente — con LangChain o paralelo — y ejecutar un pipeline de pagos autónomo end-to-end"
 goal_cumplido: true
 
