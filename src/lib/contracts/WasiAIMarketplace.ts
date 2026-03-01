@@ -201,6 +201,39 @@ export const WASIAI_MARKETPLACE_ABI = [
     inputs: [],
     outputs: [{ type: 'uint256' }],
   },
+  // ── Chainlink Automation ────────────────────────────────────────────────
+  {
+    name: 'checkUpkeep',
+    type: 'function',
+    stateMutability: 'view',
+    inputs:  [{ name: 'checkData', type: 'bytes' }],
+    outputs: [
+      { name: 'upkeepNeeded', type: 'bool'  },
+      { name: 'performData',  type: 'bytes' },
+    ],
+  },
+  {
+    name: 'performUpkeep',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs:  [{ name: 'performData', type: 'bytes' }],
+    outputs: [],
+  },
+  {
+    name: 'lastUpkeepTimestamp',
+    type: 'function',
+    stateMutability: 'view',
+    inputs:  [],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'UpkeepPerformed',
+    type: 'event',
+    inputs: [
+      { name: 'timestamp', type: 'uint256', indexed: true  },
+      { name: 'performer', type: 'address', indexed: true  },
+    ],
+  },
   // ── Pre-funded Key Events ─────────────────────────────────────────────────
   {
     name: 'KeyFunded',

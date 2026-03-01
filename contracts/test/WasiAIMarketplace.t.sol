@@ -671,4 +671,32 @@ contract WasiAIMarketplaceTest is Test {
     function test_GetKeyBalance_Empty() public view {
         assertEq(marketplace.getKeyBalance(KEY_ID), 0);
     }
+
+    // ─── Chainlink Automation tests ───────────────────────────────────────────
+
+    function testCheckUpkeepFalseBeforeInterval() public {
+        // Recién desplegado — lastUpkeepTimestamp = block.timestamp
+        // No han pasado 23h → upkeepNeeded debe ser false
+        (bool upkeepNeeded, ) = marketplace.checkUpkeep("");
+        assertFalse(upkeepNeeded, "Should not need upkeep before interval");
+    }
+
+    function testCheckUpkeepTrueAfterInterval() public {
+        // Avanzar el tiempo 23h + 1 segundo
+        vm.warp(block.timestamp + 23 hours + 1);
+        (bool upkeepNeeded, ) = marketplace.checkUpkeep("");
+        assertTrue(upkeepNeeded, "Should need upkeep after interval");
+    }
+
+    function testPerformUpkeepUpdatesTimestamp() public {
+        vm.warp(block.timestamp + 23 hours + 1);
+        uint256 before = marketplace.lastUpkeepTimestamp();
+        marketplace.performUpkeep("");
+        assertGt(marketplace.lastUpkeepTimestamp(), before, "Timestamp should update");
+    }
+
+    function testPerformUpkeepRevertsBeforeInterval() public {
+        vm.expectRevert("WasiAI: upkeep not needed");
+        marketplace.performUpkeep("");
+    }
 }
