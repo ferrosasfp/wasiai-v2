@@ -116,7 +116,7 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
                 type="number"
                 min={1}
                 max={600}
-                value={(data as Record<string, unknown>).max_rpm as number ?? 60}
+                value={data.max_rpm ?? 60}
                 onChange={e => onChange('max_rpm', parseInt(e.target.value) || 60)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
               />
@@ -130,7 +130,7 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
                 type="number"
                 min={1}
                 max={100000}
-                value={(data as Record<string, unknown>).max_rpd as number ?? 1000}
+                value={data.max_rpd ?? 1000}
                 onChange={e => onChange('max_rpd', parseInt(e.target.value) || 1000)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
               />

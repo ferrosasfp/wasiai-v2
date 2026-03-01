@@ -159,7 +159,9 @@ export async function POST(
   // Use api_key prefix when available, fall back to IP — avoids shared 'anon' bucket
   const consumerKey = rawAgentKey
     ? rawAgentKey.substring(0, 24)
-    : (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'anon')
+    : request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      ?? request.headers.get('x-real-ip')
+      ?? 'anon'
   const creatorRlId = `${slug}:${consumerKey}`
 
   // AR-fix: fail-open if Upstash is unavailable — never block invocations for infra failures
