@@ -244,6 +244,9 @@ Archivos completos en `.nexus/docs/architecture/`
 4. **F4 QA cita archivo:línea por cada AC** — sin evidencia el AC no cuenta como PASS
 5. **SM corre las 3 ceremonias** — Planning, Review y Retro — no San directamente
 6. **El SM persiste el cierre de cada HU** al completar el pipeline: `_INDEX.md`, `sprint-status.yaml`, Linear
+7. **Ceremonias activan el rol SM explícitamente** — primer token de respuesta es "Agente: SM"
+8. **F1 Work Items son del Architect** — SM no los presenta; SM solo coordina la selección en Planning
+9. **Análisis de dependencias y paralelismo es del Architect en F1** — post-SPRINT_APPROVED, no en Planning
 
 ---
 

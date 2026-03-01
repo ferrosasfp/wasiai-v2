@@ -1,6 +1,6 @@
 sprint: 6
-periodo: "2026-03-01 → 2026-03-07"
-estado: REVIEW_APPROVED
+periodo: "2026-03-01 → 2026-03-01"
+estado: CERRADO
 goal: "Un developer externo puede integrar WasiAI en su agente — con LangChain o paralelo — y ejecutar un pipeline de pagos autónomo end-to-end"
 goal_cumplido: true
 
@@ -42,4 +42,18 @@ carry_over:
 
 deuda_tecnica_nueva: []
 
-proxima_ceremonia: "Retro Sprint 6 — viernes 6 Mar"
+auto_blindaje:
+  - fecha: 2026-03-01
+    error: San ejecutó Planning sin activar rol SM
+    fix: Activar SM explícitamente ante cualquier ceremonia
+    documentado_en: sprint_cadence.md
+  - fecha: 2026-03-01
+    error: SM presentó Work Items en lugar del Architect
+    fix: F1 es del Architect — SM solo coordina
+    documentado_en: SKILL.md
+  - fecha: 2026-03-01
+    error: SM no analizó dependencias en Planning
+    fix: Análisis de paralelismo es del Architect en F1
+    documentado_en: SKILL.md + sprint_cadence.md
+
+proxima_ceremonia: "Sprint 7 Planning — lunes 2 Mar"
