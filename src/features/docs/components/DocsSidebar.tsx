@@ -10,6 +10,11 @@ const SECTION_KEYS = [
   { id: 'api-reference',   key: 'apiRef'         },
   { id: 'mcp-integration', key: 'mcpIntegration' },
   { id: 'errors',          key: 'errors'         },
+  { id: 'x402',          key: 'x402'         },
+  { id: 'compose',       key: 'compose'      },
+  { id: 'agent-keys',    key: 'agentKeys'    },
+  { id: 'creator-guide', key: 'creatorGuide' },
+  { id: 'agentkit',      key: 'agentkit'     },
 ] as const
 
 interface NavListProps {

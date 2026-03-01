@@ -319,7 +319,12 @@
     "tryItRun": "Run",
     "tryItResponse": "Response",
     "tryItLatency": "Latency",
-    "contents": "Contents"
+    "contents": "Contents",
+    "x402": "x402 Payments",
+    "compose": "Compose API",
+    "agentKeys": "Agent Keys",
+    "creatorGuide": "Creator Guide",
+    "agentkit": "AgentKit"
   },
   "codeExamples": {
     "title": "How to use",

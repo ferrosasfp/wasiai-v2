@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { CodeBlock } from '../components/CodeBlock'
 
-const TABS = [
+const TABS: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Node.js',
     language: 'javascript',
@@ -10,33 +10,42 @@ const { WasiAI } = require('@wasiai/sdk')
 
 const client = new WasiAI({ apiKey: 'wai_your_key_here' })
 
-const result = await client.agents.invoke('my-agent', {
-  input: 'What is the weather in Lima?'
+const result = await client.agents.invoke('wasi-defi-sentiment', {
+  input: JSON.stringify({
+    token_name:   'AVAX',
+    token_symbol: 'AVAX',
+  })
 })
 
-console.log(result.output)`,
+console.log(result.output)
+// { sentiment_score: 72, flags: [], analysis: "Strong DeFi fundamentals..." }`,
   },
   {
     label: 'Python',
     language: 'python',
     code: `# Install: pip install wasiai
+import json
 from wasiai import WasiAI
 
 client = WasiAI(api_key="wai_your_key_here")
 
-result = client.agents.invoke("my-agent", {
-    "input": "What is the weather in Lima?"
+result = client.agents.invoke("wasi-defi-sentiment", {
+    "input": json.dumps({
+        "token_name":   "AVAX",
+        "token_symbol": "AVAX",
+    })
 })
 
-print(result.output)`,
+print(result.output)
+# { sentiment_score: 72, flags: [], analysis: "Strong DeFi fundamentals..." }`,
   },
   {
     label: 'curl',
     language: 'bash',
-    code: `curl -X POST https://wasiai.com/api/v1/agents/my-agent/invoke \\
+    code: `curl -X POST https://wasiai-v2.vercel.app/api/v1/agents/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: wai_your_key_here" \\
-  -d '{"input": "What is the weather in Lima?"}'`,
+  -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'`,
   },
 ]
 
@@ -64,8 +73,9 @@ export function QuickstartSection() {
       </div>
 
       <div className="rounded-lg bg-avax-50 border border-avax-100 p-4 text-sm text-avax-700">
-        💡 <strong>That&apos;s it.</strong> The agent runs in the cloud — you just send a JSON payload and
-        get a structured response back.
+        💡 <strong>That&apos;s it.</strong> The example uses <code className="bg-avax-100 px-1 rounded text-xs">wasi-defi-sentiment</code>,
+        one of the DeFi Risk agents available in the marketplace. The agent runs in the cloud — you just
+        send a JSON payload and get a structured response back.
       </div>
     </section>
   )

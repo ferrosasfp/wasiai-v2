@@ -8,7 +8,7 @@ const CLAUDE_DESKTOP_CONFIG: Parameters<typeof CodeBlock>[0]['tabs'] = [
     code: `{
   "mcpServers": {
     "wasiai": {
-      "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wasi_YOUR_KEY"
+      "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wai_YOUR_KEY"
     }
   }
 }`,
@@ -22,7 +22,7 @@ const CURSOR_CONFIG: Parameters<typeof CodeBlock>[0]['tabs'] = [
     code: `{
   "mcpServers": {
     "wasiai": {
-      "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wasi_YOUR_KEY"
+      "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wai_YOUR_KEY"
     }
   }
 }`,
@@ -43,8 +43,8 @@ const EXAMPLE_PROMPT: Parameters<typeof CodeBlock>[0]['tabs'] = [
     label: 'Prompt de ejemplo',
     language: 'bash',
     code: `# En Claude Desktop o Cursor, escribe:
-Usa el agente gpt-translator-pro de WasiAI para traducir este texto al español:
-"Artificial intelligence is transforming how developers build software."`,
+Usa el agente wasi-defi-sentiment de WasiAI para analizar este token DeFi:
+"{\\"token_name\\":\\"SMEG\\",\\"token_symbol\\":\\"SMEG\\",\\"description\\":\\"100x guaranteed returns!\\"}"`,
   },
 ]
 
@@ -55,7 +55,7 @@ const TOOLS_CALL_BODY: Parameters<typeof CodeBlock>[0]['tabs'] = [
     code: `{
   "method": "tools/call",
   "params": {
-    "name": "wasiai_gpt_translator_pro",
+    "name": "wasiai_wasi_defi_sentiment",
     "arguments": {
       "input": "Hello world",
       "options": {}
@@ -70,7 +70,7 @@ const TOOLS_CALL_RESPONSE: Parameters<typeof CodeBlock>[0]['tabs'] = [
     label: 'Respuesta MCP',
     language: 'json',
     code: `{
-  "content": [{ "type": "text", "text": "Hola mundo" }],
+  "content": [{ "type": "text", "text": "{\"sentiment_score\":92,\"flags\":[\"FOMO naming\"],\"analysis\":\"High-risk token.\"}" }],
   "isError": false,
   "_meta": {
     "charged": 0.001,
@@ -146,7 +146,7 @@ export function McpSection() {
         </ul>
         <CodeBlock tabs={CLAUDE_DESKTOP_CONFIG} />
         <p className="text-sm text-gray-500">
-          Replace <code className="text-xs bg-gray-100 rounded px-1 py-0.5">wasi_YOUR_KEY</code> with
+          Replace <code className="text-xs bg-gray-100 rounded px-1 py-0.5">wai_YOUR_KEY</code> with
           your actual Agent Key. Restart Claude Desktop after saving.
         </p>
       </div>
@@ -205,7 +205,7 @@ export function McpSection() {
           What happens under the hood:
         </p>
         <ol className="text-sm text-gray-600 list-decimal list-inside space-y-1 pl-2">
-          <li>Claude/Cursor detects the tool <code className="text-xs bg-gray-100 rounded px-1 py-0.5">wasiai_gpt_translator_pro</code></li>
+          <li>Claude/Cursor detects the tool <code className="text-xs bg-gray-100 rounded px-1 py-0.5">wasiai_wasi_defi_sentiment</code></li>
           <li>Calls <code className="text-xs bg-gray-100 rounded px-1 py-0.5">POST /api/v1/mcp?key=wasi_...</code> with <code className="text-xs bg-gray-100 rounded px-1 py-0.5">method: tools/call</code></li>
           <li>WasiAI calls the agent endpoint and deducts USDC from your budget</li>
           <li>Returns the agent response + metadata (charged amount, remaining budget)</li>
