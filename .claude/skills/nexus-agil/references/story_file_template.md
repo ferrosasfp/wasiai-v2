@@ -68,6 +68,35 @@
 **Patron clave**:
 - [Patrones a seguir]
 
+## Contrato de Integración
+
+> **Obligatorio cuando hay comunicación entre dos componentes** (API ↔ agente, compose ↔ servicio, SDK ↔ endpoint, frontend ↔ backend).
+> Si esta sección está vacía en una HU que tiene comunicación entre componentes → Architect no terminó su trabajo.
+
+### Componente A: [nombre] → Componente B: [nombre]
+
+**Request (lo que A envía a B):**
+```json
+{
+  "campo": "tipo — descripción"
+}
+```
+
+**Response (lo que B devuelve a A):**
+```json
+{
+  "campo": "tipo — descripción"
+}
+```
+
+**Errores esperados:**
+| HTTP | Código | Cuándo |
+|---|---|---|
+| 400 | `missing_field` | Falta campo obligatorio |
+| 502 | `upstream_error` | Servicio externo falló |
+
+> Si hay más de dos componentes, agregar una subsección por cada par que se comunique.
+
 ## Constraint Directives
 
 ### OBLIGATORIO
