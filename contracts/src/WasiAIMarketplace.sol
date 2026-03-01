@@ -84,6 +84,9 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     /// keyId → address that can withdraw the key's remaining balance
     mapping(bytes32 => address) public keyOwners;
 
+    /// paymentId → already recorded (idempotency guard for recordInvocation)
+    mapping(bytes32 => bool) public usedPaymentIds;
+
     /// Timestamp of the last operator activity.
     /// If > EMERGENCY_TIMEOUT has passed, key owners can exit trustlessly.
     uint256 public lastOperatorActivity;
@@ -207,9 +210,13 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     function recordInvocation(
         string  calldata slug,
         address          payer,
-        uint256          amount
+        uint256          amount,
+        bytes32          paymentId
     ) external onlyOperator nonReentrant {
         lastOperatorActivity = block.timestamp;
+        require(!usedPaymentIds[paymentId], "WasiAI: payment already recorded");
+        usedPaymentIds[paymentId] = true;
+
         Agent storage agent = agents[slug];
         require(agent.active,  "WasiAI: agent inactive");
         require(amount > 0,    "WasiAI: zero amount");
@@ -332,6 +339,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         // Deduct full amount atomically before any transfers (reentrancy-safe)
         keyBalances[keyId] -= total;
 
+        uint256 totalPlatformShare = 0;
         for (uint256 i = 0; i < slugs.length; i++) {
             require(amounts[i] > 0,          "WasiAI: zero amount");
             Agent storage agent = agents[slugs[i]];
@@ -341,15 +349,17 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
             uint256 creatorShare  = amounts[i] - platformShare;
 
             earnings[agent.creator] += creatorShare;
-
-            if (platformShare > 0) {
-                usdc.safeTransfer(treasury, platformShare);
-            }
+            totalPlatformShare     += platformShare;
 
             totalVolume      += amounts[i];
             totalInvocations += 1;
 
             emit KeyCallSettled(keyId, slugs[i], amounts[i], creatorShare, platformShare);
+        }
+
+        // Single transfer to treasury after loop — avoids gas blowup in large batches
+        if (totalPlatformShare > 0) {
+            usdc.safeTransfer(treasury, totalPlatformShare);
         }
     }
 

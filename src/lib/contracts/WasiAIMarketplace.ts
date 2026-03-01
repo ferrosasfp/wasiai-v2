@@ -52,9 +52,10 @@ export const WASIAI_MARKETPLACE_ABI = [
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'slug',   type: 'string'  },
-      { name: 'payer',  type: 'address' },
-      { name: 'amount', type: 'uint256' },
+      { name: 'slug',      type: 'string'  },
+      { name: 'payer',     type: 'address' },
+      { name: 'amount',    type: 'uint256' },
+      { name: 'paymentId', type: 'bytes32' },
     ],
     outputs: [],
   },

@@ -136,7 +136,7 @@ contract WasiAIMarketplaceTest is Test {
 
         // Record invocation
         vm.prank(operator);
-        marketplace.recordInvocation(SLUG, payer, PRICE);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256(abi.encodePacked(block.number, msg.sender)));
 
         // Platform gets 10% = 2000 units = $0.002
         assertEq(usdc.balanceOf(treasury), 2_000);
@@ -156,7 +156,7 @@ contract WasiAIMarketplaceTest is Test {
 
         usdc.mint(address(marketplace), PRICE);
         vm.expectRevert("WasiAI: agent inactive");
-        marketplace.recordInvocation(SLUG, payer, PRICE);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256(abi.encodePacked(block.number, msg.sender)));
         vm.stopPrank();
     }
 
@@ -168,7 +168,7 @@ contract WasiAIMarketplaceTest is Test {
         usdc.mint(address(marketplace), PRICE);
 
         vm.prank(operator);
-        marketplace.recordInvocation(SLUG, payer, PRICE);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256(abi.encodePacked(block.number, msg.sender)));
 
         uint256 pending = marketplace.getPendingEarnings(creator);
         assertEq(pending, 18_000);
@@ -207,7 +207,7 @@ contract WasiAIMarketplaceTest is Test {
         for (uint256 i = 0; i < 5; i++) {
             usdc.mint(address(marketplace), PRICE);
             vm.prank(operator);
-            marketplace.recordInvocation(SLUG, payer, PRICE);
+            marketplace.recordInvocation(SLUG, payer, PRICE, keccak256(abi.encodePacked(i, SLUG)));
         }
 
         // 5 calls × $0.02 = $0.10 total
@@ -653,7 +653,7 @@ contract WasiAIMarketplaceTest is Test {
         _registerAgent(SLUG, creator);
         usdc.mint(address(marketplace), PRICE);
         vm.prank(operator);
-        marketplace.recordInvocation(SLUG, payer, PRICE);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256(abi.encodePacked(block.number, msg.sender)));
 
         uint256 before = marketplace.lastOperatorActivity();
         vm.warp(block.timestamp + 200);
