@@ -1,8 +1,9 @@
 // src/app/api/v1/compose/route.ts
 // HU-5.1 — Agent Compose API (POST /api/v1/compose)
+// HU-5.2 — Ejecución paralela de agentes (parallel: boolean en ComposeStep)
 // Next.js 14 App Router | createServiceClient | viem v2 | no ethers | no hardcodes
 //
-// Interface: agent_slug + pass_output (story spec)
+// Interface: agent_slug + pass_output + parallel (story spec)
 // Rate limit: getComposeLimit() de @/lib/ratelimit (rl:compose, 10/1m)
 // Receipts: signReceipt() por step de @/lib/receipts/signReceipt
 // DB: agent_calls con pipeline_id + step_index, pipeline_executions para tracking
@@ -24,6 +25,7 @@ interface ComposeStep {
   agent_slug:   string
   input?:       string
   pass_output?: boolean
+  parallel?:    boolean  // HU-5.2: si true, agrupa con steps consecutivos parallel
 }
 
 interface ComposeRequest {
@@ -41,6 +43,7 @@ interface StepReceipt {
 interface ComposeResponse {
   pipeline_id:     string
   steps_executed:  number
+  groups_executed: number  // HU-5.2: número de grupos (1 group = N parallel steps)
   total_cost_usdc: string
   result:          unknown
   receipts:        StepReceipt[]
@@ -72,6 +75,23 @@ interface KeyRow {
   is_active:   boolean
   budget_usdc: number
   spent_usdc:  number
+}
+
+// ── HU-5.2: Agrupador de steps ───────────────────────────────────────────────
+/** Agrupa steps consecutivos con parallel:true en sub-arrays */
+export function groupSteps(steps: ComposeStep[]): ComposeStep[][] {
+  const groups: ComposeStep[][] = []
+  let i = 0
+  while (i < steps.length) {
+    if (steps[i].parallel) {
+      const group: ComposeStep[] = []
+      while (i < steps.length && steps[i].parallel) group.push(steps[i++])
+      groups.push(group)
+    } else {
+      groups.push([steps[i++]])
+    }
+  }
+  return groups
 }
 
 // ── Handler principal ────────────────────────────────────────────────────────
@@ -206,10 +226,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // ── [6] LOOP SECUENCIAL ───────────────────────────────────────────────────
+  // ── [6] LOOP POR GRUPOS (secuencial + paralelo) ──────────────────────────
   const pipelineId = randomUUID()
   const receipts: StepReceipt[] = []
   let lastOutput: string | null = null
+  const groups = groupSteps(steps)
+  let globalStepIndex = 0
 
   // Crear pipeline_executions provisional para tracking
   await supabase.from('pipeline_executions').insert({
@@ -221,221 +243,179 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     status:          'failed',
   }).then(() => {}, () => {/* best-effort */})
 
-  try {
-    for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
-      const step  = steps[stepIndex]
-      const agent = agentMap.get(step.agent_slug)!
+  // ── Helper: ejecutar un step individual ──────────────────────────────────
+  const safeKeyRow = keyRow! // guard ya verificado arriba (línea 141)
+  async function executeStep(step: ComposeStep, stepIndex: number, stepInput: string): Promise<{
+    receipt: StepReceipt | null
+    output: string | null
+    status: 'success' | 'error'
+    reason: string
+  }> {
+    const agent = agentMap.get(step.agent_slug)!
 
-      // [6a] Construir input del step
-      let stepInput: string
-      if (stepIndex === 0) {
-        stepInput = step.input ?? ''
-      } else if (step.pass_output) {
-        stepInput = lastOutput ?? ''
-      } else {
-        stepInput = step.input ?? ''
-      }
+    // Rate limit check pre-step (fail-open)
+    const consumerRlId = `${step.agent_slug}:${rawKey.substring(0, 24)}`
+    try {
+      const rpmOk = await getCreatorRpmLimit(step.agent_slug, agent.max_rpm ?? 60).limit(consumerRlId)
+      if (!rpmOk.success) return { receipt: null, output: null, status: 'error', reason: `rate_limited:${step.agent_slug}` }
+      const rpdOk = await getCreatorRpdLimit(step.agent_slug, agent.max_rpd ?? 1000).limit(consumerRlId)
+      if (!rpdOk.success) return { receipt: null, output: null, status: 'error', reason: `daily_limit:${step.agent_slug}` }
+    } catch {
+      console.warn('[rate-limit] fail-open', { slug: step.agent_slug })
+    }
 
-      // [6a.5] HU-8.4: Creator rate limit check per step (FAST fix — bypass bug)
-      const consumerRlId = `${step.agent_slug}:${rawKey.substring(0, 24)}`
-      // AR-fix: fail-open if Upstash unavailable
-      try {
-        const rpmOk = await getCreatorRpmLimit(step.agent_slug, agent.max_rpm ?? 60).limit(consumerRlId)
-        if (!rpmOk.success) {
-          return NextResponse.json(
-            { error: `Rate limit exceeded for agent ${step.agent_slug}`, code: 'rate_limited', failed_step: stepIndex },
-            { status: 429, headers: { 'Retry-After': String(Math.ceil((rpmOk.reset - Date.now()) / 1000)) } },
-          )
-        }
-        const rpdOk = await getCreatorRpdLimit(step.agent_slug, agent.max_rpd ?? 1000).limit(consumerRlId)
-        if (!rpdOk.success) {
-          return NextResponse.json(
-            { error: `Daily limit reached for agent ${step.agent_slug}`, code: 'daily_limit_reached', failed_step: stepIndex },
-            { status: 429, headers: { 'Retry-After': String(Math.ceil((rpdOk.reset - Date.now()) / 1000)) } },
-          )
-        }
-      } catch {
-        console.warn('[rate-limit] Creator rate limit check failed (fail-open)', { slug: step.agent_slug })
-      }
+    // Deducir saldo
+    const { data: deductOk, error: deductError } = await supabase.rpc(
+      'deduct_key_balance',
+      { p_key_id: safeKeyRow.id, p_amount: agent.price_per_call },
+    )
+    if (deductError || deductOk === false) {
+      return { receipt: null, output: null, status: 'error', reason: 'insufficient_balance' }
+    }
 
-      // [6b] Deducir saldo atómicamente ANTES del fetch (uso de deduct_key_balance para atomicidad)
-      const { data: deductOk, error: deductError } = await supabase.rpc(
-        'deduct_key_balance',
-        { p_key_id: keyRow.id, p_amount: agent.price_per_call },
-      )
+    // Llamar al agente externo
+    const startMs = Date.now()
+    let stepOutput: unknown
+    let stepStatus: 'success' | 'error' = 'success'
+    let stepErrorReason = ''
 
-      if (deductError || deductOk === false) {
-        return NextResponse.json(
-          {
-            error:            `Pipeline failed at step ${stepIndex}`,
-            code:             'step_failed',
-            failed_step:      stepIndex,
-            reason:           'Insufficient balance (race condition detected)',
-            steps_executed:   stepIndex,
-            partial_receipts: receipts,
-          } satisfies PipelineFailedResponse,
-          { status: 422 },
-        )
-      }
-
-      // [6c] Llamar al agente externo
-      const startMs = Date.now()
-      let stepOutput: unknown
-      let stepStatus: 'success' | 'error' = 'success'
-      let stepErrorReason = ''
-
-      try {
-        const res = await fetch(agent.endpoint_url, {
-          method:  'POST',
-          headers: {
-            'Content-Type':   'application/json',
-            'X-Pipeline-Id':  pipelineId,
-            'X-Pipeline-Step': String(stepIndex),
-          },
-          body:    JSON.stringify({ input: stepInput }),
-          signal:  AbortSignal.timeout(STEP_TIMEOUT_MS),
-          redirect: 'error',
-        })
-
-        if (res.ok) {
-          const ct = res.headers.get('content-type') ?? ''
-          stepOutput = ct.includes('application/json') ? await res.json() : await res.text()
-        } else {
-          stepStatus      = 'error'
-          stepErrorReason = `Upstream ${res.status}`
-          stepOutput      = { error: stepErrorReason }
-        }
-      } catch (err) {
-        stepStatus      = 'error'
-        stepErrorReason = err instanceof Error && err.name === 'TimeoutError'
-          ? 'TIMEOUT'
-          : `Upstream unreachable: ${String(err)}`
-        stepOutput = { error: stepErrorReason }
-      }
-
-      const latencyMs = Date.now() - startMs
-
-      // [6d] Log en agent_calls con pipeline_id + step_index
-      let callId = ''
-      try {
-        const { data: callRecord } = await supabase
-          .from('agent_calls')
-          .insert({
-            agent_id:    agent.id,
-            caller_type: 'agent',
-            amount_paid: agent.price_per_call,
-            tx_hash:     null,
-            status:      stepStatus,
-            latency_ms:  latencyMs,
-            key_id:      keyRow.id,
-            is_trial:    false,
-            pipeline_id: pipelineId,
-            step_index:  stepIndex,
-          })
-          .select('id')
-          .single()
-        callId = callRecord?.id ?? ''
-      } catch {
-        // best-effort — no abortar el pipeline por fallo de log
-      }
-
-      // [6e] Firmar receipt del step (best-effort)
-      let signature = ''
-      try {
-        const receiptTimestamp = Math.floor(Date.now() / 1000)
-        signature = await signReceipt({
-          keyId:      keyHashToBytes32(keyRow.key_hash),
-          callId,
-          agentSlug:  agent.slug,
-          amountUsdc: agent.price_per_call,
-          timestamp:  receiptTimestamp,
-        })
-        // Guardar signature en DB (fire-and-forget)
-        supabase
-          .from('agent_calls')
-          .update({ receipt_signature: signature })
-          .eq('id', callId)
-          .then(undefined, () => {/* best-effort */})
-      } catch {
-        // sign failed — continuar sin abortar
-      }
-
-      // [6f] Evaluar resultado del step
-      if (stepStatus === 'error') {
-        // Actualizar pipeline_executions como parcial/fallido
-        supabase
-          .from('pipeline_executions')
-          .update({
-            status:          receipts.length === 0 ? 'failed' : 'partial',
-            steps_completed: stepIndex,
-            total_cost_usdc: receipts.reduce((acc, r) => acc + parseFloat(r.cost_usdc), 0),
-            failed_at_step:  stepIndex + 1,
-            error_detail:    stepErrorReason,
-            completed_at:    new Date().toISOString(),
-          })
-          .eq('id', pipelineId)
-          .then(undefined, () => {/* best-effort */})
-
-        return NextResponse.json(
-          {
-            error:            `Pipeline failed at step ${stepIndex}`,
-            code:             'step_failed',
-            failed_step:      stepIndex,
-            reason:           stepErrorReason,
-            steps_executed:   stepIndex,
-            partial_receipts: receipts,
-          } satisfies PipelineFailedResponse,
-          { status: 422 },
-        )
-      }
-
-      // Step exitoso — acumular
-      lastOutput = typeof stepOutput === 'string'
-        ? stepOutput
-        : JSON.stringify(stepOutput)
-
-      receipts.push({
-        step:              stepIndex,
-        agent_slug:        agent.slug,
-        cost_usdc:         agent.price_per_call.toFixed(6),
-        receipt_signature: signature,
-        call_id:           callId,
+    try {
+      const res = await fetch(agent.endpoint_url, {
+        method:   'POST',
+        headers:  { 'Content-Type': 'application/json', 'X-Pipeline-Id': pipelineId, 'X-Pipeline-Step': String(stepIndex) },
+        body:     JSON.stringify({ input: stepInput }),
+        signal:   AbortSignal.timeout(STEP_TIMEOUT_MS),
+        redirect: 'error',
       })
+      if (res.ok) {
+        const ct = res.headers.get('content-type') ?? ''
+        stepOutput = ct.includes('application/json') ? await res.json() : await res.text()
+      } else {
+        stepStatus      = 'error'
+        stepErrorReason = `Upstream ${res.status}`
+        stepOutput      = { error: stepErrorReason }
+      }
+    } catch (err) {
+      stepStatus      = 'error'
+      stepErrorReason = err instanceof Error && err.name === 'TimeoutError' ? 'step_timeout' : `Upstream unreachable: ${String(err)}`
+      stepOutput      = { error: stepErrorReason }
+    }
 
-      // Incrementar stats del agente (fire-and-forget)
-      supabase
-        .rpc('increment_agent_stats', { p_agent_id: agent.id, p_amount: agent.price_per_call })
-        .then(undefined, () => {/* best-effort */})
+    const latencyMs = Date.now() - startMs
+
+    // Log en agent_calls
+    let callId = ''
+    try {
+      const { data: callRecord } = await supabase
+        .from('agent_calls')
+        .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: agent.price_per_call, tx_hash: null, status: stepStatus, latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex })
+        .select('id').single()
+      callId = callRecord?.id ?? ''
+    } catch { /* best-effort */ }
+
+    // Firmar receipt
+    let signature = ''
+    try {
+      const ts = Math.floor(Date.now() / 1000)
+      signature = await signReceipt({ keyId: keyHashToBytes32(safeKeyRow.key_hash), callId, agentSlug: agent.slug, amountUsdc: agent.price_per_call, timestamp: ts })
+      supabase.from('agent_calls').update({ receipt_signature: signature }).eq('id', callId).then(undefined, () => {})
+    } catch { /* best-effort */ }
+
+    if (stepStatus === 'error') return { receipt: null, output: null, status: 'error', reason: stepErrorReason }
+
+    const output = typeof stepOutput === 'string' ? stepOutput : JSON.stringify(stepOutput)
+    supabase.rpc('increment_agent_stats', { p_agent_id: agent.id, p_amount: agent.price_per_call }).then(undefined, () => {})
+
+    return {
+      status: 'success',
+      output,
+      reason: '',
+      receipt: { step: stepIndex, agent_slug: agent.slug, cost_usdc: agent.price_per_call.toFixed(6), receipt_signature: signature, call_id: callId },
+    }
+  }
+
+  try {
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      const group = groups[groupIndex]
+
+      if (group.length === 1) {
+        // ── Step secuencial ─────────────────────────────────────────────────
+        const step = group[0]
+        const stepInput = globalStepIndex === 0 ? (step.input ?? '') : (step.pass_output ? (lastOutput ?? '') : (step.input ?? ''))
+        const result = await executeStep(step, globalStepIndex, stepInput)
+
+        if (result.status === 'error') {
+          supabase.from('pipeline_executions').update({ status: receipts.length === 0 ? 'failed' : 'partial', steps_completed: globalStepIndex, total_cost_usdc: receipts.reduce((a, r) => a + parseFloat(r.cost_usdc), 0), failed_at_step: globalStepIndex + 1, error_detail: result.reason, completed_at: new Date().toISOString() }).eq('id', pipelineId).then(undefined, () => {})
+          return NextResponse.json({ error: `Pipeline failed at step ${globalStepIndex}`, code: 'step_failed', failed_step: globalStepIndex, reason: result.reason, steps_executed: globalStepIndex, partial_receipts: receipts } satisfies PipelineFailedResponse, { status: 422 })
+        }
+
+        receipts.push(result.receipt!)
+        lastOutput = result.output
+        globalStepIndex++
+
+      } else {
+        // ── Grupo paralelo ──────────────────────────────────────────────────
+        // Rate limit pre-grupo (antes del allSettled)
+        const groupResults = await Promise.allSettled(
+          group.map((step, i) => {
+            const stepInput = globalStepIndex + i === 0 ? (step.input ?? '') : (step.input ?? '')
+            return executeStep(step, globalStepIndex + i, stepInput)
+          })
+        )
+
+        const successResults: string[] = []
+        for (let i = 0; i < groupResults.length; i++) {
+          const gr = groupResults[i]
+          const stepIdx = globalStepIndex + i
+          if (gr.status === 'fulfilled' && gr.value.status === 'success') {
+            receipts.push(gr.value.receipt!)
+            successResults.push(gr.value.output ?? '')
+          } else {
+            const reason = gr.status === 'rejected' ? String(gr.reason) : gr.value.reason
+            receipts.push({ step: stepIdx, agent_slug: group[i].agent_slug, cost_usdc: '0.000000', receipt_signature: '', call_id: '' })
+            console.warn('[compose] parallel step failed', { stepIdx, reason })
+          }
+        }
+
+        globalStepIndex += group.length
+
+        // Si todos fallaron → abort
+        if (successResults.length === 0) {
+          supabase.from('pipeline_executions').update({ status: 'failed', steps_completed: globalStepIndex - group.length, total_cost_usdc: receipts.reduce((a, r) => a + parseFloat(r.cost_usdc), 0), completed_at: new Date().toISOString() }).eq('id', pipelineId).then(undefined, () => {})
+          return NextResponse.json({ error: `Pipeline failed — all parallel steps in group ${groupIndex} failed`, code: 'step_failed', failed_step: globalStepIndex - group.length, reason: 'all_parallel_failed', steps_executed: globalStepIndex - group.length, partial_receipts: receipts } satisfies PipelineFailedResponse, { status: 422 })
+        }
+
+        // pass_output del último step del grupo
+        const lastStep = group[group.length - 1]
+        if (lastStep.pass_output) {
+          lastOutput = JSON.stringify(successResults)
+        } else {
+          lastOutput = successResults[successResults.length - 1] ?? null
+        }
+      }
     }
   } catch (unexpectedErr) {
-    // Error inesperado — actualizar pipeline como fallido y re-throw
-    supabase
-      .from('pipeline_executions')
-      .update({ status: 'failed', completed_at: new Date().toISOString() })
-      .eq('id', pipelineId)
-      .then(undefined, () => {/* best-effort */})
+    supabase.from('pipeline_executions').update({ status: 'failed', completed_at: new Date().toISOString() }).eq('id', pipelineId).then(undefined, () => {})
     throw unexpectedErr
   }
+
+  // ── Compat: mantener variable steps_executed = globalStepIndex ────────────
+  const stepsExecuted = globalStepIndex
 
   // ── [7] RESPONSE FINAL ────────────────────────────────────────────────────
   const totalCost = receipts.reduce((acc, r) => acc + parseFloat(r.cost_usdc), 0)
 
-  // Actualizar pipeline_executions como exitoso
   supabase
     .from('pipeline_executions')
-    .update({
-      status:          'success',
-      steps_completed: steps.length,
-      total_cost_usdc: totalCost,
-      completed_at:    new Date().toISOString(),
-    })
+    .update({ status: 'success', steps_completed: stepsExecuted, total_cost_usdc: totalCost, completed_at: new Date().toISOString() })
     .eq('id', pipelineId)
     .then(undefined, () => {/* best-effort */})
 
   return NextResponse.json(
     {
       pipeline_id:     pipelineId,
-      steps_executed:  steps.length,
+      steps_executed:  stepsExecuted,
+      groups_executed: groups.length,
       total_cost_usdc: totalCost.toFixed(6),
       result:          parseOutputSafe(lastOutput),
       receipts,
