@@ -22,6 +22,11 @@ function getRedis(): Redis {
   })
 }
 
+/** Shared Redis singleton for external consumers (e.g., pricing overhead cache) */
+export function getSharedRedis(): Redis {
+  return getRedis()
+}
+
 // Lazy singletons — not constructed until first use
 let _invoke:   Ratelimit | null = null
 let _register: Ratelimit | null = null

@@ -100,6 +100,13 @@ export const WASIAI_MARKETPLACE_ABI = [
     inputs: [],
     outputs: [{ type: 'uint16' }],
   },
+  {
+    name: 'setPlatformFee',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'bps', type: 'uint16' }],
+    outputs: [],
+  },
   // ── Events ────────────────────────────────────────────────────────────────
   {
     name: 'AgentRegistered',

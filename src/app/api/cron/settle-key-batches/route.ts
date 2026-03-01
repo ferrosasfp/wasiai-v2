@@ -35,6 +35,18 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceClient()
 
+  // Verificar modo activo — si es Chainlink, omitir este cron
+  const { data: config } = await supabase
+    .from('system_config')
+    .select('value')
+    .eq('key', 'settlement_mode')
+    .single()
+
+  if (config?.value === 'chainlink') {
+    logger.info('[settle-key-batches] Chainlink mode active — skipping Vercel cron')
+    return NextResponse.json({ skipped: true, reason: 'chainlink_mode_active' })
+  }
+
   // 1. Encontrar todas las llamadas con key no liquidadas
   // HAL-026: Limitar a últimos 7 días para evitar timeout con historial largo
   // Llamadas más antiguas se reconcilian con proceso separado si es necesario
