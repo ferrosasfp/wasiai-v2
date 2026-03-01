@@ -54,8 +54,8 @@
 
 ## 🔴 P1 — Sprint 5 (prioridad máxima)
 
-- [ ] **HU-3.3** Free Trial controlado por creator
-- [ ] **UX-08** Validación de formulario /publish alineada
+- [x] **HU-3.3** Free Trial controlado por creator
+- [~] **UX-08** Validación de formulario /publish — frontend parcial, falta validación Zod en backend /api/models
 - [ ] **UX-09** Editor visual de capabilities en /publish — reemplazar JSON crudo por formulario con campos Name, Description, InputType, OutputType, Example Input/Output. Agregar/eliminar capabilities con botones. — descripción obligatoria con `*` rojo en Step 1, validación frontend antes de llamar al servidor, mensajes de error en el campo correcto. Opción A: hacerla required con min 10 chars visible desde el formulario. — agregar `free_trial_enabled` (default: false) y `free_trial_limit` (default: 1) en tabla `agents`. Toggle en dashboard del creator. Trial solo se ejecuta si el creator lo activó explícitamente. Hoy los trials están ON para todos sin consentimiento del creator — esto lo corrige. Migration 018 requerida.
 
 ---
@@ -88,19 +88,19 @@
 
 > Trabajar en paralelo con las Épicas. Cada una es una HU pequeña, entregable en 1-2 días.
 
-- [ ] **UX-01** Empty state de búsqueda sin resultados — mostrar sugerencias de agentes populares en lugar de pantalla vacía.
+- [x] **UX-01** Empty state de búsqueda sin resultados — mostrar sugerencias de agentes populares en lugar de pantalla vacía.
 
-- [ ] **UX-02** `publish/page.tsx` — Preview live del agent card mientras el creator llena el formulario. El creator ve exactamente cómo quedará su ficha antes de publicar.
+- [x] **UX-02** `publish/page.tsx` — Preview live del agent card mientras el creator llena el formulario. El creator ve exactamente cómo quedará su ficha antes de publicar.
 
-- [ ] **UX-03** Capabilities — editor de campos estructurado en lugar de JSON crudo. La mayoría de creators no saben qué es JSON.
+- [x] **UX-03** Capabilities — editor de campos estructurado en lugar de JSON crudo. La mayoría de creators no saben qué es JSON.
 
-- [ ] **UX-04** Página de detalle del agente — agregar sección "Cómo usar" con código de ejemplo auto-generado (curl, Node.js, Python) basado en el slug y precio del agente.
+- [x] **UX-04** Página de detalle del agente — agregar sección "Cómo usar" con código de ejemplo auto-generado (curl, Node.js, Python) basado en el slug y precio del agente.
 
-- [ ] **UX-05** Navbar — indicador visual del saldo de API key activo (cuánto USDC disponible). Sin esto el usuario no sabe si puede usar agentes.
+- [x] **UX-05** Navbar — indicador visual del saldo de API key activo (cuánto USDC disponible). Sin esto el usuario no sabe si puede usar agentes.
 
-- [ ] **UX-06** Dashboard creator — gráfica de llamadas por día (últimos 30 días). Hoy solo hay tabla de últimas llamadas.
+- [x] **UX-06** Dashboard creator — gráfica de llamadas por día (últimos 30 días). Hoy solo hay tabla de últimas llamadas.
 
-- [ ] **UX-07** Hero copy — actualmente genérico. Necesita copy específico para los dos usuarios: "Publish your AI agent → get paid automatically" (creator) y "Find the right AI agent → integrate in minutes" (consumer).
+- [x] **UX-07** Hero copy — actualmente genérico. Necesita copy específico para los dos usuarios: "Publish your AI agent → get paid automatically" (creator) y "Find the right AI agent → integrate in minutes" (consumer).
 
 - [ ] **i18n-01** Archivos de traducción `en.json` y `es.json` tienen copy del template NexusFactory. Actualizar con copy real de WasiAI en todas las secciones.
 
@@ -122,20 +122,20 @@
 
 - [x] **HU-2.1** SDK Node.js/TypeScript — `npm install @wasiai/sdk`
 - [x] **HU-2.2** SDK Python — `pip install wasiai`
-- [ ] **HU-2.3** Documentación interactiva con ejemplos ejecutables
+- [x] **HU-2.3** Documentación interactiva con ejemplos ejecutables
 - [ ] **HU-2.4** CLI — `wasiai invoke <agent> "<input>"`
 
 ### 🔴 ÉPICA 3 — Free Trial por Agente *(antes de abrir registro público)*
 > Sin esto, conversión es casi cero. Nadie paga por algo que no probó.
 
 - [x] **HU-3.1** 1 llamada gratuita por usuario por agente desde la ficha
-- [ ] **HU-3.2** Playground — probar y comparar múltiples agentes
+- [x] **HU-3.2** Playground — probar y comparar múltiples agentes
 
 ### 🟡 ÉPICA 4 — Discovery y Calidad del Catálogo *(mes 2)*
 
-- [ ] **HU-4.1** Búsqueda semántica (pgvector o tsvector)
+- [x] **HU-4.1** Búsqueda semántica (pgvector o tsvector)
 - [ ] **HU-4.2** Filtros avanzados (precio, latencia, uptime, categoría)
-- [ ] **HU-4.3** Ejemplos de input/output curados por el creator
+- [x] **HU-4.3** Ejemplos de input/output curados por el creator
 - [ ] **HU-4.4** Reputación con datos reales (uptime histórico, latencia p50/p95, tasa de error) — reemplaza 👍/👎
 - [ ] **HU-4.5** Colecciones curadas y featured agents
 
@@ -160,7 +160,7 @@
 - [ ] **HU-7.1** Plugin LangChain — WasiAI como Tool nativo
 - [ ] **HU-7.2** Plugin LlamaIndex
 - [ ] **HU-7.3** Ejemplo AgentKit (Coinbase) — agente que paga agentes
-- [ ] **HU-7.4** Documentación MCP para Claude Desktop y Cursor
+- [x] **HU-7.4** Documentación MCP para Claude Desktop y Cursor
 
 ### 🟢 ÉPICA 8 — Transparencia y Confianza *(mes 4)*
 
