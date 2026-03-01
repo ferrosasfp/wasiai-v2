@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { mcpRequestSchema } from '@/lib/schemas/api.schemas'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { logger } from '@/lib/logger'
+import { getInvokeLimit, checkRateLimit } from '@/lib/ratelimit'
 
 /**
  * WasiAI MCP Server Endpoint
@@ -174,6 +175,13 @@ export async function POST(request: NextRequest) {
   if (method === 'tools/call') {
     // 1. Extract agent key from query params
     const rawKey = request.nextUrl.searchParams.get('key')
+
+    // SEC-004: Rate limiting on tools/call
+    const rlIdentifier = rawKey ? `key:${rawKey.substring(0, 24)}` : (
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'anonymous'
+    )
+    const rlRes = await checkRateLimit(getInvokeLimit(), `mcp:${rlIdentifier}`)
+    if (rlRes) return rlRes
 
     if (!rawKey || !rawKey.startsWith('wasi_')) {
       return mcpError(

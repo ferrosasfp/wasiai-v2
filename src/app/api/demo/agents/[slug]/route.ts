@@ -13,8 +13,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callGroq } from '@/lib/agents/groq'
 import { getDemoAgent } from '@/lib/agents/demoAgents'
+import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
+import { SITE_URL } from '@/lib/constants'
 
 export async function POST(
   request: NextRequest,
@@ -26,6 +27,11 @@ export async function POST(
   if (!agent) {
     return NextResponse.json({ error: 'Demo agent not found' }, { status: 404 })
   }
+
+  // SEC-001: Rate limiting — 60 req/min per IP for demo endpoints
+  const identifier = getIdentifier(request, undefined)
+  const rateLimitRes = await checkRateLimit(getInvokeLimit(), `demo:${identifier}`)
+  if (rateLimitRes) return rateLimitRes
 
   let body: Record<string, unknown> = {}
   try {
@@ -67,7 +73,7 @@ export async function POST(
         model:      response.model,
         tokens:     response.tokens,
         latency_ms: response.latency_ms,
-        powered_by: 'groq',
+        powered_by: 'wasiai-native',
       },
     })
   } catch (err) {

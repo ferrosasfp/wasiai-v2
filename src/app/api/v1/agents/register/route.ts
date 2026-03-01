@@ -32,8 +32,9 @@ import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit
 import { CHAIN_NAME } from '@/lib/chain'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
 import { createHash } from 'crypto'
+import { logger } from '@/lib/logger'
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
+import { SITE_URL } from '@/lib/constants'
 
 const RegisterAgentSchema = z.object({
   // Required
@@ -229,7 +230,7 @@ export async function POST(request: NextRequest) {
     if (!keyInsertError) {
       managementKey = raw  // Only shown once — caller must store it
     } else {
-      console.error('[register] management key insert failed:', keyInsertError)
+      logger.error('[register] management key insert failed', { keyInsertError })
     }
   }
 
@@ -239,7 +240,7 @@ export async function POST(request: NextRequest) {
       slug:             data.slug,
       pricePerCallUSDC: data.price_per_call,
       creatorWallet:    data.creator_wallet,
-    }).catch(err => console.error('[register] on-chain failed:', err))
+    }).catch(err => logger.error('[register] on-chain failed', { err }))
   }
 
   return NextResponse.json({

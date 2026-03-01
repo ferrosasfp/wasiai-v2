@@ -24,7 +24,7 @@ const USDC_ADDR  = CHAIN_ID_NUM === 43114
   ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'   // Avalanche mainnet USDC
   : '0x5425890298aed601595a70AB815c96711a31Bc65'   // Avalanche Fuji USDC (Circle test token)
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
+import { SITE_URL } from '@/lib/constants'
 
 /**
  * Build x402 payment requirements manually.
@@ -76,10 +76,28 @@ function build402Instructions(model: Record<string, unknown>, priceStr: string, 
 /**
  * Verify + settle x402 payment. Handles both Fuji (native) and mainnet (facilitator).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function settleX402(paymentHeader: any, model: Record<string, unknown>, priceStr: string, resourceUrl: string): Promise<SettlementResult | NextResponse> {
+/** Decoded x402 payment header — supports v1 (EVM payload) and opaque upstream formats */
+interface X402PaymentHeader {
+  x402Version?: number
+  scheme?: string
+  network?: string
+  payload?: {
+    signature?: string
+    authorization?: {
+      from?: string
+      to?: string
+      value?: string
+      validAfter?: string | number
+      validBefore?: string | number
+      nonce?: string
+    }
+  }
+  [key: string]: unknown
+}
+
+async function settleX402(paymentHeader: X402PaymentHeader, model: Record<string, unknown>, priceStr: string, resourceUrl: string): Promise<SettlementResult | NextResponse> {
   if (CHAIN_ID_NUM === 43113) {
-    const evmPayload = (paymentHeader as { payload?: X402EVMPayload })?.payload
+    const evmPayload = paymentHeader?.payload as X402EVMPayload | undefined
     if (!evmPayload?.authorization || !evmPayload?.signature) {
       return NextResponse.json({ error: 'Invalid payment header', code: 'payment_invalid' }, { status: 402 })
     }
@@ -89,7 +107,7 @@ async function settleX402(paymentHeader: any, model: Record<string, unknown>, pr
     const requirements = buildRequirements({ amount: priceStr, recipient: CONTRACT_ADDRESS, resource: resourceUrl, description: `Access to ${model.name as string} on WasiAI`, mimeType: 'application/json' })
     const facilitatorUrl = (process.env.X402_FACILITATOR_URL ?? 'https://facilitator.ultravioletadao.xyz').trim()
     const facilitator = new FacilitatorClient({ baseUrl: facilitatorUrl })
-    return facilitator.verifyAndSettle(paymentHeader, requirements)
+    return facilitator.verifyAndSettle(paymentHeader as import('uvd-x402-sdk').X402Header, requirements)
   }
 }
 
@@ -97,7 +115,8 @@ async function settleX402(paymentHeader: any, model: Record<string, unknown>, pr
  * Record successful invocation on-chain and update the DB flag.
  */
 async function recordOnChain(supabase: SupabaseServiceClient, slug: string, model: Record<string, unknown>, paymentHeader: unknown, txHash: string): Promise<void> {
-  const payerAddress = (paymentHeader as { payload?: { authorization?: { from?: string } } })?.payload?.authorization?.from ?? '0x0000000000000000000000000000000000000000'
+  const ph = paymentHeader as X402PaymentHeader | undefined
+  const payerAddress = ph?.payload?.authorization?.from ?? '0x0000000000000000000000000000000000000000'
   try {
     const onChainTxHash = await recordInvocationOnChain({ slug, payerAddress, amountUSDC: model.price_per_call as number })
     if (onChainTxHash) {
@@ -262,7 +281,7 @@ export async function POST(
 
   // ── 3. Route B: x402 Payment (Ultravioleta DAO / Avalanche) ──────────────
   const headers = Object.fromEntries(request.headers.entries())
-  const paymentHeader = extractPaymentFromHeaders(headers)
+  const paymentHeader = extractPaymentFromHeaders(headers) as X402PaymentHeader | null
 
   if (!paymentHeader) {
     // No payment — return 402 with x402 payment instructions (A-01: extracted)
