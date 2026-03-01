@@ -61,6 +61,10 @@ export const createModelSchema = z.object({
   // HU-3.3: free trial fields
   free_trial_enabled: z.boolean().optional().default(false),
   free_trial_limit: z.number().int().min(1).max(10).optional().default(1),
+
+  // HU-8.4: Creator-configurable rate limits
+  max_rpm: z.number().int().min(1).max(600).optional().default(60),
+  max_rpd: z.number().int().min(1).max(100000).optional().default(1000),
 })
 
 export type CreateModelInput = z.infer<typeof createModelSchema>

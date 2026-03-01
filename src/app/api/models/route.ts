@@ -31,10 +31,12 @@ export async function POST(request: NextRequest) {
   const result = createModelSchema.safeParse(body)
 
   if (!result.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', details: result.error.issues },
-      { status: 422 },
-    )
+    // UX-08: Normalize Zod issues → {errors: [{field, message}]} for consistent API contract
+    const errors = result.error.issues.map(issue => ({
+      field:   issue.path[0]?.toString() ?? 'unknown',
+      message: issue.message,
+    }))
+    return NextResponse.json({ error: 'Validation failed', errors }, { status: 422 })
   }
 
   // SEC-01: Block SSRF via endpoint_url — only if provided (drafts may not have it)

@@ -100,6 +100,46 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
         />
       </div>
 
+      {/* HU-8.4: Rate limits */}
+      <details className="group rounded-xl border border-gray-100 bg-gray-50">
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900">
+          ⚙️ {t('step2.rateLimits.title')} <span className="font-normal text-gray-400">({t('step2.optional')})</span>
+        </summary>
+        <div className="space-y-4 px-4 pb-4 pt-2">
+          <p className="text-xs text-gray-400">{t('step2.rateLimits.hint')}</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                {t('step2.rateLimits.rpm')}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={600}
+                value={(data as Record<string, unknown>).max_rpm as number ?? 60}
+                onChange={e => onChange('max_rpm', parseInt(e.target.value) || 60)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
+              />
+              <p className="mt-0.5 text-xs text-gray-400">{t('step2.rateLimits.rpmHint')}</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                {t('step2.rateLimits.rpd')}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={100000}
+                value={(data as Record<string, unknown>).max_rpd as number ?? 1000}
+                onChange={e => onChange('max_rpd', parseInt(e.target.value) || 1000)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
+              />
+              <p className="mt-0.5 text-xs text-gray-400">{t('step2.rateLimits.rpdHint')}</p>
+            </div>
+          </div>
+        </div>
+      </details>
+
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">
         <button

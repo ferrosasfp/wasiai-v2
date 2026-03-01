@@ -196,7 +196,15 @@
       "errorCapabilitiesArray": "Must be a JSON array",
       "errorCapabilitiesJson": "Invalid JSON",
       "errorPriceMin": "Price must be greater than 0",
-      "optional": "(optional)"
+      "optional": "(optional)",
+      "rateLimits": {
+        "title": "Rate limits",
+        "hint": "Limit how many times a consumer can call your agent. Applies per API key.",
+        "rpm": "Requests / minute",
+        "rpmHint": "Default: 60 req/min",
+        "rpd": "Requests / day",
+        "rpdHint": "Default: 1,000 req/day"
+      }
     },
     "form": {
       "errorSaving": "Error saving",

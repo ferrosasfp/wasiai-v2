@@ -37,6 +37,25 @@ export function getSearchLimit()   { return _search   ??= new Ratelimit({ redis:
 let _compose: Ratelimit | null = null
 export function getComposeLimit()  { return _compose  ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(10, '1 m'),  prefix: 'rl:compose' }) }
 
+// ── HU-8.4: Creator-configurable rate limits (dynamic, not singletons)
+/** RPM limiter per agent per API key consumer */
+export function getCreatorRpmLimit(slug: string, maxRpm: number): Ratelimit {
+  return new Ratelimit({
+    redis:   makeRedis(),
+    limiter: Ratelimit.slidingWindow(maxRpm, '1 m'),
+    prefix:  `rl:creator:${slug}:rpm`,
+  })
+}
+
+/** RPD limiter per agent per API key consumer */
+export function getCreatorRpdLimit(slug: string, maxRpd: number): Ratelimit {
+  return new Ratelimit({
+    redis:   makeRedis(),
+    limiter: Ratelimit.slidingWindow(maxRpd, '1 d'),
+    prefix:  `rl:creator:${slug}:rpd`,
+  })
+}
+
 /** Extract the best available identifier from a request */
 export function getIdentifier(request: NextRequest, userId?: string): string {
   if (userId) return `user:${userId}`
