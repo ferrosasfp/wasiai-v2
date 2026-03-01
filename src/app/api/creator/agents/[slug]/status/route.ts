@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
+import { logger } from '@/lib/logger'
 
 // HU-1.2: 'draft' added to support multi-step publish flow
 const statusSchema = z.object({
@@ -85,7 +86,7 @@ export async function PATCH(
         pricePerCallUSDC,
         creatorWallet: profile.wallet_address,
       }).catch(err =>
-        console.error('[status] registerAgentOnChain failed:', err)
+        logger.error('[status] registerAgentOnChain failed', { err })
       )
     }
   }

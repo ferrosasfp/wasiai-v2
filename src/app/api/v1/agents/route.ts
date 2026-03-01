@@ -19,7 +19,7 @@ import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of
 import { getSearchLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 // WasiAI handles x402 settlement natively — no external facilitator
-const SITE_URL  = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
+import { SITE_URL } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl

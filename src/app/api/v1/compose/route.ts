@@ -15,6 +15,7 @@ import { validateEndpointUrl }       from '@/lib/security/validateEndpointUrl'
 import { getComposeLimit, checkCreatorRateLimits } from '@/lib/ratelimit'
 import { signReceipt }               from '@/lib/receipts/signReceipt'
 import { keyHashToBytes32 }          from '@/lib/contracts/marketplaceClient'
+import { logger }                    from '@/lib/logger'
 
 // ── Constantes (env-driven, no hardcodes) ────────────────────────────────────
 const MAX_STEPS       = 5
@@ -381,7 +382,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           } else {
             const reason = gr.status === 'rejected' ? String(gr.reason) : gr.value.reason
             receipts.push({ step: stepIdx, agent_slug: group[i].agent_slug, cost_usdc: '0.000000', receipt_signature: '', call_id: '' })
-            console.warn('[compose] parallel step failed', { stepIdx, reason })
+            logger.warn('[compose] parallel step failed', { stepIdx, reason })
           }
         }
 

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of truth
 
-const SITE_URL   = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
+import { SITE_URL } from '@/lib/constants'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',

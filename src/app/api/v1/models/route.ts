@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { ModelCategory } from '@/features/models/types/models.types'
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app').trim().replace(/\/$/, '')
+import { SITE_URL } from '@/lib/constants'
 
 /**
  * Agent Discovery API

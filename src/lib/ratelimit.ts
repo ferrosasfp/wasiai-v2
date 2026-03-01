@@ -11,9 +11,12 @@
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis }     from '@upstash/redis'
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
 
-function makeRedis() {
-  return new Redis({
+// SEC-003 / PERF-003: Shared Redis singleton — single connection for all limiters
+let _redis: Redis | null = null
+function getRedis(): Redis {
+  return _redis ??= new Redis({
     url:   process.env.UPSTASH_REDIS_REST_URL!,
     token: process.env.UPSTASH_REDIS_REST_TOKEN!,
   })
@@ -27,33 +30,45 @@ let _upload:   Ratelimit | null = null
 
 let _search: Ratelimit | null = null
 
-export function getInvokeLimit()   { return _invoke   ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(60, '1 m'),  prefix: 'rl:invoke' }) }
-export function getRegisterLimit() { return _register ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(5,  '1 h'),  prefix: 'rl:register' }) }
-export function getKeysLimit()     { return _keys     ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(10, '1 h'),  prefix: 'rl:keys' }) }
-export function getUploadLimit()   { return _upload   ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(20, '1 h'),  prefix: 'rl:upload' }) }
-export function getSearchLimit()   { return _search   ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(30, '1 m'),  prefix: 'rl:search' }) }
+export function getInvokeLimit()   { return _invoke   ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(60, '1 m'),  prefix: 'rl:invoke' }) }
+export function getRegisterLimit() { return _register ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(5,  '1 h'),  prefix: 'rl:register' }) }
+export function getKeysLimit()     { return _keys     ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(10, '1 h'),  prefix: 'rl:keys' }) }
+export function getUploadLimit()   { return _upload   ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(20, '1 h'),  prefix: 'rl:upload' }) }
+export function getSearchLimit()   { return _search   ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(30, '1 m'),  prefix: 'rl:search' }) }
 
 // ── Compose rate limiter — HU-5.1
 let _compose: Ratelimit | null = null
-export function getComposeLimit()  { return _compose  ??= new Ratelimit({ redis: makeRedis(), limiter: Ratelimit.slidingWindow(10, '1 m'),  prefix: 'rl:compose' }) }
+export function getComposeLimit()  { return _compose  ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(10, '1 m'),  prefix: 'rl:compose' }) }
 
-// ── HU-8.4: Creator-configurable rate limits (dynamic, not singletons)
+// ── HU-8.4: Creator-configurable rate limits (dynamic, cached by slug:maxValue)
+// SEC-003: Use Map cache to avoid creating new Redis connections per request
+const _creatorRpmCache = new Map<string, Ratelimit>()
+const _creatorRpdCache = new Map<string, Ratelimit>()
+
 /** RPM limiter per agent per API key consumer */
 export function getCreatorRpmLimit(slug: string, maxRpm: number): Ratelimit {
-  return new Ratelimit({
-    redis:   makeRedis(),
-    limiter: Ratelimit.slidingWindow(maxRpm, '1 m'),
-    prefix:  `rl:creator:${slug}:rpm`,
-  })
+  const key = `${slug}:${maxRpm}`
+  if (!_creatorRpmCache.has(key)) {
+    _creatorRpmCache.set(key, new Ratelimit({
+      redis:   getRedis(),
+      limiter: Ratelimit.slidingWindow(maxRpm, '1 m'),
+      prefix:  `rl:creator:${slug}:rpm`,
+    }))
+  }
+  return _creatorRpmCache.get(key)!
 }
 
 /** RPD limiter per agent per API key consumer */
 export function getCreatorRpdLimit(slug: string, maxRpd: number): Ratelimit {
-  return new Ratelimit({
-    redis:   makeRedis(),
-    limiter: Ratelimit.slidingWindow(maxRpd, '1 d'),
-    prefix:  `rl:creator:${slug}:rpd`,
-  })
+  const key = `${slug}:${maxRpd}`
+  if (!_creatorRpdCache.has(key)) {
+    _creatorRpdCache.set(key, new Ratelimit({
+      redis:   getRedis(),
+      limiter: Ratelimit.slidingWindow(maxRpd, '1 d'),
+      prefix:  `rl:creator:${slug}:rpd`,
+    }))
+  }
+  return _creatorRpdCache.get(key)!
 }
 
 /** Extract the best available identifier from a request */
@@ -126,7 +141,7 @@ export async function checkCreatorRateLimits(
       )
     }
   } catch {
-    console.warn('[rate-limit] checkCreatorRateLimits fail-open', { slug })
+    logger.warn('[rate-limit] checkCreatorRateLimits fail-open', { slug })
   }
   return null
 }

@@ -13,6 +13,7 @@ import { createHash }               from 'crypto'
 import { z }                        from 'zod'
 import { createServiceClient }      from '@/lib/supabase/server'
 import { checkRateLimit, getIdentifier, getInvokeLimit } from '@/lib/ratelimit'
+import { logger } from '@/lib/logger'
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     )
 
   if (upsertErr) {
-    console.error('[rate] upsert failed:', upsertErr.message)
+    logger.error('[rate] upsert failed', { message: upsertErr.message })
     return NextResponse.json({ error: 'Failed to record vote' }, { status: 500 })
   }
 

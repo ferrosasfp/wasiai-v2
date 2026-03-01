@@ -109,6 +109,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     );
     event Withdrawn(address indexed creator, uint256 amount);
     event PlatformFeeUpdated(uint16 oldBps, uint16 newBps);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event OperatorSet(address indexed operator, bool active);
 
     // ── Pre-funded Key Events ────────────────────────────────────────────────
@@ -407,7 +408,9 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
 
     function setTreasury(address _treasury) external onlyOwner {
         require(_treasury != address(0), "WasiAI: zero treasury");
+        address oldTreasury = treasury;
         treasury = _treasury;
+        emit TreasuryUpdated(oldTreasury, _treasury);
     }
 
     function setOperator(address operator, bool active) external onlyOwner {

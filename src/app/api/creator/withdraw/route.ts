@@ -11,15 +11,21 @@
  *   4. Call withdrawFor(creatorWallet) via operator wallet
  *   5. Return tx hash
  */
-import { NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
   getPendingEarnings,
   withdrawForCreator,
 } from '@/lib/contracts/marketplaceClient'
 import { snowscanTx } from '@/lib/chain'
+import { validateCsrf } from '@/lib/security/csrf'
+import { logger } from '@/lib/logger'
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  // SEC-002: CSRF protection
+  const csrfError = validateCsrf(req)
+  if (csrfError) return csrfError
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -45,13 +51,13 @@ export async function POST() {
   try {
     pending = await getPendingEarnings(wallet)
   } catch (err) {
-    console.error('[withdraw] getPendingEarnings failed:', err)
+    logger.error('[withdraw] getPendingEarnings failed', { err })
     // Proceed anyway — withdrawFor will revert on-chain if truly empty
   }
 
   if (pending <= 0) {
     // Double-check: let the contract try anyway (RPC read might have failed)
-    console.warn('[withdraw] pending=0 — attempting withdrawFor regardless')
+    logger.warn('[withdraw] pending=0 — attempting withdrawFor regardless')
   }
 
   // Trigger on-chain withdrawal via operator
