@@ -238,19 +238,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       // [6a.5] HU-8.4: Creator rate limit check per step (FAST fix — bypass bug)
       const consumerRlId = `${step.agent_slug}:${rawKey.substring(0, 24)}`
-      const rpmOk = await getCreatorRpmLimit(step.agent_slug, agent.max_rpm ?? 60).limit(consumerRlId)
-      if (!rpmOk.success) {
-        return NextResponse.json(
-          { error: `Rate limit exceeded for agent ${step.agent_slug}`, code: 'rate_limited', failed_step: stepIndex },
-          { status: 429, headers: { 'Retry-After': String(Math.ceil((rpmOk.reset - Date.now()) / 1000)) } },
-        )
-      }
-      const rpdOk = await getCreatorRpdLimit(step.agent_slug, agent.max_rpd ?? 1000).limit(consumerRlId)
-      if (!rpdOk.success) {
-        return NextResponse.json(
-          { error: `Daily limit reached for agent ${step.agent_slug}`, code: 'daily_limit_reached', failed_step: stepIndex },
-          { status: 429, headers: { 'Retry-After': String(Math.ceil((rpdOk.reset - Date.now()) / 1000)) } },
-        )
+      // AR-fix: fail-open if Upstash unavailable
+      try {
+        const rpmOk = await getCreatorRpmLimit(step.agent_slug, agent.max_rpm ?? 60).limit(consumerRlId)
+        if (!rpmOk.success) {
+          return NextResponse.json(
+            { error: `Rate limit exceeded for agent ${step.agent_slug}`, code: 'rate_limited', failed_step: stepIndex },
+            { status: 429, headers: { 'Retry-After': String(Math.ceil((rpmOk.reset - Date.now()) / 1000)) } },
+          )
+        }
+        const rpdOk = await getCreatorRpdLimit(step.agent_slug, agent.max_rpd ?? 1000).limit(consumerRlId)
+        if (!rpdOk.success) {
+          return NextResponse.json(
+            { error: `Daily limit reached for agent ${step.agent_slug}`, code: 'daily_limit_reached', failed_step: stepIndex },
+            { status: 429, headers: { 'Retry-After': String(Math.ceil((rpdOk.reset - Date.now()) / 1000)) } },
+          )
+        }
+      } catch {
+        console.warn('[rate-limit] Creator rate limit check failed (fail-open)', { slug: step.agent_slug })
       }
 
       // [6b] Deducir saldo atómicamente ANTES del fetch (uso de deduct_key_balance para atomicidad)

@@ -162,26 +162,31 @@ export async function POST(
     : (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'anon')
   const creatorRlId = `${slug}:${consumerKey}`
 
-  const rpmResult = await getCreatorRpmLimit(slug, model.max_rpm ?? 60).limit(creatorRlId)
-  if (!rpmResult.success) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded', code: 'rate_limited' },
-      { status: 429, headers: {
-        'Retry-After':           String(Math.ceil((rpmResult.reset - Date.now()) / 1000)),
-        'X-RateLimit-Limit':     String(rpmResult.limit),
-        'X-RateLimit-Remaining': '0',
-      }},
-    )
-  }
-
-  const rpdResult = await getCreatorRpdLimit(slug, model.max_rpd ?? 1000).limit(creatorRlId)
-  if (!rpdResult.success) {
-    return NextResponse.json(
-      { error: 'Daily limit reached', code: 'daily_limit_reached' },
-      { status: 429, headers: {
-        'Retry-After': String(Math.ceil((rpdResult.reset - Date.now()) / 1000)),
-      }},
-    )
+  // AR-fix: fail-open if Upstash is unavailable — never block invocations for infra failures
+  try {
+    const rpmResult = await getCreatorRpmLimit(slug, model.max_rpm ?? 60).limit(creatorRlId)
+    if (!rpmResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', code: 'rate_limited' },
+        { status: 429, headers: {
+          'Retry-After':           String(Math.ceil((rpmResult.reset - Date.now()) / 1000)),
+          'X-RateLimit-Limit':     String(rpmResult.limit),
+          'X-RateLimit-Remaining': '0',
+        }},
+      )
+    }
+    const rpdResult = await getCreatorRpdLimit(slug, model.max_rpd ?? 1000).limit(creatorRlId)
+    if (!rpdResult.success) {
+      return NextResponse.json(
+        { error: 'Daily limit reached', code: 'daily_limit_reached' },
+        { status: 429, headers: {
+          'Retry-After': String(Math.ceil((rpdResult.reset - Date.now()) / 1000)),
+        }},
+      )
+    }
+  } catch {
+    // Upstash unavailable — fail-open, log and continue
+    console.warn('[rate-limit] Creator rate limit check failed (fail-open)', { slug })
   }
 
   // S-03: Explicit agent status check — must be active before any payment processing
