@@ -230,4 +230,21 @@ Archivos completos en `.nexus/docs/architecture/`
 
 ---
 
-*Última actualización: 2026-02-26 | Migrations aplicadas: 000–016 | Próxima: 017*
+| ADR-014 | Rate limiting creator por slug+api_key (HU-8.4) | Aísla por consumer y por agente. Fail-open si Upstash cae. Aplicado en invoke + compose | Sprint 5 |
+
+---
+
+## Reglas de proceso — NexusAgil QUALITY (Auto-Blindaje Sprint 5)
+
+> Estas reglas son INVIOLABLES. Cualquier violación se documenta en la Retro.
+
+1. **Dev no empieza sin SPEC_APPROVED** — sin excepciones, sin importar la urgencia
+2. **Story File se genera DESPUÉS de SPEC_APPROVED** — nunca antes
+3. **CR siempre cita archivo:línea** — "APPROVED" sin evidencia no es CR
+4. **F4 QA cita archivo:línea por cada AC** — sin evidencia el AC no cuenta como PASS
+5. **SM corre las 3 ceremonias** — Planning, Review y Retro — no San directamente
+6. **El SM persiste el cierre de cada HU** al completar el pipeline: `_INDEX.md`, `sprint-status.yaml`, Linear
+
+---
+
+*Última actualización: 2026-02-28 | Migrations aplicadas: 000–025 | Próxima: 026*
