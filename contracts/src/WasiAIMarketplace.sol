@@ -410,6 +410,22 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
 
     // ─── Admin ────────────────────────────────────────────────────────────────
 
+    /**
+     * @notice Update the platform fee for all future invocations.
+     * @dev Only callable by the contract owner (WasiAI operator).
+     *      Fee is applied to all new invocations after the change.
+     *      Existing pending earnings are NOT retroactively affected.
+     *
+     *      Fee model:
+     *      - Default: 1000 bps = 10% to treasury, 90% to creator
+     *      - Early creator program: set creatorFeeBps = 10000 on specific agents (0% platform fee)
+     *      - Maximum allowed: 3000 bps = 30%
+     *
+     *      To change: call setPlatformFee(bps) from the owner wallet.
+     *      Example: setPlatformFee(1500) → 15% platform fee, 85% to creator.
+     *
+     * @param bps New platform fee in basis points (100 bps = 1%). Max: 3000 (30%).
+     */
     function setPlatformFee(uint16 bps) external onlyOwner {
         require(bps <= 3000, "WasiAI: max 30%");
         emit PlatformFeeUpdated(platformFeeBps, bps);

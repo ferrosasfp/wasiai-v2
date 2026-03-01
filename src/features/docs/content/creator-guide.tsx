@@ -78,6 +78,11 @@ export function CreatorGuideSection() {
             wallet on-chain. El <strong>10% restante</strong> es el fee de plataforma de WasiAI.
             La distribución es automática — no hay facturas ni reconciliaciones manuales.
           </p>
+          <p className="mt-2 text-avax-700">
+            El fee de plataforma es configurable por WasiAI (máximo 30%). Los creators del programa
+            early adopter pueden tener fee 0% de forma individual. Cualquier cambio aplica solo a
+            invocaciones futuras — tus earnings acumulados no se ven afectados.
+          </p>
         </div>
       </div>
 
