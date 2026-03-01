@@ -10,6 +10,6 @@
 | 006 | 2026-02-28 | WAS-45 | WAS-45: Wallet connect/disconnect en navbar | improvement | full | CANCELLED | — |
 | 007 | 2026-02-28 | WAS-47 | WAS-47: Botón "Ver agentes" scroll | improvement | mini | CANCELLED | — |
 | 008 | 2026-02-28 | WAS-48 | WAS-48: Bottom navigation mobile completa | feature | full | CANCELLED | — |
-| 009 | 2026-03-01 | WAS-20 | HU-5.2: Ejecución paralela de agentes en compose | feature | full | IN_PROGRESS | feat/009-parallel-compose |
-| 010 | 2026-03-01 | WAS-23 | HU-7.1: Plugin LangChain — WasiAI como Tool nativa | feature | full | IN_PROGRESS | feat/010-langchain-plugin |
-| 011 | 2026-03-01 | WAS-68 | Sentry error tracking en WasiAI | feature | full | IN_PROGRESS | feat/011-sentry |
+| 009 | 2026-03-01 | WAS-20 | HU-5.2: Ejecución paralela de agentes en compose | feature | full | DONE | feat/009-parallel-compose |
+| 010 | 2026-03-01 | WAS-23 | HU-7.1: Plugin LangChain — WasiAI como Tool nativa | feature | full | DONE | feat/010-langchain-plugin |
+| 011 | 2026-03-01 | WAS-68 | Sentry error tracking en WasiAI | feature | full | DONE | feat/011-sentry |
