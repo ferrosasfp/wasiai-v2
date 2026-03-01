@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 
 const OPERATOR_ADDRESS = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? ''
+const OWNER_ADDRESS    = process.env.NEXT_PUBLIC_WASIAI_OWNER ?? OPERATOR_ADDRESS
 
 interface AdminStatus {
   platformFeeBps:    number
@@ -22,7 +23,8 @@ export default function AdminPage() {
   const [feeMsg, setFeeMsg]       = useState<string>('')
   const [settleMsg, setSettleMsg] = useState<string>('')
 
-  const isOwner = isConnected && address?.toLowerCase() === OPERATOR_ADDRESS.toLowerCase()
+  const ALLOWED = [OPERATOR_ADDRESS, OWNER_ADDRESS].map(a => a.toLowerCase()).filter(Boolean)
+  const isOwner = isConnected && !!address && ALLOWED.includes(address.toLowerCase())
 
   async function loadStatus() {
     setLoading(true)
