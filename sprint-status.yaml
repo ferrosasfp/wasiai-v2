@@ -1,76 +1,25 @@
-sprint: 9
-semana: "2026-02-27 → 2026-03-05"
-estado: planning
+sprint: 4
+periodo: "2026-02-28 → 2026-02-28"
+estado: CERRADO
+goal: "Pipeline multi-agente pagando por step on-chain en Fuji"
+goal_cumplido: true
 
-objetivo: >
-  Estabilizar la experiencia core del producto: arreglar visualización de saldo USDC en navbar,
-  restablecer analytics (vacío en web y mobile), y corregir UX/navigation bugs en mobile.
-  Sprint de calidad antes de retomar features grandes.
+completadas:
+  - id: WAS-19
+    hu: HU-5.1 Compose API
+    estado: DONE
+    commit: e806bb9
+  - id: WAS-69
+    hu: HU-7.6 DeFi Risk 5 agentes
+    estado: DONE
+    repo: github.com/ferrosasfp/wasiai-agents
 
-historias:
-  - id: WAS-63
-    titulo: "BUG — Navbar desktop elementos borrosos (saldo USDC no visible)"
-    prioridad: 1
-    estimacion: S
-    sdd_mode: bugfix
-    pipeline: full
-    estado: backlog
-    notas: "P1. Saldo USDC invisible bloquea confianza del usuario. Arrancar aquí."
+carry_over:
+  - id: WAS-68
+    hu: Sentry error tracking
+    razon: No entró al pipeline — sin story file
 
-  - id: WAS-64
-    titulo: "BUG — Analytics completamente vacío en web y mobile"
-    prioridad: 1
-    estimacion: M
-    sdd_mode: bugfix
-    pipeline: full
-    estado: backlog
-    notas: "P1. Verificar primero si es env var (PostHog/Mixpanel key en Vercel) antes de codear."
+deuda_tecnica_nueva:
+  - endpoint_url de agentes apunta a deployment URL dinámico → necesita dominio fijo
 
-  - id: WAS-65
-    titulo: "BUG — Mobile tab Home resaltado cuando se está en Explorar"
-    prioridad: 2
-    estimacion: S
-    sdd_mode: patch
-    pipeline: quick_flow
-    estado: backlog
-    notas: "P2. UX nav bug. Quick Flow."
-
-  - id: WAS-66
-    titulo: "BUG — Categorías duplicadas en filtros marketplace"
-    prioridad: 2
-    estimacion: S
-    sdd_mode: patch
-    pipeline: quick_flow
-    estado: backlog
-    notas: "P2. Quick Flow. Revisar dedup en query o en el componente de filtros."
-
-  - id: WAS-67
-    titulo: "BUG — Contenido cortado por bottom nav (falta padding)"
-    prioridad: 2
-    estimacion: S
-    sdd_mode: patch
-    pipeline: quick_flow
-    estado: backlog
-    notas: "P2. Quick Fix. Añadir pb-[altura_bottom_nav] al layout mobile."
-
-diferidos_sprint_10:
-  - id: HU-3.2
-    titulo: "Playground comparativo de agentes"
-    razon: "Feature L — sprint 9 es de estabilidad. Preparar F0 al final de esta semana."
-
-  - id: WAS-51
-    titulo: "Tether USDT multi-token support"
-    razon: "Feature L, riesgo alto. Requiere sprint limpio post-estabilización."
-
-  - id: WAS-52
-    titulo: "Chainlink Price Feeds"
-    razon: "Feature L, dependencia de infra. Diferido intencionalmente."
-
-criterios_exito:
-  - "WAS-63: Saldo USDC visible y nítido en navbar desktop en todos los breakpoints"
-  - "WAS-64: Analytics muestra datos reales (o empty state) en web y mobile; no pantalla en blanco"
-  - "WAS-65: Tab Home en mobile NO resaltado cuando usuario está en Explorar"
-  - "WAS-66: Cada categoría aparece una sola vez en filtros del marketplace"
-  - "WAS-67: Contenido con bottom nav tiene padding suficiente; nada cortado"
-
-planning_doc: ".nexus/docs/sprint-reviews/sprint-9-planning.md"
+proxima_ceremonia: "Lunes 2 Mar 2026 — Retro Sprint 4 + Planning Sprint 5"
