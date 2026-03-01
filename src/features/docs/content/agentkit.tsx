@@ -82,7 +82,7 @@ CDP_API_KEY_ID=your_cdp_key_id
 CDP_API_KEY_SECRET=your_cdp_key_secret
 
 # La wallet CDP necesita USDC en Avalanche Fuji Testnet
-# Faucet: core.app/en/bridge (bridge testnet USDC a Fuji)`,
+# Faucet: faucet.avax.network (seleccionar Fuji + ERC-20 USDC)`,
   },
 ]
 
