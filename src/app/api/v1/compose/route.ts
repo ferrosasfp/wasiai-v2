@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash, randomUUID }    from 'crypto'
 import { createServiceClient }       from '@/lib/supabase/server'
 import { validateEndpointUrl }       from '@/lib/security/validateEndpointUrl'
-import { getComposeLimit, getCreatorRpmLimit, getCreatorRpdLimit } from '@/lib/ratelimit'
+import { getComposeLimit, checkCreatorRateLimits } from '@/lib/ratelimit'
 import { signReceipt }               from '@/lib/receipts/signReceipt'
 import { keyHashToBytes32 }          from '@/lib/contracts/marketplaceClient'
 
@@ -253,16 +253,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }> {
     const agent = agentMap.get(step.agent_slug)!
 
-    // Rate limit check pre-step (fail-open)
+    // Rate limit check pre-step (fail-open via checkCreatorRateLimits)
     const consumerRlId = `${step.agent_slug}:${rawKey.substring(0, 24)}`
-    try {
-      const rpmOk = await getCreatorRpmLimit(step.agent_slug, agent.max_rpm ?? 60).limit(consumerRlId)
-      if (!rpmOk.success) return { receipt: null, output: null, status: 'error', reason: `rate_limited:${step.agent_slug}` }
-      const rpdOk = await getCreatorRpdLimit(step.agent_slug, agent.max_rpd ?? 1000).limit(consumerRlId)
-      if (!rpdOk.success) return { receipt: null, output: null, status: 'error', reason: `daily_limit:${step.agent_slug}` }
-    } catch {
-      console.warn('[rate-limit] fail-open', { slug: step.agent_slug })
-    }
+    const rlRes = await checkCreatorRateLimits(step.agent_slug, agent.max_rpm ?? 60, agent.max_rpd ?? 1000, consumerRlId)
+    if (rlRes) return { receipt: null, output: null, status: 'error', reason: `rate_limited:${step.agent_slug}` }
 
     // Deducir saldo
     const { data: deductOk, error: deductError } = await supabase.rpc(

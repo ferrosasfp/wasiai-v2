@@ -67,3 +67,50 @@ export async function POST(request: NextRequest) {
   // HU-1.2: registerAgentOnChain moved to PATCH /status when status → 'active'
   return NextResponse.json(data, { status: 201 })
 }
+
+// ── PATCH /api/models — actualiza max_rpm y max_rpd de un agente del creator ──
+export async function PATCH(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  let body: unknown
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+
+  const { slug, max_rpm, max_rpd } = body as { slug?: string; max_rpm?: unknown; max_rpd?: unknown }
+
+  if (!slug || typeof slug !== 'string') {
+    return NextResponse.json({ errors: [{ field: 'slug', message: 'slug is required' }] }, { status: 422 })
+  }
+
+  const updates: Record<string, number> = {}
+  if (max_rpm !== undefined) {
+    if (typeof max_rpm !== 'number' || max_rpm < 1 || max_rpm > 10000) {
+      return NextResponse.json({ errors: [{ field: 'max_rpm', message: 'max_rpm must be between 1 and 10000' }] }, { status: 422 })
+    }
+    updates.max_rpm = max_rpm
+  }
+  if (max_rpd !== undefined) {
+    if (typeof max_rpd !== 'number' || max_rpd < 1 || max_rpd > 100000) {
+      return NextResponse.json({ errors: [{ field: 'max_rpd', message: 'max_rpd must be between 1 and 100000' }] }, { status: 422 })
+    }
+    updates.max_rpd = max_rpd
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ errors: [{ field: 'body', message: 'At least one of max_rpm or max_rpd is required' }] }, { status: 422 })
+  }
+
+  const { data, error } = await supabase
+    .from('agents')
+    .update(updates)
+    .eq('slug', slug)
+    .eq('creator_id', user.id) // RLS: solo el creator puede editar su propio agente
+    .select('slug, max_rpm, max_rpd')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'Agent not found or not owned by you' }, { status: 404 })
+
+  return NextResponse.json(data, { status: 200 })
+}

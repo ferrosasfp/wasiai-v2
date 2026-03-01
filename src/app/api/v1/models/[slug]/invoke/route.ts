@@ -10,7 +10,7 @@ import { recordInvocationOnChain, keyHashToBytes32 } from '@/lib/contracts/marke
 import { signReceipt } from '@/lib/receipts/signReceipt'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
-import { getInvokeLimit, getIdentifier, checkRateLimit, getCreatorRpmLimit, getCreatorRpdLimit } from '@/lib/ratelimit'
+import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits } from '@/lib/ratelimit'
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
 import { logger } from '@/lib/logger'
 import { enqueuePendingRecording } from '@/lib/chain/pendingRecordings'
@@ -164,32 +164,9 @@ export async function POST(
       ?? 'anon'
   const creatorRlId = `${slug}:${consumerKey}`
 
-  // AR-fix: fail-open if Upstash is unavailable — never block invocations for infra failures
-  try {
-    const rpmResult = await getCreatorRpmLimit(slug, model.max_rpm ?? 60).limit(creatorRlId)
-    if (!rpmResult.success) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded', code: 'rate_limited' },
-        { status: 429, headers: {
-          'Retry-After':           String(Math.ceil((rpmResult.reset - Date.now()) / 1000)),
-          'X-RateLimit-Limit':     String(rpmResult.limit),
-          'X-RateLimit-Remaining': '0',
-        }},
-      )
-    }
-    const rpdResult = await getCreatorRpdLimit(slug, model.max_rpd ?? 1000).limit(creatorRlId)
-    if (!rpdResult.success) {
-      return NextResponse.json(
-        { error: 'Daily limit reached', code: 'daily_limit_reached' },
-        { status: 429, headers: {
-          'Retry-After': String(Math.ceil((rpdResult.reset - Date.now()) / 1000)),
-        }},
-      )
-    }
-  } catch {
-    // Upstash unavailable — fail-open, log and continue
-    console.warn('[rate-limit] Creator rate limit check failed (fail-open)', { slug })
-  }
+  // AR-fix: fail-open — checkCreatorRateLimits retorna null si Upstash no está disponible
+  const rlResponse = await checkCreatorRateLimits(slug, model.max_rpm ?? 60, model.max_rpd ?? 1000, creatorRlId)
+  if (rlResponse) return rlResponse
 
   // S-03: Explicit agent status check — must be active before any payment processing
   if (model.status !== 'active') {

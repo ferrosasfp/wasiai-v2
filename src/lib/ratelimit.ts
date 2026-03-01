@@ -98,3 +98,35 @@ export async function checkRateLimit(
 
   return null
 }
+
+/**
+ * Verifica RPM + RPD del creator para un slug+consumer dado.
+ * Retorna NextResponse 429 si excede algún límite, null si OK.
+ * Fail-open: si Upstash no está disponible, retorna null (no bloquea).
+ */
+export async function checkCreatorRateLimits(
+  slug:       string,
+  maxRpm:     number,
+  maxRpd:     number,
+  identifier: string, // formato: `slug:consumer_key_prefix`
+): Promise<NextResponse | null> {
+  try {
+    const rpmResult = await getCreatorRpmLimit(slug, maxRpm).limit(identifier)
+    if (!rpmResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', code: 'rate_limited' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((rpmResult.reset - Date.now()) / 1000)), 'X-RateLimit-Limit': String(rpmResult.limit), 'X-RateLimit-Remaining': '0' } },
+      )
+    }
+    const rpdResult = await getCreatorRpdLimit(slug, maxRpd).limit(identifier)
+    if (!rpdResult.success) {
+      return NextResponse.json(
+        { error: 'Daily limit reached', code: 'daily_limit_reached' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((rpdResult.reset - Date.now()) / 1000)) } },
+      )
+    }
+  } catch {
+    console.warn('[rate-limit] checkCreatorRateLimits fail-open', { slug })
+  }
+  return null
+}
