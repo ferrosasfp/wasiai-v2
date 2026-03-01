@@ -76,7 +76,7 @@ Marketplace on-chain de agentes IA en Avalanche. Cualquier developer publica un 
 8. **RLS activo** antes de cualquier commit con tablas nuevas
 9. **Push siempre:** `git push origin master master:main`
 10. **Migrations numeradas:** `0XX_descripcion.sql` — próxima disponible: 017
-11. **Contrato de integración obligatorio** — todo story file con comunicación entre componentes (compose ↔ agente, frontend ↔ API, SDK ↔ endpoint) debe incluir sección "Contrato de Integración" con formato exacto de request/response. Sin esta sección el story file está incompleto y Dev no puede empezar.
+11. **Contrato de integración condicional** — si la HU involucra comunicación entre componentes (compose ↔ agente, frontend ↔ API, SDK ↔ endpoint): la sección "Contrato de Integración" es BLOQUEANTE en el story file — Dev no empieza sin ella completa. Si NO hay comunicación entre componentes: la sección se elimina del story file, no se deja vacía.
 
 ---
 

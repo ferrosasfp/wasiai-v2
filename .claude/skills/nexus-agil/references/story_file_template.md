@@ -68,34 +68,43 @@
 **Patron clave**:
 - [Patrones a seguir]
 
-## Contrato de Integración
+<!--
+  ARCHITECT: Antes de continuar, responde esta pregunta:
+  ¿Esta HU involucra comunicación entre dos o más componentes?
+  (API ↔ agente, compose ↔ servicio, SDK ↔ endpoint, frontend ↔ API, worker ↔ queue)
 
-> **Obligatorio cuando hay comunicación entre dos componentes** (API ↔ agente, compose ↔ servicio, SDK ↔ endpoint, frontend ↔ backend).
-> Si esta sección está vacía en una HU que tiene comunicación entre componentes → Architect no terminó su trabajo.
+  SI  → Incluir la sección "Contrato de Integración" abajo. Es BLOQUEANTE — sin ella Dev no empieza.
+  NO  → Eliminar esta sección completa del story file. No dejar vacía ni con placeholder.
+-->
 
-### Componente A: [nombre] → Componente B: [nombre]
+## Contrato de Integración ⚠️ BLOQUEANTE
 
-**Request (lo que A envía a B):**
+> Esta sección es requerida porque esta HU tiene comunicación entre componentes.
+> Dev no puede empezar si algún campo está vacío o dice "[pendiente]".
+
+### [Componente A] → [Componente B]
+
+**Request:**
 ```json
 {
-  "campo": "tipo — descripción"
+  "campo": "tipo — descripción exacta"
 }
 ```
 
-**Response (lo que B devuelve a A):**
+**Response exitoso (2xx):**
 ```json
 {
-  "campo": "tipo — descripción"
+  "campo": "tipo — descripción exacta"
 }
 ```
 
-**Errores esperados:**
-| HTTP | Código | Cuándo |
-|---|---|---|
-| 400 | `missing_field` | Falta campo obligatorio |
-| 502 | `upstream_error` | Servicio externo falló |
+**Errores:**
+| HTTP | Cuándo |
+|---|---|
+| 400 | [condición exacta] |
+| 502 | [condición exacta] |
 
-> Si hay más de dos componentes, agregar una subsección por cada par que se comunique.
+> Si hay más pares de componentes → agregar subsección por cada par.
 
 ## Constraint Directives
 
