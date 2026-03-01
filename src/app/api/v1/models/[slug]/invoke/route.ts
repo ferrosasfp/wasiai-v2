@@ -14,6 +14,7 @@ import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits }
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
 import { logger } from '@/lib/logger'
 import { enqueuePendingRecording } from '@/lib/chain/pendingRecordings'
+import { calcPlatformOverhead } from '@/lib/pricing/overhead'
 
 // x402 recipient = the marketplace contract (it splits 90/10 internally)
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
@@ -198,7 +199,22 @@ export async function POST(
     )
   }
 
-  const priceStr = String(model.price_per_call)    // e.g. "0.02"
+  const creatorPrice = Number(model.creator_price ?? model.price_per_call)
+  const { overhead, breakdown, circuitBreaker } = await calcPlatformOverhead(creatorPrice)
+
+  if (circuitBreaker) {
+    return NextResponse.json(
+      {
+        error:               'agent_temporarily_unavailable',
+        code:                'operational_cost_exceeds_price',
+        retry_after_seconds: 300,
+      },
+      { status: 503, headers: { 'Retry-After': '300' } },
+    )
+  }
+
+  const totalPrice = Math.round((creatorPrice + overhead) * 1_000_000) / 1_000_000
+  const priceStr   = totalPrice.toFixed(6)
   const resourceUrl = `${SITE_URL}/api/v1/models/${slug}/invoke`
 
   // ── 2. Route A: Agent Key (budget-based) ─────────────────────────────────
@@ -213,7 +229,7 @@ export async function POST(
     }
 
     const remaining = Number(keyRow.budget_usdc) - Number(keyRow.spent_usdc)
-    if (remaining < model.price_per_call) {
+    if (remaining < totalPrice) {
       return NextResponse.json(
         {
           error: 'Agent key budget exhausted',
@@ -221,7 +237,7 @@ export async function POST(
           budget: keyRow.budget_usdc,
           spent: keyRow.spent_usdc,
           remaining,
-          needed: model.price_per_call,
+          needed: totalPrice,
           action: 'Top up your agent key budget at /en/agent-keys',
         },
         {
@@ -250,7 +266,7 @@ export async function POST(
           keyId:      keyHashToBytes32(keyRow.key_hash),
           callId,
           agentSlug:  slug,
-          amountUsdc: model.price_per_call as number,
+          amountUsdc: creatorPrice,   // receipt certifica lo que va al creator, NO totalPrice
           timestamp:  receiptTimestamp,
         }).catch(err => {
           logger.warn('[invoke] signReceipt failed (non-fatal)', { err: String(err).slice(0, 200) })
@@ -272,14 +288,14 @@ export async function POST(
       // 4. Increment DB spend (source of truth for UI)
       await supabase.rpc('increment_agent_key_spend', {
         p_key_id: keyRow.id,
-        p_amount: model.price_per_call,
+        p_amount: totalPrice,
       })
     } else {
       // Log failed call (no receipt needed)
       await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
     }
 
-    return buildResponse(model, result, undefined, receiptSignature ?? undefined)
+    return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown })
   }
 
   // ── 3. Route B: x402 Payment (Ultravioleta DAO / Avalanche) ──────────────
@@ -324,7 +340,7 @@ export async function POST(
     await recordOnChain(supabase, slug, model, paymentHeader, settlement.transactionHash)
   }
 
-  return buildResponse(model, result, settlement.transactionHash)
+  return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
   } catch (err) {
     logger.error('[invoke] unhandled error', { err })
     // S-10: Never expose raw error details in production
@@ -446,11 +462,19 @@ async function logCall(
   return { id: (insertResult.data as { id?: string } | null)?.id }
 }
 
+interface PricingInfo {
+  creatorPrice: number
+  overhead:     number
+  totalPrice:   number
+  breakdown:    { gas: number; inference: number; buffer: number }
+}
+
 function buildResponse(
   model: Record<string, unknown>,
   result: { data: unknown; status: string; latencyMs: number },
   txHash?: string,
   receiptSignature?: string,
+  pricingInfo?: PricingInfo,
 ) {
   return NextResponse.json(
     {
@@ -458,7 +482,7 @@ function buildResponse(
       meta: {
         model: model.slug,
         latency_ms: result.latencyMs,
-        charged: model.price_per_call,
+        charged: model.price_per_call,  // mantener para compatibilidad SDK
         currency: 'USDC',
         chain: CHAIN_NAME,
         tx_hash: txHash ?? null,
@@ -468,6 +492,15 @@ function buildResponse(
       // Verify with: verifyReceipt(receipt, signature) from @/lib/receipts/signReceipt
       receipt: receiptSignature
         ? { signature: receiptSignature }
+        : undefined,
+      // AC9: desglose de precios
+      pricing: pricingInfo
+        ? {
+            creator_price:     pricingInfo.creatorPrice,
+            platform_overhead: pricingInfo.overhead,
+            total:             pricingInfo.totalPrice,
+            breakdown:         pricingInfo.breakdown,
+          }
         : undefined,
     },
     { headers: X402_CORS_HEADERS },
