@@ -94,6 +94,12 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     /// 30 days without operator activity → users can emergency-withdraw
     uint256 public constant EMERGENCY_TIMEOUT = 30 days;
 
+    /// Timestamp del último upkeep ejecutado por Chainlink Automation
+    uint256 public lastUpkeepTimestamp;
+
+    /// Intervalo mínimo entre upkeeps (23h para no chocar con el cron diario de 02:00 UTC)
+    uint256 public constant UPKEEP_INTERVAL = 23 hours;
+
     // ─── Events ───────────────────────────────────────────────────────────────
 
     event AgentRegistered(
@@ -114,6 +120,9 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     event PlatformFeeUpdated(uint16 oldBps, uint16 newBps);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event OperatorSet(address indexed operator, bool active);
+
+    /// @notice Emitido cuando Chainlink Automation ejecuta performUpkeep
+    event UpkeepPerformed(uint256 indexed timestamp, address indexed performer);
 
     // ── Pre-funded Key Events ────────────────────────────────────────────────
     event KeyFunded(bytes32 indexed keyId, address indexed owner, uint256 amount);
@@ -139,6 +148,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         treasury = _treasury;
         operators[msg.sender] = true;
         lastOperatorActivity  = block.timestamp;
+        lastUpkeepTimestamp   = block.timestamp;
     }
 
     // ─── Agent Registry ───────────────────────────────────────────────────────
@@ -456,6 +466,34 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         external view returns (uint256)
     {
         return earnings[creator];
+    }
+
+    // ─── Chainlink Automation ─────────────────────────────────────────────────
+
+    /// @notice Chainlink Automation compatible — checkUpkeep
+    /// @dev Retorna true si han pasado >= UPKEEP_INTERVAL desde el último upkeep.
+    ///      No requiere checkData — se ignora.
+    function checkUpkeep(bytes calldata /* checkData */)
+        external
+        view
+        returns (bool upkeepNeeded, bytes memory /* performData */)
+    {
+        upkeepNeeded = (block.timestamp - lastUpkeepTimestamp) >= UPKEEP_INTERVAL;
+    }
+
+    /// @notice Chainlink Automation compatible — performUpkeep
+    /// @dev Emite UpkeepPerformed y actualiza lastUpkeepTimestamp.
+    ///      El settlement real sigue ejecutándose desde el operador backend.
+    ///      Cualquier address puede llamar performUpkeep — el intervalo protege
+    ///      de abuso (solo ejecutable cada 23h máximo).
+    function performUpkeep(bytes calldata /* performData */) external {
+        require(
+            (block.timestamp - lastUpkeepTimestamp) >= UPKEEP_INTERVAL,
+            "WasiAI: upkeep not needed"
+        );
+        lastUpkeepTimestamp  = block.timestamp;
+        lastOperatorActivity = block.timestamp;
+        emit UpkeepPerformed(block.timestamp, msg.sender);
     }
 
     /// @notice Returns platform stats
