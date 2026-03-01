@@ -355,10 +355,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       } else {
         // ── Grupo paralelo ──────────────────────────────────────────────────
-        // Rate limit pre-grupo (antes del allSettled)
+        // AR20-1: preflight de saldo para el grupo completo antes del allSettled
+        const groupCost = group.reduce((acc, s) => acc + (agentMap.get(s.agent_slug)?.price_per_call ?? 0), 0)
+        const { data: freshKey } = await supabase
+          .from('agent_keys')
+          .select('budget_usdc, spent_usdc')
+          .eq('id', safeKeyRow.id)
+          .single()
+        const available = freshKey ? freshKey.budget_usdc - freshKey.spent_usdc : 0
+        if (available < groupCost) {
+          return NextResponse.json(
+            { error: `Insufficient balance for parallel group ${groupIndex}. Required: $${groupCost.toFixed(6)}, available: $${available.toFixed(6)}`, code: 'step_failed', failed_step: globalStepIndex, reason: 'insufficient_balance_for_group', steps_executed: globalStepIndex, partial_receipts: receipts } satisfies PipelineFailedResponse,
+            { status: 422 },
+          )
+        }
+
         const groupResults = await Promise.allSettled(
           group.map((step, i) => {
-            const stepInput = globalStepIndex + i === 0 ? (step.input ?? '') : (step.input ?? '')
+            const stepInput = step.input ?? ''
             return executeStep(step, globalStepIndex + i, stepInput)
           })
         )
