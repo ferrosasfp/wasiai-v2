@@ -156,7 +156,10 @@ export async function POST(
   }
 
   // HU-8.4: Creator-configurable rate limiting — check AFTER model load, BEFORE payment
-  const consumerKey = rawAgentKey?.substring(0, 24) ?? 'anon'
+  // Use api_key prefix when available, fall back to IP — avoids shared 'anon' bucket
+  const consumerKey = rawAgentKey
+    ? rawAgentKey.substring(0, 24)
+    : (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'anon')
   const creatorRlId = `${slug}:${consumerKey}`
 
   const rpmResult = await getCreatorRpmLimit(slug, model.max_rpm ?? 60).limit(creatorRlId)

@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash, randomUUID }    from 'crypto'
 import { createServiceClient }       from '@/lib/supabase/server'
 import { validateEndpointUrl }       from '@/lib/security/validateEndpointUrl'
-import { getComposeLimit }           from '@/lib/ratelimit'
+import { getComposeLimit, getCreatorRpmLimit, getCreatorRpdLimit } from '@/lib/ratelimit'
 import { signReceipt }               from '@/lib/receipts/signReceipt'
 import { keyHashToBytes32 }          from '@/lib/contracts/marketplaceClient'
 
@@ -62,6 +62,8 @@ interface AgentRow {
   price_per_call: number
   endpoint_url:   string
   status:         string
+  max_rpm:        number
+  max_rpd:        number
 }
 
 interface KeyRow {
@@ -148,7 +150,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const slugs = [...new Set(steps.map(s => s.agent_slug))]
   const { data: agentsData } = await supabase
     .from('agents')
-    .select('id, slug, name, price_per_call, endpoint_url, status')
+    .select('id, slug, name, price_per_call, endpoint_url, status, max_rpm, max_rpd')
     .in('slug', slugs)
     .eq('status', 'active')
 
@@ -232,6 +234,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         stepInput = lastOutput ?? ''
       } else {
         stepInput = step.input ?? ''
+      }
+
+      // [6a.5] HU-8.4: Creator rate limit check per step (FAST fix — bypass bug)
+      const consumerRlId = `${step.agent_slug}:${rawKey.substring(0, 24)}`
+      const rpmOk = await getCreatorRpmLimit(step.agent_slug, agent.max_rpm ?? 60).limit(consumerRlId)
+      if (!rpmOk.success) {
+        return NextResponse.json(
+          { error: `Rate limit exceeded for agent ${step.agent_slug}`, code: 'rate_limited', failed_step: stepIndex },
+          { status: 429, headers: { 'Retry-After': String(Math.ceil((rpmOk.reset - Date.now()) / 1000)) } },
+        )
+      }
+      const rpdOk = await getCreatorRpdLimit(step.agent_slug, agent.max_rpd ?? 1000).limit(consumerRlId)
+      if (!rpdOk.success) {
+        return NextResponse.json(
+          { error: `Daily limit reached for agent ${step.agent_slug}`, code: 'daily_limit_reached', failed_step: stepIndex },
+          { status: 429, headers: { 'Retry-After': String(Math.ceil((rpdOk.reset - Date.now()) / 1000)) } },
+        )
       }
 
       // [6b] Deducir saldo atómicamente ANTES del fetch (uso de deduct_key_balance para atomicidad)
