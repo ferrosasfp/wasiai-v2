@@ -84,10 +84,13 @@ export async function processPendingRecordings(): Promise<{ processed: number; s
     stats.processed++
 
     try {
+      const { keccak256, encodePacked } = await import('viem')
+      const paymentId = keccak256(encodePacked(['string', 'string'], [record.slug, record.id ?? '']))
       const txHash = await recordInvocationOnChain({
         slug:         record.slug,
         payerAddress: record.payer_address,
         amountUSDC:   Number(record.amount_usdc),
+        paymentId,
       })
 
       if (txHash) {

@@ -67,10 +67,12 @@ export async function recordInvocationOnChain({
   slug,
   payerAddress,
   amountUSDC, // in dollars, e.g. 0.02
+  paymentId,  // bytes32 idempotency key — keccak256(txHash + slug)
 }: {
   slug:         string
   payerAddress: string
   amountUSDC:   number
+  paymentId:    `0x${string}`
 }): Promise<string | null> {
   const contractAddress = getContractAddress()
   if (!contractAddress) {
@@ -85,7 +87,7 @@ export async function recordInvocationOnChain({
       address:      contractAddress,
       abi:          WASIAI_MARKETPLACE_ABI,
       functionName: 'recordInvocation',
-      args:         [slug, payerAddress as Address, toUSDCAtomics(amountUSDC)],
+      args:         [slug, payerAddress as Address, toUSDCAtomics(amountUSDC), paymentId],
       account,
     })
 
