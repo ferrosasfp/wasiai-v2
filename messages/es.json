@@ -319,7 +319,12 @@
     "tryItRun": "Ejecutar",
     "tryItResponse": "Respuesta",
     "tryItLatency": "Latencia",
-    "contents": "Contenido"
+    "contents": "Contenido",
+    "x402": "Pagos x402",
+    "compose": "Compose API",
+    "agentKeys": "Agent Keys",
+    "creatorGuide": "Guía del Creator",
+    "agentkit": "AgentKit"
   },
   "codeExamples": {
     "title": "Cómo usar",

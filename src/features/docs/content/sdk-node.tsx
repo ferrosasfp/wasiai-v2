@@ -28,13 +28,17 @@ const INVOKE: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Node.js',
     language: 'javascript',
-    code: `const result = await client.agents.invoke('translator-es', {
-  input: 'Hello world',
-  targetLang: 'es',
+    code: `const result = await client.agents.invoke('wasi-defi-sentiment', {
+  input: JSON.stringify({
+    token_name:   'SafeMoonElonGem',
+    token_symbol: 'SMEG',
+    description:  '100x guaranteed returns!',
+  })
 })
 
-console.log(result.output)   // "Hola mundo"
-console.log(result.latencyMs) // 342`,
+console.log(result.output)
+// { sentiment_score: 92, flags: ["FOMO naming", "Unrealistic returns"], analysis: "..." }
+console.log(result.latencyMs) // 1240`,
   },
 ]
 
@@ -42,7 +46,7 @@ const AGENTS_LIST: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Node.js',
     language: 'javascript',
-    code: `const agents = await client.agents.list({ category: 'nlp', limit: 20 })
+    code: `const agents = await client.agents.list({ category: 'defi-risk', limit: 10 })
 
 for (const agent of agents) {
   console.log(agent.slug, agent.name, agent.pricePerCall)
@@ -54,11 +58,10 @@ const AGENTS_GET: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Node.js',
     language: 'javascript',
-    code: `const agent = await client.agents.get('translator-es')
+    code: `const agent = await client.agents.get('wasi-defi-sentiment')
 
-console.log(agent.name)        // "Translator ES"
-console.log(agent.description) // "Translates text to Spanish"
-console.log(agent.pricePerCall) // 0.001`,
+console.log(agent.name)          // "DeFi Sentiment Analyzer"
+console.log(agent.pricePerCall)  // 0.05`,
   },
 ]
 
@@ -69,7 +72,9 @@ const ERROR_HANDLING: Parameters<typeof CodeBlock>[0]['tabs'] = [
     code: `import { WasiAIError } from '@wasiai/sdk'
 
 try {
-  const result = await client.agents.invoke('my-agent', { input: 'test' })
+  const result = await client.agents.invoke('wasi-defi-sentiment', {
+    input: JSON.stringify({ token_name: 'AVAX', token_symbol: 'AVAX' })
+  })
 } catch (err) {
   if (err instanceof WasiAIError) {
     console.error(err.status, err.code, err.message)

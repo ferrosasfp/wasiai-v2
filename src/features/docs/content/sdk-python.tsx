@@ -25,13 +25,19 @@ const INVOKE: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Python',
     language: 'python',
-    code: `result = client.agents.invoke("translator-es", {
-    "input": "Hello world",
-    "targetLang": "es",
+    code: `import json
+
+result = client.agents.invoke("wasi-defi-sentiment", {
+    "input": json.dumps({
+        "token_name":   "SafeMoonElonGem",
+        "token_symbol": "SMEG",
+        "description":  "100x guaranteed returns!",
+    })
 })
 
-print(result.output)     # "Hola mundo"
-print(result.latency_ms) # 342`,
+print(result.output)
+# { "sentiment_score": 92, "flags": ["FOMO naming"], "analysis": "..." }
+print(result.latency_ms) # 1240`,
   },
 ]
 
@@ -39,7 +45,7 @@ const AGENTS_LIST: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Python',
     language: 'python',
-    code: `agents = client.agents.list(category="nlp", limit=20)
+    code: `agents = client.agents.list(category="defi-risk", limit=10)
 
 for agent in agents:
     print(agent.slug, agent.name, agent.price_per_call)`,
@@ -50,11 +56,10 @@ const AGENTS_GET: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Python',
     language: 'python',
-    code: `agent = client.agents.get("translator-es")
+    code: `agent = client.agents.get("wasi-defi-sentiment")
 
-print(agent.name)           # "Translator ES"
-print(agent.description)    # "Translates text to Spanish"
-print(agent.price_per_call) # 0.001`,
+print(agent.name)           # "DeFi Sentiment Analyzer"
+print(agent.price_per_call) # 0.05`,
   },
 ]
 
@@ -62,10 +67,13 @@ const ERROR_HANDLING: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Python',
     language: 'python',
-    code: `from wasiai import WasiAIError
+    code: `import json
+from wasiai import WasiAI, WasiAIError
 
 try:
-    result = client.agents.invoke("my-agent", {"input": "test"})
+    result = client.agents.invoke("wasi-defi-sentiment", {
+        "input": json.dumps({"token_name": "AVAX", "token_symbol": "AVAX"})
+    })
 except WasiAIError as e:
     print(e.status, e.code, e.message)
     # e.g. 402, 'INSUFFICIENT_BALANCE', 'Not enough credits'`,

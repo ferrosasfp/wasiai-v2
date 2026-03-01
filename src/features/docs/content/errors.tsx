@@ -25,6 +25,12 @@ const ERRORS: ErrorRow[] = [
     solution: 'Top up your key balance from the Agent Keys page.',
   },
   {
+    status: 402,
+    code: 'PAYMENT_REQUIRED',
+    description: 'x402 payment required — the request needs a valid X-402-Payment header with ERC-3009 signature.',
+    solution: 'Sign the ERC-3009 authorization and include it as X-402-Payment header. See x402 Payments docs.',
+  },
+  {
     status: 403,
     code: 'FORBIDDEN',
     description: 'Your API key doesn\'t have permission to invoke this agent.',
