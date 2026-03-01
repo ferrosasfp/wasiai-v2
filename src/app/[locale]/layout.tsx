@@ -5,6 +5,7 @@ import { routing } from '@/i18n/routing'
 import { Web3Provider } from '@/shared/providers/Web3Provider'
 import { WasiNavBar } from '@/components/WasiNavBar'
 import { MobileBottomNav } from '@/components/MobileBottomNav'   // HU-MOBILE-NAV
+import { WasiFooter } from '@/components/WasiFooter'
 import { createClient } from '@/lib/supabase/server'
 
 export function generateStaticParams() {
@@ -49,6 +50,7 @@ export default async function LocaleLayout({ children, params }: Props) {
         {/* HU-MOBILE-NAV: Bottom Nav — sm:hidden lo oculta en desktop */}
         <MobileBottomNav locale={locale} userRole={userRole} />
       </Web3Provider>
+      <WasiFooter locale={locale} />
     </NextIntlClientProvider>
   )
 }
