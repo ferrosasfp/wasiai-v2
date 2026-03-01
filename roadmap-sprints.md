@@ -26,17 +26,25 @@ WAS-19 HU-5.1 Compose API + WAS-69 HU-7.6 DeFi Risk 5 agentes
 - [ ] WAS-13 HU-2.4 CLI wasiai invoke
 - [ ] WAS-44 HU-8.4 Rate limiting configurable por creator
 
-## ⬜ Sprint 6 (9-13 Mar) — "Developer Ecosystem"
-**Goal:** Un developer externo integra WasiAI en su agente en menos de 10 minutos.
+## 🔄 Sprint 6 (1-7 Mar) — "Developer Ecosystem"
+**Goal:** Un developer externo puede integrar WasiAI en su agente — con LangChain o paralelo — y ejecutar un pipeline de pagos autónomo end-to-end.
 
+- [ ] WAS-23 HU-7.1 Plugin LangChain — WasiAI como Tool nativa
 - [ ] WAS-20 HU-5.2 Ejecución paralela de agentes
-- [ ] WAS-23 HU-7.1 Plugin LangChain
-- [ ] WAS-45 UX Wallet connect en navbar
-- [ ] WAS-47 UX Botón "Ver agentes" scroll
-- [ ] WAS-48 HU-MOBILE-NAV Bottom navigation mobile
+- [ ] WAS-68 Sentry error tracking
+- [ ] Deuda: PATCH max_rpm/rpd + refactor helper
 
-## ⬜ Sprint 7 (16-20 Mar) — "First Real Creators"
-**Goal:** 3 creators reales con agentes publicados en Fuji — demo lista para hackathon.
+## ⬜ Sprint 7 (8-14 Mar) — "Mainnet + AgentKit"
+**Goal:** WasiAI en Avalanche mainnet. AgentKit example funcional.
+
+- [ ] WAS-42 HU-7.3 AgentKit Example (Coinbase) — CDP key requerida
+- [ ] WAS-22 HU-6.2 Deploy contrato mainnet
+- [ ] WAS-39 HU-6.3 Migrar agentes a mainnet
+- [ ] WAS-40 HU-6.4 Monitoring operator wallet
+- [ ] Dominio fijo agents.wasiai.io
+
+## ⬜ Sprint 8 (15-21 Mar) — "First Real Creators"
+**Goal:** 3 creators reales con agentes publicados en mainnet — demo lista para hackathon.
 
 - [ ] WAS-38 HU-5.4 UI visual de pipelines
 - [ ] WAS-25 HU-8.2 Dashboard público /transparency

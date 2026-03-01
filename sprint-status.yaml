@@ -1,44 +1,37 @@
-sprint: 5
-periodo: "2026-02-28 → 2026-02-28"
-estado: CERRADO
-goal: "Creator puede publicar su agente, configurar límites de uso, y el sistema protege la invocación antes de cobrar"
-goal_cumplido: parcial
+sprint: 6
+periodo: "2026-03-01 → 2026-03-07"
+estado: EN_PROGRESO
+goal: "Un developer externo puede integrar WasiAI en su agente — con LangChain o paralelo — y ejecutar un pipeline de pagos autónomo end-to-end"
+goal_cumplido: false
 
-completadas:
-  - id: WAS-08
-    hu: UX-08 Validación 422 backend
-    modo: FAST
-    estado: DONE
-    commit: ae9b286
-
-  - id: WAS-44
-    hu: HU-8.4 Rate Limiting configurable por creator
+seleccionadas:
+  - id: WAS-23
+    hu: HU-7.1 Plugin LangChain — WasiAI como Tool nativa
     modo: QUALITY
-    estado: DONE
-    commit: 7347dc6
-    ar_bloqueantes: 1
-    cr_menores: 3
+    tamaño: L
+    estado: TODO
 
-carry_over:
+  - id: WAS-20
+    hu: HU-5.2 Ejecución paralela de agentes
+    modo: QUALITY
+    tamaño: M
+    estado: TODO
+
+  - id: WAS-68
+    hu: Sentry error tracking
+    modo: QUALITY
+    tamaño: S
+    estado: TODO
+
+  - id: deuda-rpm
+    hu: PATCH max_rpm/rpd + refactor helper invoke+compose
+    modo: FAST
+    tamaño: S
+    estado: TODO
+
+carry_over_desde_sprint5:
   - id: WAS-42
-    hu: HU-7.3 AgentKit Example (Coinbase)
-    razon: Bloqueado por CDP API key externa — Fer crea cuenta el lunes
+    hu: AgentKit Example (Coinbase)
+    movido_a: Sprint 7
 
-canceladas_por_ya_implementadas:
-  - WAS-45 Wallet navbar
-  - WAS-47 Scroll Ver agentes
-  - WAS-48 Mobile bottom nav
-
-hallazgos_proceso:
-  - Gates F2.5 y F3 ejecutados antes de SPEC_APPROVED — corregido en sesión
-  - Backlog auditado: 13 HUs descubiertas como ya implementadas, 7 canceladas por prematuras
-
-deuda_tecnica_nueva:
-  - descripcion: Duplicación rpm/rpd en invoke + compose — extraíble a helper
-    severidad: MENOR
-    sprint_objetivo: 6
-  - descripcion: PATCH /api/models no guarda max_rpm/max_rpd post-publicación
-    severidad: MENOR
-    sprint_objetivo: 6
-
-proxima_ceremonia: "Retrospectiva Sprint 5 — ahora"
+proxima_ceremonia: "Miércoles 4 Mar — Status Meeting"
