@@ -272,6 +272,41 @@ Based in Honduras 🇭🇳 | Building for the Latin American Web3/AI ecosystem
 
 ---
 
+## Security Methodology
+
+WasiAI's smart contract was audited using **NexusAudit** — an AI-powered audit methodology developed alongside this project.
+
+### NexusAudit
+
+> Every finding must be proven with a passing Foundry test before it can be reported as CONFIRMED.
+
+NexusAudit combines techniques from Trail of Bits, Code4rena, Sherlock, and OpenZeppelin with an anti-hallucination enforcement layer. No PoC test = no CONFIRMED finding.
+
+**Audit results on WasiAIMarketplace.sol:**
+- 16 findings identified across 8-phase methodology
+- 15 confirmed via Foundry PoC tests (0 false positives)
+- 15/16 findings matched simulated audits from 4 major firms
+- 7 findings fixed in Sprint 9 with inverted PoC tests proving attacks no longer work
+- 78 tests total, 0 failures after fix loop
+
+📖 **NexusAudit methodology:** https://github.com/ferrosasfp/nexus-audit
+
+### NexusAgil
+
+WasiAI is built using **NexusAgil** — an AI-native agile development methodology.
+
+NexusAgil defines strict gates between phases (Discovery → Spec → Development → QA) and integrates directly with NexusAudit's Fix Type classification:
+
+| Fix Type | Criteria | Process |
+|---|---|---|
+| FAST-FIX | Surgical, 1-2 files | Direct execution |
+| HU-MINOR | Simple new logic | Story File + sub-agent |
+| HU-MAJOR | Architectural change | Full pipeline |
+
+Every bug found by NexusAudit is classified by Fix Type and routed through the appropriate NexusAgil process — ensuring no fix is too casual for its risk level, and no fix is over-engineered for a one-line change.
+
+---
+
 ## License
 
 MIT
