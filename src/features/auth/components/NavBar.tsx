@@ -11,6 +11,9 @@ const NAV_ITEMS = [
   { href: '/wallet', key: 'wallet' },
   { href: '/contracts', key: 'contracts' },
   { href: '/storage', key: 'storage' },
+  { href: '/sandbox', key: 'sandbox' },
+  { href: '/pipelines', key: 'pipelines' },
+  { href: '/profile', key: 'profile' },
 ] as const
 
 export function NavBar() {
