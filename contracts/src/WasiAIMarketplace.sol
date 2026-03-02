@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
@@ -50,7 +51,7 @@ interface IERC3009 {
  * @dev Deployed on Avalanche C-Chain (chainId: 43114)
  *      USDC: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
  */
-contract WasiAIMarketplace is Ownable, ReentrancyGuard {
+contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     // ─── Types ────────────────────────────────────────────────────────────────
@@ -149,6 +150,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         operators[msg.sender] = true;
         lastOperatorActivity  = block.timestamp;
         lastUpkeepTimestamp   = block.timestamp;
+        emit PlatformFeeUpdated(0, platformFeeBps);
     }
 
     // ─── Agent Registry ───────────────────────────────────────────────────────
@@ -194,6 +196,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         bool    active
     ) external {
         Agent storage agent = agents[slug];
+        require(agent.creator != address(0), "WasiAI: agent not found");
         require(
             agent.creator == msg.sender ||
             operators[msg.sender]       ||
@@ -230,6 +233,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         Agent storage agent = agents[slug];
         require(agent.active,  "WasiAI: agent inactive");
         require(amount > 0,    "WasiAI: zero amount");
+        require(amount == agent.pricePerCall, "WasiAI: amount mismatch");
 
         // Verify contract actually holds the funds
         // (soft check — if the operator is trusted this is just defensive)
@@ -305,7 +309,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         uint8   v,
         bytes32 r,
         bytes32 s
-    ) external onlyOperator nonReentrant {
+    ) external onlyOperator nonReentrant whenNotPaused {
         lastOperatorActivity = block.timestamp;
         require(keyId  != bytes32(0), "WasiAI: zero keyId");
         require(owner  != address(0), "WasiAI: zero owner");
@@ -334,10 +338,11 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
         bytes32          keyId,
         string[] calldata slugs,
         uint256[] calldata amounts
-    ) external onlyOperator nonReentrant {
+    ) external onlyOperator nonReentrant whenNotPaused {
         lastOperatorActivity = block.timestamp;
         require(slugs.length == amounts.length, "WasiAI: length mismatch");
         require(slugs.length > 0,               "WasiAI: empty batch");
+        require(slugs.length <= 500,            "WasiAI: batch too large");
 
         // Compute total first — fail early if insufficient balance
         uint256 total = 0;
@@ -438,8 +443,19 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
      */
     function setPlatformFee(uint16 bps) external onlyOwner {
         require(bps <= 3000, "WasiAI: max 30%");
-        emit PlatformFeeUpdated(platformFeeBps, bps);
+        uint16 oldBps = platformFeeBps;
         platformFeeBps = bps;
+        emit PlatformFeeUpdated(oldBps, bps);
+    }
+
+    /// @notice Pause deposits and batch settlement. Emergency use only.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpause the contract.
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function setTreasury(address _treasury) external onlyOwner {
@@ -450,6 +466,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
     }
 
     function setOperator(address operator, bool active) external onlyOwner {
+        require(operator != address(0), "WasiAI: zero operator");
         operators[operator] = active;
         emit OperatorSet(operator, active);
     }
@@ -491,8 +508,7 @@ contract WasiAIMarketplace is Ownable, ReentrancyGuard {
             (block.timestamp - lastUpkeepTimestamp) >= UPKEEP_INTERVAL,
             "WasiAI: upkeep not needed"
         );
-        lastUpkeepTimestamp  = block.timestamp;
-        lastOperatorActivity = block.timestamp;
+        lastUpkeepTimestamp = block.timestamp;
         emit UpkeepPerformed(block.timestamp, msg.sender);
     }
 
