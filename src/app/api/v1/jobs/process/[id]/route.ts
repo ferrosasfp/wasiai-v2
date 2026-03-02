@@ -54,16 +54,17 @@ export async function POST(
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   }
 
-  // [3] Verificar status pending
-  if (job.status !== 'pending') {
-    return NextResponse.json({ error: 'Job already processed' }, { status: 409 })
-  }
-
-  // [4] Marcar como processing
-  await serviceClient
+  // [3+4] Atomic claim: UPDATE WHERE status='pending' → previene doble-ejecución
+  const { data: updated } = await serviceClient
     .from('jobs')
     .update({ status: 'processing', updated_at: new Date().toISOString() })
     .eq('id', id)
+    .eq('status', 'pending')
+    .select('id')
+
+  if (!updated || updated.length === 0) {
+    return NextResponse.json({ error: 'already_processing' }, { status: 409 })
+  }
 
   // [5] Obtener agente
   const { data: agent, error: agentError } = await serviceClient

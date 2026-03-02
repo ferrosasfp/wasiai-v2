@@ -36,13 +36,13 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
 
   // Cargar API key de localStorage
   useEffect(() => {
-    const stored = localStorage.getItem(API_KEY_STORAGE_KEY)
+    const stored = sessionStorage.getItem(API_KEY_STORAGE_KEY)
     if (stored) setApiKey(stored)
   }, [])
 
   function handleApiKeyChange(value: string) {
     setApiKey(value)
-    localStorage.setItem(API_KEY_STORAGE_KEY, value)
+    sessionStorage.setItem(API_KEY_STORAGE_KEY, value)
   }
 
   function addStep() {

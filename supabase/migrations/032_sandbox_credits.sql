@@ -46,3 +46,16 @@ BEGIN
   RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Función atómica para reembolsar balance (INCREMENT, evita race condition)
+CREATE OR REPLACE FUNCTION refund_sandbox_balance(
+  p_user_id UUID,
+  p_amount  NUMERIC
+) RETURNS VOID AS $$
+BEGIN
+  UPDATE sandbox_credits
+  SET balance_usdc = balance_usdc + p_amount,
+      updated_at   = now()
+  WHERE user_id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
