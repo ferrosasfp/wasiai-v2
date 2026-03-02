@@ -291,7 +291,7 @@ export default async function CreatorDashboardPage({
         </section>
 
         {/* WAS-74: Webhooks */}
-        <WebhooksPanel userId={user.id} />
+        <WebhooksPanel />
 
         {/* Agent API quick-start */}
         <section className="rounded-2xl bg-gray-900 p-6 text-white">

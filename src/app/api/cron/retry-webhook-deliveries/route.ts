@@ -52,38 +52,44 @@ export async function POST(request: NextRequest) {
       .from('webhooks')
       .select('id, url, secret')
       .in('id', webhookIds)
+      .eq('is_active', true)
 
     const webhookMap = new Map((webhooks ?? []).map(w => [w.id, w]))
 
     let retried = 0
     let succeeded = 0
 
-    await Promise.allSettled(
-      deliveries.map(async (delivery) => {
-        const wh = webhookMap.get(delivery.webhook_id)
-        if (!wh) return
+    // Process in batches of 10 to limit concurrency
+    const BATCH_SIZE = 10
+    for (let i = 0; i < deliveries.length; i += BATCH_SIZE) {
+      const batch = deliveries.slice(i, i + BATCH_SIZE)
+      await Promise.allSettled(
+        batch.map(async (delivery) => {
+          const wh = webhookMap.get(delivery.webhook_id)
+          if (!wh) return
 
-        const result = await deliverWebhook(
-          wh.url as string,
-          wh.secret as string,
-          delivery.payload as WebhookPayload
-        )
+          const result = await deliverWebhook(
+            wh.url as string,
+            wh.secret as string,
+            delivery.payload as WebhookPayload
+          )
 
-        await supabase
-          .from('webhook_deliveries')
-          .update({
-            success: result.success,
-            status_code: result.statusCode ?? null,
-            attempt: (delivery.attempt ?? 1) + 1,
-            delivered_at: new Date().toISOString(),
-            locked_until: null, // release lock after processing
-          })
-          .eq('id', delivery.id)
+          await supabase
+            .from('webhook_deliveries')
+            .update({
+              success: result.success,
+              status_code: result.statusCode ?? null,
+              attempt: (delivery.attempt ?? 1) + 1,
+              delivered_at: new Date().toISOString(),
+              locked_until: null, // release lock after processing
+            })
+            .eq('id', delivery.id)
 
-        retried++
-        if (result.success) succeeded++
-      })
-    )
+          retried++
+          if (result.success) succeeded++
+        })
+      )
+    }
 
     logger.info('[cron/retry-webhook-deliveries] completed', { retried, succeeded })
     return NextResponse.json({ ok: true, retried, succeeded, timestamp: new Date().toISOString() })

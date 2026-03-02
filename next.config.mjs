@@ -17,6 +17,11 @@ const nextConfig = {
   experimental: {
     mcpServer: true,
   },
+  // Fix 431 Request Header Fields Too Large
+  serverExternalPackages: [],
+  httpAgentOptions: {
+    maxHeaderSize: 32768, // 32KB (default is 8KB)
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.mypinata.cloud' },

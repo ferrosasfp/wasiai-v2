@@ -23,12 +23,7 @@ interface Delivery {
   error_message?: string | null
 }
 
-interface Props {
-  userId: string
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function WebhooksPanel({ userId: _userId }: Props) {
+export function WebhooksPanel() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -42,6 +37,7 @@ export function WebhooksPanel({ userId: _userId }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setDeliveriesMap({})
     try {
       const res = await fetch('/api/v1/webhooks')
       const json = await res.json() as { webhooks?: Webhook[] }
@@ -91,6 +87,7 @@ export function WebhooksPanel({ userId: _userId }: Props) {
     })
     if (!res.ok) {
       setWebhooks(prev => prev.map(w => w.id === webhook.id ? { ...w, is_active: webhook.is_active } : w))
+      setError('Error al actualizar el webhook. Intenta de nuevo.')
     }
   }
 
@@ -99,6 +96,8 @@ export function WebhooksPanel({ userId: _userId }: Props) {
     const res = await fetch(`/api/v1/webhooks/${id}`, { method: 'DELETE' })
     if (res.ok) {
       setWebhooks(prev => prev.filter(w => w.id !== id))
+    } else {
+      setError('Error al eliminar el webhook. Intenta de nuevo.')
     }
   }
 
@@ -109,9 +108,14 @@ export function WebhooksPanel({ userId: _userId }: Props) {
     }
     setExpandedId(id)
     if (!deliveriesMap[id]) {
-      const res = await fetch(`/api/v1/webhooks/${id}/deliveries`)
-      const json = await res.json() as { deliveries?: Delivery[] }
-      setDeliveriesMap(prev => ({ ...prev, [id]: json.deliveries ?? [] }))
+      try {
+        const res = await fetch(`/api/v1/webhooks/${id}/deliveries`)
+        const json = await res.json() as { deliveries?: Delivery[] }
+        setDeliveriesMap(prev => ({ ...prev, [id]: json.deliveries ?? [] }))
+      } catch {
+        setDeliveriesMap(prev => ({ ...prev, [id]: [] }))
+        setError('Error al cargar las deliveries del webhook.')
+      }
     }
   }
 
