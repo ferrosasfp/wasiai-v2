@@ -1,0 +1,155 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { useState, useEffect, startTransition } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { ActionSheet } from '@/features/auth/components/ActionSheet'
+
+interface BottomTabBarProps {
+  locale: string
+  initialEmail?: string | null
+}
+
+export function BottomTabBar({ locale, initialEmail = null }: BottomTabBarProps) {
+  const pathname = usePathname()
+  const t = useTranslations('nav')
+  const tMobile = useTranslations('mobileNav')
+
+  const [createOpen, setCreateOpen] = useState(false)
+  const [meOpen, setMeOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState<string | null>(initialEmail)
+
+  useEffect(() => {
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      startTransition(() => setUserEmail(session?.user?.email ?? null))
+    })
+    return () => subscription?.unsubscribe()
+  }, [])
+
+  async function handleSignout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = `/${locale}/login`
+  }
+
+  const isLoggedIn = !!userEmail
+
+  function isActive(pattern: string): boolean {
+    if (pattern === 'explore') {
+      return pathname === `/${locale}` || pathname === `/${locale}/`
+    }
+    if (pattern === 'sandbox') {
+      return pathname.startsWith(`/${locale}/sandbox`)
+    }
+    return false
+  }
+
+  const currentLang = locale === 'en' ? 'ES' : 'EN'
+
+  const createItems = isLoggedIn
+    ? [
+        { icon: '📦', label: t('publishAgent'), href: `/${locale}/publish` },
+        { icon: '📊', label: t('myDashboard'), href: `/${locale}/creator/dashboard` },
+        { icon: '🔗', label: t('pipelines'), href: `/${locale}/pipelines` },
+        { icon: '🔑', label: t('agentKeys'), href: `/${locale}/agent-keys` },
+      ]
+    : [
+        { icon: '🔑', label: t('login'), href: `/${locale}/login` },
+      ]
+
+  const meItems = isLoggedIn
+    ? [
+        { icon: '👤', label: t('profile'), href: `/${locale}/profile` },
+        { icon: '💰', label: t('wallet'), href: `/${locale}/wallet` },
+        { icon: '📦', label: t('storage'), href: `/${locale}/storage` },
+        {
+          icon: '🌐',
+          label: `${currentLang}`,
+          href: `/${locale === 'en' ? 'es' : 'en'}${pathname.replace(`/${locale}`, '')}`,
+        },
+        { icon: '🚪', label: t('signout'), onClick: handleSignout, danger: true },
+      ]
+    : [
+        { icon: '🔑', label: t('login'), href: `/${locale}/login` },
+        { icon: '✨', label: t('signup'), href: `/${locale}/signup` },
+      ]
+
+  return (
+    <>
+      <ActionSheet
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        items={createItems}
+        title={t('create')}
+      />
+      <ActionSheet
+        open={meOpen}
+        onClose={() => setMeOpen(false)}
+        items={meItems}
+        title={isLoggedIn ? (userEmail ?? undefined) : undefined}
+      />
+
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 sm:hidden border-t border-gray-200 bg-white"
+        aria-label="Navegación principal mobile"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex items-stretch justify-around px-1 pt-1 pb-1">
+          {/* Explore */}
+          <Link
+            href={`/${locale}`}
+            className={`flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] font-medium transition-colors ${
+              isActive('explore') ? 'text-[#E84142]' : 'text-gray-500'
+            }`}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+            </svg>
+            {tMobile('explore')}
+          </Link>
+
+          {/* Sandbox */}
+          <Link
+            href={`/${locale}/sandbox`}
+            className={`flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] font-medium transition-colors ${
+              isActive('sandbox') ? 'text-[#E84142]' : 'text-gray-500'
+            }`}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21a48.309 48.309 0 0 1-8.135-1.587c-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+            </svg>
+            {tMobile('sandbox')}
+          </Link>
+
+          {/* Crear — FAB */}
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            aria-label={tMobile('create')}
+            className="relative -mt-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#E84142] text-white shadow-lg"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
+
+          {/* Yo */}
+          <button
+            type="button"
+            onClick={() => setMeOpen(true)}
+            aria-label={tMobile('me')}
+            className="flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] font-medium text-gray-500 transition-colors hover:text-[#E84142]"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+            {tMobile('me')}
+          </button>
+        </div>
+      </nav>
+    </>
+  )
+}

@@ -359,7 +359,16 @@
     "signOutLabel": "Cerrar sesión de tu cuenta",
     "sandbox": "Sandbox",
     "pipelines": "Pipelines",
-    "profile": "Perfil"
+    "profile": "Perfil",
+    "create": "Crear",
+    "me": "Yo",
+    "publishAgent": "Publicar agente",
+    "myDashboard": "Mi dashboard",
+    "wallet": "Mi wallet",
+    "storage": "Storage",
+    "login": "Iniciar Sesión",
+    "signup": "Crear Cuenta",
+    "signout": "Cerrar Sesión"
   },
   "agentKeys": {
     "title": "Claves de Agente",
@@ -508,7 +517,10 @@
     "explore": "Explorar",
     "publish": "Publicar",
     "dashboard": "Dashboard",
-    "profile": "Perfil"
+    "profile": "Perfil",
+    "sandbox": "Sandbox",
+    "create": "Crear",
+    "me": "Yo"
   },
   "reputation": {
     "title": "Confiabilidad",

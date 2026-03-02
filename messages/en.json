@@ -359,7 +359,16 @@
     "signOutLabel": "Sign out of your account",
     "sandbox": "Sandbox",
     "pipelines": "Pipelines",
-    "profile": "Profile"
+    "profile": "Profile",
+    "create": "Create",
+    "me": "Me",
+    "publishAgent": "Publish agent",
+    "myDashboard": "My dashboard",
+    "wallet": "Wallet",
+    "storage": "Storage",
+    "login": "Sign In",
+    "signup": "Create Account",
+    "signout": "Sign Out"
   },
   "agentKeys": {
     "title": "Agent Keys",
@@ -508,7 +517,10 @@
     "explore": "Explore",
     "publish": "Publish",
     "dashboard": "Dashboard",
-    "profile": "Profile"
+    "profile": "Profile",
+    "sandbox": "Sandbox",
+    "create": "Create",
+    "me": "Me"
   },
   "reputation": {
     "title": "Reliability",
