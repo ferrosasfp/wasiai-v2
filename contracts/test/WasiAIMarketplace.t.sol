@@ -1433,3 +1433,194 @@ contract WasiAIMarketplaceTest is Test {
         marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-helper"));
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WAS-89: Real ERC-3009 signature tests
+//
+// WHY the rest of the test suite uses MockUSDC (mock bypass):
+//   All other tests focus on marketplace business logic (splits, caps, roles,
+//   emergency paths, etc.). MockUSDC skips signature verification so those
+//   tests stay fast and decoupled from USDC internals. The ERC-3009 signature
+//   path is exercised exclusively in WAS89_ERC3009SignatureTest below, which
+//   deploys MockUSDCReal — a minimal but spec-compliant implementation that
+//   verifies ECDSA signatures and enforces nonce uniqueness.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// @dev Minimal ERC-3009 implementation with real ECDSA signature verification.
+contract MockUSDCReal {
+    bytes32 public constant TRANSFER_WITH_AUTHORIZATION_TYPEHASH =
+        keccak256("TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)");
+
+    bytes32 public immutable DOMAIN_SEPARATOR;
+
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+    mapping(address => mapping(bytes32 => bool)) public authorizationState;
+
+    constructor() {
+        DOMAIN_SEPARATOR = keccak256(abi.encode(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes("USD Coin")),
+            keccak256(bytes("2")),
+            block.chainid,
+            address(this)
+        ));
+    }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "insufficient");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        balanceOf[from] -= amount;
+        balanceOf[to]   += amount;
+        return true;
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+
+    function transferWithAuthorization(
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint8   v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        require(block.timestamp > validAfter,  "ERC3009: auth not yet valid");
+        require(block.timestamp < validBefore, "ERC3009: auth expired");
+        require(!authorizationState[from][nonce], "ERC3009: auth already used");
+
+        bytes32 structHash = keccak256(abi.encode(
+            TRANSFER_WITH_AUTHORIZATION_TYPEHASH,
+            from, to, value, validAfter, validBefore, nonce
+        ));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+
+        address signer = ecrecover(digest, v, r, s);
+        require(signer != address(0) && signer == from, "ERC3009: invalid signature");
+
+        authorizationState[from][nonce] = true;
+        require(balanceOf[from] >= value, "ERC3009: insufficient balance");
+        balanceOf[from] -= value;
+        balanceOf[to]   += value;
+    }
+}
+
+contract WAS89_ERC3009SignatureTest is Test {
+    WasiAIMarketplace marketplace;
+    MockUSDCReal      usdcReal;
+
+    address owner    = address(0x1);
+    address treasury = address(0x2);
+    address operator = address(0x5);
+
+    // Foundry default account #0
+    uint256 constant SIGNER_PRIV = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
+
+    bytes32 constant KEY_REAL = bytes32(uint256(0xBEEF0001));
+
+    function setUp() public {
+        vm.startPrank(owner);
+        usdcReal    = new MockUSDCReal();
+        marketplace = new WasiAIMarketplace(address(usdcReal), treasury);
+        marketplace.setOperator(operator, true);
+        vm.stopPrank();
+    }
+
+    function _buildDigest(
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce
+    ) internal view returns (bytes32) {
+        bytes32 structHash = keccak256(abi.encode(
+            usdcReal.TRANSFER_WITH_AUTHORIZATION_TYPEHASH(),
+            from, to, value, validAfter, validBefore, nonce
+        ));
+        return keccak256(abi.encodePacked("\x19\x01", usdcReal.DOMAIN_SEPARATOR(), structHash));
+    }
+
+    /// WAS-89-1: Happy path - valid ECDSA signature funds the key.
+    function test_ERC3009_DepositForKey_RealSignature() public {
+        address signer = vm.addr(SIGNER_PRIV);
+        uint256 amount = 1_000_000;
+        usdcReal.mint(signer, amount);
+
+        uint256 validAfter  = 0;
+        uint256 validBefore = type(uint256).max;
+        bytes32 nonce       = keccak256("was89-nonce-1");
+
+        bytes32 digest = _buildDigest(signer, address(marketplace), amount, validAfter, validBefore, nonce);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIV, digest);
+
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_REAL, signer, amount, validAfter, validBefore, nonce, v, r, s);
+
+        assertEq(marketplace.getKeyBalance(KEY_REAL), amount);
+        assertEq(marketplace.keyOwners(KEY_REAL), signer);
+        assertEq(usdcReal.balanceOf(address(marketplace)), amount);
+        assertEq(usdcReal.balanceOf(signer), 0);
+    }
+
+    /// WAS-89-2: Wrong signer - signature from a different private key must revert.
+    function test_ERC3009_DepositForKey_WrongSignature_Reverts() public {
+        address signer  = vm.addr(SIGNER_PRIV);
+        // Foundry default account #1
+        uint256 wrongPriv = 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d;
+        uint256 amount  = 500_000;
+        usdcReal.mint(signer, amount);
+
+        uint256 validAfter  = 0;
+        uint256 validBefore = type(uint256).max;
+        bytes32 nonce       = keccak256("was89-nonce-2");
+
+        bytes32 digest = _buildDigest(signer, address(marketplace), amount, validAfter, validBefore, nonce);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongPriv, digest);
+
+        vm.prank(operator);
+        vm.expectRevert("ERC3009: invalid signature");
+        marketplace.depositForKey(KEY_REAL, signer, amount, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    /// WAS-89-3: Replay attack - reusing the same nonce must revert on second call.
+    function test_ERC3009_DepositForKey_ReplayAttack_Reverts() public {
+        address signer = vm.addr(SIGNER_PRIV);
+        uint256 amount = 300_000;
+        usdcReal.mint(signer, amount * 2);
+
+        uint256 validAfter  = 0;
+        uint256 validBefore = type(uint256).max;
+        bytes32 nonce       = keccak256("was89-replay-nonce");
+
+        bytes32 digest = _buildDigest(signer, address(marketplace), amount, validAfter, validBefore, nonce);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIV, digest);
+
+        // First deposit: ok
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_REAL, signer, amount, validAfter, validBefore, nonce, v, r, s);
+
+        // Second deposit with same nonce: must fail
+        vm.prank(operator);
+        vm.expectRevert("ERC3009: auth already used");
+        marketplace.depositForKey(
+            bytes32(uint256(KEY_REAL) + 1),
+            signer, amount, validAfter, validBefore, nonce, v, r, s
+        );
+    }
+}
