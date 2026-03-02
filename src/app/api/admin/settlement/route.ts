@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 import { createServiceClient } from '@/lib/supabase/server'
 import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
 import { logger } from '@/lib/logger'
@@ -20,16 +21,31 @@ interface SettlementBody {
  * run    → dispara settleKeyBatchOnChain() directamente
  */
 export async function POST(request: NextRequest) {
-  const sig = request.headers.get('x-admin-signature')
-  if (!sig) {
-    return NextResponse.json({ error: 'X-Admin-Signature required' }, { status: 401 })
-  }
-
+  // ORDEN OBLIGATORIO: leer body PRIMERO → construir message → verificar firma
   let body: SettlementBody
   try {
     body = await request.json() as SettlementBody
   } catch {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+
+  const sig       = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr  = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr     = request.headers.get('x-admin-timestamp')
+
+  if (!sig || !nonceHdr || !tsHdr) {
+    return NextResponse.json({ error: 'Missing admin auth headers' }, { status: 401 })
+  }
+
+  const message: AdminActionMessage = {
+    action:    `settlement:${body.action}`,
+    nonce:     nonceHdr,
+    timestamp: BigInt(tsHdr),
+  }
+
+  const { ok, reason } = await verifyAdminSignature(sig, message)
+  if (!ok) {
+    return NextResponse.json({ error: 'Unauthorized', reason }, { status: 401 })
   }
 
   const { action, mode } = body

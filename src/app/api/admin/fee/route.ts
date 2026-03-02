@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji } from 'viem/chains'
@@ -18,10 +19,24 @@ function getChain() {
  * Cambia platformFeeBps on-chain con OPERATOR_PRIVATE_KEY.
  */
 export async function POST(request: NextRequest) {
-  // Verificar que viene del panel (header requerido)
-  const sig = request.headers.get('x-admin-signature')
-  if (!sig) {
-    return NextResponse.json({ error: 'X-Admin-Signature required' }, { status: 401 })
+  // Verificar firma EIP-712
+  const sig       = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr  = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr     = request.headers.get('x-admin-timestamp')
+
+  if (!sig || !nonceHdr || !tsHdr) {
+    return NextResponse.json({ error: 'Missing admin auth headers' }, { status: 401 })
+  }
+
+  const message: AdminActionMessage = {
+    action:    'setPlatformFee',
+    nonce:     nonceHdr,
+    timestamp: BigInt(tsHdr),
+  }
+
+  const { ok, reason } = await verifyAdminSignature(sig, message)
+  if (!ok) {
+    return NextResponse.json({ error: 'Unauthorized', reason }, { status: 401 })
   }
 
   let bps: number
