@@ -70,6 +70,11 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
     address public           treasury;
     uint16  public           platformFeeBps = 1000; // 10% default
 
+    // ── Fee Timelock (NA-M03) ─────────────────────────────────────────────────
+    uint16  public pendingFeeBps;
+    uint256 public pendingFeeTimestamp;
+    uint256 public constant FEE_TIMELOCK = 48 hours;
+
     /// slug → Agent
     mapping(string  => Agent)   public agents;
     /// creator wallet → claimable USDC (atomic units)
@@ -79,6 +84,12 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
 
     uint256 public totalVolume;   // lifetime USDC volume (atomic units)
     uint256 public totalInvocations;
+
+    // ── Solvency Counters (NA-H01) ────────────────────────────────────────────
+    /// @notice Sum of all keyBalances -- updated on every key operation
+    uint256 public totalKeyBalances;
+    /// @notice Sum of all pending earnings -- updated on every earnings operation
+    uint256 public totalEarnings;
 
     /// keyId (bytes32 from SHA-256 key_hash) → on-chain USDC balance
     mapping(bytes32 => uint256) public keyBalances;
@@ -119,6 +130,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
     );
     event Withdrawn(address indexed creator, uint256 amount);
     event PlatformFeeUpdated(uint16 oldBps, uint16 newBps);
+    event FeeProposed(uint16 indexed newBps, uint256 executeAfter);
+    event FeeCanceled(uint16 indexed canceledBps);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event OperatorSet(address indexed operator, bool active);
 
@@ -247,6 +260,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
 
         // Accumulate creator earnings (pull pattern — creator withdraws when ready)
         earnings[agent.creator] += creatorShare;
+        totalEarnings           += creatorShare;
+        // Note: platformShare goes to treasury immediately -- not tracked in totalEarnings
 
         // Send platform share immediately to treasury
         if (platformShare > 0) {
@@ -269,6 +284,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
         require(amount > 0, "WasiAI: nothing to withdraw");
 
         earnings[msg.sender] = 0;
+        totalEarnings       -= amount;
         usdc.safeTransfer(msg.sender, amount);
 
         emit Withdrawn(msg.sender, amount);
@@ -284,6 +300,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
         require(amount > 0, "WasiAI: nothing to withdraw");
 
         earnings[creator] = 0;
+        totalEarnings    -= amount;
         usdc.safeTransfer(creator, amount);
 
         emit Withdrawn(creator, amount);
@@ -320,7 +337,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
             validAfter, validBefore, nonce, v, r, s
         );
 
-        keyBalances[keyId] += amount;
+        keyBalances[keyId]  += amount;
+        totalKeyBalances    += amount;
         if (keyOwners[keyId] == address(0)) {
             keyOwners[keyId] = owner;
         }
@@ -352,7 +370,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
         require(keyBalances[keyId] >= total, "WasiAI: insufficient key balance");
 
         // Deduct full amount atomically before any transfers (reentrancy-safe)
-        keyBalances[keyId] -= total;
+        keyBalances[keyId]  -= total;
+        totalKeyBalances    -= total;
 
         uint256 totalPlatformShare = 0;
         for (uint256 i = 0; i < slugs.length; i++) {
@@ -364,6 +383,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
             uint256 creatorShare  = amounts[i] - platformShare;
 
             earnings[agent.creator] += creatorShare;
+            totalEarnings           += creatorShare;
             totalPlatformShare     += platformShare;
 
             totalVolume      += amounts[i];
@@ -389,8 +409,10 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 amount = keyBalances[keyId];
         require(amount > 0, "WasiAI: nothing to refund");
 
-        keyBalances[keyId] = 0;
+        keyBalances[keyId]          = 0;
+        totalKeyBalances           -= amount;
         earnings[keyOwners[keyId]] += amount;
+        totalEarnings              += amount;
 
         emit KeyRefunded(keyId, keyOwners[keyId], amount);
     }
@@ -411,6 +433,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
         require(amount > 0, "WasiAI: nothing to withdraw");
 
         keyBalances[keyId] = 0;
+        totalKeyBalances  -= amount;
         usdc.safeTransfer(msg.sender, amount);
 
         emit KeyRefunded(keyId, msg.sender, amount);
@@ -425,27 +448,33 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
 
     // ─── Admin ────────────────────────────────────────────────────────────────
 
-    /**
-     * @notice Update the platform fee for all future invocations.
-     * @dev Only callable by the contract owner (WasiAI operator).
-     *      Fee is applied to all new invocations after the change.
-     *      Existing pending earnings are NOT retroactively affected.
-     *
-     *      Fee model:
-     *      - Default: 1000 bps = 10% to treasury, 90% to creator
-     *      - Early creator program: set creatorFeeBps = 10000 on specific agents (0% platform fee)
-     *      - Maximum allowed: 3000 bps = 30%
-     *
-     *      To change: call setPlatformFee(bps) from the owner wallet.
-     *      Example: setPlatformFee(1500) → 15% platform fee, 85% to creator.
-     *
-     * @param bps New platform fee in basis points (100 bps = 1%). Max: 3000 (30%).
-     */
-    function setPlatformFee(uint16 bps) external onlyOwner {
+    // ── Fee Timelock (NA-M03 fix) ─────────────────────────────────────────────
+
+    /// @notice Step 1: propose a new platform fee. Executable after 48h.
+    function proposeFee(uint16 bps) external onlyOwner {
         require(bps <= 3000, "WasiAI: max 30%");
+        pendingFeeBps = bps;
+        pendingFeeTimestamp = block.timestamp + FEE_TIMELOCK;
+        emit FeeProposed(bps, pendingFeeTimestamp);
+    }
+
+    /// @notice Step 2: execute the proposed fee after timelock expires.
+    function executeFee() external onlyOwner {
+        require(pendingFeeTimestamp > 0,                "WasiAI: no pending fee");
+        require(block.timestamp >= pendingFeeTimestamp, "WasiAI: timelock active");
         uint16 oldBps = platformFeeBps;
-        platformFeeBps = bps;
-        emit PlatformFeeUpdated(oldBps, bps);
+        platformFeeBps = pendingFeeBps;
+        pendingFeeBps = 0;
+        pendingFeeTimestamp = 0;
+        emit PlatformFeeUpdated(oldBps, platformFeeBps);
+    }
+
+    /// @notice Cancel a pending fee proposal.
+    function cancelFee() external onlyOwner {
+        require(pendingFeeTimestamp > 0, "WasiAI: no pending fee");
+        emit FeeCanceled(pendingFeeBps);
+        pendingFeeBps = 0;
+        pendingFeeTimestamp = 0;
     }
 
     /// @notice Pause deposits and batch settlement. Emergency use only.
@@ -483,6 +512,19 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
         external view returns (uint256)
     {
         return earnings[creator];
+    }
+
+    /// @notice Check contract solvency.
+    /// @return solvent         true if contract holds enough USDC for all obligations
+    /// @return totalAccounted  sum of all keyBalances + all earnings
+    /// @return contractBalance current USDC balance of this contract
+    function checkSolvency()
+        external view
+        returns (bool solvent, uint256 totalAccounted, uint256 contractBalance)
+    {
+        totalAccounted  = totalKeyBalances + totalEarnings;
+        contractBalance = usdc.balanceOf(address(this));
+        solvent         = contractBalance >= totalAccounted;
     }
 
     // ─── Chainlink Automation ─────────────────────────────────────────────────

@@ -190,14 +190,17 @@ contract WasiAIMarketplaceTest is Test {
 
     function test_SetPlatformFee() public {
         vm.prank(owner);
-        marketplace.setPlatformFee(500); // 5%
+        marketplace.proposeFee(500);
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(owner);
+        marketplace.executeFee();
         assertEq(marketplace.platformFeeBps(), 500);
     }
 
     function test_SetPlatformFee_TooHigh() public {
         vm.prank(owner);
         vm.expectRevert("WasiAI: max 30%");
-        marketplace.setPlatformFee(3001);
+        marketplace.proposeFee(3001);
     }
 
     function test_MultipleInvocations() public {
@@ -706,7 +709,10 @@ contract WasiAIMarketplaceTest is Test {
 
     function test_EdgeCase_ZeroFee_CreatorGetsAll() public {
         vm.prank(owner);
-        marketplace.setPlatformFee(0);
+        marketplace.proposeFee(0);
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(owner);
+        marketplace.executeFee();
 
         _registerAgent(SLUG, creator);
         usdc.mint(address(marketplace), PRICE);
@@ -719,7 +725,10 @@ contract WasiAIMarketplaceTest is Test {
 
     function test_EdgeCase_MaxFee_Treasury30pct() public {
         vm.prank(owner);
-        marketplace.setPlatformFee(3000);
+        marketplace.proposeFee(3000);
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(owner);
+        marketplace.executeFee();
 
         _registerAgent(SLUG, creator);
         usdc.mint(address(marketplace), PRICE);
@@ -734,7 +743,7 @@ contract WasiAIMarketplaceTest is Test {
     function test_EdgeCase_FeeAboveMax_Reverts() public {
         vm.prank(owner);
         vm.expectRevert("WasiAI: max 30%");
-        marketplace.setPlatformFee(3001);
+        marketplace.proposeFee(3001);
     }
 
     // Batch edge cases
@@ -1009,9 +1018,12 @@ contract WasiAIMarketplaceTest is Test {
         vm.prank(owner);
         if (bps > 3000) {
             vm.expectRevert("WasiAI: max 30%");
-            marketplace.setPlatformFee(bps);
+            marketplace.proposeFee(bps);
         } else {
-            marketplace.setPlatformFee(bps);
+            marketplace.proposeFee(bps);
+            vm.warp(block.timestamp + 48 hours + 1);
+            vm.prank(owner);
+            marketplace.executeFee();
             assertEq(marketplace.platformFeeBps(), bps);
         }
     }
@@ -1183,5 +1195,120 @@ contract WasiAIMarketplaceTest is Test {
 
         assertEq(marketplace.getKeyBalance(KEY_ID), 0);
         assertEq(usdc.balanceOf(payer), funded);
+    }
+
+    // ── Fee Timelock Tests ────────────────────────────────────────────────────
+
+    function test_ProposeFee_Works() public {
+        vm.prank(owner);
+        marketplace.proposeFee(1500);
+        assertEq(marketplace.pendingFeeBps(), 1500);
+        assertGt(marketplace.pendingFeeTimestamp(), block.timestamp);
+    }
+
+    function test_ExecuteFee_BeforeTimelock_Reverts() public {
+        vm.prank(owner);
+        marketplace.proposeFee(1500);
+        vm.expectRevert("WasiAI: timelock active");
+        vm.prank(owner);
+        marketplace.executeFee();
+    }
+
+    function test_ExecuteFee_AfterTimelock_Works() public {
+        vm.prank(owner);
+        marketplace.proposeFee(1500);
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(owner);
+        marketplace.executeFee();
+        assertEq(marketplace.platformFeeBps(), 1500);
+        assertEq(marketplace.pendingFeeBps(), 0);
+    }
+
+    function test_CancelFee_Works() public {
+        vm.prank(owner);
+        marketplace.proposeFee(1500);
+        vm.prank(owner);
+        marketplace.cancelFee();
+        assertEq(marketplace.pendingFeeBps(), 0);
+        assertEq(marketplace.pendingFeeTimestamp(), 0);
+        assertEq(marketplace.platformFeeBps(), 1000); // unchanged
+    }
+
+    function test_ProposeFee_TooHigh_Reverts() public {
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: max 30%");
+        marketplace.proposeFee(3001);
+    }
+
+    // ── Solvency Tests ────────────────────────────────────────────────────────
+
+    function test_CheckSolvency_InitialState() public view {
+        (bool solvent, uint256 accounted, uint256 balance) = marketplace.checkSolvency();
+        assertTrue(solvent);
+        assertEq(accounted, 0);
+        assertEq(balance, 0);
+    }
+
+    function test_CheckSolvency_AfterDeposit() public {
+        usdc.mint(payer, 1_000_000);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, 1_000_000,
+            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+        (bool solvent, uint256 accounted, uint256 balance) = marketplace.checkSolvency();
+        assertTrue(solvent);
+        assertEq(accounted, balance);
+    }
+
+    function test_TotalKeyBalances_TrackedCorrectly() public {
+        usdc.mint(payer, 500_000);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, 500_000,
+            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+        assertEq(marketplace.totalKeyBalances(), 500_000);
+    }
+
+    function test_TotalEarnings_TrackedCorrectly() public {
+        _setupAndInvoke();
+        assertEq(marketplace.totalEarnings(), marketplace.getPendingEarnings(creator));
+    }
+
+    // Fuzz: random operations must keep checkSolvency() == true
+    function testFuzz_Solvency_AlwaysHolds(uint96 depositAmt, uint8 numCalls) public {
+        vm.assume(depositAmt >= PRICE && depositAmt <= 10_000_000);
+        vm.assume(numCalls > 0 && numCalls <= 10);
+        uint256 callsToSettle = uint256(numCalls) % (depositAmt / PRICE + 1);
+        if (callsToSettle == 0) callsToSettle = 1;
+        uint256 totalCost = callsToSettle * PRICE;
+        vm.assume(totalCost <= depositAmt);
+
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, depositAmt);
+
+        (bool s1,,) = marketplace.checkSolvency();
+        assertTrue(s1, "Solvent after deposit");
+
+        string[] memory slugs = new string[](callsToSettle);
+        uint256[] memory amounts = new uint256[](callsToSettle);
+        for (uint i = 0; i < callsToSettle; i++) { slugs[i] = SLUG; amounts[i] = PRICE; }
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        (bool s2,,) = marketplace.checkSolvency();
+        assertTrue(s2, "Solvent after settle");
+
+        vm.prank(creator);
+        marketplace.withdraw();
+
+        (bool s3,,) = marketplace.checkSolvency();
+        assertTrue(s3, "Solvent after withdraw");
+    }
+
+    // ── Helper ────────────────────────────────────────────────────────────────
+
+    function _setupAndInvoke() internal {
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-helper"));
     }
 }
