@@ -11,6 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { deliverWebhook } from '@/lib/webhooks/deliverWebhook'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Non-blocking: no await — known limitation bajo Vercel serverless
-  processJobAsync(job.id as string, agent_slug, input, supabase).catch(console.error)
+  processJobAsync(job.id as string, agent_slug, input, user.id, supabase).catch(console.error)
 
   return NextResponse.json({
     jobId: job.id,
@@ -50,6 +51,7 @@ async function processJobAsync(
   jobId: string,
   agentSlug: string,
   input: unknown,
+  userId: string,
   supabase: SupabaseClient,
 ): Promise<void> {
   try {
@@ -75,6 +77,9 @@ async function processJobAsync(
         completed_at: new Date().toISOString(),
       })
       .eq('id', jobId)
+
+    // Fire-and-forget: disparar webhooks job.completed sin bloquear
+    fireJobWebhooks(supabase, userId, jobId, agentSlug, 'job.completed', { result }).catch(console.error)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     await supabase
@@ -86,5 +91,54 @@ async function processJobAsync(
         completed_at: new Date().toISOString(),
       })
       .eq('id', jobId)
+
+    // Fire-and-forget: disparar webhooks job.failed sin bloquear
+    fireJobWebhooks(supabase, userId, jobId, agentSlug, 'job.failed', { error: message }).catch(console.error)
   }
+}
+
+/**
+ * Busca webhooks activos del usuario suscritos al evento y los entrega.
+ * Guarda cada delivery en webhook_deliveries.
+ * Diseñado para uso fire-and-forget.
+ */
+async function fireJobWebhooks(
+  supabase: SupabaseClient,
+  userId: string,
+  jobId: string,
+  agentSlug: string,
+  event: 'job.completed' | 'job.failed',
+  extraData: Record<string, unknown>,
+): Promise<void> {
+  const { data: webhooks, error } = await supabase
+    .from('webhooks')
+    .select('id, url, secret')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .contains('events', [event])
+
+  if (error || !webhooks?.length) return
+
+  const payload = {
+    event,
+    timestamp: new Date().toISOString(),
+    data: {
+      jobId,
+      agentSlug,
+      ...extraData,
+    },
+  }
+
+  await Promise.allSettled(
+    webhooks.map(async (wh) => {
+      const result = await deliverWebhook(wh.url as string, wh.secret as string, payload)
+      await supabase.from('webhook_deliveries').insert({
+        webhook_id: wh.id,
+        event: payload.event,
+        payload,
+        status_code: result.statusCode ?? null,
+        success: result.success,
+      })
+    })
+  )
 }
