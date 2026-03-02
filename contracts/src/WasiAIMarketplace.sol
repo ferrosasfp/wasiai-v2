@@ -92,6 +92,14 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     /// @notice Sum of all pending earnings -- updated on every earnings operation
     uint256 public totalEarnings;
 
+    // ── Daily Settlement Cap (WAS-94 / SHK-ATTACKER) ─────────────────────────
+    /// @notice Max USDC that can be settled in a 24h window (6 decimals)
+    uint256 public dailySettlementCap;
+    /// @notice USDC settled in the current 24h window
+    uint256 public dailySettledAmount;
+    /// @notice Timestamp when the current 24h window started
+    uint256 public dailySettlementReset;
+
     /// keyId (bytes32 from SHA-256 key_hash) → on-chain USDC balance
     mapping(bytes32 => uint256) public keyBalances;
     /// keyId → address that can withdraw the key's remaining balance
@@ -140,6 +148,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     /// @notice Emitido cuando Chainlink Automation ejecuta performUpkeep
     event UpkeepPerformed(uint256 indexed timestamp, address indexed performer);
 
+    event DailyCapUpdated(uint256 oldCap, uint256 newCap);
+
     // ── Pre-funded Key Events ────────────────────────────────────────────────
     event KeyFunded(bytes32 indexed keyId, address indexed owner, uint256 amount);
     event KeyCallSettled(bytes32 indexed keyId, string slug, uint256 amount, uint256 creatorShare, uint256 platformShare);
@@ -165,6 +175,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         operators[msg.sender] = true;
         lastOperatorActivity  = block.timestamp;
         lastUpkeepTimestamp   = block.timestamp;
+        dailySettlementCap    = 10_000 * 1e6; // 10,000 USDC default
+        dailySettlementReset  = block.timestamp;
         emit PlatformFeeUpdated(0, platformFeeBps);
     }
 
@@ -361,6 +373,14 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         emit KeyFunded(keyId, owner, amount);
     }
 
+    /// @dev Reset daily counter if 24h window has passed.
+    function _checkAndResetDailyWindow() internal {
+        if (block.timestamp >= dailySettlementReset + 24 hours) {
+            dailySettledAmount   = 0;
+            dailySettlementReset = block.timestamp;
+        }
+    }
+
     /**
      * @notice Liquida un batch de llamadas de key en una sola tx.
      * @dev Gas amortizado: una tx cubre cientos de llamadas.
@@ -383,6 +403,16 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
             total += amounts[i];
         }
         require(keyBalances[keyId] >= total, "WasiAI: insufficient key balance");
+
+        // Reset daily window if needed, then check cap (before any transfer)
+        _checkAndResetDailyWindow();
+        if (dailySettlementCap > 0) {
+            require(
+                dailySettledAmount + total <= dailySettlementCap,
+                "WasiAI: daily cap exceeded"
+            );
+        }
+        dailySettledAmount += total;
 
         // Deduct full amount atomically before any transfers (reentrancy-safe)
         keyBalances[keyId]  -= total;
@@ -462,6 +492,25 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     }
 
     // ─── Admin ────────────────────────────────────────────────────────────────
+
+    // ── Daily Cap Admin (WAS-94) ──────────────────────────────────────────────
+
+    /// @notice Update the daily settlement cap. Set to 0 to disable cap.
+    function setDailySettlementCap(uint256 newCap) external onlyOwner {
+        uint256 old = dailySettlementCap;
+        dailySettlementCap = newCap;
+        emit DailyCapUpdated(old, newCap);
+    }
+
+    /// @notice Returns current daily settlement window status.
+    function getDailySettlementStatus()
+        external view
+        returns (uint256 cap, uint256 settled, uint256 resetsAt)
+    {
+        cap      = dailySettlementCap;
+        settled  = dailySettledAmount;
+        resetsAt = dailySettlementReset + 24 hours;
+    }
 
     // ── Fee Timelock (NA-M03 fix) ─────────────────────────────────────────────
 
@@ -575,5 +624,17 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         external view returns (uint256 volume, uint256 invocations, uint16 feeBps)
     {
         return (totalVolume, totalInvocations, platformFeeBps);
+    }
+
+    /// @notice Compute the canonical paymentId for an invocation.
+    /// @dev    Off-chain verifiable: anyone can recompute with public data.
+    ///         paymentId = keccak256(slug, payer, amount, nonce, chainId)
+    function computePaymentId(
+        string  calldata slug,
+        address          payer,
+        uint256          amount,
+        bytes32          nonce
+    ) external view returns (bytes32) {
+        return keccak256(abi.encodePacked(slug, payer, amount, nonce, block.chainid));
     }
 }
