@@ -11,6 +11,16 @@ interface ComposeStep {
   parallel?:    boolean
 }
 
+// Estado local — _id es solo para React key, nunca se envía a la API
+interface LocalStep extends ComposeStep {
+  _id: string
+}
+
+let _stepCounter = 0
+function newStepId(): string {
+  return `step-${++_stepCounter}-${Date.now()}`
+}
+
 interface AvailableAgent {
   slug:           string
   name:           string
@@ -29,27 +39,27 @@ const MAX_STEPS = 5
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineBuilderProps) {
-  const [steps, setSteps] = useState<ComposeStep[]>([
-    { agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: false, parallel: false },
+  const [steps, setSteps] = useState<LocalStep[]>([
+    { _id: newStepId(), agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: false, parallel: false },
   ])
   const [apiKey, setApiKey] = useState('')
 
   // Cargar API key de localStorage
   useEffect(() => {
-    const stored = sessionStorage.getItem(API_KEY_STORAGE_KEY)
+    const stored = localStorage.getItem(API_KEY_STORAGE_KEY)
     if (stored) setApiKey(stored)
   }, [])
 
   function handleApiKeyChange(value: string) {
     setApiKey(value)
-    sessionStorage.setItem(API_KEY_STORAGE_KEY, value)
+    localStorage.setItem(API_KEY_STORAGE_KEY, value)
   }
 
   function addStep() {
     if (steps.length >= MAX_STEPS) return
     setSteps(prev => [
       ...prev,
-      { agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: false, parallel: false },
+      { _id: newStepId(), agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: false, parallel: false },
     ])
   }
 
@@ -57,12 +67,12 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
     setSteps(prev => prev.filter((_, i) => i !== index))
   }
 
-  function updateStep(index: number, patch: Partial<ComposeStep>) {
+  function updateStep(index: number, patch: Partial<LocalStep>) {
     setSteps(prev => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)))
   }
 
   function handleRun() {
-    const cleaned: ComposeStep[] = steps.map(s => {
+    const cleaned: ComposeStep[] = steps.map((s: LocalStep) => {
       const step: ComposeStep = { agent_slug: s.agent_slug }
       if (s.pass_output) {
         step.pass_output = true
@@ -102,7 +112,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
       {/* Steps */}
       <div className="space-y-4">
         {steps.map((step, index) => (
-          <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+          <div key={step._id} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-600">Step {index + 1}</span>
               {steps.length > 1 && (

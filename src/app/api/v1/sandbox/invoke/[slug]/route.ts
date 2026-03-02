@@ -80,7 +80,7 @@ export async function POST(
   }
 
   // 2. Rate limit — sliding window 10 calls / 1 hora
-  const { success, limit, reset } = await getSandboxLimit().limit(`rl:sandbox:${user.id}`)
+  const { success, limit, reset } = await getSandboxLimit().limit(user.id)
   if (!success) {
     const body: SandboxRateLimitResponse = {
       error:    'Rate limit exceeded',

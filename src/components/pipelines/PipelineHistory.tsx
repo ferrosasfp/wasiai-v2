@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -93,9 +93,8 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map(item => (
-                <>
+                <Fragment key={item.id}>
                   <tr
-                    key={item.id}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={() => toggleExpand(item.id)}
                   >
@@ -111,7 +110,7 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
                     </td>
                   </tr>
                   {expandedId === item.id && (
-                    <tr key={`${item.id}-expanded`} className="bg-gray-50">
+                    <tr className="bg-gray-50">
                       <td colSpan={4} className="px-4 py-3">
                         <div className="text-xs text-gray-500 space-y-1">
                           <div>
@@ -128,7 +127,7 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

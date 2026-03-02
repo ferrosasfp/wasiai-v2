@@ -12,8 +12,11 @@ CREATE TABLE IF NOT EXISTS sandbox_credits (
 
 -- RLS: solo el owner puede leer su propio balance
 ALTER TABLE sandbox_credits ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "users_own_sandbox_credits" ON sandbox_credits
-  FOR ALL USING (auth.uid() = user_id);
+DO $$ BEGIN
+  CREATE POLICY "users_own_sandbox_credits" ON sandbox_credits
+    FOR ALL USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Columna payment_type en agent_calls (sin romper registros existentes)
 ALTER TABLE agent_calls
