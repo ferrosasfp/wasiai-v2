@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { useWalletClient } from 'wagmi'
 import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
 
 const OPERATOR_ADDRESS = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? ''
@@ -26,6 +27,7 @@ interface AdminStatus {
 
 export default function AdminPage() {
   const { address, isConnected } = useAccount()
+  const { data: walletClient }    = useWalletClient()
   const [status, setStatus]       = useState<AdminStatus | null>(null)
   const [loading, setLoading]     = useState(true)
   const [newBps, setNewBps]       = useState<string>('')
@@ -46,15 +48,54 @@ export default function AdminPage() {
 
   useEffect(() => { void loadStatus() }, [])
 
+  async function signAdminAction(action: string): Promise<{
+    signature: string
+    nonce: string
+    timestamp: string
+  } | null> {
+    if (!walletClient) return null
+
+    const nonce     = ('0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`
+    const timestamp = BigInt(Math.floor(Date.now() / 1000))
+
+    const signature = await walletClient.signTypedData({
+      domain: {
+        name:    'WasiAI Admin',
+        version: '1',
+        chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113),
+      },
+      types: {
+        AdminAction: [
+          { name: 'action',    type: 'string'  },
+          { name: 'nonce',     type: 'bytes32' },
+          { name: 'timestamp', type: 'uint256' },
+        ],
+      },
+      primaryType: 'AdminAction',
+      message: { action, nonce, timestamp },
+    })
+
+    return { signature, nonce, timestamp: timestamp.toString() }
+  }
+
   async function handleUpdateFee() {
     if (!isOwner) return
+    if (!walletClient) { setFeeMsg('❌ Wallet not ready, try reconnecting'); return }
+    setFeeMsg('Signing…')
+
+    const auth = await signAdminAction('setPlatformFee').catch(() => null)
+    if (!auth) { setFeeMsg('❌ Signature rejected'); return }
+
     setFeeMsg('Sending tx…')
     try {
       const res = await fetch('/api/admin/fee', {
         method: 'POST',
         headers: {
-          'Content-Type':     'application/json',
-          'X-Admin-Signature': address ?? '',  // simplified: address as proof of identity
+          'Content-Type':      'application/json',
+          'X-Admin-Signature': auth.signature,
+          'X-Admin-Nonce':     auth.nonce,
+          'X-Admin-Timestamp': auth.timestamp,
         },
         body: JSON.stringify({ bps: Number(newBps) }),
       })
@@ -72,13 +113,21 @@ export default function AdminPage() {
 
   async function handleToggleMode(mode: 'vercel' | 'chainlink') {
     if (!isOwner) return
+    if (!walletClient) { setSettleMsg('❌ Wallet not ready, try reconnecting'); return }
+    setSettleMsg('Signing…')
+
+    const auth = await signAdminAction('toggleSettlement').catch(() => null)
+    if (!auth) { setSettleMsg('❌ Signature rejected'); return }
+
     setSettleMsg('Updating…')
     try {
       const res = await fetch('/api/admin/settlement', {
         method: 'POST',
         headers: {
-          'Content-Type':     'application/json',
-          'X-Admin-Signature': address ?? '',
+          'Content-Type':      'application/json',
+          'X-Admin-Signature': auth.signature,
+          'X-Admin-Nonce':     auth.nonce,
+          'X-Admin-Timestamp': auth.timestamp,
         },
         body: JSON.stringify({ action: 'toggle', mode }),
       })
@@ -96,13 +145,21 @@ export default function AdminPage() {
 
   async function handleRunSettlement() {
     if (!isOwner) return
+    if (!walletClient) { setSettleMsg('❌ Wallet not ready, try reconnecting'); return }
+    setSettleMsg('Signing…')
+
+    const auth = await signAdminAction('runSettlement').catch(() => null)
+    if (!auth) { setSettleMsg('❌ Signature rejected'); return }
+
     setSettleMsg('Running settlement…')
     try {
       const res = await fetch('/api/admin/settlement', {
         method: 'POST',
         headers: {
-          'Content-Type':     'application/json',
-          'X-Admin-Signature': address ?? '',
+          'Content-Type':      'application/json',
+          'X-Admin-Signature': auth.signature,
+          'X-Admin-Nonce':     auth.nonce,
+          'X-Admin-Timestamp': auth.timestamp,
         },
         body: JSON.stringify({ action: 'run' }),
       })
