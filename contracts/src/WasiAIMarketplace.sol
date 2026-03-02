@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
 
 /**
  * @notice ERC-3009: Token Transfer With Authorization
@@ -51,7 +52,7 @@ interface IERC3009 {
  * @dev Deployed on Avalanche C-Chain (chainId: 43114)
  *      USDC: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
  */
-contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
+contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, AutomationCompatibleInterface {
     using SafeERC20 for IERC20;
 
     // ─── Types ────────────────────────────────────────────────────────────────
@@ -134,6 +135,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
     event FeeCanceled(uint16 indexed canceledBps);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event OperatorSet(address indexed operator, bool active);
+    event AgentTransferred(string indexed agentId, address indexed oldCreator, address indexed newCreator);
 
     /// @notice Emitido cuando Chainlink Automation ejecuta performUpkeep
     event UpkeepPerformed(uint256 indexed timestamp, address indexed performer);
@@ -219,6 +221,19 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
         agent.pricePerCall = newPrice;
         agent.active       = active;
         emit AgentUpdated(slug, newPrice, active);
+    }
+
+    /// @notice Transfer agent ownership to a new creator.
+    /// @param agentId  The agent slug to transfer.
+    /// @param newOwner New creator address. Cannot be address(0).
+    function transferAgent(string calldata agentId, address newOwner) external nonReentrant {
+        require(newOwner != address(0), "WasiAI: zero address");
+        Agent storage agent = agents[agentId];
+        require(agent.creator != address(0), "WasiAI: agent not found");
+        require(agent.creator == msg.sender, "WasiAI: not creator");
+        address old = agent.creator;
+        agent.creator = newOwner;
+        emit AgentTransferred(agentId, old, newOwner);
     }
 
     // ─── Payment Accounting ───────────────────────────────────────────────────
@@ -535,6 +550,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
     function checkUpkeep(bytes calldata /* checkData */)
         external
         view
+        override
         returns (bool upkeepNeeded, bytes memory /* performData */)
     {
         upkeepNeeded = (block.timestamp - lastUpkeepTimestamp) >= UPKEEP_INTERVAL;
@@ -545,7 +561,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable {
     ///      El settlement real sigue ejecutándose desde el operador backend.
     ///      Cualquier address puede llamar performUpkeep — el intervalo protege
     ///      de abuso (solo ejecutable cada 23h máximo).
-    function performUpkeep(bytes calldata /* performData */) external {
+    function performUpkeep(bytes calldata /* performData */) external override {
         require(
             (block.timestamp - lastUpkeepTimestamp) >= UPKEEP_INTERVAL,
             "WasiAI: upkeep not needed"
