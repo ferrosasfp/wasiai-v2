@@ -7,7 +7,7 @@ import {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const signature = req.headers.get('x-admin-signature') as `0x${string}` | null
   const messageRaw = req.headers.get('x-admin-message')
@@ -33,7 +33,7 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden', reason: auth.reason }, { status: 403 })
   }
 
-  const { id } = params
+  const { id } = await params
   await resetCircuit(id)
   return NextResponse.json({ ok: true, providerId: id, state: 'closed' })
 }

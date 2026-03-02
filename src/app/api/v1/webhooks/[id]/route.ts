@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,10 +18,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
   }
 
+  const { id } = await params
   const { data, error } = await supabase
     .from('webhooks')
     .update({ ...body, updated_at: new Date().toISOString() })
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('user_id', user.id) // ownership check — webhook belongs to authenticated user
     .select('id, url, events, is_active, updated_at')
     .single()
@@ -30,15 +31,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({ webhook: data })
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { id } = await params
   const { error } = await supabase
     .from('webhooks')
     .delete()
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('user_id', user.id) // ownership check
 
   if (error) return NextResponse.json({ error: 'Webhook not found' }, { status: 404 })
