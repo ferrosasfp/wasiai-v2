@@ -118,13 +118,21 @@ async function settleX402(paymentHeader: X402PaymentHeader, model: Record<string
 async function recordOnChain(supabase: SupabaseServiceClient, slug: string, model: Record<string, unknown>, paymentHeader: unknown, txHash: string): Promise<void> {
   const ph = paymentHeader as X402PaymentHeader | undefined
   const payerAddress = ph?.payload?.authorization?.from ?? '0x0000000000000000000000000000000000000000'
-  // Idempotency key: keccak256(txHash + slug) — prevents double-spend in recordInvocation()
-  const { keccak256, encodePacked } = await import('viem')
-  const paymentId = keccak256(encodePacked(['string', 'string'], [txHash, slug]))
+  // WAS-93: canonical paymentId = computePaymentId(slug, payer, amount, nonce, chainId)
+  // Deterministic and off-chain verifiable — anyone can recompute with Supabase data.
+  const { computePaymentId, generateNonce } = await import('@/lib/payments/computePaymentId')
+  const nonce = generateNonce()
+  const amountAtomic = BigInt(model.price_per_call as number)
+  const paymentId = computePaymentId(slug, payerAddress as `0x${string}`, amountAtomic, nonce)
   try {
     const onChainTxHash = await recordInvocationOnChain({ slug, payerAddress, amountUSDC: model.price_per_call as number, paymentId })
     if (onChainTxHash) {
-      await supabase.from('agent_calls').update({ on_chain_recorded: true, on_chain_tx_hash: onChainTxHash }).eq('tx_hash', txHash)
+      await supabase.from('agent_calls').update({
+        on_chain_recorded: true,
+        on_chain_tx_hash:  onChainTxHash,
+        payment_id:        paymentId,
+        payment_nonce:     nonce,
+      }).eq('tx_hash', txHash)
     }
   } catch (err) {
     logger.error('[invoke] on-chain recording failed — enqueueing for retry', { err })
