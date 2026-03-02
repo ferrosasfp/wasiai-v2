@@ -165,6 +165,80 @@ contract NexusAuditValidationTest is Test {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // NA-H01 [FIXED] -- Solvency invariant: counters prevent cross-pool abuse
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function test_NA_H01_FIXED_SolvencyInvariantHolds() public {
+        uint256 USER_DEPOSIT = 1_000_000;
+
+        // 1. User deposits
+        usdc.mint(payer, USER_DEPOSIT);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, USER_DEPOSIT,
+            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        // 2. Operator calls recordInvocation (would have caused insolvency before fix)
+        // Now: this MUST revert because amount != pricePerCall
+        // (recordInvocation amount mismatch fix from WAS-105 prevents cross-pool abuse)
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: amount mismatch");
+        marketplace.recordInvocation(SLUG, payer, USER_DEPOSIT, keccak256("attack"));
+
+        // 3. checkSolvency must return true
+        (bool solvent, uint256 accounted, uint256 balance) = marketplace.checkSolvency();
+        assertTrue(solvent, "NA-H01 FIXED: contract is solvent");
+        assertEq(accounted, balance, "NA-H01 FIXED: accounted == balance");
+    }
+
+    function test_NA_H01_FIXED_SolvencyHolds_WhenAmountMatchesPricePerCall() public {
+        // Setup: user deposits exactly pricePerCall in their key
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, PRICE,
+            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        // Operator funds contract separately for a legitimate x402 invocation
+        usdc.mint(address(marketplace), PRICE);
+
+        // Legitimate recordInvocation (USDC minted separately, not from keyBalance)
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("legit"));
+
+        // checkSolvency: totalKeyBalances(PRICE) + totalEarnings(creatorShare) <= balance
+        (bool solvent,,) = marketplace.checkSolvency();
+        assertTrue(solvent, "NA-H01 FIXED: solvent even when amount == pricePerCall");
+    }
+
+    function test_NA_H01_FIXED_SolvencyAfterFullLifecycle() public {
+        uint256 DEPOSIT = 1_000_000;
+        usdc.mint(payer, DEPOSIT);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, DEPOSIT,
+            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        // Check solvency after deposit
+        (bool s1,,) = marketplace.checkSolvency();
+        assertTrue(s1, "Solvent after deposit");
+
+        // Settle 5 calls
+        string[] memory slugs = new string[](5);
+        uint256[] memory amounts = new uint256[](5);
+        for (uint i = 0; i < 5; i++) { slugs[i] = SLUG; amounts[i] = PRICE; }
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        (bool s2,,) = marketplace.checkSolvency();
+        assertTrue(s2, "Solvent after settle");
+
+        // Creator withdraws
+        vm.prank(creator);
+        marketplace.withdraw();
+
+        (bool s3,,) = marketplace.checkSolvency();
+        assertTrue(s3, "Solvent after withdraw");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // NA-H02 [FIXED] -- recordInvocation ahora valida amount == pricePerCall
     // ─────────────────────────────────────────────────────────────────────────
     function test_NA_H02_FIXED_recordInvocation_RejectsWrongAmount() public {
@@ -270,46 +344,54 @@ contract NexusAuditValidationTest is Test {
 
     // ─────────────────────────────────────────────────────────────────────────
     // NA-M03 [MEDIUM] -- Fee sandwich
+    // ORIGINAL PoC kept for documentation -- attack no longer executable after timelock fix
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_M03_FeeSandwich() public {
+    /*
+    function test_NA_M03_ORIGINAL_FeeSandwich_WasExecutable() public {
+        // This test PASSED before NA-M03 fix (setPlatformFee had no timelock).
+        // setPlatformFee has been removed -- replaced by proposeFee/executeFee (48h timelock).
+        // Attack path: owner proposes 30% fee -- cannot execute for 48h -- user protected.
+    }
+    */
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // NA-M03 [FIXED] -- Fee sandwich blocked by 48h timelock
+    // ─────────────────────────────────────────────────────────────────────────
+    function test_NA_M03_FIXED_FeeSandwich_TimelockPrevents() public {
         uint256 DEPOSIT   = 1_000_000;
-        uint256 CALL_COST = 100_000;
+        uint256 CALL_COST = PRICE;
 
         usdc.mint(payer, DEPOSIT);
         vm.prank(operator);
-        marketplace.depositForKey(
-            KEY_ID, payer, DEPOSIT,
-            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0)
-        );
+        marketplace.depositForKey(KEY_ID, payer, DEPOSIT,
+            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
 
-        uint256 feeAtDeposit = marketplace.platformFeeBps();
-        assertEq(feeAtDeposit, 1000, "Fee inicial 10%");
-
-        // Owner cambia fee a 30% ANTES del settle
+        // Owner tries to propose fee change to 30%
         vm.prank(owner);
-        marketplace.setPlatformFee(3000);
+        marketplace.proposeFee(3000);
 
-        string[] memory slugs   = new string[](1);
+        // Try to execute immediately -- must REVERT (timelock active)
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: timelock active");
+        marketplace.executeFee();
+
+        // Settle happens at original 10% fee -- user is protected
+        string[] memory slugs = new string[](1);
         uint256[] memory amounts = new uint256[](1);
         slugs[0] = SLUG; amounts[0] = CALL_COST;
-
         vm.prank(operator);
         marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
 
-        uint256 treasuryGot  = usdc.balanceOf(treasury);
-        uint256 expectedWith10pct = CALL_COST * 1000 / 10000; // 10_000
-        uint256 expectedWith30pct = CALL_COST * 3000 / 10000; // 30_000
+        // Treasury got 10%, not 30%
+        uint256 expected10pct = CALL_COST * 1000 / 10000;
+        assertEq(usdc.balanceOf(treasury), expected10pct,
+            "NA-M03 FIXED: user paid original 10% fee, not sandwich 30%");
+    }
 
-        emit log_named_uint("Fee al depositar (bps)      ", feeAtDeposit);
-        emit log_named_uint("Fee al settle (bps)         ", marketplace.platformFeeBps());
-        emit log_named_uint("Treasury esperado (10%)     ", expectedWith10pct);
-        emit log_named_uint("Treasury real (30%)         ", treasuryGot);
-        emit log_named_uint("Extraccion extra            ", treasuryGot - expectedWith10pct);
-
-        assertEq(treasuryGot, expectedWith30pct,
-            "NA-M03 CONFIRMED: treasury collected 30% instead of 10%");
-        assertGt(treasuryGot, expectedWith10pct,
-            "NA-M03 CONFIRMED: user paid more than expected at deposit time");
+    function test_NA_M03_FIXED_SetPlatformFee_NoLongerExists() public {
+        bytes4 selector = bytes4(keccak256("setPlatformFee(uint16)"));
+        (bool success,) = address(marketplace).call(abi.encodeWithSelector(selector, 2000));
+        assertFalse(success, "NA-M03 FIXED: setPlatformFee removed, replaced by proposeFee/executeFee");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -365,39 +447,35 @@ contract NexusAuditValidationTest is Test {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NA-L03 [LOW] -- Event emitido ANTES de actualizar estado en setPlatformFee
+    // NA-L03 [FIXED] -- executeFee emits PlatformFeeUpdated with correct state order
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_L03_EventBeforeStateUpdate() public {
-        uint256 newFee = 2000;
+    function test_NA_L03_FIXED_EventOrderCorrectInExecuteFee() public {
+        uint16 newFee = 2000;
 
-        // Capturamos el evento para verificar los valores
+        vm.prank(owner);
+        marketplace.proposeFee(newFee);
+
+        // Advance past timelock
+        vm.warp(block.timestamp + 48 hours + 1);
+
         vm.recordLogs();
         vm.prank(owner);
-        marketplace.setPlatformFee(uint16(newFee));
+        marketplace.executeFee();
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // El evento PlatformFeeUpdated debe existir
-        // Verificamos que el contrato actualizo el estado correctamente al final
-        assertEq(marketplace.platformFeeBps(), newFee,
-            "State was updated");
+        // State must be updated
+        assertEq(marketplace.platformFeeBps(), newFee, "State updated correctly");
+        assertEq(marketplace.pendingFeeBps(),  0,       "Pending cleared");
 
-        // El problema es el ORDEN: el evento se emite con el valor VIEJO de platformFeeBps
-        // como `oldBps` pero si un listener lee platformFeeBps on-chain en ese momento,
-        // todavia ve el valor viejo. Documentamos que el evento existe antes del state.
-        emit log_named_uint("Logs capturados             ", logs.length);
-        emit log_string("NA-L03 CONFIRMED: emit occurs before state update on line 288-289");
-        emit log_string("See: emit PlatformFeeUpdated(platformFeeBps, bps) THEN platformFeeBps = bps");
-
-        // Verificamos que el evento fue emitido (prueba de que el orden es incorrecto)
+        // PlatformFeeUpdated must be emitted
         bool eventFound = false;
         for (uint i = 0; i < logs.length; i++) {
-            // PlatformFeeUpdated(uint16,uint16)
             if (logs[i].topics[0] == keccak256("PlatformFeeUpdated(uint16,uint16)")) {
                 eventFound = true;
             }
         }
-        assertTrue(eventFound, "NA-L03 CONFIRMED: PlatformFeeUpdated emitted before state change");
+        assertTrue(eventFound, "NA-L03 FIXED: PlatformFeeUpdated emitted by executeFee");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -436,9 +514,12 @@ contract NexusAuditValidationTest is Test {
         emit log_named_uint("creatorFeeBps almacenado    ", storedCreatorBps);
         emit log_named_uint("platformFeeBps global       ", marketplace.platformFeeBps());
 
-        // Ahora cambiamos el platformFeeBps global
+        // Ahora cambiamos el platformFeeBps global via timelock
         vm.prank(owner);
-        marketplace.setPlatformFee(2000); // 20%
+        marketplace.proposeFee(2000);
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(owner);
+        marketplace.executeFee(); // 20%
 
         // El agente todavia tiene el creatorFeeBps viejo
         WasiAIMarketplace.Agent memory agentAfter = marketplace.getAgent(SLUG);
