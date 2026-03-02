@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { AgentCBBadge } from './AgentCBBadge'
 
 interface AgentActionsProps {
   slug: string
@@ -70,6 +71,9 @@ export function AgentActions({ slug, locale, currentStatus, agentName }: AgentAc
 
   return (
     <div className="flex items-center gap-2">
+      {/* CB Status Badge */}
+      <AgentCBBadge slug={slug} />
+
       {/* Edit */}
       <Link
         href={`/${locale}/creator/agents/${slug}/edit`}

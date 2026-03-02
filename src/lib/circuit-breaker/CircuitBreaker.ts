@@ -1,4 +1,5 @@
 import { Redis } from '@upstash/redis'
+import { triggerCircuitOpen } from '@/lib/webhooks/triggerCircuitOpen'
 
 const redis = Redis.fromEnv()
 
@@ -38,7 +39,7 @@ export async function recordSuccess(providerId: string): Promise<void> {
   await redis.del(k.lastFailure)
 }
 
-export async function recordFailure(providerId: string): Promise<void> {
+export async function recordFailure(providerId: string, creatorId?: string): Promise<void> {
   const k = keys(providerId)
   const failures = await redis.incr(k.failures)
   await redis.set(k.lastFailure, Math.floor(Date.now() / 1000))
@@ -47,6 +48,7 @@ export async function recordFailure(providerId: string): Promise<void> {
   if (failures >= FAILURE_THRESHOLD) {
     await redis.set(k.state, 'open', { ex: 300 }) // max 5min safety TTL
     await redis.set(k.lastFailure, Math.floor(Date.now() / 1000))
+    if (creatorId) void triggerCircuitOpen(providerId, creatorId)
   }
 }
 
@@ -59,7 +61,8 @@ export async function resetCircuit(providerId: string): Promise<void> {
 
 export async function wrapWithCircuitBreaker<T>(
   providerId: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  creatorId?: string
 ): Promise<T> {
   const state = await getState(providerId)
 
@@ -72,7 +75,7 @@ export async function wrapWithCircuitBreaker<T>(
     await recordSuccess(providerId)
     return result
   } catch (err) {
-    await recordFailure(providerId)
+    await recordFailure(providerId, creatorId)
     throw err
   }
 }
