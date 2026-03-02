@@ -10,6 +10,7 @@ import { AgentActions } from './_components/AgentActions'
 import { FreeTrialToggle } from './_components/FreeTrialToggle'
 import { PendingEarningsBanner } from '@/components/PendingEarningsBanner'
 import { CreatorAnalytics } from '@/features/creator/components/CreatorAnalytics'
+import { CallsPagination } from '@/features/creator/components/CallsPagination'
 
 interface ModelRow {
   id: string
@@ -36,8 +37,17 @@ interface CallRow {
   agent: { name: string; slug: string } | null
 }
 
-export default async function CreatorDashboardPage({ params }: { params: Promise<{ locale: string }> }) {
+const CALLS_PER_PAGE = 10
+
+export default async function CreatorDashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>
+  searchParams: Promise<{ callsPage?: string }>
+}) {
   const { locale } = await params
+  const { callsPage: callsPageParam } = await searchParams
   const t = await getTranslations('dashboard')
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -69,17 +79,24 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
   const modelIds = safeModels.map(m => m.id)
 
   // Recent calls — fetched in parallel with above (independent query)
+  const callsPage = Math.max(1, parseInt(callsPageParam ?? '1', 10))
+  const callsOffset = (callsPage - 1) * CALLS_PER_PAGE
   const serviceClient = createServiceClient()
   const recentCallsData = modelIds.length > 0
     ? await serviceClient
         .from('agent_calls')
-        .select('id, agent_id, caller_type, amount_paid, status, latency_ms, called_at, agent:agents(name, slug)')
+        .select(
+          'id, agent_id, caller_type, amount_paid, status, latency_ms, called_at, agent:agents(name, slug)',
+          { count: 'exact' }
+        )
         .in('agent_id', modelIds)
         .order('called_at', { ascending: false })
-        .limit(20)
-    : { data: [] }
+        .range(callsOffset, callsOffset + CALLS_PER_PAGE - 1)
+    : { data: [], count: 0 }
 
   const recentCalls: CallRow[] = (recentCallsData.data as unknown as CallRow[]) ?? []
+  const totalCallsCount = recentCallsData.count ?? 0
+  const totalPages = Math.ceil(totalCallsCount / CALLS_PER_PAGE)
 
   // Aggregate stats
   const totalCalls = safeModels.reduce((s, m) => s + (m.total_calls ?? 0), 0)
@@ -214,13 +231,14 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
         <section>
           <h2 className="mb-4 font-semibold text-gray-900">{t('recentCalls')}</h2>
 
-          {recentCalls.length === 0 ? (
+          {recentCalls.length === 0 && callsPage === 1 ? (
             <EmptyState
               icon="⚡"
               title={t('noCalls')}
               subtitle={t('noCallsSubtitle')}
             />
           ) : (
+            <>
             <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
               {/* WAS-55: min-w fuerza overflow real en mobile */}
               <table className="w-full min-w-[560px] text-sm">
@@ -266,6 +284,8 @@ export default async function CreatorDashboardPage({ params }: { params: Promise
                 </tbody>
               </table>
             </div>
+            <CallsPagination currentPage={callsPage} totalPages={totalPages} />
+            </>
           )}
         </section>
 
