@@ -1,39 +1,39 @@
 sprint: 14
 periodo: "2026-03-02 → ?"
-estado: ACTIVO
+estado: DONE
 goal: "Circuit breaker, webhooks UI y producto pulido — sin inversión adicional"
-goal_cumplido: false
+goal_cumplido: true
 
 seleccionadas:
   - id: WAS-73
     hu: HU-5.5 Circuit breaker y retry automático en invocaciones
     prioridad: P1
     tamano: M
-    estado: pending
+    estado: DONE
 
   - id: WAS-74
     hu: HU-8.5 Webhooks y eventos para agentes (UI)
     prioridad: P2
     tamano: M
-    estado: pending
+    estado: DONE
 
   - id: WAS-115
     hu: Paginación en Recent Calls del Creator Dashboard
     prioridad: P2
     tamano: S
-    estado: pending
+    estado: DONE
 
   - id: WAS-116
     hu: Capabilities estructuradas en agentes DeFi Risk
     prioridad: P2
     tamano: S
-    estado: pending
+    estado: DONE
 
   - id: WAS-117
     hu: FIX CodeBlock docs — código invisible
     prioridad: fix
     tamano: XS
-    estado: pending
+    estado: DONE
 
 carry_over: []
 

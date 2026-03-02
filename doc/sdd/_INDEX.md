@@ -14,3 +14,8 @@
 | 010 | 2026-03-01 | WAS-23 | HU-7.1: Plugin LangChain — WasiAI como Tool nativa | feature | full | DONE | feat/010-langchain-plugin |
 | 011 | 2026-03-01 | WAS-68 | Sentry error tracking en WasiAI | feature | full | DONE | feat/011-sentry |
 | 012 | 2026-03-01 | WAS-docs | Documentación WasiAI — rewrite completo | improvement | full | DONE | docs/012-docs-rewrite |
+| 013 | 2026-03-02 | WAS-73 | Circuit breaker y retry automático en invocaciones | feature | QUALITY | DONE | master |
+| 014 | 2026-03-02 | WAS-74 | Webhooks y eventos para agentes — UI + triggers + retry cron | feature | QUALITY | DONE | master |
+| 015 | 2026-03-02 | WAS-115 | Paginación en Recent Calls del Creator Dashboard | improvement | QUALITY | DONE | master |
+| 016 | 2026-03-02 | WAS-116 | Capabilities estructuradas en agentes DeFi Risk | feature | FAST | DONE | master |
+| 017 | 2026-03-02 | WAS-117 | FIX CodeBlock docs código invisible | bugfix | FAST | DONE | master |
