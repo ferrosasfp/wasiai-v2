@@ -171,6 +171,38 @@
 
 ---
 
+---
+
+## 🚀 Sprint 14 — Backlog
+
+> **Goal:** Producto listo para usuarios reales + completar el círculo de pagos autónomos
+
+### 🔴 P0 — Producto listo para usuarios reales
+
+- [ ] **WAS-22** Deploy contrato en mainnet + operator wallet con AVAX real (138 tests, NexusAudit completo)
+- [ ] **WAS-39** Migrar agentes demo a mainnet
+- [ ] **WAS-70** Ejecución asíncrona de pipelines (jobs + polling) — `processJobAsync` conectar con invoke real
+
+### 🟠 P1 — Completar el círculo
+
+- [ ] **WAS-71** Agentes con wallet propia — self-custody payments, el diferenciador principal de WasiAI
+- [ ] **WAS-73** Circuit breaker y retry automático en invocaciones — el servicio existe, falta wrapping en invoke route
+- [ ] **WAS-75** Sandbox gratuito builders — testnet dedicado para developers sin USDC real
+
+### 🟡 P2 — Producto pulido
+
+- [ ] **WAS-72** Escrow tareas largas — depende de WAS-70 (done) + diseño económico
+- [ ] **WAS-74** Webhooks y eventos para agentes — UI para que creators configuren endpoints
+- [ ] **WAS-38** UI visual de pipelines — mostrar estado jobs async (pending/running/done/failed)
+- [ ] **WAS-115** Paginación Recent Calls — 10 calls/página, Anterior/Siguiente, `.range()` Supabase, `?callsPage=N` → ver `story-WAS-76.md`
+- [ ] **WAS-116** Capabilities estructuradas DeFi — reemplaza tags simples por objetos con input/output types y ejemplos reales → ver `story-WAS-77.md`
+
+### 🔧 Fixes / Deuda técnica
+
+- [ ] **WAS-117** CodeBlock docs: código invisible (texto negro sobre fondo negro) — fix aplicado, pendiente commit
+
+---
+
 ## ✅ Completado
 
 - [x] Deploy Next.js + Supabase + Tailwind (golden path base)

@@ -63,7 +63,7 @@ export function CodeBlock({ tabs }: CodeBlockProps) {
         </div>
       </div>
       {/* Code */}
-      <pre className="overflow-x-auto p-4 text-sm leading-relaxed">
+      <pre className="overflow-x-auto p-4 text-sm leading-relaxed text-gray-300">
         <code
           dangerouslySetInnerHTML={{ __html: highlighted }}
           className={`language-${current.language}`}
