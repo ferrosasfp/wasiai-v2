@@ -356,7 +356,10 @@
     "mainNavLabel": "Navegación principal",
     "homeLabel": "WasiAI — ir al inicio",
     "loadingUser": "Cargando usuario...",
-    "signOutLabel": "Cerrar sesión de tu cuenta"
+    "signOutLabel": "Cerrar sesión de tu cuenta",
+    "sandbox": "Sandbox",
+    "pipelines": "Pipelines",
+    "profile": "Perfil"
   },
   "agentKeys": {
     "title": "Claves de Agente",

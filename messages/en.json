@@ -356,7 +356,10 @@
     "mainNavLabel": "Main navigation",
     "homeLabel": "WasiAI — go to homepage",
     "loadingUser": "Loading user...",
-    "signOutLabel": "Sign out of your account"
+    "signOutLabel": "Sign out of your account",
+    "sandbox": "Sandbox",
+    "pipelines": "Pipelines",
+    "profile": "Profile"
   },
   "agentKeys": {
     "title": "Agent Keys",
