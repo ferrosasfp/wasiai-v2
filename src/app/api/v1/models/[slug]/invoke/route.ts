@@ -482,7 +482,12 @@ function buildResponse(
       meta: {
         model: model.slug,
         latency_ms: result.latencyMs,
-        charged: model.price_per_call,  // mantener para compatibilidad SDK
+        charged: result.status === 'success'
+          ? (pricingInfo?.totalPrice ?? Number(model.price_per_call))
+          : 0,
+        charged_breakdown: result.status === 'success' && pricingInfo
+          ? { creator: pricingInfo.creatorPrice, overhead: pricingInfo.overhead }
+          : undefined,
         currency: 'USDC',
         chain: CHAIN_NAME,
         tx_hash: txHash ?? null,
