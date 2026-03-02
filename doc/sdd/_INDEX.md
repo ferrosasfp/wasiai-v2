@@ -19,3 +19,8 @@
 | 015 | 2026-03-02 | WAS-115 | Paginación en Recent Calls del Creator Dashboard | improvement | QUALITY | DONE | master |
 | 016 | 2026-03-02 | WAS-116 | Capabilities estructuradas en agentes DeFi Risk | feature | FAST | DONE | master |
 | 017 | 2026-03-02 | WAS-117 | FIX CodeBlock docs código invisible | bugfix | FAST | DONE | master |
+| 018 | 2026-03-02 | WAS-74-deuda | Deuda técnica Webhooks UI — 6 menores Sprint 14 | deuda | FAST | DONE | master |
+| 019 | 2026-03-02 | WAS-70 | HU-5.1b — Ejecución asíncrona de pipelines (jobs + polling) | feature | QUALITY | DONE | master |
+| 020 | 2026-03-02 | WAS-75 | HU-9.1 — Sandbox gratuito para builders (Fuji + créditos) | feature | QUALITY | DONE | master |
+| 021 | 2026-03-02 | WAS-38 | HU-5.4 — UI visual de pipelines de agentes | feature | QUALITY | DONE | master |
+| 022 | 2026-03-02 | WAS-71 | HU-6.5 — Agentes con wallet propia (self-custody payments) | feature | QUALITY | DONE | master |
