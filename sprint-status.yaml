@@ -1,8 +1,8 @@
 sprint: 15
-periodo: "2026-03-02 → ?"
-estado: IN_PROGRESS
+periodo: "2026-03-02 → 2026-03-02"
+estado: DONE
 goal: "Builders con superpoderes: sandbox gratuito, jobs async, UI pipelines, agent wallets"
-goal_cumplido: false
+goal_cumplido: true
 
 seleccionadas:
   - id: WAS-74-deuda
@@ -10,35 +10,36 @@ seleccionadas:
     prioridad: P0-deuda
     nnn: "018"
     modo: FAST
-    estado: TODO
+    estado: DONE
 
   - id: WAS-70
     hu: HU-5.1b — Ejecución asíncrona de pipelines (jobs + polling)
     prioridad: P2
     nnn: "019"
     modo: QUALITY
-    estado: TODO
+    estado: DONE
 
   - id: WAS-75
     hu: HU-9.1 — Sandbox gratuito para builders (Fuji + créditos)
     prioridad: P1
     nnn: "020"
     modo: QUALITY
-    estado: TODO
+    estado: DONE
 
   - id: WAS-38
     hu: HU-5.4 — UI visual de pipelines de agentes
     prioridad: P2
     nnn: "021"
     modo: QUALITY
-    estado: TODO
+    estado: DONE
 
   - id: WAS-71
     hu: HU-6.5 — Agentes con wallet propia (self-custody payments)
     prioridad: P1-stretch
     nnn: "022"
     modo: QUALITY
-    estado: STRETCH
+    estado: DONE
 
 sp_comprometidos: 24
 sp_stretch: 13
+sp_entregados: 37
