@@ -1400,6 +1400,30 @@ contract WasiAIMarketplaceTest is Test {
         assertEq(settled, 10_000 * 1e6);
     }
 
+    // ── WAS-93: computePaymentId Tests ────────────────────────────────────────
+
+    function test_ComputePaymentId_Deterministic() public view {
+        bytes32 nonce = keccak256("test-nonce-1");
+        bytes32 id1 = marketplace.computePaymentId(SLUG, payer, PRICE, nonce);
+        bytes32 id2 = marketplace.computePaymentId(SLUG, payer, PRICE, nonce);
+        assertEq(id1, id2, "Same inputs = same paymentId");
+    }
+
+    function test_ComputePaymentId_DifferentNonce_DifferentId() public view {
+        bytes32 nonce1 = keccak256("nonce-1");
+        bytes32 nonce2 = keccak256("nonce-2");
+        bytes32 id1 = marketplace.computePaymentId(SLUG, payer, PRICE, nonce1);
+        bytes32 id2 = marketplace.computePaymentId(SLUG, payer, PRICE, nonce2);
+        assertTrue(id1 != id2, "Different nonce = different paymentId");
+    }
+
+    function test_ComputePaymentId_MatchesExpected() public view {
+        bytes32 nonce = bytes32(uint256(1));
+        bytes32 expected = keccak256(abi.encodePacked(SLUG, payer, PRICE, nonce, block.chainid));
+        bytes32 result = marketplace.computePaymentId(SLUG, payer, PRICE, nonce);
+        assertEq(result, expected);
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
 
     function _setupAndInvoke() internal {
