@@ -699,4 +699,489 @@ contract WasiAIMarketplaceTest is Test {
         vm.expectRevert("WasiAI: upkeep not needed");
         marketplace.performUpkeep("");
     }
+
+    // ── Edge Cases ────────────────────────────────────────────────────────────────
+
+    // Fee edge cases
+
+    function test_EdgeCase_ZeroFee_CreatorGetsAll() public {
+        vm.prank(owner);
+        marketplace.setPlatformFee(0);
+
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-zero-fee"));
+
+        assertEq(marketplace.getPendingEarnings(creator), PRICE);
+        assertEq(usdc.balanceOf(treasury), 0);
+    }
+
+    function test_EdgeCase_MaxFee_Treasury30pct() public {
+        vm.prank(owner);
+        marketplace.setPlatformFee(3000);
+
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-max-fee"));
+
+        uint256 expectedTreasury = PRICE * 3000 / 10000;
+        assertEq(usdc.balanceOf(treasury), expectedTreasury);
+        assertEq(marketplace.getPendingEarnings(creator), PRICE - expectedTreasury);
+    }
+
+    function test_EdgeCase_FeeAboveMax_Reverts() public {
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: max 30%");
+        marketplace.setPlatformFee(3001);
+    }
+
+    // Batch edge cases
+
+    function test_EdgeCase_BatchSize1() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, PRICE);
+
+        string[]  memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = PRICE;
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        assertEq(marketplace.totalInvocations(), 1);
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
+    }
+
+    function test_EdgeCase_BatchSize500() public {
+        _registerAgent(SLUG, creator);
+        uint256 perCall   = 1_000;
+        uint256 batchSize = 500;
+        _fundKey(KEY_ID, payer, batchSize * perCall);
+
+        string[]  memory slugs   = new string[](batchSize);
+        uint256[] memory amounts = new uint256[](batchSize);
+        for (uint256 i = 0; i < batchSize; i++) {
+            slugs[i]   = SLUG;
+            amounts[i] = perCall;
+        }
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        assertEq(marketplace.totalInvocations(), batchSize);
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
+    }
+
+    // Amount edge cases
+
+    function test_EdgeCase_AmountOne_Reverts() public {
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), 1);
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: amount mismatch");
+        marketplace.recordInvocation(SLUG, payer, 1, keccak256("pid-one"));
+    }
+
+    function test_EdgeCase_AmountExact_Works() public {
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-exact"));
+        assertGt(marketplace.getPendingEarnings(creator), 0);
+    }
+
+    function test_EdgeCase_RecordInvocation_ZeroAmount_Reverts() public {
+        _registerAgent(SLUG, creator);
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: zero amount");
+        marketplace.recordInvocation(SLUG, payer, 0, keccak256("pid-zero"));
+    }
+
+    // Earnings isolation
+
+    function test_EdgeCase_EarningsIsolation_TwoCreators() public {
+        address creator2 = address(0xAA);
+        _registerAgent(SLUG, creator);
+        vm.prank(operator);
+        marketplace.registerAgent(SLUG2, PRICE, creator2, 0);
+
+        usdc.mint(address(marketplace), PRICE * 3);
+
+        vm.startPrank(operator);
+        marketplace.recordInvocation(SLUG,  payer, PRICE, keccak256("p1"));
+        marketplace.recordInvocation(SLUG,  payer, PRICE, keccak256("p2"));
+        marketplace.recordInvocation(SLUG2, payer, PRICE, keccak256("p3"));
+        vm.stopPrank();
+
+        uint256 fee    = PRICE * 1000 / 10000;
+        uint256 share1 = (PRICE - fee) * 2;
+        uint256 share2 =  PRICE - fee;
+
+        assertEq(marketplace.getPendingEarnings(creator),  share1);
+        assertEq(marketplace.getPendingEarnings(creator2), share2);
+    }
+
+    // Pause edge cases (WAS-106)
+
+    function test_EdgeCase_DepositWhenPaused_Reverts() public {
+        vm.prank(owner);
+        marketplace.pause();
+
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        vm.expectRevert();
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+    }
+
+    function test_EdgeCase_SettleWhenPaused_Reverts() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, PRICE);
+
+        vm.prank(owner);
+        marketplace.pause();
+
+        string[]  memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = PRICE;
+
+        vm.prank(operator);
+        vm.expectRevert();
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+    }
+
+    function test_EdgeCase_WithdrawWhenPaused_Works() public {
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-pause-withdraw"));
+
+        vm.prank(owner);
+        marketplace.pause();
+
+        // withdraw() has no whenNotPaused — pull pattern preserved
+        uint256 pending = marketplace.getPendingEarnings(creator);
+        vm.prank(creator);
+        marketplace.withdraw();
+
+        assertEq(usdc.balanceOf(creator), pending);
+        assertEq(marketplace.getPendingEarnings(creator), 0);
+    }
+
+    function test_EdgeCase_UnpauseRestoresOperation() public {
+        vm.prank(owner);
+        marketplace.pause();
+
+        vm.prank(owner);
+        marketplace.unpause();
+
+        // depositForKey should work again
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+        assertEq(marketplace.getKeyBalance(KEY_ID), PRICE);
+    }
+
+    function test_EdgeCase_PauseOnlyOwner_Reverts() public {
+        vm.prank(stranger);
+        vm.expectRevert();
+        marketplace.pause();
+    }
+
+    function test_EdgeCase_UnpauseOnlyOwner_Reverts() public {
+        vm.prank(owner);
+        marketplace.pause();
+
+        vm.prank(stranger);
+        vm.expectRevert();
+        marketplace.unpause();
+    }
+
+    // Payment ID idempotency
+
+    function test_EdgeCase_DuplicatePaymentId_Reverts() public {
+        _registerAgent(SLUG, creator);
+        bytes32 pid = keccak256("duplicate-payment");
+
+        usdc.mint(address(marketplace), PRICE * 2);
+        vm.startPrank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, pid);
+        vm.expectRevert("WasiAI: payment already recorded");
+        marketplace.recordInvocation(SLUG, payer, PRICE, pid);
+        vm.stopPrank();
+    }
+
+    // Unknown agent
+
+    function test_EdgeCase_RecordInvocation_UnknownAgent_Reverts() public {
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: agent inactive");
+        marketplace.recordInvocation("nonexistent-agent", payer, PRICE, keccak256("pid-unknown"));
+    }
+
+    // Admin edge cases
+
+    function test_EdgeCase_SetTreasury_ZeroAddress_Reverts() public {
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: zero treasury");
+        marketplace.setTreasury(address(0));
+    }
+
+    function test_EdgeCase_SetTreasury_Success() public {
+        address newTreasury = address(0xBB);
+        vm.prank(owner);
+        marketplace.setTreasury(newTreasury);
+        assertEq(marketplace.treasury(), newTreasury);
+    }
+
+    function test_EdgeCase_SetOperator_ZeroAddress_Reverts() public {
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: zero operator");
+        marketplace.setOperator(address(0), true);
+    }
+
+    function test_EdgeCase_GetStats() public {
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), PRICE * 2);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("s1"));
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("s2"));
+
+        (uint256 volume, uint256 invocations, uint16 feeBps) = marketplace.getStats();
+        assertEq(volume,      PRICE * 2);
+        assertEq(invocations, 2);
+        assertEq(feeBps,      1000);
+    }
+
+    // Emergency withdraw when contract is paused — should still work
+
+    function test_EdgeCase_EmergencyWithdraw_WhenContractPaused() public {
+        _fundKey(KEY_ID, payer, 100_000);
+
+        vm.prank(owner);
+        marketplace.pause();
+
+        vm.warp(block.timestamp + 30 days + 1);
+
+        vm.prank(payer);
+        marketplace.emergencyWithdrawKey(KEY_ID); // must NOT revert
+
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
+        assertEq(usdc.balanceOf(payer), 100_000);
+    }
+
+    // Multiple creators withdraw independently
+
+    function test_EdgeCase_MultipleWithdrawals() public {
+        address creator2 = address(0xCC);
+        _registerAgent(SLUG,  creator);
+        vm.prank(operator);
+        marketplace.registerAgent(SLUG2, PRICE, creator2, 0);
+
+        usdc.mint(address(marketplace), PRICE * 2);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG,  payer, PRICE, keccak256("mw1"));
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG2, payer, PRICE, keccak256("mw2"));
+
+        uint256 e1 = marketplace.getPendingEarnings(creator);
+        uint256 e2 = marketplace.getPendingEarnings(creator2);
+
+        vm.prank(creator);
+        marketplace.withdraw();
+        vm.prank(creator2);
+        marketplace.withdraw();
+
+        assertEq(usdc.balanceOf(creator),  e1);
+        assertEq(usdc.balanceOf(creator2), e2);
+        assertEq(marketplace.getPendingEarnings(creator),  0);
+        assertEq(marketplace.getPendingEarnings(creator2), 0);
+    }
+
+    // ── Fuzz Tests ────────────────────────────────────────────────────────────────
+
+    function testFuzz_SetPlatformFee(uint16 bps) public {
+        vm.prank(owner);
+        if (bps > 3000) {
+            vm.expectRevert("WasiAI: max 30%");
+            marketplace.setPlatformFee(bps);
+        } else {
+            marketplace.setPlatformFee(bps);
+            assertEq(marketplace.platformFeeBps(), bps);
+        }
+    }
+
+    function testFuzz_SettleKeyBatch_SizeCap(uint16 size) public {
+        vm.assume(size > 500 && size <= 600);
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, uint256(size) * PRICE);
+
+        string[]  memory slugs   = new string[](size);
+        uint256[] memory amounts = new uint256[](size);
+        for (uint256 i = 0; i < size; i++) {
+            slugs[i]   = SLUG;
+            amounts[i] = PRICE;
+        }
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: batch too large");
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+    }
+
+    function testFuzz_RecordInvocation_AmountMismatch(uint256 amount) public {
+        vm.assume(amount > 0 && amount != PRICE);
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), amount);
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: amount mismatch");
+        marketplace.recordInvocation(SLUG, payer, amount, keccak256(abi.encode(amount)));
+    }
+
+    // ── Integration Flows ─────────────────────────────────────────────────────────
+
+    // Full Flow A: deposit → multiple settles → refund → withdraw
+    function test_Integration_FullKeyLifecycle() public {
+        _registerAgent(SLUG, creator);
+
+        // 1. User funds key with $5.00 (5_000_000 = 5 USDC in 6 decimals)
+        uint256 keyFund = 5_000_000;
+        _fundKey(KEY_ID, payer, keyFund);
+        assertEq(marketplace.getKeyBalance(KEY_ID), keyFund);
+
+        // 2. 10 calls settled ($0.10 each = $1.00 total)
+        uint256 perCall = 100_000; // $0.10
+        string[]  memory slugs   = new string[](10);
+        uint256[] memory amounts = new uint256[](10);
+        for (uint256 i = 0; i < 10; i++) {
+            slugs[i]   = SLUG;
+            amounts[i] = perCall;
+        }
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        uint256 spent = perCall * 10; // 1_000_000
+        assertEq(marketplace.getKeyBalance(KEY_ID), keyFund - spent);
+
+        // 3. Remaining $4.00 refunded to payer earnings
+        vm.prank(operator);
+        marketplace.refundKeyToEarnings(KEY_ID);
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
+        assertEq(marketplace.getPendingEarnings(payer), keyFund - spent);
+
+        // 4. Payer withdraws all earnings
+        uint256 payerEarnings = marketplace.getPendingEarnings(payer);
+        vm.prank(payer);
+        marketplace.withdraw();
+
+        // 5. Assert final state
+        assertEq(marketplace.getPendingEarnings(payer), 0);
+        assertEq(usdc.balanceOf(payer), payerEarnings);
+    }
+
+    // Full Flow B: x402 direct → multiple invocations → creator withdraw
+    function test_Integration_DirectPaymentFlow() public {
+        _registerAgent(SLUG, creator);
+
+        uint256 n = 5;
+        usdc.mint(address(marketplace), PRICE * n);
+
+        vm.startPrank(operator);
+        for (uint256 i = 0; i < n; i++) {
+            marketplace.recordInvocation(SLUG, payer, PRICE, keccak256(abi.encode("dp", i)));
+        }
+        vm.stopPrank();
+
+        uint256 totalFee      = (PRICE * 1000 / 10000) * n;
+        uint256 creatorEarned = PRICE * n - totalFee;
+
+        assertEq(usdc.balanceOf(treasury), totalFee);
+        assertEq(marketplace.getPendingEarnings(creator), creatorEarned);
+
+        vm.prank(creator);
+        marketplace.withdraw();
+
+        assertEq(usdc.balanceOf(creator), creatorEarned);
+        assertEq(marketplace.getPendingEarnings(creator), 0);
+    }
+
+    // Full Flow C: Pause → pending operations → unpause → resume
+    function test_Integration_PauseResumeCycle() public {
+        _registerAgent(SLUG, creator);
+
+        // 1. Fund key before pause
+        _fundKey(KEY_ID, payer, 1_000_000);
+
+        // 2. Pause contract
+        vm.prank(owner);
+        marketplace.pause();
+
+        // 3. Try depositForKey → revert
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        vm.expectRevert();
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+
+        // 4. Try settleKeyBatch → revert
+        string[]  memory slugs   = new string[](1);
+        uint256[] memory amounts = new uint256[](1);
+        slugs[0]   = SLUG;
+        amounts[0] = PRICE;
+        vm.prank(operator);
+        vm.expectRevert();
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        // 5. withdraw() still works — pull pattern preserved
+        // Give creator some earnings first (recordInvocation has no whenNotPaused)
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(operator);
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("prc1"));
+        uint256 pending = marketplace.getPendingEarnings(creator);
+        assertGt(pending, 0);
+        vm.prank(creator);
+        marketplace.withdraw();
+        assertEq(marketplace.getPendingEarnings(creator), 0);
+
+        // 6. Unpause
+        vm.prank(owner);
+        marketplace.unpause();
+
+        // 7. depositForKey works again
+        vm.prank(operator);
+        marketplace.depositForKey(
+            bytes32(uint256(KEY_ID) + 1), payer, PRICE,
+            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0)
+        );
+        assertEq(marketplace.getKeyBalance(bytes32(uint256(KEY_ID) + 1)), PRICE);
+    }
+
+    // Full Flow D: Emergency exit after operator inactivity
+    function test_Integration_EmergencyExitFlow() public {
+        // 1. Fund key
+        _fundKey(KEY_ID, payer, 100_000);
+        uint256 funded = 100_000;
+
+        // 2. 30 days + 1 second pass with no operator activity
+        vm.warp(block.timestamp + 30 days + 1);
+
+        // 3. performUpkeep called by attacker — must NOT update lastOperatorActivity (v7 fix)
+        marketplace.performUpkeep("");
+        uint256 activityAfterUpkeep = marketplace.lastOperatorActivity();
+        // lastOperatorActivity should NOT have changed due to performUpkeep
+        assertTrue(
+            block.timestamp > activityAfterUpkeep + 30 days,
+            "performUpkeep must not reset lastOperatorActivity"
+        );
+
+        // 4. emergencyWithdrawKey succeeds
+        vm.prank(payer);
+        marketplace.emergencyWithdrawKey(KEY_ID);
+
+        assertEq(marketplace.getKeyBalance(KEY_ID), 0);
+        assertEq(usdc.balanceOf(payer), funded);
+    }
 }
