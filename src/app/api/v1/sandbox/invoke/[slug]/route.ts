@@ -153,7 +153,19 @@ export async function POST(
     return NextResponse.json(body, { status: 402 })
   }
 
-  // 7. Parsear body de la request
+  // 7. Validar endpoint_url contra SSRF (B-02)
+  try {
+    validateEndpointUrl(agent.endpoint_url)
+  } catch {
+    // Reembolso atómico antes de retornar
+    await supabase.rpc('refund_sandbox_balance', {
+      p_user_id: user.id,
+      p_amount:  agent.price_per_call,
+    })
+    return NextResponse.json({ error: 'invalid_endpoint' }, { status: 422 })
+  }
+
+  // 8. Parsear body de la request
   let input: Record<string, unknown> | string = {}
   try {
     const rawBody = await req.json() as SandboxInvokeRequest
@@ -162,7 +174,7 @@ export async function POST(
     // body vacío — usar input vacío
   }
 
-  // 8. Llamar agente externo (timeout 8s)
+  // 9. Llamar agente externo (timeout 8s)
   let agentResult: unknown = null
   let agentFailed = false
 
