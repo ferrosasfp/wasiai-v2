@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
+import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -28,13 +29,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'url and events are required' }, { status: 400 })
   }
 
-  // Validate HTTPS in production
+  // B1: Validate URL — blocks SSRF/DNS-rebinding via shared validateEndpointUrl
   try {
-    if (new URL(url).protocol !== 'https:' && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'URL must use HTTPS in production' }, { status: 400 })
-    }
+    validateEndpointUrl(url)
   } catch {
-    return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid webhook URL' }, { status: 400 })
   }
 
   // Limit to 5 webhooks per user (free tier)
