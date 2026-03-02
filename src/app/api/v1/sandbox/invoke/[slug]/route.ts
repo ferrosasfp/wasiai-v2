@@ -196,20 +196,16 @@ export async function POST(
     agentFailed = true
   }
 
-  // 8b. Reembolso si el agente falló — restaurar balance previo
+  // 9b. Reembolso si el agente falló — incremento atómico (B-01)
   if (agentFailed) {
-    await supabase
-      .from('sandbox_credits')
-      .update({
-        balance_usdc: creditsRow.balance_usdc,
-        updated_at:   new Date().toISOString(),
-      })
-      .eq('user_id', user.id)
-
+    await supabase.rpc('refund_sandbox_balance', {
+      p_user_id: user.id,
+      p_amount:  agent.price_per_call,
+    })
     return NextResponse.json({ error: 'Agent invocation failed' }, { status: 422 })
   }
 
-  // 9. Registrar en agent_calls
+  // 10. Registrar en agent_calls
   const callId = randomUUID()
   await supabase.from('agent_calls').insert({
     id:           callId,
@@ -222,7 +218,7 @@ export async function POST(
     created_at:   new Date().toISOString(),
   })
 
-  // 10. Obtener balance restante actualizado
+  // 11. Obtener balance restante actualizado
   const { data: updatedCredits } = await supabase
     .from('sandbox_credits')
     .select('balance_usdc')
@@ -231,7 +227,7 @@ export async function POST(
 
   const balanceRemaining = (updatedCredits?.balance_usdc ?? 0).toString()
 
-  // 11. Respuesta final
+  // 12. Respuesta final
   const responseBody: SandboxInvokeResponse = {
     result:            agentResult,
     cost_usdc:         agent.price_per_call.toString(),
