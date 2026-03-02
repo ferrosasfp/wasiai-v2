@@ -4,7 +4,15 @@ import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 
 const OPERATOR_ADDRESS = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? ''
-const OWNER_ADDRESS    = process.env.NEXT_PUBLIC_WASIAI_OWNER ?? OPERATOR_ADDRESS
+const OWNER_ADDRESS    = process.env.NEXT_PUBLIC_WASIAI_OWNER ?? ''
+
+// Direcciones permitidas para acceder al admin (owner + operator)
+const ADMIN_ALLOWED = [
+  OPERATOR_ADDRESS,
+  OWNER_ADDRESS,
+  '0x94DCDb84207724A609B17e4838936832EA59B9eD', // owner testnet
+  '0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba', // operator testnet
+].map(a => a.toLowerCase()).filter(Boolean)
 
 interface AdminStatus {
   platformFeeBps:    number
@@ -23,8 +31,7 @@ export default function AdminPage() {
   const [feeMsg, setFeeMsg]       = useState<string>('')
   const [settleMsg, setSettleMsg] = useState<string>('')
 
-  const ALLOWED = [OPERATOR_ADDRESS, OWNER_ADDRESS].map(a => a.toLowerCase()).filter(Boolean)
-  const isOwner = isConnected && !!address && ALLOWED.includes(address.toLowerCase())
+  const isOwner = isConnected && !!address && ADMIN_ALLOWED.includes(address.toLowerCase())
 
   async function loadStatus() {
     setLoading(true)
