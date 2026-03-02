@@ -44,15 +44,33 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
   ])
   const [apiKey, setApiKey] = useState('')
 
-  // Cargar API key de localStorage
+  // Cargar API key de localStorage con expiración de 30 días
   useEffect(() => {
-    const stored = localStorage.getItem(API_KEY_STORAGE_KEY)
-    if (stored) setApiKey(stored)
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+    const raw = localStorage.getItem(API_KEY_STORAGE_KEY)
+    if (raw) {
+      try {
+        const entry = JSON.parse(raw) as { key: string; savedAt: number }
+        if (typeof entry.key === 'string' && typeof entry.savedAt === 'number') {
+          if (Date.now() - entry.savedAt < THIRTY_DAYS_MS) {
+            setApiKey(entry.key)
+          } else {
+            localStorage.removeItem(API_KEY_STORAGE_KEY)
+          }
+        }
+      } catch {
+        // Formato viejo (string plano) — migrar al nuevo formato
+        const entry = { key: raw, savedAt: Date.now() }
+        localStorage.setItem(API_KEY_STORAGE_KEY, JSON.stringify(entry))
+        setApiKey(raw)
+      }
+    }
   }, [])
 
   function handleApiKeyChange(value: string) {
     setApiKey(value)
-    localStorage.setItem(API_KEY_STORAGE_KEY, value)
+    const entry = { key: value, savedAt: Date.now() }
+    localStorage.setItem(API_KEY_STORAGE_KEY, JSON.stringify(entry))
   }
 
   function addStep() {
