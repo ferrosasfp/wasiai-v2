@@ -17,12 +17,16 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createServiceClient()
 
-    // Fetch hasta 50 deliveries fallidas con attempt < 3 (más antiguas primero)
+    const now = new Date()
+    const lockUntil = new Date(now.getTime() + 5 * 60 * 1000).toISOString() // now + 5 min
+
+    // B2: Fetch deliveries that are not currently locked (avoid race condition across concurrent cron runs)
     const { data: deliveries, error } = await supabase
       .from('webhook_deliveries')
       .select('id, webhook_id, event, payload, attempt')
       .eq('success', false)
       .lt('attempt', 3)
+      .or(`locked_until.is.null,locked_until.lt.${now.toISOString()}`)
       .order('delivered_at', { ascending: true })
       .limit(50)
 
@@ -34,6 +38,13 @@ export async function POST(request: NextRequest) {
     if (!deliveries?.length) {
       return NextResponse.json({ ok: true, retried: 0, timestamp: new Date().toISOString() })
     }
+
+    // Acquire lock on selected deliveries before processing
+    const deliveryIds = deliveries.map(d => d.id)
+    await supabase
+      .from('webhook_deliveries')
+      .update({ locked_until: lockUntil })
+      .in('id', deliveryIds)
 
     // Obtener secrets de los webhooks involucrados
     const webhookIds = [...new Set(deliveries.map(d => d.webhook_id))]
@@ -65,6 +76,7 @@ export async function POST(request: NextRequest) {
             status_code: result.statusCode ?? null,
             attempt: (delivery.attempt ?? 1) + 1,
             delivered_at: new Date().toISOString(),
+            locked_until: null, // release lock after processing
           })
           .eq('id', delivery.id)
 
