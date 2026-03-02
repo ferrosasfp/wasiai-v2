@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
 
 const OPERATOR_ADDRESS = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? ''
 const OWNER_ADDRESS    = process.env.NEXT_PUBLIC_WASIAI_OWNER ?? ''
@@ -133,7 +134,10 @@ export default function AdminPage() {
               )}
             </span>
           ) : (
-            <span className="text-yellow-400">Connect wallet to manage</span>
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <p className="text-gray-400 text-sm">Connect your wallet to access the admin panel</p>
+              <WalletConnectButton locale="en" />
+            </div>
           )}
         </div>
       </div>
