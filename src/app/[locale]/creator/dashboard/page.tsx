@@ -9,6 +9,7 @@ import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection
 import { AgentActions } from './_components/AgentActions'
 import { FreeTrialToggle } from './_components/FreeTrialToggle'
 import { WebhooksPanel } from './_components/WebhooksPanel'
+import { AgentWalletSection } from './_components/AgentWalletSection'
 import { PendingEarningsBanner } from '@/components/PendingEarningsBanner'
 import { CreatorAnalytics } from '@/features/creator/components/CreatorAnalytics'
 import { CallsPagination } from '@/features/creator/components/CallsPagination'
@@ -292,6 +293,11 @@ export default async function CreatorDashboardPage({
 
         {/* WAS-74: Webhooks */}
         <WebhooksPanel />
+
+        {/* WAS-71: Agent Wallets — una sección por agente */}
+        {safeModels.map((model) => (
+          <AgentWalletSection key={model.id} agentSlug={model.slug} />
+        ))}
 
         {/* Agent API quick-start */}
         <section className="rounded-2xl bg-gray-900 p-6 text-white">
