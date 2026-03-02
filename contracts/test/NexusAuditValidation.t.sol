@@ -101,7 +101,7 @@ contract NexusAuditValidationTest is Test {
     // Resultado: sum(keyBalances) + sum(earnings) > usdc.balanceOf(contract)
     // ─────────────────────────────────────────────────────────────────────────
     function test_NA_H01_Insolvency_KeyBalances_vs_Earnings() public {
-        uint256 USER_DEPOSIT = 1_000_000; // $1.00
+        uint256 USER_DEPOSIT = 1_000_000; // $1.00 en key
 
         // 1. Usuario deposita $1.00 en su key
         usdc.mint(payer, USER_DEPOSIT);
@@ -119,9 +119,10 @@ contract NexusAuditValidationTest is Test {
         assertEq(usdc.balanceOf(address(marketplace)), USER_DEPOSIT);
 
         // 2. Operador llama recordInvocation usando el mismo pool de USDC
-        //    (el contrato solo verifica que tenga suficiente balance, no de donde viene)
+        //    Usa PRICE (pricePerCall) para pasar la validacion de amount mismatch
+        //    El contrato no distingue si ese USDC vino de una key o de otra fuente
         vm.prank(operator);
-        marketplace.recordInvocation(SLUG, payer, USER_DEPOSIT, keccak256("payment-1"));
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("payment-1"));
 
         // 3. Calcular insolvencia
         uint256 keyBalancesTotal = marketplace.getKeyBalance(KEY_ID);
@@ -129,8 +130,7 @@ contract NexusAuditValidationTest is Test {
         uint256 contractBalance  = usdc.balanceOf(address(marketplace));
 
         // Platform share salio al treasury -- lo que queda en el contrato
-        uint256 platformShare = USER_DEPOSIT * 1000 / 10000; // 10%
-        uint256 creatorShare  = USER_DEPOSIT - platformShare; // 90%
+        uint256 platformShare = PRICE * 1000 / 10000; // 10%
 
         emit log_named_uint("keyBalances[KEY_ID]         ", keyBalancesTotal);
         emit log_named_uint("earnings[creator]           ", earningsTotal);
@@ -143,67 +143,35 @@ contract NexusAuditValidationTest is Test {
         );
 
         // INSOLVENCIA: el contrato debe mas de lo que tiene
+        // keyBalances = 1_000_000, earnings = 90_000, sum = 1_090_000, contract = 900_000
         assertGt(
             keyBalancesTotal + earningsTotal,
             contractBalance,
             "NA-H01 CONFIRMED: sum(keyBalances+earnings) > contract balance"
         );
 
-        // El usuario quiere su key de vuelta -- no hay suficiente USDC
-        // (el operador ya lo distribuyo via recordInvocation)
+        // El usuario quiere su key de vuelta -- el contrato no tiene USDC suficiente
+        // para pagar TANTO al creator (earnings) COMO devolver la key completa
         vm.prank(operator);
-        // refundKeyToEarnings: mueve keyBalance a earnings del payer
         marketplace.refundKeyToEarnings(KEY_ID);
 
-        // Ahora earnings[payer] = 1_000_000 pero el contrato solo tiene ~900_000
-        // Si payer intenta retirar, el contrato no tiene fondos suficientes
+        // Ahora earnings[payer] = USER_DEPOSIT pero el contrato solo tiene USER_DEPOSIT - platformShare
         uint256 payerEarnings = marketplace.getPendingEarnings(payer);
         emit log_named_uint("payer quiere retirar        ", payerEarnings);
         emit log_named_uint("contrato tiene              ", usdc.balanceOf(address(marketplace)));
 
-        assertGt(payerEarnings, usdc.balanceOf(address(marketplace)),
-            "NA-H01 CONFIRMED: payer no puede retirar -- contrato insolvente");
+        assertGt(payerEarnings + earningsTotal, usdc.balanceOf(address(marketplace)),
+            "NA-H01 CONFIRMED: payer + creator no pueden retirar -- contrato insolvente");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NA-H02 [HIGH] -- recordInvocation acepta amount != pricePerCall
-    // (Fix: assertion aritmetica corregida respecto a v1.0)
+    // NA-H02 [FIXED] -- recordInvocation ahora valida amount == pricePerCall
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_H02_recordInvocation_ArbitraryAmount() public {
-        uint256 TINY  = 1;
-        uint256 HUGE  = 999_999;
-
-        usdc.mint(address(marketplace), TINY + HUGE);
-
-        // Operador registra con amount=1 (pricePerCall es 100_000)
+    function test_NA_H02_FIXED_recordInvocation_RejectsWrongAmount() public {
+        usdc.mint(address(marketplace), PRICE * 2);
         vm.prank(operator);
-        marketplace.recordInvocation(SLUG, payer, TINY, keccak256("pid-1"));
-
-        // Operador registra con amount=999_999
-        vm.prank(operator);
-        marketplace.recordInvocation(SLUG, payer, HUGE, keccak256("pid-2"));
-
-        // Si el contrato validara amount == pricePerCall, ambas llamadas hubieran revertido
-        // El hecho de que earnings tenga algo distinto a 0 confirma el finding
-
-        uint256 creatorEarnings = marketplace.getPendingEarnings(creator);
-        uint256 platformTiny = TINY * 1000 / 10000;
-        uint256 platformHuge = HUGE * 1000 / 10000;
-        uint256 expectedEarnings = (TINY - platformTiny) + (HUGE - platformHuge);
-
-        emit log_named_uint("pricePerCall del agente     ", PRICE);
-        emit log_named_uint("amount usado (tiny)         ", TINY);
-        emit log_named_uint("amount usado (huge)         ", HUGE);
-        emit log_named_uint("earnings del creator        ", creatorEarnings);
-        emit log_named_uint("earnings esperados          ", expectedEarnings);
-
-        assertEq(creatorEarnings, expectedEarnings,
-            "NA-H02 CONFIRMED: operator passed amounts != pricePerCall and contract accepted them");
-
-        // Prueba directa: si pricePerCall es 100_000, ninguna de las dos llamadas deberia pasar
-        // Pero si llegamos hasta aqui, pasaron -- finding CONFIRMED
-        assertNotEq(TINY, PRICE,  "TINY != pricePerCall");
-        assertNotEq(HUGE, PRICE,  "HUGE != pricePerCall");
+        vm.expectRevert("WasiAI: amount mismatch");
+        marketplace.recordInvocation(SLUG, payer, 1, keccak256("pid-fix"));  // 1 != pricePerCall
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -255,9 +223,10 @@ contract NexusAuditValidationTest is Test {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NA-M01 [MEDIUM] -- performUpkeep bloquea emergencyWithdrawKey
+    // NA-M01 [FIXED] -- performUpkeep ya NO resetea lastOperatorActivity
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_M01_performUpkeep_Blocks_EmergencyExit() public {
+    function test_NA_M01_FIXED_performUpkeep_NoLongerBlocksEmergencyExit() public {
+        // Fund key
         usdc.mint(payer, 1_000_000);
         vm.prank(operator);
         marketplace.depositForKey(
@@ -265,44 +234,38 @@ contract NexusAuditValidationTest is Test {
             0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0)
         );
 
-        // Operador real desaparece -- pasan 25 dias
+        // Operator disappears — 25 days pass
         vm.warp(block.timestamp + 25 days);
 
-        // Atacante llama performUpkeep para resetear el timer (sin ser operador)
+        // Attacker calls performUpkeep — should NOT reset lastOperatorActivity
         vm.warp(block.timestamp + 23 hours + 1);
         vm.prank(attacker);
         marketplace.performUpkeep("");
 
-        // Pasan 5 dias mas -- total 30d desde deposit, pero solo 5 desde performUpkeep
+        // 5 more days — total 30+ days since real operator activity
         vm.warp(block.timestamp + 5 days);
 
-        // Emergency exit debe fallar -- timer fue reseteado por el atacante
+        // Emergency exit should NOW WORK (fix confirmed)
         vm.prank(payer);
-        vm.expectRevert("WasiAI: operator still active");
-        marketplace.emergencyWithdrawKey(KEY_ID);
-
-        emit log_string("NA-M01 CONFIRMED: attacker reset the emergency timer via performUpkeep");
-        emit log_named_uint("Fondos del usuario atrapados", marketplace.getKeyBalance(KEY_ID));
+        marketplace.emergencyWithdrawKey(KEY_ID);  // must NOT revert
+        assertEq(usdc.balanceOf(payer), 1_000_000, "NA-M01 FIXED: user recovered funds");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NA-M02 [MEDIUM] -- Sin Pausable: no existe funcion pause()
-    //
-    // Este finding es una OMISION -- no hay attack path directo.
-    // El test demuestra que la funcion no existe en el contrato.
+    // NA-M02 [FIXED] -- Pausable ahora existe
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_M02_NoPausable_FunctionAbsent() public {
-        // Verificamos que el contrato no tiene selector de pause()
-        // Si tuviera Pausable, bytes4(keccak256("pause()")) existiria en el ABI
-        bytes4 pauseSelector = bytes4(keccak256("pause()"));
-
-        // Llamar pause() debe fallar -- no existe en el contrato
-        (bool success, ) = address(marketplace).staticcall(abi.encodeWithSelector(pauseSelector));
-
-        assertFalse(success,
-            "NA-M02 CONFIRMED: pause() does not exist -- no circuit breaker available");
-
-        emit log_string("NA-M02 CONFIRMED: No Pausable -- cannot stop deposits if bug found post-mainnet");
+    function test_NA_M02_FIXED_PausableExists() public {
+        // pause() should now work
+        vm.prank(owner);
+        marketplace.pause();
+        // depositForKey should revert when paused
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        vm.expectRevert();
+        marketplace.depositForKey(
+            KEY_ID, payer, PRICE,
+            0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0)
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -350,109 +313,55 @@ contract NexusAuditValidationTest is Test {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NA-M04 [MEDIUM] -- Ownable sin two-step: transferOwnership es inmediato
+    // NA-M04 [FIXED] -- Ownable2Step: transferOwnership requiere aceptacion
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_M04_Ownable_NoTwoStep() public {
+    function test_NA_M04_FIXED_Ownable2Step_RequiresAcceptance() public {
         address newOwner = address(0x999);
-        address wrongOwner = address(0xDEAD); // typo simulado
-
-        // Con Ownable basico: transferOwnership es INMEDIATO sin confirmacion
         vm.prank(owner);
-        marketplace.transferOwnership(wrongOwner); // typo -- direccion incorrecta
-
-        // El ownership ya cambio -- no hay forma de revertirlo
-        assertEq(marketplace.owner(), wrongOwner,
-            "NA-M04 CONFIRMED: ownership transferred immediately without confirmation");
-
-        // El owner original ya no tiene control
-        vm.prank(owner);
-        vm.expectRevert(); // cualquier llamada onlyOwner desde el owner viejo falla
-        marketplace.setPlatformFee(500);
-
-        // wrongOwner tiene control total -- ownership perdido para siempre
-        // (a menos que wrongOwner coopere)
-        emit log_string("NA-M04 CONFIRMED: Ownable without 2-step - one wrong address = permanent loss");
-        emit log_named_address("Owner original            ", owner);
-        emit log_named_address("Owner actual (typo)       ", marketplace.owner());
+        marketplace.transferOwnership(newOwner);
+        // Ownership not transferred yet — still old owner
+        assertEq(marketplace.owner(), owner, "NA-M04 FIXED: owner unchanged until accepted");
+        // newOwner must accept
+        vm.prank(newOwner);
+        marketplace.acceptOwnership();
+        assertEq(marketplace.owner(), newOwner, "NA-M04 FIXED: ownership transferred after acceptance");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NA-M05 [MEDIUM] -- settleKeyBatch sin cap: batch grande consume todo el gas
-    //
-    // No podemos simular un OOG real en Forge (gas limit alto por defecto),
-    // pero demostramos que no hay validacion de tamano del array.
+    // NA-M05 [FIXED] -- settleKeyBatch rechaza batch > 500
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_M05_SettleKeyBatch_NoSizeCap() public {
-        uint256 BATCH_SIZE = 1000; // 1000 elementos -- sin cap
-        uint256 PER_CALL   = 100;
-
-        usdc.mint(payer, BATCH_SIZE * PER_CALL);
+    function test_NA_M05_FIXED_SettleKeyBatch_RejectsOversizeBatch() public {
+        uint256 OVER_CAP = 501;
+        usdc.mint(payer, OVER_CAP * 100);
         vm.prank(operator);
         marketplace.depositForKey(
-            KEY_ID, payer, BATCH_SIZE * PER_CALL,
+            KEY_ID, payer, OVER_CAP * 100,
             0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0)
         );
-
-        string[]  memory slugs   = new string[](BATCH_SIZE);
-        uint256[] memory amounts = new uint256[](BATCH_SIZE);
-        for (uint256 i = 0; i < BATCH_SIZE; i++) {
-            slugs[i]   = SLUG;
-            amounts[i] = PER_CALL;
-        }
-
-        uint256 gasBefore = gasleft();
+        string[]  memory slugs   = new string[](OVER_CAP);
+        uint256[] memory amounts = new uint256[](OVER_CAP);
+        for (uint i = 0; i < OVER_CAP; i++) { slugs[i] = SLUG; amounts[i] = 100; }
         vm.prank(operator);
+        vm.expectRevert("WasiAI: batch too large");
         marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
-        uint256 gasUsed = gasBefore - gasleft();
-
-        emit log_named_uint("Batch size                  ", BATCH_SIZE);
-        emit log_named_uint("Gas usado en batch de 1000  ", gasUsed);
-        emit log_named_uint("Avalanche block gas limit   ", 15_000_000);
-        emit log_string("NA-M05 CONFIRMED: no require(slugs.length <= MAX) -- batch size unbounded");
-
-        // El contrato acepto 1000 elementos sin revertir -- no hay cap
-        assertEq(marketplace.totalInvocations(), BATCH_SIZE,
-            "NA-M05 CONFIRMED: contract accepted 1000-item batch without size validation");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NA-L01 [LOW] -- setOperator acepta address(0)
+    // NA-L01 [FIXED] -- setOperator ahora rechaza address(0)
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_L01_SetOperator_AcceptsZeroAddress() public {
+    function test_NA_L01_FIXED_SetOperator_RejectsZeroAddress() public {
         vm.prank(owner);
-        marketplace.setOperator(address(0), true); // no deberia ser posible
-
-        assertTrue(marketplace.operators(address(0)),
-            "NA-L01 CONFIRMED: operators[address(0)] = true -- no zero-check in setOperator");
-
-        emit log_string("NA-L01 CONFIRMED: address(0) registered as operator");
+        vm.expectRevert("WasiAI: zero operator");
+        marketplace.setOperator(address(0), true);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NA-L02 [LOW] -- updateAgent sin validar existencia del slug
+    // NA-L02 [FIXED] -- updateAgent ahora rechaza slugs inexistentes
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_L02_UpdateAgent_NonExistentSlug() public {
-        string memory GHOST_SLUG = "slug-that-does-not-exist";
-
-        // El slug no existe -- agent.creator == address(0)
-        WasiAIMarketplace.Agent memory before = marketplace.getAgent(GHOST_SLUG);
-        assertEq(before.creator, address(0), "Slug no existe antes");
-
-        // Owner puede llamar updateAgent sobre un slug inexistente
+    function test_NA_L02_FIXED_UpdateAgent_RejectsNonExistentSlug() public {
         vm.prank(owner);
-        marketplace.updateAgent(GHOST_SLUG, 999_999, true);
-
-        WasiAIMarketplace.Agent memory after_ = marketplace.getAgent(GHOST_SLUG);
-
-        emit log_named_uint("pricePerCall despues        ", after_.pricePerCall);
-        //emit log_named_bool("active despues              ", after_.active);
-        emit log_named_address("creator del ghost agent   ", after_.creator);
-
-        // El contrato escribio en un slot inexistente sin revertir
-        assertEq(after_.pricePerCall, 999_999,
-            "NA-L02 CONFIRMED: updateAgent wrote to non-existent agent slot");
-        assertEq(after_.creator, address(0),
-            "NA-L02 CONFIRMED: ghost agent has address(0) as creator -- earnings unrecoverable");
+        vm.expectRevert("WasiAI: agent not found");
+        marketplace.updateAgent("does-not-exist", 999, true);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -510,10 +419,10 @@ contract NexusAuditValidationTest is Test {
         }
 
         assertEq(fresh.platformFeeBps(), 1000, "Fee inicial es 1000 bps");
-        assertFalse(feeEventFound,
-            "NA-L04 CONFIRMED: constructor sets platformFeeBps=1000 but emits no PlatformFeeUpdated event");
+        assertTrue(feeEventFound,
+            "NA-L04 FIXED: constructor now emits PlatformFeeUpdated(0, 1000)");
 
-        emit log_string("NA-L04 CONFIRMED: indexers miss the initial fee -- no event on constructor");
+        emit log_string("NA-L04 FIXED: constructor emits PlatformFeeUpdated(0, 1000) for indexers");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
