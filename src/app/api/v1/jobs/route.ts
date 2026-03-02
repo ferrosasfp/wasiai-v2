@@ -7,6 +7,18 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { Ratelimit } from '@upstash/ratelimit'
+import { getSharedRedis, checkRateLimit } from '@/lib/ratelimit'
+
+// 10 jobs/min por usuario — sliding window
+let _jobsLimit: Ratelimit | null = null
+function getJobsLimit(): Ratelimit {
+  return _jobsLimit ??= new Ratelimit({
+    redis:   getSharedRedis(),
+    limiter: Ratelimit.slidingWindow(10, '1 m'),
+    prefix:  'rl:jobs',
+  })
+}
 
 interface CreateJobRequest {
   agent_slug: string
@@ -28,7 +40,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // [2] Parse body
+  // [2] Rate limit — 10 jobs/min por usuario
+  const rlHit = await checkRateLimit(getJobsLimit(), `user:${user.id}`)
+  if (rlHit) return rlHit
+
+  // [3-orig] Parse body
   let body: CreateJobRequest
   try {
     body = await request.json() as CreateJobRequest
@@ -40,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'agent_slug and input are required' }, { status: 400 })
   }
 
-  // [3] Verificar agente activo
+  // [4-orig] Verificar agente activo
   const { data: agent, error: agentError } = await supabase
     .from('agents')
     .select('id, status')

@@ -53,6 +53,7 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
     supabase
       .from('pipeline_executions')
       .select('id, status, steps_completed, total_cost_usdc, created_at, completed_at')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => {

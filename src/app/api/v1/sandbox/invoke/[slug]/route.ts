@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { logger } from '@/lib/logger'
+import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 
 // ── Rate limiter sandbox (lazy singleton) ────────────────────────────────────
 let _sandboxLimit: Ratelimit | null = null
