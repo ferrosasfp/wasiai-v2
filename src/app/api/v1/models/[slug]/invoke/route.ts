@@ -460,17 +460,24 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   try {
     // WAS-73: wrapWithCircuitBreaker handles success/failure counting.
     // retryWithBackoff handles network-level retries (TypeError/AbortError/TimeoutError).
-    // recordFailure is called once by wrapWithCircuitBreaker catch if all retries fail.
+    // B-01: HTTP 5xx throws so wrapWithCircuitBreaker calls recordFailure correctly.
+    // HTTP 4xx does NOT throw — caller error, not provider failure.
     const upstream = await wrapWithCircuitBreaker(
       slug,
-      () => retryWithBackoff(
-        () => fetch(model.endpoint_url as string, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(10_000), // PERF-02: 10s max, no infinite hangs
-        })
-      ),
+      async () => {
+        const res = await retryWithBackoff(
+          () => fetch(model.endpoint_url as string, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(10_000), // PERF-02: 10s max, no infinite hangs
+          })
+        )
+        if (!res.ok && res.status >= 500) {
+          throw new Error(`Upstream HTTP ${res.status}`)
+        }
+        return res
+      },
       model.user_id as string
     )
     data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
