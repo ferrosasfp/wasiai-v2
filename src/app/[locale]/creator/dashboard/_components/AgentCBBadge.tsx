@@ -20,8 +20,8 @@ export function AgentCBBadge({ slug }: Props) {
   useEffect(() => {
     fetch(`/api/v1/agents/${slug}/cb-status`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d: { state: CBState }) => {
-        setState(d.state)
+      .then((d: { state?: CBState }) => {
+        if (d.state) setState(d.state)
         setLoading(false)
       })
       .catch(() => setLoading(false))
