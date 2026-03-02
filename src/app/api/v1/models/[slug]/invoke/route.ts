@@ -10,11 +10,14 @@ import { recordInvocationOnChain, keyHashToBytes32 } from '@/lib/contracts/marke
 import { signReceipt } from '@/lib/receipts/signReceipt'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitBreaker'
+import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
 import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits } from '@/lib/ratelimit'
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
 import { logger } from '@/lib/logger'
 import { enqueuePendingRecording } from '@/lib/chain/pendingRecordings'
 import { calcPlatformOverhead } from '@/lib/pricing/overhead'
+import { triggerAgentEvent } from '@/lib/webhooks/triggerAgentEvent'
 
 // x402 recipient = the marketplace contract (it splits 90/10 internally)
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
@@ -207,6 +210,15 @@ export async function POST(
     )
   }
 
+  // WAS-73: Circuit Breaker check — block if CB is open
+  const cbState = await getState(slug)
+  if (cbState === 'open') {
+    return NextResponse.json(
+      { error: 'agent_circuit_open', message: 'Agent temporarily unavailable', retry_after_seconds: 30 },
+      { status: 503, headers: { 'Retry-After': '30' } },
+    )
+  }
+
   const creatorPrice = Number(model.creator_price ?? model.price_per_call)
   const { overhead, breakdown, circuitBreaker } = await calcPlatformOverhead(creatorPrice)
 
@@ -255,7 +267,7 @@ export async function POST(
       )
     }
 
-    const result = await callUpstream(model, request)
+    const result = await callUpstream(model, request, slug)
 
     // Track receipt signature (non-fatal if it fails)
     let receiptSignature: string | null = null
@@ -303,6 +315,20 @@ export async function POST(
       await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
     }
 
+    // WAS-74: Fire-and-forget webhook trigger — never await, never blocks TTFB
+    if (model.creator_id) {
+      void triggerAgentEvent(
+        result.status === 'success' ? 'agent.invoked' : 'agent.error',
+        model.id as string,
+        model.creator_id as string,
+        {
+          slug: slug as string,
+          status: result.status,
+          latency_ms: result.latencyMs,
+        }
+      ).catch(() => { /* non-fatal */ })
+    }
+
     return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown })
   }
 
@@ -340,12 +366,26 @@ export async function POST(
   }
 
   // ── 5. Payment valid — call the upstream model ────────────────────────────
-  const result = await callUpstream(model, request)
+  const result = await callUpstream(model, request, slug)
   await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
 
   // ── 6. Record invocation on-chain (A-01: extracted to recordOnChain helper) ─
   if (result.status === 'success' && settlement.transactionHash) {
     await recordOnChain(supabase, slug, model, paymentHeader, settlement.transactionHash)
+  }
+
+  // WAS-74: Fire-and-forget webhook trigger — never await, never blocks TTFB
+  if (model.creator_id) {
+    void triggerAgentEvent(
+      result.status === 'success' ? 'agent.invoked' : 'agent.error',
+      model.id as string,
+      model.creator_id as string,
+      {
+        slug: slug as string,
+        status: result.status,
+        latency_ms: result.latencyMs,
+      }
+    ).catch(() => { /* non-fatal */ })
   }
 
   return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
@@ -402,7 +442,7 @@ export async function GET(
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-async function callUpstream(model: Record<string, unknown>, request: NextRequest) {
+async function callUpstream(model: Record<string, unknown>, request: NextRequest, slug: string) {
   let body: Record<string, unknown> = {}
   try { body = await request.json() } catch { /* empty body ok */ }
 
@@ -418,12 +458,21 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   let status: 'success' | 'error' = 'success'
 
   try {
-    const upstream = await fetch(model.endpoint_url as string, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(10_000), // PERF-02: 10s max, no infinite hangs
-    })
+    // WAS-73: wrapWithCircuitBreaker handles success/failure counting.
+    // retryWithBackoff handles network-level retries (TypeError/AbortError/TimeoutError).
+    // recordFailure is called once by wrapWithCircuitBreaker catch if all retries fail.
+    const upstream = await wrapWithCircuitBreaker(
+      slug,
+      () => retryWithBackoff(
+        () => fetch(model.endpoint_url as string, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(10_000), // PERF-02: 10s max, no infinite hangs
+        })
+      ),
+      model.user_id as string
+    )
     data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
     if (!upstream.ok) status = 'error'
   } catch (err) {

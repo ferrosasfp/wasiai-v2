@@ -1,0 +1,10 @@
+-- Circuit Breaker webhook event: agent.circuit_open
+--
+-- No se requiere cambio de schema. La tabla webhooks.events es TEXT[]
+-- y ya acepta cualquier string como evento válido.
+--
+-- Eventos soportados (documentación):
+--   credits.low        → triggers cuando el balance cae por debajo del threshold
+--   agent.circuit_open → triggers cuando el CB de un agente entra en estado 'open'
+--
+-- Para suscribirse: incluir 'agent.circuit_open' en el array events al crear/editar webhook.
