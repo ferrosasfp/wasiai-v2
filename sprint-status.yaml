@@ -1,24 +1,12 @@
 sprint: 14
 periodo: "2026-03-02 → ?"
 estado: ACTIVO
-goal: "Completar el círculo de pagos autónomos — circuit breaker, wallets de agentes, sandbox para builders, webhooks UI y mejoras de producto pulido"
+goal: "Circuit breaker, webhooks UI y producto pulido — sin inversión adicional"
 goal_cumplido: false
 
 seleccionadas:
   - id: WAS-73
     hu: HU-5.5 Circuit breaker y retry automático en invocaciones
-    prioridad: P1
-    tamano: M
-    estado: pending
-
-  - id: WAS-71
-    hu: HU-6.5 Agentes con wallet propia (self-custody payments)
-    prioridad: P1
-    tamano: L
-    estado: pending
-
-  - id: WAS-75
-    hu: HU-9.1 Sandbox gratuito para builders (Opción A — Fuji + créditos)
     prioridad: P1
     tamano: M
     estado: pending
@@ -48,6 +36,14 @@ seleccionadas:
     estado: pending
 
 carry_over: []
+
+sprint_15_preview:
+  - id: WAS-71
+    hu: HU-6.5 Agentes con wallet propia (self-custody payments)
+  - id: WAS-72
+    hu: HU-6.6 Escrow para tareas largas
+  - id: WAS-75
+    hu: HU-9.1 Sandbox gratuito para builders
 
 deuda_tecnica_nueva: []
 
