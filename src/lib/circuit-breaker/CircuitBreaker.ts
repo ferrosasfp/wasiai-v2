@@ -18,45 +18,62 @@ function keys(providerId: string) {
 }
 
 export async function getState(providerId: string): Promise<CBState> {
-  const k = keys(providerId)
-  const state = await redis.get<CBState>(k.state)
-  if (!state) return 'closed'
+  try {
+    const k = keys(providerId)
+    const state = await redis.get<CBState>(k.state)
+    if (!state) return 'closed'
 
-  if (state === 'open') {
-    const lastFailure = await redis.get<number>(k.lastFailure)
-    if (lastFailure && Date.now() / 1000 - lastFailure >= RECOVERY_TIMEOUT) {
-      await redis.set(k.state, 'half-open', { ex: 300 })
-      return 'half-open'
+    if (state === 'open') {
+      const lastFailure = await redis.get<number>(k.lastFailure)
+      if (lastFailure && Date.now() / 1000 - lastFailure >= RECOVERY_TIMEOUT) {
+        await redis.set(k.state, 'half-open', { ex: 300 })
+        return 'half-open'
+      }
     }
+    return state
+  } catch {
+    // B-02: Redis down → fail-open (treat as closed, allow traffic)
+    return 'closed'
   }
-  return state
 }
 
 export async function recordSuccess(providerId: string): Promise<void> {
-  const k = keys(providerId)
-  await redis.del(k.state)
-  await redis.del(k.failures)
-  await redis.del(k.lastFailure)
+  try {
+    const k = keys(providerId)
+    await redis.del(k.state)
+    await redis.del(k.failures)
+    await redis.del(k.lastFailure)
+  } catch {
+    // B-02: Redis down → no-op, fail-open
+  }
 }
 
 export async function recordFailure(providerId: string, creatorId?: string): Promise<void> {
-  const k = keys(providerId)
-  const failures = await redis.incr(k.failures)
-  await redis.set(k.lastFailure, Math.floor(Date.now() / 1000))
-  await redis.expire(k.failures, WINDOW_SECONDS)
-
-  if (failures >= FAILURE_THRESHOLD) {
-    await redis.set(k.state, 'open', { ex: 300 }) // max 5min safety TTL
+  try {
+    const k = keys(providerId)
+    const failures = await redis.incr(k.failures)
     await redis.set(k.lastFailure, Math.floor(Date.now() / 1000))
-    if (creatorId) void triggerCircuitOpen(providerId, creatorId)
+    await redis.expire(k.failures, WINDOW_SECONDS)
+
+    if (failures >= FAILURE_THRESHOLD) {
+      await redis.set(k.state, 'open', { ex: 300 }) // max 5min safety TTL
+      await redis.set(k.lastFailure, Math.floor(Date.now() / 1000))
+      if (creatorId) void triggerCircuitOpen(providerId, creatorId)
+    }
+  } catch {
+    // B-02: Redis down → no-op, fail-open
   }
 }
 
 export async function resetCircuit(providerId: string): Promise<void> {
-  const k = keys(providerId)
-  await redis.del(k.state)
-  await redis.del(k.failures)
-  await redis.del(k.lastFailure)
+  try {
+    const k = keys(providerId)
+    await redis.del(k.state)
+    await redis.del(k.failures)
+    await redis.del(k.lastFailure)
+  } catch {
+    // B-02: Redis down → no-op, fail-open
+  }
 }
 
 export async function wrapWithCircuitBreaker<T>(
