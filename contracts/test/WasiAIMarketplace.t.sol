@@ -1303,6 +1303,103 @@ contract WasiAIMarketplaceTest is Test {
         assertTrue(s3, "Solvent after withdraw");
     }
 
+    // ── Daily Cap Tests (WAS-94) ──────────────────────────────────────────────
+
+    function _settleKey(bytes32 keyId, uint256 amount) internal {
+        string[]  memory slugs_   = new string[](1);
+        uint256[] memory amounts_ = new uint256[](1);
+        slugs_[0]   = SLUG;
+        amounts_[0] = amount;
+        vm.prank(operator);
+        marketplace.settleKeyBatch(keyId, slugs_, amounts_);
+    }
+
+    function test_DailyCap_NormalSettlement_Passes() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 5_000 * 1e6);
+        _settleKey(KEY_ID, 5_000 * 1e6); // within 10k default cap
+        (, uint256 settled,) = marketplace.getDailySettlementStatus();
+        assertEq(settled, 5_000 * 1e6);
+    }
+
+    function test_DailyCap_ExceedsCap_Reverts() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 15_000 * 1e6);
+
+        string[]  memory slugs_   = new string[](1);
+        uint256[] memory amounts_ = new uint256[](1);
+        slugs_[0]   = SLUG;
+        amounts_[0] = 15_000 * 1e6;
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: daily cap exceeded");
+        marketplace.settleKeyBatch(KEY_ID, slugs_, amounts_);
+    }
+
+    function test_DailyCap_ResetsAfter24h() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 20_000 * 1e6);
+        _settleKey(KEY_ID, 9_000 * 1e6); // within cap
+        vm.warp(block.timestamp + 24 hours + 1);
+        _settleKey(KEY_ID, 9_000 * 1e6); // new day, cap reset
+        (, uint256 settled,) = marketplace.getDailySettlementStatus();
+        assertEq(settled, 9_000 * 1e6); // only second settle counts
+    }
+
+    function test_DailyCap_OwnerCanUpdate() public {
+        vm.prank(owner);
+        marketplace.setDailySettlementCap(50_000 * 1e6);
+        (uint256 cap,,) = marketplace.getDailySettlementStatus();
+        assertEq(cap, 50_000 * 1e6);
+    }
+
+    function test_DailyCap_ZeroDisablesCap() public {
+        vm.prank(owner);
+        marketplace.setDailySettlementCap(0);
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 999_999 * 1e6);
+        _settleKey(KEY_ID, 999_999 * 1e6); // no cap, passes
+        (, uint256 settled,) = marketplace.getDailySettlementStatus();
+        assertEq(settled, 999_999 * 1e6);
+    }
+
+    function test_DailyCap_EmitsDailyCapUpdated() public {
+        vm.prank(owner);
+        vm.expectEmit(false, false, false, true);
+        emit WasiAIMarketplace.DailyCapUpdated(10_000 * 1e6, 25_000 * 1e6);
+        marketplace.setDailySettlementCap(25_000 * 1e6);
+    }
+
+    function test_DailyCap_OnlyOwnerCanSet() public {
+        vm.prank(stranger);
+        vm.expectRevert();
+        marketplace.setDailySettlementCap(1);
+    }
+
+    function test_DailyCap_GetStatus_DefaultValues() public view {
+        (uint256 cap, uint256 settled, uint256 resetsAt) = marketplace.getDailySettlementStatus();
+        assertEq(cap,    10_000 * 1e6);
+        assertEq(settled, 0);
+        assertGt(resetsAt, block.timestamp);
+    }
+
+    function test_DailyCap_AccumulatesAcrossMultipleBatches() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 10_000 * 1e6);
+        _settleKey(KEY_ID, 4_000 * 1e6);
+        _settleKey(KEY_ID, 4_000 * 1e6);
+        (, uint256 settled,) = marketplace.getDailySettlementStatus();
+        assertEq(settled, 8_000 * 1e6);
+    }
+
+    function test_DailyCap_ExactCapBoundary_Passes() public {
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 10_000 * 1e6);
+        _settleKey(KEY_ID, 10_000 * 1e6); // exactly at cap, should pass
+        (, uint256 settled,) = marketplace.getDailySettlementStatus();
+        assertEq(settled, 10_000 * 1e6);
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
 
     function _setupAndInvoke() internal {
