@@ -1,11 +1,10 @@
 import { recoverTypedDataAddress } from 'viem'
 
 // NA-010: usar WASIAI_OWNER_ADDRESS (server-only) para el check de autorización.
-// NEXT_PUBLIC_WASIAI_OWNER se mantiene solo para el frontend (firma EIP-712 en cliente).
-// NA-003: NEXT_PUBLIC_OPERATOR_ADDRESS se eliminará cuando el Safe multisig esté configurado.
+// NA-003 Parte A: NEXT_PUBLIC_OPERATOR_ADDRESS eliminado — operador NO tiene privilegios admin.
+// NA-003 Parte B (Mainnet/Sprint 20): migrar WASIAI_OWNER_ADDRESS a Safe multisig 2-de-3.
 const ALLOWED_ADDRESSES = [
   process.env.WASIAI_OWNER_ADDRESS,
-  process.env.NEXT_PUBLIC_OPERATOR_ADDRESS, // TODO NA-003: eliminar tras Safe multisig
 ].map(a => a?.toLowerCase()).filter(Boolean) as string[]
 
 export const ADMIN_EIP712_DOMAIN = {
