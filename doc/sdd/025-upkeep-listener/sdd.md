@@ -82,9 +82,12 @@ Chainlink Automation ejecuta `performUpkeep()` en el contrato WasiAIMarketplace.
 ```
 
 **Decisión de implementación del pipeline:**
-- Opción A (recomendada): Duplicar pipeline simplificado inline (sin la lógica de `settlement_mode` skip)
-- Opción B: `fetch('/api/cron/settle-key-batches')` interno — pero requiere pasar header auth y puede generar loops si settlement_mode cambia
-- **Elegir Opción A**: Más robusto, el dev controla exactamente qué se ejecuta
+- ~~Opción A (original): Duplicar pipeline inline~~ → **DESCARTADA** — genera duplicación de ~260 líneas de lógica crítica
+- Opción B: `fetch('/api/cron/settle-key-batches')` interno — pero requiere pasar header auth y puede generar loops
+- **Opción A revisada (elegida): Extraer pipeline a `src/lib/settlement/runSettlement.ts`** y que ambos crons importen desde ahí
+  - `settle-key-batches` se refactoriza para importar `runSettlement`
+  - `upkeep-listener` también importa `runSettlement`
+  - La lógica de settlement vive en un solo lugar → sin duplicación, fácil de mantener
 
 **Variables de entorno requeridas (ya existentes):**
 - `CRON_SECRET` — autenticación
@@ -98,16 +101,35 @@ Chainlink Automation ejecuta `performUpkeep()` en el contrato WasiAIMarketplace.
 
 ### Crear
 ```
+src/lib/settlement/runSettlement.ts
 src/app/api/cron/upkeep-listener/route.ts
 ```
+
+**`src/lib/settlement/runSettlement.ts`**
+- Función exportada `runSettlement(supabase: SupabaseClient)`
+- Contiene todo el pipeline de settlement (pasos 2-5 de settle-key-batches): fetch unsettled calls, slugCreatorMap, agrupar por key, liquidar on-chain, actualizar DB
+- Retorna `{ settled: number, results: Array<{ keyId, txHash, callCount, error? }> }`
+- **No** incluye auth CRON_SECRET (eso queda en cada route handler)
+- **No** incluye el check de `settlement_mode` (eso lo decide cada caller)
+
+**`src/app/api/cron/upkeep-listener/route.ts`**
 - Handler GET con auth CRON_SECRET
 - `readContract` → `checkUpkeep`
-- Pipeline de settlement (importar funciones de marketplaceClient y lógica de supabase)
+- Si `upkeepNeeded = true` → llama `runSettlement(supabase)` y retorna resultado
+- Si `upkeepNeeded = false` → retorna `{ ok: true, settled: 0, reason: 'upkeep_not_needed' }`
 
 ### Modificar
 ```
+src/app/api/cron/settle-key-batches/route.ts
 vercel.json
 ```
+
+**`src/app/api/cron/settle-key-batches/route.ts`** (refactor)
+- Eliminar pipeline de settlement inline (pasos 2-5)
+- Importar `runSettlement` desde `@/lib/settlement/runSettlement`
+- Después del check de `settlement_mode`, llamar `runSettlement(supabase)` y retornar resultado
+
+**`vercel.json`**
 - Agregar entry en `crons[]`:
 ```json
 {
@@ -146,8 +168,9 @@ vercel.json
 - Nuevos servicios de infraestructura (Railway, Fly.io, etc.)
 - Hardcodear direcciones de contrato o claves privadas
 - Llamar a `performUpkeep()` desde el cron — Chainlink lo ejecuta; nosotros solo leemos el estado
-- Modificar `settle-key-batches/route.ts` — no tocar el cron existente
+- Duplicar el pipeline de settlement — toda la lógica vive en `runSettlement.ts`
 - Bucles infinitos o re-fetch del mismo endpoint
+- Auth CRON_SECRET dentro de `runSettlement.ts` — solo en los route handlers
 
 ---
 
@@ -165,7 +188,9 @@ vercel.json
 
 ## 9. DoD (Definition of Done)
 
-- [ ] `src/app/api/cron/upkeep-listener/route.ts` creado con auth + checkUpkeep + settlement pipeline
+- [ ] `src/lib/settlement/runSettlement.ts` creado con pipeline de settlement extraído
+- [ ] `src/app/api/cron/settle-key-batches/route.ts` refactorizado para importar `runSettlement`
+- [ ] `src/app/api/cron/upkeep-listener/route.ts` creado con auth + checkUpkeep + llamada a `runSettlement`
 - [ ] `vercel.json` actualizado con schedule `*/5 * * * *`
 - [ ] `npm run build` pasa 0 errores
 - [ ] Test manual en Fuji: hit endpoint con `Bearer CRON_SECRET` cuando hay unsettled calls → retorna `{ ok: true, settled: N }`
