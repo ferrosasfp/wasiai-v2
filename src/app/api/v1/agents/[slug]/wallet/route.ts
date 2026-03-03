@@ -10,6 +10,7 @@ import {
   generateAgentWallet,
   getAgentWalletAddress,
   getAgentWalletBalance,
+  getAgentWalletUsdcBalance,
 } from '@/lib/agent-wallets/agentWallet'
 
 interface Params { params: Promise<{ slug: string }> }
@@ -68,6 +69,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({ address: null, balanceWei: '0', balanceFormatted: '0' })
   }
 
-  const { balanceWei, balanceFormatted } = await getAgentWalletBalance(address)
-  return NextResponse.json({ address, balanceWei, balanceFormatted })
+  const [{ balanceWei, balanceFormatted }, { balanceUsdcFormatted }] = await Promise.all([
+    getAgentWalletBalance(address),
+    getAgentWalletUsdcBalance(address),
+  ])
+  return NextResponse.json({ address, balanceWei, balanceFormatted, balanceUsdcFormatted })
 }
