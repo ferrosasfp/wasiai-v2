@@ -248,10 +248,35 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         emit AgentTransferred(agentId, old, newOwner);
     }
 
+    // ─── FLOW GUIDE ───────────────────────────────────────────────────────────────
+    // This contract implements two payment flows that share state but serve
+    // distinct use cases:
+    //
+    //  ┌─ Flow x402 (direct payment, post-funded) ──────────────────────────────┐
+    //  │  Used by: Ultravioleta DAO facilitator after on-chain USDC settlement  │
+    //  │  Functions: recordInvocation(), withdraw(), withdrawFor()              │
+    //  │  State:     earnings[creator], totalEarnings, usedPaymentIds           │
+    //  └────────────────────────────────────────────────────────────────────────┘
+    //
+    //  ┌─ Flow Key (pre-funded API key) ────────────────────────────────────────┐
+    //  │  Used by: Backend operator after user signs ERC-3009 authorization     │
+    //  │  Functions: depositForKey(), settleKeyBatch(), refundKeyToEarnings(),  │
+    //  │             emergencyWithdrawKey()                                      │
+    //  │  State:     keyBalances[keyId], keyOwners[keyId], totalKeyBalances     │
+    //  └────────────────────────────────────────────────────────────────────────┘
+    //
+    //  Both flows share: agents[], operators[], platformFeeBps, totalVolume,
+    //  totalInvocations, treasury.
+    //
+    //  OZ-A1 note: A single `onlyOperator` modifier controls both flows.
+    //  Future role separation tracked in WAS-110+.
+    // ─────────────────────────────────────────────────────────────────────────────
+
     // ─── Payment Accounting ───────────────────────────────────────────────────
 
     /**
      * @notice Record an invocation and split earnings.
+     * @dev flow: x402
      * @dev Called by the backend AFTER the x402 USDC payment has been confirmed
      *      on-chain (Ultravioleta DAO facilitator settles to this contract address).
      *      The `amount` of USDC must already be in this contract.
@@ -305,6 +330,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     /**
      * @notice Creator claims all pending USDC earnings.
+     * @dev flow: x402 (also accessible after Key refund via refundKeyToEarnings)
      */
     function withdraw() external nonReentrant {
         uint256 amount = earnings[msg.sender];
@@ -319,6 +345,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     /**
      * @notice Operator-triggered withdrawal on behalf of a creator.
+     * @dev flow: x402
      * @dev Useful for automatic payouts triggered by the backend.
      */
     function withdrawFor(address creator) external onlyOperator nonReentrant {
@@ -337,6 +364,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     /**
      * @notice Fund an API key with USDC via ERC-3009 transferWithAuthorization.
+     * @dev flow: Key
      * @dev Operator calls this after user signs the ERC-3009 authorization off-chain.
      *      USDC is transferred from the user directly to this contract.
      * @param keyId  bytes32 derived from SHA-256 of the raw API key (hex string → bytes32)
@@ -383,6 +411,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     /**
      * @notice Liquida un batch de llamadas de key en una sola tx.
+     * @dev flow: Key
      * @dev Gas amortizado: una tx cubre cientos de llamadas.
      *      slugs[i] y amounts[i] corresponden 1-a-1.
      *      El balance total se deduce primero para evitar reentrancy parcial.
@@ -445,10 +474,11 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     /**
      * @notice Mueve el balance restante de una key a earnings del owner.
+     * @dev flow: Key
      * @dev Operador llama esto cuando el usuario cierra su key.
      *      El owner luego usa withdraw() como cualquier creator.
      */
-    function refundKeyToEarnings(bytes32 keyId) external onlyOperator nonReentrant {
+    function refundKeyToEarnings(bytes32 keyId) external onlyOperator nonReentrant whenNotPaused {
         lastOperatorActivity = block.timestamp;
         require(keyOwners[keyId] != address(0), "WasiAI: unknown key");
         uint256 amount = keyBalances[keyId];
@@ -465,6 +495,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     /**
      * @notice Salida de emergencia: usuario recupera su USDC si el operador
      *         lleva más de EMERGENCY_TIMEOUT sin actividad.
+     * @dev flow: Key (trustless exit — no operator permission required)
      * @dev Trustless exit — no requiere permiso del operador.
      */
     function emergencyWithdrawKey(bytes32 keyId) external nonReentrant {
