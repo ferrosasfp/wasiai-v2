@@ -568,7 +568,7 @@
     "maxInputChars": "(máx. 500 chars)",
     "maxOutputChars": "(máx. 1000 chars)",
     "inputPlaceholder": "Ej: Analiza el sentimiento del siguiente texto: ...",
-    "outputPlaceholder": "Ej: { \"sentiment\": \"positive\", \"score\": 0.92, ... }",
+    "outputPlaceholder": "Ej: sentiment positive, score 0.92 ...",
     "edit": "Editar",
     "delete": "Eliminar",
     "cancel": "Cancelar"
