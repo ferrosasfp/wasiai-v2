@@ -393,7 +393,7 @@ export async function getPendingEarnings(creatorWallet: string): Promise<number>
       args:         [creatorWallet as Address],
     }) as bigint
     const result = Number(atomics) / 1_000_000
-    logger.debug('[marketplace] getPendingEarnings', { wallet: `${creatorWallet.slice(0,8)}...`, result })
+
     return result
   } catch (err) {
     logger.error('[marketplace] getPendingEarnings failed', { err: String(err).slice(0, 200) })
