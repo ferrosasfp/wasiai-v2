@@ -24,8 +24,10 @@ export async function GET(
     .eq('slug', slug)
     .single()
 
-  if (!agent) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (agent.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Si el agente no existe o no pertenece al usuario, devolver estado default (sin 404)
+  if (!agent || agent.user_id !== user.id) {
+    return NextResponse.json({ state: 'closed', failures: 0 })
+  }
 
   // 3. Leer estado CB
   const state = await getState(slug)
