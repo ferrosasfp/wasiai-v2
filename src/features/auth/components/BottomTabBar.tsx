@@ -12,7 +12,8 @@ interface BottomTabBarProps {
   initialEmail?: string | null
 }
 
-export function BottomTabBar({ locale: _localeProp, initialEmail = null }: BottomTabBarProps) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function BottomTabBar({ locale: _locale, initialEmail = null }: BottomTabBarProps) {
   const pathname = usePathname()
   // Deriva el locale actual del pathname para evitar stale prop tras navegación client-side
   const locale = pathname.startsWith('/es') ? 'es' : 'en'
