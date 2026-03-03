@@ -93,36 +93,45 @@ export async function checkRateLimit(
   limiter: Ratelimit,
   identifier: string,
 ): Promise<NextResponse | null> {
-  const { success, limit, reset } = await limiter.limit(identifier)
+  try {
+    const { success, limit, reset } = await limiter.limit(identifier)
 
-  if (!success) {
-    return NextResponse.json(
-      {
-        error:   'Rate limit exceeded',
-        code:    'rate_limited',
-        limit,
-        remaining: 0,
-        reset_at: new Date(reset).toISOString(),
-      },
-      {
-        status: 429,
-        headers: {
-          'X-RateLimit-Limit':     String(limit),
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset':     String(reset),
-          'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
+    if (!success) {
+      return NextResponse.json(
+        {
+          error:   'Rate limit exceeded',
+          code:    'rate_limited',
+          limit,
+          remaining: 0,
+          reset_at: new Date(reset).toISOString(),
         },
-      },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit':     String(limit),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset':     String(reset),
+            'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
+          },
+        },
+      )
+    }
+
+    return null
+  } catch (err) {
+    // NA-004: fail-closed — Upstash unavailable → 503 instead of fail-open
+    logger.warn('[rate-limit] upstash-unavailable', { identifier, err })
+    return NextResponse.json(
+      { error: 'Service temporarily unavailable', code: 'rate_limit_unavailable' },
+      { status: 503, headers: { 'Retry-After': '60' } },
     )
   }
-
-  return null
 }
 
 /**
  * Verifica RPM + RPD del creator para un slug+consumer dado.
  * Retorna NextResponse 429 si excede algún límite, null si OK.
- * Fail-open: si Upstash no está disponible, retorna null (no bloquea).
+ * NA-004: Fail-closed — si Upstash no está disponible, retorna 503 + Retry-After:60.
  */
 export async function checkCreatorRateLimits(
   slug:       string,
@@ -145,8 +154,13 @@ export async function checkCreatorRateLimits(
         { status: 429, headers: { 'Retry-After': String(Math.ceil((rpdResult.reset - Date.now()) / 1000)) } },
       )
     }
-  } catch {
-    logger.warn('[rate-limit] checkCreatorRateLimits fail-open', { slug })
+  } catch (err) {
+    // NA-004: fail-closed — Upstash unavailable → 503 instead of fail-open
+    logger.warn('[rate-limit] upstash-unavailable', { slug, err })
+    return NextResponse.json(
+      { error: 'Service temporarily unavailable', code: 'rate_limit_unavailable' },
+      { status: 503, headers: { 'Retry-After': '60' } },
+    )
   }
   return null
 }
