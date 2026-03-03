@@ -1,6 +1,8 @@
+'use client'
+
 import Link from 'next/link'
 import Image from 'next/image'
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import type { Model } from '../types/models.types'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -28,6 +30,7 @@ interface ModelCardProps {
 // P-03: Memoized to avoid unnecessary re-renders in grid lists
 export const ModelCard = memo(function ModelCard({ model, locale, index = 0, reputationBadge }: ModelCardProps) {
   const remaining = Math.max(0, model.total_calls ?? 0)
+  const [imgError, setImgError] = useState(false)
 
   return (
     <Link
@@ -38,7 +41,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-avax-400 to-avax-600 text-lg shrink-0 overflow-hidden">
-            {model.cover_image ? (
+            {model.cover_image && !imgError ? (
               // P-04: sizes avoids downloading unnecessarily large images; priority for LCP candidates
               <Image
                 src={model.cover_image}
@@ -47,6 +50,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
                 className="object-cover"
                 sizes="40px"
                 priority={index < 3}
+                onError={() => setImgError(true)}
               />
             ) : (
               CATEGORY_ICONS[model.category] ?? '🤖'
