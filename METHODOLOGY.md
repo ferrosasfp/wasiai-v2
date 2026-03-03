@@ -74,4 +74,26 @@ git push origin master master:main
 
 ---
 
-*NexusAgil instalado: 2026-02-28 — San*
+---
+
+## Auto-Blindajes — Reglas permanentes de ingeniería
+
+Aprobados por San. Obligatorios en cada HU, story file y deploy.
+
+| # | Blindaje | Origen |
+|---|---------|--------|
+| 1 | **ethers.js → siempre versión explícita en story file** — nunca implícita; preferir viem v2 siempre | Sprint 15 |
+| 2 | **Commits atómicos obligatorios** — un commit por cambio lógico, nunca acumular en uno solo | Sprint 15 |
+| 3 | **Env vars de prod verificadas antes de cada deploy** — usar `doc/deploy-checklist.md`; el SM valida antes de aprobar merge | Sprint 17 |
+| 4 | **Plan de infraestructura validado en SDD** — timezones (UTC), redes (fuji/mainnet), endpoints y addresses explícitos | Sprint 17 |
+| 5 | **Bugs de navegación client-side → escribir test Playwright primero, luego fix** — sin test reproducible el bug no entra al sprint | Sprint 17 ✅ San |
+
+### Reglas adicionales de stack
+
+- MockUSDC / mocks on-chain: evaluar compatibilidad en F2 Codebase Grounding antes de estimar SP
+- Chainlink Automation: siempre documentar trigger manual como fallback en el story file
+- Story files con CLI/API/plugins: el contrato de integración debe incluir tipo TypeScript de retorno + ejemplo JSON real + comportamiento en error
+
+---
+
+*NexusAgil instalado: 2026-02-28 — Actualizado: 2026-03-03 (Sprint 17 cierre) — San*
