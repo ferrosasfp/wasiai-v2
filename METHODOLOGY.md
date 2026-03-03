@@ -41,6 +41,8 @@ El flujo QUALITY completo es obligatorio en cada HU. Sin excepciones.
 [Docs] DONE → _INDEX.md
 git push origin master master:main
 # AB-012: Vercel escucha `main` — siempre pushear ambos branches al cerrar sprint
+# AB-013: Plan free Vercel = 100 deployments/día — agrupar commits en bloques, NO pushear por cada fix
+#         Flujo correcto: todos los commits en local → 1 solo push al cerrar bloque o sprint
 ```
 
 ---
