@@ -87,6 +87,9 @@ Aprobados por San. Obligatorios en cada HU, story file y deploy.
 | 3 | **Env vars de prod verificadas antes de cada deploy** — usar `doc/deploy-checklist.md`; el SM valida antes de aprobar merge | Sprint 17 |
 | 4 | **Plan de infraestructura validado en SDD** — timezones (UTC), redes (fuji/mainnet), endpoints y addresses explícitos | Sprint 17 |
 | 5 | **Bugs de navegación client-side → escribir test Playwright primero, luego fix** — sin test reproducible el bug no entra al sprint | Sprint 17 ✅ San |
+| 6 | **AB-007 — PAT scopes en planning** — Antes de cada sprint que incluya CI/GitHub Actions: verificar que el PAT tiene scope `workflow`. Si no, es un bloqueante que se resuelve en planning, no a mitad del sprint. | Sprint 18 |
+| 7 | **AB-008 — San solo valida, nunca implementa** — San (rol validador/architect) NO ejecuta comandos de Dev, NO hace commits de código, NO corre tests. Su único output son validaciones escritas y gate approvals. Si San hace trabajo de Dev, el pipeline está roto. | Sprint 18 |
+| 8 | **AB-009 — AR siempre verifica build** — El Adversary Review DEBE incluir `npm run build` (o `forge test` para contratos) como check obligatorio. Un AR sin verificación de build no está completo. | Sprint 18 |
 
 ### Reglas adicionales de stack
 
@@ -96,4 +99,4 @@ Aprobados por San. Obligatorios en cada HU, story file y deploy.
 
 ---
 
-*NexusAgil instalado: 2026-02-28 — Actualizado: 2026-03-03 (Sprint 17 cierre) — San*
+*NexusAgil instalado: 2026-02-28 — Actualizado: 2026-03-03 (Sprint 18 — AB-007/008/009) — San*
