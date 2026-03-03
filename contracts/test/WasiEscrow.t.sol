@@ -163,4 +163,33 @@ contract WasiEscrowTest is Test {
         escrow.disputeEscrow(escrowId);
         assertEq(uint(escrow.getEscrow(escrowId).status), uint(WasiEscrow.EscrowStatus.Disputed));
     }
+
+    // ── WAS-118: refundExpired ────────────────────────────────────────────────
+
+    function test_RefundExpired_After24h_ByStranger() public {
+        _createEscrow();
+        uint256 payerBefore = usdc.balanceOf(payer);
+        vm.warp(block.timestamp + 25 hours);
+        vm.prank(stranger);
+        escrow.refundExpired(escrowId);
+        assertEq(usdc.balanceOf(payer), payerBefore + AMOUNT);
+        assertEq(uint(escrow.getEscrow(escrowId).status), uint(WasiEscrow.EscrowStatus.Refunded));
+    }
+
+    function test_RefundExpired_Before24h_Reverts() public {
+        _createEscrow();
+        vm.prank(stranger);
+        vm.expectRevert("WasiEscrow: timeout not reached");
+        escrow.refundExpired(escrowId);
+    }
+
+    function test_RefundExpired_AlreadyRefunded_Reverts() public {
+        _createEscrow();
+        vm.warp(block.timestamp + 25 hours);
+        vm.prank(stranger);
+        escrow.refundExpired(escrowId);
+        vm.prank(stranger);
+        vm.expectRevert("WasiEscrow: not pending");
+        escrow.refundExpired(escrowId);
+    }
 }
