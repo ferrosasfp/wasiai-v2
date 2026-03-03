@@ -12,8 +12,10 @@ interface BottomTabBarProps {
   initialEmail?: string | null
 }
 
-export function BottomTabBar({ locale, initialEmail = null }: BottomTabBarProps) {
+export function BottomTabBar({ locale: _localeProp, initialEmail = null }: BottomTabBarProps) {
   const pathname = usePathname()
+  // Deriva el locale actual del pathname para evitar stale prop tras navegación client-side
+  const locale = pathname.startsWith('/es') ? 'es' : 'en'
   const t = useTranslations('nav')
   const tMobile = useTranslations('mobileNav')
 
