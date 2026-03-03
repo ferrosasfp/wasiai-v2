@@ -27,3 +27,4 @@
 | 023 | 2026-03-02 | WAS-89 | Tests MockUSDC firma ERC-3009 (ya implementado — cerrado sin pipeline) | tech-task | QUALITY | DONE | master |
 | 024 | 2026-03-02 | WAS-103 | Arquitectura dual-flow OZ-A1 — FLOW GUIDE + whenNotPaused | refactor | QUALITY | DONE | master |
 | 025 | 2026-03-02 | WAS-82 | Upkeep Listener — Vercel Cron Chainlink + runSettlement compartido | feature | QUALITY | DONE | master |
+| 026 | 2026-03-02 | WAS-13 | CLI `wasiai invoke` — terminal client para agentes WasiAI | feature | QUALITY | DONE | master |
