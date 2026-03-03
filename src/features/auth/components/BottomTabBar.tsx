@@ -63,7 +63,7 @@ export function BottomTabBar({ locale, initialEmail = null }: BottomTabBarProps)
   const meItems = isLoggedIn
     ? [
         { icon: '👤', label: t('profile'), href: `/${locale}/profile` },
-        { icon: '💰', label: t('wallet'), href: `/${locale}/creator/dashboard` },
+        { icon: '📊', label: t('myDashboard'), href: `/${locale}/creator/dashboard` },
         { icon: '📦', label: t('storage'), href: `/${locale}/storage` },
         { icon: '📖', label: t('docs'), href: `/${locale}/docs` },
         {
