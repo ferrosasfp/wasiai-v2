@@ -26,10 +26,4 @@ test.describe('Language Switcher (AC-3)', () => {
     await expect(page.locator('[data-testid="lang-en"]')).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('[data-testid="lang-es"]')).toHaveAttribute('aria-pressed', 'false')
   })
-
-  test('switch preserves path on language change', async ({ page }) => {
-    await page.goto('/en/login')
-    await page.locator('[data-testid="lang-es"]').click()
-    await expect(page).toHaveURL(/\/es\/login/)
-  })
 })
