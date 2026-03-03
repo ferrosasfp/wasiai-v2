@@ -71,3 +71,66 @@ El hallazgo #2 debe ser corregido antes de merge a producción. El riesgo de dob
 ---
 
 *Generado por NexusAgil Adversary · WasiAI v2 QUALITY Mode*
+
+---
+
+## Re-Review — Commit `9429025`
+**Fecha:** 2026-03-02  
+**Revisión:** Verificación del fix al hallazgo BLOQUEANTE #2
+
+### Fix implementado
+
+```typescript
+// Compare-and-swap: solo actualiza si value = 'idle'
+const { data: lockRow, error: lockError } = await supabase
+  .from('system_config')
+  .update({ value: 'running', updated_at: new Date().toISOString() })
+  .eq('key', 'settlement_lock')
+  .eq('value', 'idle')
+  .select('key')
+  .single()
+
+if (lockError || !lockRow) {
+  logger.info('[runSettlement] already running — skipping (settlement_lock)')
+  return { settled: 0, results: [] }
+}
+
+try {
+  return await _runSettlementPipeline(supabase)
+} finally {
+  await supabase
+    .from('system_config')
+    .update({ value: 'idle' })
+    .eq('key', 'settlement_lock')
+}
+```
+
+### Análisis punto por punto
+
+**¿El UPDATE atómico previene doble ejecución?**  
+✅ Sí. El `UPDATE WHERE key='settlement_lock' AND value='idle'` es atómico a nivel Postgres. Si dos instancias compiten simultáneamente, solo una obtendrá el lock (la que ejecuta primero el UPDATE). La otra recibirá 0 rows → `lockRow` null → retorna early. El CAS es correcto.
+
+**¿El `try/finally` garantiza liberación del lock?**  
+✅ Sí. El `finally` se ejecuta siempre, incluso si `_runSettlementPipeline` lanza excepción no capturada. El lock se libera en todos los caminos de error.
+
+**¿Qué pasa si la row `settlement_lock` no existe?**  
+⚠️ MENOR (no bloqueante). Si la row no existe en `system_config`, el UPDATE retorna 0 rows → `lockError` se activa (Supabase `.single()` retorna error si no hay match) → la función retorna `{ settled: 0, results: [] }` silenciosamente **siempre**. El settlement nunca correría. Esto es un riesgo de configuración: si la row se borra accidentalmente o el ambiente está sin seed, el sistema silencia el problema en lugar de alertarlo. Se recomienda agregar logging diferenciado para distinguir "lock ocupado" vs "lock row ausente", pero no bloquea el fix actual del race condition.
+
+**¿Hay deadlock posible?**  
+✅ No. Solo hay un lock (`settlement_lock`), no hay ciclos. El `finally` garantiza que siempre se libera. No hay riesgo de deadlock.
+
+### Veredicto Re-Review
+
+```
+✅ APPROVED
+```
+
+El hallazgo BLOQUEANTE #2 (race condition doble ejecución) está **correctamente resuelto**. El advisory lock via compare-and-swap en `system_config` es atómico, el `try/finally` garantiza liberación, y no hay deadlock posible.
+
+**Nota MENOR registrada (no bloquea):** Si la row `settlement_lock` no existe, el sistema silencia el problema en lugar de alertar. Recomendación futura: diferenciar en el log entre "ya corriendo" vs "lock row ausente/error de config".
+
+El código puede proceder a producción.
+
+---
+
+*Re-review por NexusAgil Adversary · WasiAI v2 QUALITY Mode · 2026-03-02*
