@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useState, useEffect, startTransition } from 'react'
+import { useState, useEffect, useRef, startTransition } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ActionSheet } from '@/features/auth/components/ActionSheet'
 
@@ -20,6 +20,13 @@ export function BottomTabBar({ locale, initialEmail = null }: BottomTabBarProps)
   const [createOpen, setCreateOpen] = useState(false)
   const [meOpen, setMeOpen] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(initialEmail)
+  const prevInitialEmailRef = useRef(initialEmail)
+
+  // Sincronizar prop → state en render (evita react-hooks/set-state-in-effect)
+  if (initialEmail !== prevInitialEmailRef.current) {
+    prevInitialEmailRef.current = initialEmail
+    setUserEmail(initialEmail ?? null)
+  }
 
   useEffect(() => {
     const supabase = createClient()
