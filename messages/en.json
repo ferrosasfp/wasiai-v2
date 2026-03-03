@@ -571,5 +571,19 @@
     "edit": "Edit",
     "delete": "Delete",
     "cancel": "Cancel"
+  },
+  "storage": {
+    "title": "Storage",
+    "description": "Upload and retrieve files via decentralized storage.",
+    "upload": "Upload",
+    "viewer": "Viewer",
+    "dragOrClick": "Drag & drop or click to upload",
+    "uploading": "Uploading...",
+    "selectFile": "Select file",
+    "uploadSuccess": "Uploaded successfully",
+    "enterCid": "Enter CID",
+    "loading": "Loading...",
+    "retrieve": "Retrieve",
+    "fileUrl": "File URL"
   }
 }
