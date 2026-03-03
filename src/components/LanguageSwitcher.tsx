@@ -24,6 +24,7 @@ export function LanguageSwitcher() {
     >
       <button
         type="button"
+        data-testid="lang-en"
         onClick={() => switchLocale('en')}
         aria-pressed={currentLocale === 'en'}
         aria-label="Switch to English"
@@ -38,6 +39,7 @@ export function LanguageSwitcher() {
       <span className="text-gray-300" aria-hidden="true">|</span>
       <button
         type="button"
+        data-testid="lang-es"
         onClick={() => switchLocale('es')}
         aria-pressed={currentLocale === 'es'}
         aria-label="Cambiar a Español"

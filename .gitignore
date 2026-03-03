@@ -39,3 +39,7 @@ contracts/lib/
 contracts/.git/
 contracts/broadcast/
 contracts/cache/DeployMarketplace.s.sol/
+
+# Playwright
+test-results/
+playwright-report/
