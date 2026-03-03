@@ -50,10 +50,11 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
     if (!userId) return
 
     const supabase = createClient()
+    // pipeline_executions usa RLS via key_id → key_owner_read policy
+    // filtra automáticamente por las keys del usuario autenticado
     supabase
       .from('pipeline_executions')
       .select('id, status, steps_completed, total_cost_usdc, created_at, completed_at')
-      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => {
