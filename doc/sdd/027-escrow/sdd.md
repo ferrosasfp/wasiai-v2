@@ -119,7 +119,7 @@ event EscrowDisputed(bytes32 indexed escrowId);
 #### `POST /api/v1/agents/[slug]/invoke-long`
 - Igual al invoke normal pero para agentes long_running
 - Verifica `agents.long_running = true`
-- Llama al contrato `createEscrow` vía ethers.js (operador wallet)
+- Llama al contrato `createEscrow` vía viem v2 (operador wallet — mismo patrón que `marketplaceClient.ts`)
 - Inserta row en `escrow_transactions` con status `pending`
 - Retorna `{ escrow_id, estimated_completion, status: "pending" }`
 
@@ -143,7 +143,7 @@ event EscrowDisputed(bytes32 indexed escrowId);
 | `src/app/api/v1/agents/[slug]/invoke-long/route.ts` | Crear nuevo |
 | `src/app/api/v1/escrow/[escrowId]/status/route.ts` | Crear nuevo |
 | `src/app/api/v1/internal/escrow/release-expired/route.ts` | Crear nuevo |
-| `src/lib/contracts/escrow.ts` | Crear — wrapper ethers para WasiEscrow |
+| `src/lib/contracts/escrow.ts` | Crear — wrapper viem v2 para WasiEscrow (seguir patrón de `marketplaceClient.ts`) |
 
 ---
 
