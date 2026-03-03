@@ -453,7 +453,7 @@ interface InvokeLongResponse {
 1. Verificar `agents.long_running = true` y `agents.status = 'active'`
 2. Verificar API key del caller (mismo flujo que invoke normal)
 3. Calcular `escrowId = keccak256(slug, payer, amount, nonce, chainId)`
-4. Llamar `WasiEscrow.createEscrow(...)` via ethers.js (operador wallet desde env)
+4. Llamar `WasiEscrow.createEscrow(...)` via viem v2 (operador wallet desde env — seguir patrón de `marketplaceClient.ts`)
 5. Insertar en `escrow_transactions` con `status = 'pending'`
 6. Despachar job asíncrono (fetch al runner del agente sin await)
 7. Return 202 con escrow_id
@@ -496,28 +496,88 @@ interface EscrowStatusResponse {
 
 ### 1d. `src/lib/contracts/escrow.ts`
 
+**IMPORTANTE: Usar viem v2 (pinned 2.21.0) — NUNCA ethers.js. Seguir el patrón exacto de `src/lib/contracts/marketplaceClient.ts`.**
+
 ```typescript
-import { ethers } from 'ethers'
+import { createWalletClient, createPublicClient, http, type Address } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { avalancheFuji } from 'viem/chains'
 
 const ESCROW_ABI = [
-  'function createEscrow(bytes32,string,address,uint256,uint256,uint256,bytes32,uint8,bytes32,bytes32) external',
-  'function releaseEscrow(bytes32) external',
-  'function releaseExpired(bytes32) external',
-  'function refundEscrow(bytes32) external',
-  'function computeEscrowId(string,address,uint256,bytes32) external view returns (bytes32)',
-  'function getEscrow(bytes32) external view returns (address,string,uint256,uint256,uint8)',
-]
+  { name: 'createEscrow', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'escrowId', type: 'bytes32' }, { name: 'slug', type: 'string' },
+      { name: 'payer', type: 'address' }, { name: 'amount', type: 'uint256' },
+      { name: 'validAfter', type: 'uint256' }, { name: 'validBefore', type: 'uint256' },
+      { name: 'nonce', type: 'bytes32' }, { name: 'v', type: 'uint8' },
+      { name: 'r', type: 'bytes32' }, { name: 's', type: 'bytes32' },
+    ], outputs: [] },
+  { name: 'releaseEscrow', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'escrowId', type: 'bytes32' }], outputs: [] },
+  { name: 'releaseExpired', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'escrowId', type: 'bytes32' }], outputs: [] },
+  { name: 'refundEscrow', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'escrowId', type: 'bytes32' }], outputs: [] },
+] as const
 
-export function getEscrowContract(signerOrProvider: ethers.Signer | ethers.Provider) {
-  const address = process.env.WASI_ESCROW_ADDRESS!
-  return new ethers.Contract(address, ESCROW_ABI, signerOrProvider)
+function getEscrowClient() {
+  const rpcUrl = process.env.NEXT_PUBLIC_RPC_TESTNET ?? 'https://api.avax-test.network/ext/bc/C/rpc'
+  const privateKey = process.env.OPERATOR_PRIVATE_KEY as `0x${string}`
+  const account = privateKeyToAccount(privateKey)
+  return {
+    wallet: createWalletClient({ account, chain: avalancheFuji, transport: http(rpcUrl) }),
+    public: createPublicClient({ chain: avalancheFuji, transport: http(rpcUrl) }),
+    account,
+  }
 }
 
-export function getOperatorSigner() {
-  const provider = new ethers.JsonRpcProvider(
-    process.env.FUJI_RPC_URL ?? 'https://api.avax-test.network/ext/bc/C/rpc'
-  )
-  return new ethers.Wallet(process.env.OPERATOR_PRIVATE_KEY!, provider)
+function getEscrowAddress(): Address {
+  return process.env.WASI_ESCROW_ADDRESS as Address
+}
+
+export async function createEscrowOnChain(
+  escrowId: `0x${string}`, slug: string, payer: Address, amount: bigint,
+  validAfter: bigint, validBefore: bigint, nonce: `0x${string}`,
+  v: number, r: `0x${string}`, s: `0x${string}`
+): Promise<string | null> {
+  const { wallet, public: pub, account } = getEscrowClient()
+  const address = getEscrowAddress()
+  const { request } = await pub.simulateContract({
+    address, abi: ESCROW_ABI, functionName: 'createEscrow', account,
+    args: [escrowId, slug, payer, amount, validAfter, validBefore, nonce, v, r, s],
+  })
+  const hash = await wallet.writeContract(request)
+  return hash
+}
+
+export async function releaseEscrowOnChain(escrowId: `0x${string}`): Promise<string | null> {
+  const { wallet, public: pub, account } = getEscrowClient()
+  const address = getEscrowAddress()
+  const { request } = await pub.simulateContract({
+    address, abi: ESCROW_ABI, functionName: 'releaseEscrow', account,
+    args: [escrowId],
+  })
+  return wallet.writeContract(request)
+}
+
+export async function releaseExpiredOnChain(escrowId: `0x${string}`): Promise<string | null> {
+  const { wallet, public: pub, account } = getEscrowClient()
+  const address = getEscrowAddress()
+  const { request } = await pub.simulateContract({
+    address, abi: ESCROW_ABI, functionName: 'releaseExpired', account,
+    args: [escrowId],
+  })
+  return wallet.writeContract(request)
+}
+
+export async function refundEscrowOnChain(escrowId: `0x${string}`): Promise<string | null> {
+  const { wallet, public: pub, account } = getEscrowClient()
+  const address = getEscrowAddress()
+  const { request } = await pub.simulateContract({
+    address, abi: ESCROW_ABI, functionName: 'refundEscrow', account,
+    args: [escrowId],
+  })
+  return wallet.writeContract(request)
 }
 ```
 
