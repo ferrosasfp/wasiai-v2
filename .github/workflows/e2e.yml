@@ -1,0 +1,34 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BASE_URL: https://wasiai-v2.vercel.app
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install chromium --with-deps
+
+      - run: npx playwright test e2e/navigation.spec.ts e2e/language-switcher.spec.ts
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
