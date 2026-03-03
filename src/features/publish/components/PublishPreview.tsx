@@ -62,6 +62,7 @@ export function PublishPreview({
     mcp_description: null,
     free_trial_enabled: false,
     free_trial_limit: 0,
+    long_running: false,
   }
 
   return (

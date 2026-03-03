@@ -51,6 +51,9 @@ export interface Model {
   free_trial_enabled: boolean
   free_trial_limit: number
 
+  // WAS-72: Escrow para tareas largas
+  long_running: boolean
+
   // joined
   creator?: CreatorProfile
 }

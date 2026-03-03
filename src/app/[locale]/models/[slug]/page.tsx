@@ -8,6 +8,7 @@ import { CodeExamples } from '@/features/models/components/CodeExamples'
 import { ReputationMetrics } from '@/features/models/components/ReputationMetrics'
 import { AgentExamplesDisplay } from '@/features/models/components/AgentExamplesDisplay'
 import { createClient } from '@/lib/supabase/server'
+import { EscrowInfoBanner } from '@/features/agents/components/EscrowInfoBanner'
 import Link from 'next/link'
 
 // PERF-04: ISR — revalidate detail pages every 5 minutes
@@ -194,6 +195,9 @@ X-PAYMENT: <x402-eip712-signed-payload>
 
           {/* ── Sidebar ──────────────────────────────────────────────────── */}
           <div className="space-y-4">
+
+            {/* WAS-72: Escrow banner para agentes de tareas largas */}
+            {model.long_running && <EscrowInfoBanner />}
 
             {/* Pay & Call — real component */}
             <ModelCallSection model={model} />
