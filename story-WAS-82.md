@@ -33,19 +33,60 @@ Cuando Chainlink Automation ejecuta `performUpkeep()` en el contrato WasiAIMarke
 
 ## Archivos a Crear
 
+### `src/lib/settlement/runSettlement.ts` ← CREAR NUEVO (extraído de settle-key-batches)
+
+Esta función centraliza el pipeline de settlement para que ambos crons la reutilicen.
+
+**Qué extraer de `settle-key-batches/route.ts`:**
+- Todo desde la línea 36 en adelante (búsqueda de unsettled calls, slugCreatorMap, agrupación por key, liquidación on-chain, actualización DB)
+- **No extraer:** auth CRON_SECRET (líneas 24-34) ni el check de `settlement_mode` (líneas 39-48)
+
+**Firma de función:**
+```typescript
+import { SupabaseClient } from '@supabase/supabase-js'
+
+export async function runSettlement(supabase: SupabaseClient): Promise<{
+  settled: number
+  results: Array<{ keyId: string; txHash: string | null; callCount: number; error?: string }>
+}>
+```
+
+**Estructura del archivo:**
+```typescript
+import { createServiceClient } from '@/lib/supabase/server'  // NO — recibe supabase como param
+import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
+import { PENDING_WALLET_SENTINEL } from '@/lib/settlement/immediateSettlement'
+import { logger } from '@/lib/logger'
+import { SupabaseClient } from '@supabase/supabase-js'
+
+const BATCH_SIZE_LIMIT = 500
+
+export async function runSettlement(supabase: SupabaseClient): Promise<{
+  settled: number
+  results: Array<{ keyId: string; txHash: string | null; callCount: number; error?: string }>
+}> {
+  // 1. Fetch unsettled calls (settle-key-batches:L57-75)
+  // 2. Build slugCreatorMap (settle-key-batches:L77-105)
+  // 3. Agrupar por key_id (settle-key-batches:L107-114)
+  // 4. Loop: liquidar cada key (settle-key-batches:L121-268)
+  // 5. Return { settled: totalSettled, results }
+}
+```
+
+> ⚠️ El `SupabaseClient` se recibe como parámetro (inyección de dependencia) — no crearlo dentro de la función. Esto permite que cada route handler cree su propio cliente antes de llamar a `runSettlement`.
+
+---
+
 ### `src/app/api/cron/upkeep-listener/route.ts` ← CREAR NUEVO
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
-import { PENDING_WALLET_SENTINEL } from '@/lib/settlement/immediateSettlement'
+import { runSettlement } from '@/lib/settlement/runSettlement'
 import { logger } from '@/lib/logger'
 import { createPublicClient, http } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
-
-const BATCH_SIZE_LIMIT = 500
 
 function getPublicClient() {
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
@@ -97,16 +138,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, settled: 0, reason: 'upkeep_not_needed' })
   }
 
-  // 2. upkeepNeeded = true → ejecutar settlement pipeline
+  // 2. upkeepNeeded = true → ejecutar settlement pipeline compartido
   logger.info('[upkeep-listener] upkeepNeeded=true — running settlement')
+  const supabase = createServiceClient()
+  const { settled, results } = await runSettlement(supabase)
 
-  // [PEGAR AQUÍ el pipeline completo de settle-key-batches desde L36 hasta L298]
-  // El pipeline es idéntico, excepto que NO tiene el check de settlement_mode
-  // (este cron SOLO corre cuando Chainlink ya ejecutó, independiente del modo)
-
-  // ... (ver settle-key-batches/route.ts para el pipeline completo)
-
-  return NextResponse.json({ ok: true, settled: totalSettled, keys: byKey.size, results })
+  logger.info('[upkeep-listener] done', { settled, keys: results.length })
+  return NextResponse.json({ ok: true, settled, keys: results.length, results })
 }
 ```
 
@@ -115,6 +153,34 @@ export async function GET(request: NextRequest) {
 ---
 
 ## Archivos a Modificar
+
+### `src/app/api/cron/settle-key-batches/route.ts` ← REFACTOR (importar runSettlement)
+
+**Cambio:** Eliminar el pipeline inline (pasos 1-5: unsettled calls hasta DB update) y reemplazarlo con una llamada a `runSettlement`.
+
+**Después del check de settlement_mode (L48), el handler queda así:**
+```typescript
+// (después del check chainlink skip)
+const supabase = createServiceClient()
+const { settled, results } = await runSettlement(supabase)
+
+logger.info('[settle-key-batches] done', { settled, keys: results.length })
+return NextResponse.json({
+  ok: true,
+  settled,
+  keys: results.length,
+  results,
+})
+```
+
+**Agregar import al inicio del archivo:**
+```typescript
+import { runSettlement } from '@/lib/settlement/runSettlement'
+```
+
+> ⚠️ Mantener el `createServiceClient()` call en el route handler — no moverlo a `runSettlement`.
+
+---
 
 ### `vercel.json` ← AGREGAR entry en `crons[]`
 
@@ -202,7 +268,8 @@ const [upkeepNeeded, performData] = await pub.readContract({
 ### PROHIBIDO
 - `watchContractEvent` — requiere proceso persistente, viola zero-infra-cost
 - Llamar `performUpkeep()` desde el cron — eso es rol exclusivo de Chainlink
-- Modificar `settle-key-batches/route.ts` — no tocar el cron existente
+- Duplicar el pipeline de settlement — toda la lógica core vive en `runSettlement.ts`
+- Auth CRON_SECRET dentro de `runSettlement.ts` — solo en route handlers
 - Hardcodear address del contrato o private keys
 - Agregar terceros servicios (Railway, Fly.io, etc.)
 - Más de 2 entries en `vercel.json crons[]` sin upgrade de plan
@@ -212,15 +279,23 @@ const [upkeepNeeded, performData] = await pub.readContract({
 ## Waves de Implementación
 
 ### W0 — Serial (prereq)
-1. Leer `src/app/api/cron/settle-key-batches/route.ts` completo (ya tienes el código)
+1. Leer `src/app/api/cron/settle-key-batches/route.ts` completo — este es el código a extraer
 2. Leer `src/lib/contracts/marketplaceClient.ts` L1-60 (patrón `getOperatorClient`)
+3. Leer `src/lib/settlement/immediateSettlement.ts` — importar `PENDING_WALLET_SENTINEL`
 
 ### W1 — Implementación
-1. Crear `src/app/api/cron/upkeep-listener/route.ts`
+1. **Crear** `src/lib/settlement/runSettlement.ts`
+   - Extraer pipeline de `settle-key-batches/route.ts` (desde L57 hasta el return final)
+   - Firma: `export async function runSettlement(supabase: SupabaseClient)`
+   - Return: `{ settled: number, results: [...] }`
+2. **Refactorizar** `src/app/api/cron/settle-key-batches/route.ts`
+   - Importar `runSettlement` desde `@/lib/settlement/runSettlement`
+   - Reemplazar pipeline inline por `const { settled, results } = await runSettlement(supabase)`
+3. **Crear** `src/app/api/cron/upkeep-listener/route.ts`
    - Auth check
    - `readContract` → `checkUpkeep`
-   - Pipeline de settlement (copiar de settle-key-batches, sin el block de settlement_mode)
-2. Modificar `vercel.json` — agregar entry cron
+   - Si true: `await runSettlement(supabase)`
+4. **Modificar** `vercel.json` — agregar entry cron
 
 ### W2 — Verificación
 1. `npm run build` → 0 errores
@@ -269,8 +344,10 @@ curl -X GET http://localhost:3000/api/cron/upkeep-listener \
 ## Archivos Esperados al Final
 
 ```
+✅ src/lib/settlement/runSettlement.ts          ← NUEVO (pipeline extraído)
 ✅ src/app/api/cron/upkeep-listener/route.ts   ← NUEVO
+✅ src/app/api/cron/settle-key-batches/route.ts ← MODIFICADO (refactor → importa runSettlement)
 ✅ vercel.json                                  ← MODIFICADO (+1 cron entry)
 ```
 
-**NO se tocan:** `settle-key-batches/route.ts`, `marketplaceClient.ts`, `WasiAIMarketplace.ts`
+**NO se tocan:** `marketplaceClient.ts`, `WasiAIMarketplace.ts`, `immediateSettlement.ts`
