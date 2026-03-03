@@ -76,8 +76,9 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   ]
 
   const secondaryLinks = [
-    { path: '/sandbox', label: tNav('sandbox')     },
-    { path: '/docs',    label: tNav('docs')        },
+    { path: '/creator/dashboard', label: tNav('dashboard') },
+    { path: '/sandbox',           label: tNav('sandbox')   },
+    { path: '/docs',              label: tNav('docs')      },
   ]
 
   const createItems = [
