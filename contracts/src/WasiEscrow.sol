@@ -157,6 +157,28 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
     }
 
     /**
+     * @notice Trustless refund: cualquiera puede llamar tras RELEASE_TIMEOUT
+     *         y devolver los fondos al payer original.
+     *         Protege al payer si el operador desaparece y la tarea falló.
+     * @dev    CEI pattern: estado → Refunded ANTES del safeTransfer.
+     */
+    function refundExpired(bytes32 escrowId)
+        external
+        nonReentrant
+        escrowExists(escrowId)
+        isPending(escrowId)
+    {
+        require(
+            block.timestamp >= escrows[escrowId].createdAt + RELEASE_TIMEOUT,
+            "WasiEscrow: timeout not reached"
+        );
+        EscrowTx storage e = escrows[escrowId];
+        e.status = EscrowStatus.Refunded;              // CEI: Effect primero
+        usdc.safeTransfer(e.payer, e.amount);           // Interaction después
+        emit EscrowRefunded(escrowId, e.payer, e.amount);
+    }
+
+    /**
      * @notice Operador devuelve USDC al payer (agente falló o cancelación).
      */
     function refundEscrow(bytes32 escrowId)
