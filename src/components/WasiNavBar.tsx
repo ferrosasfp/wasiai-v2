@@ -73,6 +73,9 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
 
   const primaryLinks = [
     { path: '',         label: tNav('marketplace') },
+  ]
+
+  const secondaryLinks = [
     { path: '/sandbox', label: tNav('sandbox')     },
     { path: '/docs',    label: tNav('docs')        },
   ]
@@ -140,7 +143,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
               </Link>
             ))}
 
-            {/* Dropdown: Crear */}
+            {/* Dropdown: Crear — justo después de Marketplace */}
             {isLoggedIn && (
               <div ref={createRef} className="relative">
                 <button
@@ -173,6 +176,21 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                 )}
               </div>
             )}
+
+            {/* Secondary links — Sandbox, Docs */}
+            {secondaryLinks.map(({ path, label }) => (
+              <Link
+                key={path}
+                href={`/${locale}${path}`}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isActive(path)
+                    ? 'bg-avax-50 text-avax-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
           </div>
 
           {/* Language switcher — desktop */}
