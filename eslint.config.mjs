@@ -14,6 +14,7 @@ const eslintConfig = [
             ".agent/**",
             "contracts/**",
             "packages/**",
+            "scripts/**",
             "*.min.*",
         ],
     },
