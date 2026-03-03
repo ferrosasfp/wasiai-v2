@@ -9,6 +9,8 @@ import { ReputationMetrics } from '@/features/models/components/ReputationMetric
 import { AgentExamplesDisplay } from '@/features/models/components/AgentExamplesDisplay'
 import { createClient } from '@/lib/supabase/server'
 import { EscrowInfoBanner } from '@/features/agents/components/EscrowInfoBanner'
+import { PricingBadge }    from '@/features/agents/components/PricingBadge'
+import { WasiKeyBanner }   from '@/features/agents/components/WasiKeyBanner'
 import Link from 'next/link'
 
 // PERF-04: ISR — revalidate detail pages every 5 minutes
@@ -195,6 +197,19 @@ X-PAYMENT: <x402-eip712-signed-payload>
 
           {/* ── Sidebar ──────────────────────────────────────────────────── */}
           <div className="space-y-4">
+
+            {/* WAS-133: Gas fee dinámico — solo si el agente tiene precio */}
+            {model.price_per_call > 0 && (
+              <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Precio estimado por invocación (x402)
+                </p>
+                <PricingBadge slug={model.slug} basePrice={model.price_per_call} />
+              </div>
+            )}
+
+            {/* WAS-133: Banner WasiAI Key — se autogestiona según si el usuario tiene key activa */}
+            <WasiKeyBanner locale={locale} creatorPrice={model.price_per_call} />
 
             {/* WAS-72: Escrow banner para agentes de tareas largas */}
             {model.long_running && <EscrowInfoBanner />}
