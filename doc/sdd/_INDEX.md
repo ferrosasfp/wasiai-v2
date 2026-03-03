@@ -30,3 +30,4 @@
 | 026 | 2026-03-02 | WAS-13 | CLI `wasiai invoke` — terminal client para agentes WasiAI | feature | QUALITY | DONE | master |
 | 027 | 2026-03-02 | WAS-72 | WasiEscrow — escrow on-chain para invocaciones long-running (ERC-3009) | feature | QUALITY | DONE | master |
 | 028 | 2026-03-02 | WAS-41 | LlamaIndex Plugin — `llama-index-wasiai` npm package (WasiAITool) | package | QUALITY | DONE | master |
+| 029 | 2026-03-03 | WAS-120 | Playwright CI — e2e tests en GitHub Actions (navigation + language-switcher) | ci | QUALITY | DONE | master |
