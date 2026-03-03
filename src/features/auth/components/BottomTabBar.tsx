@@ -75,7 +75,7 @@ export function BottomTabBar({ locale, initialEmail = null }: BottomTabBarProps)
         {
           icon: '🌐',
           label: `${currentLang}`,
-          href: `/${locale === 'en' ? 'es' : 'en'}${pathname.replace(`/${locale}`, '')}`,
+          href: `/${locale === 'en' ? 'es' : 'en'}${pathname.replace(new RegExp(`^/${locale}`), '')}`,
         },
         { icon: '🚪', label: t('signout'), onClick: handleSignout, danger: true },
       ]
