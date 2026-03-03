@@ -15,9 +15,10 @@ interface WalletData {
 
 interface AgentWalletSectionProps {
   agentSlug: string
+  agentName?: string
 }
 
-export function AgentWalletSection({ agentSlug }: AgentWalletSectionProps) {
+export function AgentWalletSection({ agentSlug, agentName }: AgentWalletSectionProps) {
   const [wallet, setWallet]     = useState<WalletData | null>(null)
   const [loading, setLoading]   = useState(true)
   const [initializing, setInit] = useState(false)
@@ -78,7 +79,10 @@ export function AgentWalletSection({ agentSlug }: AgentWalletSectionProps) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-semibold text-gray-900">Wallet del Agente</h3>
+        <div>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Wallet del Agente</p>
+          <h3 className="text-base font-semibold text-gray-900">{agentName ?? agentSlug}</h3>
+        </div>
         <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Fuji Testnet</span>
       </div>
 

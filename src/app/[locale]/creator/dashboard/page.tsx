@@ -296,7 +296,7 @@ export default async function CreatorDashboardPage({
 
         {/* WAS-71: Agent Wallets — una sección por agente */}
         {safeModels.map((model) => (
-          <AgentWalletSection key={model.id} agentSlug={model.slug} />
+          <AgentWalletSection key={model.id} agentSlug={model.slug} agentName={model.name} />
         ))}
 
         {/* Agent API quick-start */}
