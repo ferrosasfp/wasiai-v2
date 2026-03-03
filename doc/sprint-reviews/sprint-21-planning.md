@@ -50,4 +50,6 @@
 
 ---
 
-**Esperando aprobación de Fer. Escribe exactamente:** `SPRINT_APPROVED`
+**SPRINT_APPROVED — 2026-03-03 por Fer.**
+
+Pipeline QUALITY/FAST inicia por HU en orden: WAS-136 → WAS-138 → WAS-137 → WAS-139
