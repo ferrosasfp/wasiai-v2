@@ -100,12 +100,41 @@ export const WASIAI_MARKETPLACE_ABI = [
     inputs: [],
     outputs: [{ type: 'uint16' }],
   },
+  // NA-001: fee timelock 2-step (setPlatformFee eliminado del contrato)
   {
-    name: 'setPlatformFee',
+    name: 'proposeFee',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [{ name: 'bps', type: 'uint16' }],
     outputs: [],
+  },
+  {
+    name: 'executeFee',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'cancelFee',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'pendingFeeBps',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint16' }],
+  },
+  {
+    name: 'pendingFeeTimestamp',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
   },
   // ── Events ────────────────────────────────────────────────────────────────
   {
