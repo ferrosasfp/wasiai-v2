@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/settle-key-batches",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/upkeep-listener",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
