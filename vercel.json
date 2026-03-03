@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/upkeep-listener",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
