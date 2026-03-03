@@ -12,6 +12,7 @@
  * }
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyInternalSecret } from '@/lib/admin/verifyInternalSecret'
 import { readChainlinkFeed }  from '@/lib/defi-risk/chainlink'
 import { analyzeOnChain }     from '@/lib/defi-risk/onchain'
 import { auditContract }      from '@/lib/defi-risk/auditor'
@@ -22,6 +23,9 @@ import type { RiskReport }    from '@/lib/defi-risk/types'
 const DEFAULT_FEED = (process.env.CHAINLINK_AVAX_USD_FEED ?? '').trim()
 
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalSecret(request)
+  if (authError) return authError
+
   let body: Record<string, unknown> = {}
   try { body = await request.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })

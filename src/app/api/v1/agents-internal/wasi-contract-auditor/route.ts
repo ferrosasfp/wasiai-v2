@@ -7,9 +7,13 @@
  * Body: { token_address, contract_source? } or { input: string (JSON) }
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyInternalSecret } from '@/lib/admin/verifyInternalSecret'
 import { auditContract } from '@/lib/defi-risk/auditor'
 
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalSecret(request)
+  if (authError) return authError
+
   let body: Record<string, unknown> = {}
   try { body = await request.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
