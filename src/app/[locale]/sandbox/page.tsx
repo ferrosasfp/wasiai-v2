@@ -197,7 +197,7 @@ export default function SandboxPage() {
               onChange={(e) => setSelectedSlug(e.target.value)}
             >
               {agents.map((a) => (
-                <option key={a.id} value={a.slug}>
+                <option key={a.slug} value={a.slug}>
                   {a.name} — {formatUsdc(a.price_per_call)}/llamada
                 </option>
               ))}
