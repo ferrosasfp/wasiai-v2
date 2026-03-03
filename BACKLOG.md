@@ -253,3 +253,10 @@ Dependencia: HU-5.1 síncrona completada.
 - **Impacto:** UX — confuso para nuevos usuarios. No bloqueante.
 - **Prioridad:** P3 — Sprint 21
 - **Fecha:** 2026-03-03
+
+## Bug/Feature: Edit agent form — campos faltantes vs create wizard
+- **Síntoma:** El formulario de edición no incluye todos los campos del wizard de creación: capabilities, agent_type, mcp_tool_name, mcp_description, framework, version.
+- **Decisión:** Edit mantiene formato flat (no wizard) — estándar de marketplaces. Agregar campos faltantes al edit form.
+- **Campos a agregar:** capabilities, agent_type, mcp_tool_name, mcp_description, framework, version
+- **Prioridad:** P2 — Sprint 21
+- **Fecha:** 2026-03-03
