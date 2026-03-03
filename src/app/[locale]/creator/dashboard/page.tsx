@@ -10,6 +10,7 @@ import { AgentActions } from './_components/AgentActions'
 import { FreeTrialToggle } from './_components/FreeTrialToggle'
 import { WebhooksPanel } from './_components/WebhooksPanel'
 import { AgentWalletSection } from './_components/AgentWalletSection'
+import { AgentKeyWidget }     from './_components/AgentKeyWidget'
 import { PendingEarningsBanner } from '@/components/PendingEarningsBanner'
 import { CreatorAnalytics } from '@/features/creator/components/CreatorAnalytics'
 import { CallsPagination } from '@/features/creator/components/CallsPagination'
@@ -293,6 +294,9 @@ export default async function CreatorDashboardPage({
 
         {/* WAS-74: Webhooks */}
         <WebhooksPanel />
+
+        {/* Agent Key widget — fondos para servicios agénticos */}
+        <AgentKeyWidget locale={locale} />
 
         {/* WAS-71: Agent Wallets — una sección por agente */}
         {safeModels.map((model) => (
