@@ -348,11 +348,11 @@
     }
   },
   "nav": {
-    "marketplace": "Marketplace",
-    "dashboard": "Dashboard",
+    "marketplace": "Mercado",
+    "dashboard": "Panel",
     "docs": "Docs",
     "publish": "Publicar",
-    "agentKeys": "Agent Keys",
+    "agentKeys": "Claves de agente",
     "mainNavLabel": "Navegación principal",
     "homeLabel": "WasiAI — ir al inicio",
     "loadingUser": "Cargando usuario...",
@@ -363,9 +363,9 @@
     "create": "Crear",
     "me": "Yo",
     "publishAgent": "Publicar agente",
-    "myDashboard": "Mi dashboard",
+    "myDashboard": "Mi panel",
     "wallet": "Mi wallet",
-    "storage": "Storage",
+    "storage": "Almacenamiento",
     "login": "Iniciar Sesión",
     "signup": "Crear Cuenta",
     "signout": "Cerrar Sesión"
