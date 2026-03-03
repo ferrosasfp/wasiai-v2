@@ -30,13 +30,24 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
 
   const initialEmailRef = useRef(initialEmail)
 
+  // Sincronizar prop → state sin violar react-hooks/set-state-in-effect
+  // Comparamos en render; si cambió, actualizamos ref y state juntos
+  if (initialEmail !== initialEmailRef.current) {
+    initialEmailRef.current = initialEmail
+    setUserEmail(initialEmail)
+  }
+
   useEffect(() => {
     const supabase = createClient()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION' && initialEmailRef.current !== null) {
-        setLoading(false)
-        return
+      // INITIAL_SESSION: si ya tenemos email del SSR, no sobreescribir con null
+      if (event === 'INITIAL_SESSION') {
+        if (initialEmailRef.current !== null) {
+          setLoading(false)
+          return
+        }
       }
+      // SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED: siempre actualizar
       setUserEmail(session?.user?.email ?? null)
       setLoading(false)
     })
