@@ -1,15 +1,14 @@
 /**
  * usdcSettler.ts
  *
- * Self-hosted x402 settlement for Avalanche Fuji testnet.
+ * Self-hosted x402 settlement for Avalanche (Fuji testnet + mainnet).
  *
- * The UVD facilitator (facilitator.ultravioletadao.xyz) only supports mainnet chains
- * in its /verify endpoint. For testnet (Fuji), we:
- *   1. Verify the EIP-712 TransferWithAuthorization signature ourselves
- *   2. Execute transferWithAuthorization on the Fuji USDC contract via operator wallet
+ * WAS-134: WasiAI es su propio facilitador x402 — no dependencia de UltravioletaDAO.
+ * settlePaymentDirectly() soporta ambas chains (43113 Fuji / 43114 mainnet):
+ *   1. Verifica la firma EIP-712 TransferWithAuthorization
+ *   2. Ejecuta transferWithAuthorization en el contrato USDC via operator wallet
  *
- * This is functionally identical to what the facilitator does on mainnet.
- * The operator wallet pays AVAX gas — user pays zero gas.
+ * El operator wallet paga gas AVAX — el usuario paga cero gas.
  */
 
 import {
