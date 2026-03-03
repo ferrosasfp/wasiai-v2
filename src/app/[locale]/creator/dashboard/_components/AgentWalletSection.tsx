@@ -16,9 +16,10 @@ interface WalletData {
 interface AgentWalletSectionProps {
   agentSlug: string
   agentName?: string
+  locale?: string
 }
 
-export function AgentWalletSection({ agentSlug, agentName }: AgentWalletSectionProps) {
+export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: AgentWalletSectionProps) {
   const [wallet, setWallet]     = useState<WalletData | null>(null)
   const [loading, setLoading]   = useState(true)
   const [initializing, setInit] = useState(false)
@@ -104,34 +105,61 @@ export function AgentWalletSection({ agentSlug, agentName }: AgentWalletSectionP
           </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <code className="text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded font-mono">
-              {wallet.address.slice(0, 6)}…{wallet.address.slice(-4)}
-            </code>
-            <button
-              onClick={copyAddress}
-              className="text-xs text-indigo-600 hover:text-indigo-800"
-            >
-              {copied ? '✓ Copiado' : 'Copiar'}
-            </button>
-            {fujiExplorer && (
-              <a
-                href={fujiExplorer}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-gray-400 hover:text-gray-600"
+        <div className="flex flex-col gap-4">
+
+          {/* Dirección con tooltip + copiar */}
+          <div className="flex flex-col gap-1">
+            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Dirección de earnings</p>
+            <div className="flex items-center gap-2">
+              <div className="relative group">
+                <code className="text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded font-mono cursor-default">
+                  {wallet.address.slice(0, 6)}…{wallet.address.slice(-4)}
+                </code>
+                {/* Tooltip dirección completa */}
+                <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-10">
+                  <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 font-mono whitespace-nowrap shadow-lg">
+                    {wallet.address}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={copyAddress}
+                className="text-xs text-avax-600 hover:text-avax-800 font-medium"
               >
-                Ver en explorer ↗
-              </a>
-            )}
+                {copied ? '✓ Copiado' : 'Copiar dirección'}
+              </button>
+              {fujiExplorer && (
+                <a
+                  href={fujiExplorer}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Ver en explorer ↗
+                </a>
+              )}
+            </div>
+            <p className="text-xs text-gray-400">
+              AVAX balance: <span className="font-medium text-gray-600">{wallet.balanceFormatted} AVAX</span>
+            </p>
           </div>
-          <p className="text-sm text-gray-600">
-            Balance (Fuji AVAX): <span className="font-medium">{wallet.balanceFormatted} AVAX</span>
-          </p>
-          <p className="text-xs text-gray-400">
-            Los pagos agente→agente estarán disponibles en Sprint 16.
-          </p>
+
+          {/* CTA principal — depositar en Agent Key */}
+          <div className="rounded-xl bg-avax-50 border border-avax-100 p-4">
+            <p className="text-sm font-semibold text-gray-900 mb-1">
+              ¿Tu agente necesita pagar otros servicios?
+            </p>
+            <p className="text-xs text-gray-500 mb-3">
+              Para que tu agente pueda invocar otros agentes en WasiAI, deposita USDC en tu Agent Key. Sin fondos, tu agente no puede comprar servicios de otros agentes.
+            </p>
+            <a
+              href={`/${locale}/agent-keys`}
+              className="inline-block rounded-lg bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-400 transition"
+            >
+              Depositar en Agent Key →
+            </a>
+          </div>
+
         </div>
       )}
     </section>
