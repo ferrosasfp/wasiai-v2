@@ -571,5 +571,19 @@
     "edit": "Editar",
     "delete": "Eliminar",
     "cancel": "Cancelar"
+  },
+  "storage": {
+    "title": "Almacenamiento",
+    "description": "Sube y recupera archivos mediante almacenamiento descentralizado.",
+    "upload": "Subir",
+    "viewer": "Visor",
+    "dragOrClick": "Arrastra o haz clic para subir",
+    "uploading": "Subiendo...",
+    "selectFile": "Seleccionar archivo",
+    "uploadSuccess": "Subido correctamente",
+    "enterCid": "Ingresa el CID",
+    "loading": "Cargando...",
+    "retrieve": "Recuperar",
+    "fileUrl": "URL del archivo"
   }
 }
