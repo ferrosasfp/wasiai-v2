@@ -6,9 +6,13 @@
  *   OR  { token_address: string }
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyInternalSecret } from '@/lib/admin/verifyInternalSecret'
 import { analyzeOnChain } from '@/lib/defi-risk/onchain'
 
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalSecret(request)
+  if (authError) return authError
+
   let body: Record<string, unknown> = {}
   try { body = await request.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
