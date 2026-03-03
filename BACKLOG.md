@@ -246,3 +246,10 @@ Migrar POST /api/v1/compose de síncrono (25s) a async con polling:
 - Webhooks opcionales para notificar completion
 Requiere: tabla pipeline_executions en Supabase, worker o Vercel Edge Functions.
 Dependencia: HU-5.1 síncrona completada.
+
+## Bug: Flash "red incorrecta" al conectar Core Wallet (home)
+- **Síntoma:** Al conectar Core Wallet por primera vez en el home, aparece brevemente un error de red incorrecta aunque el usuario esté en Fuji. Desaparece al refrescar.
+- **Causa probable:** Race condition en hidratación — el check de chainId se ejecuta antes de que el contexto de wallet esté estable.
+- **Impacto:** UX — confuso para nuevos usuarios. No bloqueante.
+- **Prioridad:** P3 — Sprint 21
+- **Fecha:** 2026-03-03
