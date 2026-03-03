@@ -72,9 +72,9 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   const isLoggedIn = !!userEmail
 
   const primaryLinks = [
-    { path: '',       label: tNav('marketplace') },
-    { path: '/docs',  label: tNav('docs')        },
-    { path: '/sandbox', label: tNav('sandbox')   },
+    { path: '',         label: tNav('marketplace') },
+    { path: '/sandbox', label: tNav('sandbox')     },
+    { path: '/docs',    label: tNav('docs')        },
   ]
 
   const createItems = [
