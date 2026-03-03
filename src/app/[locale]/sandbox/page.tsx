@@ -3,9 +3,6 @@
 /**
  * /[locale]/sandbox — Sandbox Gratuito
  * WAS-75: Prueba agentes gratis con balance inicial de 0.5 USDC sandbox
- *
- * Nota: Este es un Client Component para manejar estado interactivo del invoker.
- * El balance inicial se carga via fetch al API en el cliente.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -36,30 +33,26 @@ interface SandboxErrorResponse {
   reset_at?: string
 }
 
-interface SandboxCreditsRow {
-  balance_usdc: number
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatUsdc(value: number | string): string {
-  return `$${parseFloat(String(value)).toFixed(4)} USDC`
+  return `$${parseFloat(String(value)).toFixed(4)}`
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function SandboxPage() {
   const params = useParams<{ locale: string }>()
-  const locale = params?.locale ?? 'es'
+  const _locale = params?.locale ?? 'es'
 
-  const [agents, setAgents] = useState<AgentOption[]>([])
-  const [selectedSlug, setSelectedSlug] = useState<string>('')
-  const [inputText, setInputText] = useState<string>('')
-  const [balance, setBalance] = useState<number | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<SandboxInvokeResponse | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [agents, setAgents]               = useState<AgentOption[]>([])
+  const [selectedSlug, setSelectedSlug]   = useState<string>('')
+  const [inputText, setInputText]         = useState<string>('')
+  const [balance, setBalance]             = useState<number | null>(null)
+  const [totalCalls, setTotalCalls]       = useState<number>(0)
+  const [loading, setLoading]             = useState(false)
+  const [result, setResult]               = useState<SandboxInvokeResponse | null>(null)
+  const [errorMsg, setErrorMsg]           = useState<string | null>(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
 
-  // Cargar agentes activos
   const fetchAgents = useCallback(async () => {
     try {
       const res = await fetch('/api/v1/agents?status=active&limit=50')
@@ -67,35 +60,28 @@ export default function SandboxPage() {
         const data = await res.json() as { agents?: AgentOption[]; data?: AgentOption[] }
         const list: AgentOption[] = data.agents ?? data.data ?? []
         setAgents(list)
-        if (list.length > 0 && !selectedSlug) {
-          setSelectedSlug(list[0].slug)
-        }
+        if (list.length > 0 && !selectedSlug) setSelectedSlug(list[0].slug)
       }
-    } catch {
-      // fail silently — lista vacía
-    }
+    } catch { /* fail silently */ }
   }, [selectedSlug])
 
-  // Cargar balance sandbox del usuario
   const fetchBalance = useCallback(async () => {
     try {
       const res = await fetch('/api/v1/sandbox/balance')
       if (res.ok) {
-        const data = await res.json() as SandboxCreditsRow
+        const data = await res.json() as { balance_usdc: number; total_calls: number }
         setBalance(data.balance_usdc ?? 0.5)
+        setTotalCalls(data.total_calls ?? 0)
       }
     } catch {
-      setBalance(0.5) // default si no hay endpoint de balance aún
+      setBalance(0.5)
     }
   }, [])
 
   useEffect(() => {
-    Promise.all([fetchAgents(), fetchBalance()]).finally(() => {
-      setLoadingInitial(false)
-    })
+    Promise.all([fetchAgents(), fetchBalance()]).finally(() => setLoadingInitial(false))
   }, [fetchAgents, fetchBalance])
 
-  // Invocar agente
   const handleInvoke = async () => {
     if (!selectedSlug) return
     setLoading(true)
@@ -103,11 +89,7 @@ export default function SandboxPage() {
     setErrorMsg(null)
 
     let parsedInput: Record<string, unknown> | string = inputText
-    try {
-      parsedInput = JSON.parse(inputText) as Record<string, unknown>
-    } catch {
-      parsedInput = inputText
-    }
+    try { parsedInput = JSON.parse(inputText) as Record<string, unknown> } catch { /* use string */ }
 
     try {
       const res = await fetch(`/api/v1/sandbox/invoke/${selectedSlug}`, {
@@ -120,16 +102,13 @@ export default function SandboxPage() {
         const data = await res.json() as SandboxInvokeResponse
         setResult(data)
         setBalance(parseFloat(data.balance_remaining))
+        setTotalCalls(c => c + 1)
       } else {
         const errData = await res.json() as SandboxErrorResponse
         if (res.status === 402) {
-          setErrorMsg(
-            `Créditos insuficientes. Balance: ${formatUsdc(errData.balance_usdc ?? 0)} | Requerido: ${formatUsdc(errData.required_usdc ?? 0)}`
-          )
+          setErrorMsg(`Créditos insuficientes. Balance: ${formatUsdc(errData.balance_usdc ?? 0)} | Requerido: ${formatUsdc(errData.required_usdc ?? 0)}`)
         } else if (res.status === 429) {
-          setErrorMsg(
-            `Límite de rate excedido (${errData.limit ?? 10} llamadas/hora). Reintentar en: ${errData.reset_at ?? 'pronto'}`
-          )
+          setErrorMsg(`Límite alcanzado (${errData.limit ?? 10} llamadas/hora). Reintentar en: ${errData.reset_at ?? 'pronto'}`)
         } else if (res.status === 422) {
           setErrorMsg('El agente falló. Se reembolsó el costo. Intenta de nuevo.')
         } else if (res.status === 401) {
@@ -147,118 +126,141 @@ export default function SandboxPage() {
     }
   }
 
-  const selectedAgent = agents.find((a) => a.slug === selectedSlug)
+  const selectedAgent = agents.find(a => a.slug === selectedSlug)
+  const balancePct    = balance !== null ? Math.min(100, (balance / 0.5) * 100) : 100
 
   if (loadingInitial) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Cargando sandbox…</p>
-      </div>
+      <main className="min-h-screen bg-gray-50 pb-24">
+        <div className="mx-auto max-w-2xl px-4 py-10 flex items-center justify-center">
+          <p className="text-gray-400 text-sm">Cargando sandbox…</p>
+        </div>
+      </main>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white px-4 py-10 max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-1">🧪 Sandbox — Prueba gratis</h1>
-        <p className="text-gray-400 text-sm">
-          Invoca agentes sin pagar. Usa tus créditos sandbox iniciales.
-        </p>
-      </div>
+    <main className="min-h-screen bg-gray-50 pb-24">
+      <div className="mx-auto max-w-2xl px-4 py-8 space-y-5">
 
-      {/* Balance card */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6 flex items-center justify-between">
+        {/* Header */}
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Balance sandbox</p>
-          <p className="text-2xl font-bold text-green-400">
-            {balance !== null ? formatUsdc(balance) : '—'}
+          <h1 className="text-2xl font-bold text-gray-900">🧪 Sandbox</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Prueba agentes gratis con tus créditos iniciales. Sin tarjeta.
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-gray-500">Inicial: $0.5000 USDC</p>
-          <p className="text-xs text-gray-600 mt-1">10 llamadas/hora máx.</p>
-        </div>
-      </div>
 
-      {/* Formulario */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6 space-y-4">
-        {/* Selector de agente */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Seleccionar agente
-          </label>
-          {agents.length === 0 ? (
-            <p className="text-gray-500 text-sm">No hay agentes activos disponibles.</p>
-          ) : (
-            <select
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={selectedSlug}
-              onChange={(e) => setSelectedSlug(e.target.value)}
-            >
-              {agents.map((a) => (
-                <option key={a.slug} value={a.slug}>
-                  {a.name} — {formatUsdc(a.price_per_call)}/llamada
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* Input */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Input (texto o JSON)
-          </label>
-          <textarea
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-            rows={4}
-            placeholder='{"prompt": "Hola, agente!"}'
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-          />
-        </div>
-
-        {/* Botón invocar */}
-        <button
-          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
-          onClick={handleInvoke}
-          disabled={loading || !selectedSlug || agents.length === 0}
-        >
-          {loading ? 'Invocando…' : 'Invocar gratis →'}
-        </button>
-
-        {/* Info del agente seleccionado */}
-        {selectedAgent && (
-          <p className="text-xs text-gray-600 text-center">
-            Costo: {formatUsdc(selectedAgent.price_per_call)} por llamada
-          </p>
-        )}
-      </div>
-
-      {/* Error */}
-      {errorMsg && (
-        <div className="bg-red-950 border border-red-800 text-red-300 rounded-xl p-4 mb-6 text-sm">
-          ⚠️ {errorMsg}
-        </div>
-      )}
-
-      {/* Resultado */}
-      {result && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-gray-300 mb-3">Resultado</h2>
-          <pre className="text-xs text-green-300 bg-gray-950 rounded-lg p-3 overflow-auto max-h-72 whitespace-pre-wrap">
-            {JSON.stringify(result.result, null, 2)}
-          </pre>
-          <div className="mt-3 flex gap-4 text-xs text-gray-500">
-            <span>Costo deducido: <span className="text-yellow-400">{formatUsdc(result.cost_usdc)}</span></span>
-            <span>|</span>
-            <span>Restante: <span className="text-green-400">{formatUsdc(result.balance_remaining)}</span></span>
-            <span>|</span>
-            <span className="font-mono text-gray-600">ID: {result.call_id.slice(0, 8)}…</span>
+        {/* Balance card */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Balance sandbox</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {balance !== null ? formatUsdc(balance) : '—'}
+                <span className="text-sm font-normal text-gray-400 ml-1">USDC</span>
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-400">{totalCalls} llamadas</p>
+              <p className="text-xs text-gray-400 mt-0.5">máx 10/hora</p>
+            </div>
           </div>
-        </div>
-      )}
+          {/* Barra de balance */}
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#E84142] rounded-full transition-all duration-500"
+              style={{ width: `${balancePct}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">
+            Inicial: $0.5000 USDC · Restante: {balancePct.toFixed(0)}%
+          </p>
+        </section>
+
+        {/* Formulario */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm space-y-4">
+          {/* Selector de agente */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Agente
+            </label>
+            {agents.length === 0 ? (
+              <p className="text-sm text-gray-400">No hay agentes activos disponibles.</p>
+            ) : (
+              <select
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142]"
+                value={selectedSlug}
+                onChange={e => setSelectedSlug(e.target.value)}
+              >
+                {agents.map(a => (
+                  <option key={a.slug} value={a.slug}>
+                    {a.name} — {formatUsdc(a.price_per_call)} USDC/llamada
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Input <span className="text-gray-400 font-normal">(texto o JSON)</span>
+            </label>
+            <textarea
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142] font-mono resize-none"
+              rows={4}
+              placeholder='{"prompt": "Hola, agente!"}'
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+            />
+          </div>
+
+          {/* Costo estimado */}
+          {selectedAgent && (
+            <p className="text-xs text-gray-400">
+              Costo estimado: <span className="font-medium text-gray-600">{formatUsdc(selectedAgent.price_per_call)} USDC</span>
+            </p>
+          )}
+
+          {/* Botón */}
+          <button
+            className="w-full bg-[#E84142] hover:bg-[#d03536] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+            onClick={handleInvoke}
+            disabled={loading || !selectedSlug || agents.length === 0}
+          >
+            {loading ? 'Invocando…' : 'Invocar gratis →'}
+          </button>
+        </section>
+
+        {/* Error */}
+        {errorMsg && (
+          <section className="rounded-2xl border border-red-100 bg-red-50 p-4">
+            <p className="text-sm text-red-600">⚠️ {errorMsg}</p>
+          </section>
+        )}
+
+        {/* Resultado */}
+        {result && (
+          <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-700">Resultado</h2>
+              <div className="flex gap-3 text-xs text-gray-400">
+                <span>Costo: <span className="text-gray-700 font-medium">{formatUsdc(result.cost_usdc)}</span></span>
+                <span>·</span>
+                <span>Restante: <span className="text-[#E84142] font-medium">{formatUsdc(result.balance_remaining)}</span></span>
+              </div>
+            </div>
+            <pre className="text-xs text-gray-800 bg-gray-50 border border-gray-100 rounded-xl p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono">
+              {JSON.stringify(result.result, null, 2)}
+            </pre>
+            <p className="text-xs text-gray-400 font-mono">
+              ID: {result.call_id.slice(0, 8)}…
+            </p>
+          </section>
+        )}
+
+      </div>
     </main>
   )
 }
