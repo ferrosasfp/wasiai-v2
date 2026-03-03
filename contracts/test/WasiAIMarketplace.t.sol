@@ -825,7 +825,7 @@ contract WasiAIMarketplaceTest is Test {
         marketplace.recordInvocation(SLUG2, payer, PRICE, keccak256("p3"));
         vm.stopPrank();
 
-        uint256 fee    = PRICE * 1000 / 10000;
+        uint256 fee    = (PRICE * 1000) / 10000;
         uint256 share1 = (PRICE - fee) * 2;
         uint256 share2 =  PRICE - fee;
 
@@ -1108,7 +1108,7 @@ contract WasiAIMarketplaceTest is Test {
         }
         vm.stopPrank();
 
-        uint256 totalFee      = (PRICE * 1000 / 10000) * n;
+        uint256 totalFee      = (PRICE * 1000 * n) / 10000;
         uint256 creatorEarned = PRICE * n - totalFee;
 
         assertEq(usdc.balanceOf(treasury), totalFee);
