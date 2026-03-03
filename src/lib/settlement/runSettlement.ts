@@ -15,6 +15,35 @@ export async function runSettlement(supabase: SupabaseClient): Promise<{
   settled: number
   results: Array<{ keyId: string; txHash: string | null; callCount: number; error?: string }>
 }> {
+  // 0. Advisory lock — evitar doble ejecución concurrente (race condition WAS-82)
+  // Compare-and-swap: solo actualiza si value = 'idle'
+  const { data: lockRow, error: lockError } = await supabase
+    .from('system_config')
+    .update({ value: 'running', updated_at: new Date().toISOString() })
+    .eq('key', 'settlement_lock')
+    .eq('value', 'idle')
+    .select('key')
+    .single()
+
+  if (lockError || !lockRow) {
+    logger.info('[runSettlement] already running — skipping (settlement_lock)')
+    return { settled: 0, results: [] }
+  }
+
+  try {
+    return await _runSettlementPipeline(supabase)
+  } finally {
+    await supabase
+      .from('system_config')
+      .update({ value: 'idle' })
+      .eq('key', 'settlement_lock')
+  }
+}
+
+async function _runSettlementPipeline(supabase: SupabaseClient): Promise<{
+  settled: number
+  results: Array<{ keyId: string; txHash: string | null; callCount: number; error?: string }>
+}> {
   // 1. Encontrar todas las llamadas con key no liquidadas
   // HAL-026: Limitar a últimos 7 días para evitar timeout con historial largo
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
