@@ -1,11 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import {
-  FacilitatorClient,
-  extractPaymentFromHeaders,
-  X402_CORS_HEADERS,
-} from 'uvd-x402-sdk/backend'
+// WAS-134: x402 utilities inlineadas — eliminada dependencia de uvd-x402-sdk
+const X402_CORS_HEADERS = {
+  'Access-Control-Allow-Headers': 'Content-Type, X-PAYMENT, PAYMENT-SIGNATURE, Authorization',
+  'Access-Control-Expose-Headers': 'X-PAYMENT-RESPONSE, PAYMENT-RESPONSE, PAYMENT-REQUIRED',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+} as const
+
+function extractPaymentFromHeaders(headers: Headers | Record<string, string | string[] | undefined>): Record<string, string> | null {
+  const normalized: Record<string, string> = {}
+  const entries = headers instanceof Headers
+    ? Array.from(headers.entries())
+    : Object.entries(headers)
+  for (const [key, value] of entries) {
+    if (typeof value === 'string') normalized[key.toLowerCase()] = value
+    else if (Array.isArray(value) && value.length > 0) normalized[key.toLowerCase()] = value[0]
+  }
+  const payment = normalized['x-payment'] ?? normalized['payment-signature'] ?? null
+  if (!payment) return null
+  try { return JSON.parse(Buffer.from(payment, 'base64').toString('utf-8')) }
+  catch { return null }
+}
 import { keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
 import { signReceipt } from '@/lib/receipts/signReceipt'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
@@ -99,20 +115,15 @@ interface X402PaymentHeader {
   [key: string]: unknown
 }
 
-async function settleX402(paymentHeader: X402PaymentHeader, model: Record<string, unknown>, priceStr: string, resourceUrl: string): Promise<SettlementResult | NextResponse> {
-  if (CHAIN_ID_NUM === 43113) {
-    const evmPayload = paymentHeader?.payload as X402EVMPayload | undefined
-    if (!evmPayload?.authorization || !evmPayload?.signature) {
-      return NextResponse.json({ error: 'Invalid payment header', code: 'payment_invalid' }, { status: 402 })
-    }
-    const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
-    return settlePaymentDirectly(evmPayload, atomicRequired)
-  } else {
-    const requirements = buildRequirements({ amount: priceStr, recipient: CONTRACT_ADDRESS, resource: resourceUrl, description: `Access to ${model.name as string} on WasiAI`, mimeType: 'application/json' })
-    const facilitatorUrl = (process.env.X402_FACILITATOR_URL ?? 'https://facilitator.ultravioletadao.xyz').trim()
-    const facilitator = new FacilitatorClient({ baseUrl: facilitatorUrl })
-    return facilitator.verifyAndSettle(paymentHeader as import('uvd-x402-sdk').X402Header, requirements)
+// WAS-134: settlePaymentDirectly() cubre Fuji (43113) y mainnet (43114) — sin facilitador externo
+async function settleX402(paymentHeader: X402PaymentHeader, model: Record<string, unknown>, priceStr: string, _resourceUrl: string): Promise<SettlementResult | NextResponse> {
+  const evmPayload = paymentHeader?.payload as X402EVMPayload | undefined
+  if (!evmPayload?.authorization || !evmPayload?.signature) {
+    return NextResponse.json({ error: 'Invalid payment header', code: 'payment_invalid' }, { status: 402 })
   }
+  const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
+  void model // unused after WAS-134 — kept for signature compatibility
+  return settlePaymentDirectly(evmPayload, atomicRequired)
 }
 
 // WAS-132: recordOnChain() eliminado — Supabase agent_calls es la fuente de verdad.
