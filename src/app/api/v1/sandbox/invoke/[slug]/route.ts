@@ -210,12 +210,13 @@ export async function POST(
   await supabase.from('agent_calls').insert({
     id:           callId,
     agent_id:     agent.id,
-    user_id:      user.id,
+    caller_id:    user.id,       // FK a auth.users (era user_id en el draft)
+    caller_type:  'human',
+    amount_paid:  agent.price_per_call,  // columna real (no cost_usdc)
     is_trial:     true,
     payment_type: 'sandbox',
-    cost_usdc:    agent.price_per_call,
     status:       'completed',
-    created_at:   new Date().toISOString(),
+    called_at:    new Date().toISOString(),
   })
 
   // 11. Obtener balance restante actualizado
