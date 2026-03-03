@@ -239,6 +239,7 @@ CREATE INDEX idx_escrow_payer  ON escrow_transactions(payer_user_id);
 - NO agregar tercer Vercel Cron (plan Hobby 2/2 ocupado)
 - NO exponer endpoint release-expired sin autenticación
 - NO guardar private keys en escrow_transactions
+- NO usar ethers.js — SIEMPRE viem v2 (pinned 2.21.0)
 
 ---
 
@@ -251,3 +252,13 @@ CREATE INDEX idx_escrow_payer  ON escrow_transactions(payer_user_id);
 | escrow_id colisión (nonce predecible) | Media | nonce = UUID v4 generado server-side, incluye chainId en hash |
 | Vercel cold start en invoke-long demora la tx | Baja | AbortSignal 30s en fetch + retry en cliente |
 | long_running false positivo (creator se equivoca) | Baja | Creator puede editar el campo en dashboard |
+
+---
+
+## Auto-Blindaje
+
+### [2026-03-02]: ethers.js en código ejemplar del story file
+- **Error:** El Architect generó código ejemplar para `escrow.ts` usando `ethers.js` (ethers.Contract, ethers.Wallet, ethers.JsonRpcProvider) violando el Golden Path del proyecto.
+- **Fix:** Reemplazado por viem v2 con el patrón exacto de `marketplaceClient.ts` (createWalletClient, createPublicClient, privateKeyToAccount, simulateContract + writeContract).
+- **Aplicar en:** Cualquier generación futura de código de contratos — siempre leer `marketplaceClient.ts` como exemplar antes de generar código de cliente on-chain.
+- **Regla reforzada:** `NUNCA ethers.js` es una regla del Golden Path — verificar en Constraint Directives de cada SDD que involucre contratos.
