@@ -44,7 +44,7 @@
 | 2 | WAS-138 | Fix tests fallando | M | Deuda técnica — CI en rojo es señal de alerta |
 | 3 | WAS-137 | Edit agent campos faltantes | M | UX crítico para creators reales |
 | 4 | WAS-139 | Vista pública creator_public_profiles | S | Rápido, habilita perfiles públicos |
-| 5 | WAS-140 | Pagos autónomos agente→agente | XL | Core Build Games S2 — flujo agéntico completo |
+| 5 | WAS-140 | Pagos autónomos agente→agente — **MVP Fuji, 1 hop** | XL | Core Build Games S2 — scope limitado a Fuji + 1 salto. Mainnet diferido. |
 
 ---
 
