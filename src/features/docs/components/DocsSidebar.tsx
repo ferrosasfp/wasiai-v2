@@ -13,6 +13,7 @@ const SECTION_KEYS = [
   { id: 'x402',          key: 'x402'         },
   { id: 'compose',       key: 'compose'      },
   { id: 'agent-keys',    key: 'agentKeys'    },
+  { id: 'pricing',       key: 'pricing'      },
   { id: 'creator-guide', key: 'creatorGuide' },
   { id: 'agentkit',      key: 'agentkit'     },
 ] as const
