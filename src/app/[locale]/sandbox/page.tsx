@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { SandboxClient } from './SandboxClient'
 
-export default async function SandboxPage({
+export default async function Page({
   params,
 }: {
   params: Promise<{ locale: string }>
