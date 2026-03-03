@@ -11,6 +11,7 @@ interface WalletData {
   address: string | null
   balanceWei: string
   balanceFormatted: string
+  balanceUsdcFormatted: string
 }
 
 interface AgentWalletSectionProps {
@@ -139,9 +140,14 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
                 </a>
               )}
             </div>
-            <p className="text-xs text-gray-400">
-              AVAX balance: <span className="font-medium text-gray-600">{wallet.balanceFormatted} AVAX</span>
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-sm font-semibold text-gray-900">
+                {wallet.balanceUsdcFormatted} USDC
+              </span>
+              <span className="text-xs text-gray-400">
+                ({wallet.balanceFormatted} AVAX)
+              </span>
+            </div>
           </div>
 
           {/* CTA principal — depositar en Agent Key */}

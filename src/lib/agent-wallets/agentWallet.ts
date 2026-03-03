@@ -163,3 +163,40 @@ export async function getAgentWalletClient(agentId: string) {
     transport: http('https://api.avax-test.network/ext/bc/C/rpc'),
   })
 }
+
+/**
+ * Lee el balance USDC de la wallet del agente.
+ * USDC Fuji: 0x5425890298aed601595a70AB815c96711a31Bc65
+ * USDC Mainnet: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
+ */
+const USDC_ABI = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs:  [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const
+
+const CHAIN_ID   = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+const USDC_ADDR  = CHAIN_ID === 43114
+  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E' as const
+  : '0x5425890298aed601595a70AB815c96711a31Bc65' as const
+
+export async function getAgentWalletUsdcBalance(
+  address: string,
+): Promise<{ balanceUsdc: string; balanceUsdcFormatted: string }> {
+  try {
+    const raw = await publicClient.readContract({
+      address:      USDC_ADDR,
+      abi:          USDC_ABI,
+      functionName: 'balanceOf',
+      args:         [address as `0x${string}`],
+    })
+    const formatted = (Number(raw) / 1_000_000).toFixed(2)
+    return { balanceUsdc: raw.toString(), balanceUsdcFormatted: formatted }
+  } catch {
+    return { balanceUsdc: '0', balanceUsdcFormatted: '0.00' }
+  }
+}
