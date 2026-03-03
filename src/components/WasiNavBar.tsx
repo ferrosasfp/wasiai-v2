@@ -83,7 +83,6 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
 
   const createItems = [
     { icon: '📦', label: tNav('publishAgent'),  href: `/${locale}/publish`            },
-    { icon: '📊', label: tNav('myDashboard'),   href: `/${locale}/creator/dashboard`  },
     { icon: '🔗', label: tNav('pipelines'),     href: `/${locale}/pipelines`          },
     { icon: '🔑', label: tNav('agentKeys'),     href: `/${locale}/agent-keys`         },
   ]

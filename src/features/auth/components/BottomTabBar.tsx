@@ -52,7 +52,6 @@ export function BottomTabBar({ locale, initialEmail = null }: BottomTabBarProps)
   const createItems = isLoggedIn
     ? [
         { icon: '📦', label: t('publishAgent'), href: `/${locale}/publish` },
-        { icon: '📊', label: t('myDashboard'), href: `/${locale}/creator/dashboard` },
         { icon: '🔗', label: t('pipelines'), href: `/${locale}/pipelines` },
         { icon: '🔑', label: t('agentKeys'), href: `/${locale}/agent-keys` },
       ]
