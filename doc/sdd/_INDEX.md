@@ -39,3 +39,4 @@
 | 035 | 2026-03-03 | WAS-132 | Eliminar recordInvocation() del hot path — Supabase como fuente de verdad | improvement | QUALITY | DONE | master |
 | 036 | 2026-03-03 | WAS-134 | Facilitador x402 propio en mainnet — elimina dependencia UltravioletaDAO | improvement | QUALITY | DONE | master |
 | 037 | 2026-03-03 | WAS-133 | Gas fee dinámico Chainlink + banner WasiAI Key en detail page | feature | QUALITY | DONE | master |
+| 038 | 2026-03-03 | WAS-131 | Freemium publish — primer agente gratis, listing fee x402 real para siguientes | feature | QUALITY | DONE | master |
