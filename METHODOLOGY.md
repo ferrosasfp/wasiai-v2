@@ -40,6 +40,7 @@ El flujo QUALITY completo es obligatorio en cada HU. Sin excepciones.
 [QA] F4 — Drift Detection + ACs con evidencia archivo:línea
 [Docs] DONE → _INDEX.md
 git push origin master master:main
+# AB-012: Vercel escucha `main` — siempre pushear ambos branches al cerrar sprint
 ```
 
 ---
