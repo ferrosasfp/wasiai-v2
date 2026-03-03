@@ -24,3 +24,4 @@
 | 020 | 2026-03-02 | WAS-75 | HU-9.1 — Sandbox gratuito para builders (Fuji + créditos) | feature | QUALITY | DONE | master |
 | 021 | 2026-03-02 | WAS-38 | HU-5.4 — UI visual de pipelines de agentes | feature | QUALITY | DONE | master |
 | 022 | 2026-03-02 | WAS-71 | HU-6.5 — Agentes con wallet propia (self-custody payments) | feature | QUALITY | DONE | master |
+| 024 | 2026-03-02 | WAS-103 | Arquitectura dual-flow OZ-A1 — FLOW GUIDE + whenNotPaused | refactor | QUALITY | DONE | master |
