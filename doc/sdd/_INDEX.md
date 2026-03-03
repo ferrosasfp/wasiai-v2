@@ -28,3 +28,4 @@
 | 024 | 2026-03-02 | WAS-103 | Arquitectura dual-flow OZ-A1 — FLOW GUIDE + whenNotPaused | refactor | QUALITY | DONE | master |
 | 025 | 2026-03-02 | WAS-82 | Upkeep Listener — Vercel Cron Chainlink + runSettlement compartido | feature | QUALITY | DONE | master |
 | 026 | 2026-03-02 | WAS-13 | CLI `wasiai invoke` — terminal client para agentes WasiAI | feature | QUALITY | DONE | master |
+| 027 | 2026-03-02 | WAS-72 | WasiEscrow — escrow on-chain para invocaciones long-running (ERC-3009) | feature | QUALITY | DONE | master |
