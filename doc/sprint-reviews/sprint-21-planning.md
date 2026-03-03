@@ -44,14 +44,9 @@
 | 2 | WAS-138 | Fix tests fallando | M | Deuda técnica — CI en rojo es señal de alerta |
 | 3 | WAS-137 | Edit agent campos faltantes | M | UX crítico para creators reales |
 | 4 | WAS-139 | Vista pública creator_public_profiles | S | Rápido, habilita perfiles públicos |
-| 5 | WAS-140 | Pagos autónomos agente→agente — **MVP Fuji, 1 hop** | XL | Core Build Games S2 — scope limitado a Fuji + 1 salto. Mainnet diferido. |
 
----
-
-## Contexto Build Games
-
-**Semana 2** (debería tener): Mainnet + AgentKit + 3 creadores reales
-**Estado real:** WAS-140 (agente→agente) es el MVP del flujo agéntico — prioridad máxima
+**WAS-140 — Pagos autónomos agente→agente → Sprint 22 completo (solo eso)**
+**AgentKit integration + 3 creadores reales → diferido, fecha TBD**
 
 ---
 
