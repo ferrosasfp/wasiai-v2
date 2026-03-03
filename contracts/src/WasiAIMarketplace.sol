@@ -157,13 +157,14 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     // ─── Modifiers ────────────────────────────────────────────────────────────
 
-    modifier onlyOperator() {
+    function _checkOperator() internal view {
         require(
             operators[msg.sender] || msg.sender == owner(),
             "WasiAI: not operator"
         );
-        _;
     }
+
+    modifier onlyOperator() { _checkOperator(); _; }
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
