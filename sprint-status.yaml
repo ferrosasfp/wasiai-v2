@@ -1,45 +1,56 @@
-sprint: 15
-periodo: "2026-03-02 → 2026-03-02"
-estado: DONE
-goal: "Builders con superpoderes: sandbox gratuito, jobs async, UI pipelines, agent wallets"
-goal_cumplido: true
+sprint: 17
+periodo: "2026-03-02 → TBD"
+estado: planning
+goal: "Blindar el stack de pagos on-chain: tests ERC-3009 reales, arquitectura dual-flow consolidada, settlement automático vía listener, CLI para developers, escrow para tareas largas y primer plugin de ecosistema LlamaIndex."
+goal_cumplido: false
 
 seleccionadas:
-  - id: WAS-74-deuda
-    hu: Deuda técnica Webhooks UI — 6 menores Sprint 14
-    prioridad: P0-deuda
-    nnn: "018"
-    modo: FAST
-    estado: DONE
-
-  - id: WAS-70
-    hu: HU-5.1b — Ejecución asíncrona de pipelines (jobs + polling)
-    prioridad: P2
-    nnn: "019"
+  - id: WAS-89
+    hu: "[L-03] Tests MockUSDC firma ERC-3009"
+    prioridad: P0-seguridad
     modo: QUALITY
-    estado: DONE
+    estado: Todo
+    sp: 5
 
-  - id: WAS-75
-    hu: HU-9.1 — Sandbox gratuito para builders (Fuji + créditos)
+  - id: WAS-103
+    hu: "[OZ-A1] Arquitectura dual-flow en un contrato"
+    prioridad: P1-arch
+    modo: QUALITY
+    estado: Todo
+    sp: 3
+
+  - id: WAS-82
+    hu: "Listener UpkeepPerformed → settlement automático"
     prioridad: P1
-    nnn: "020"
     modo: QUALITY
-    estado: DONE
+    estado: Todo
+    sp: 8
 
-  - id: WAS-38
-    hu: HU-5.4 — UI visual de pipelines de agentes
+  - id: WAS-13
+    hu: "CLI wasiai invoke <agent> '<input>'"
     prioridad: P2
-    nnn: "021"
     modo: QUALITY
-    estado: DONE
+    estado: Todo
+    sp: 5
 
-  - id: WAS-71
-    hu: HU-6.5 — Agentes con wallet propia (self-custody payments)
-    prioridad: P1-stretch
-    nnn: "022"
+  - id: WAS-72
+    hu: "HU-6.6 — Escrow para tareas largas"
+    prioridad: P2-stretch
     modo: QUALITY
-    estado: DONE
+    estado: Todo
+    sp: 13
 
-sp_comprometidos: 24
-sp_stretch: 13
-sp_entregados: 37
+  - id: WAS-41
+    hu: "HU-7.2: Plugin LlamaIndex para WasiAI"
+    prioridad: P3-stretch
+    modo: QUALITY
+    estado: Todo
+    sp: 8
+
+sp_comprometidos: 29
+sp_stretch: 21
+sp_total: 42
+
+duplicados:
+  - id: WAS-114
+    razon: "Duplicado de WAS-13. Won't Do."
