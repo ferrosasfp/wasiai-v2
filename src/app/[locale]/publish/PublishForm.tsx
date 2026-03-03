@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import ListingFeeModal from './ListingFeeModal'
 import { useRouter, useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import type { CreateModelDraft, ModelCapability } from '@/lib/schemas/model.schema'
@@ -56,6 +57,16 @@ export default function PublishForm({ initialDraft, from }: Props) {
   const [publishing, setPublishing] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showDraftModal, setShowDraftModal] = useState(!!initialDraft)
+
+  // WAS-131: Freemium publish gate
+  const [gateData, setGateData] = useState<{
+    agentCount:      number
+    listingFee:      number
+    requiresFee:     boolean
+    hasWallet:       boolean
+    treasuryAddress: string
+  } | null>(null)
+  const [showFeeModal, setShowFeeModal] = useState(false)
 
   function handleChange(field: string, value: unknown) {
     setData(prev => ({ ...prev, [field]: value }))
@@ -129,6 +140,27 @@ export default function PublishForm({ initialDraft, from }: Props) {
     if (!draftSlug) return
     setPublishing(true)
     try {
+      // WAS-131: Verificar gate freemium antes de activar
+      const gateRes = await fetch('/api/creator/publish-gate')
+      if (gateRes.ok) {
+        const gate = await gateRes.json() as {
+          agentCount: number; listingFee: number; requiresFee: boolean
+          hasWallet: boolean; treasuryAddress: string
+        }
+        setGateData(gate)
+        if (gate.requiresFee) {
+          if (!gate.hasWallet) {
+            setErrors({ endpoint_url: 'Configura tu wallet antes de publicar este agente.' })
+            setPublishing(false)
+            return
+          }
+          setPublishing(false)
+          setShowFeeModal(true)
+          return
+        }
+      }
+
+      // Sin fee requerido → flujo actual
       // Guardar campos técnicos
       const patchRes = await fetch(`/api/creator/agents/${draftSlug}`, {
         method: 'PATCH',
@@ -255,6 +287,17 @@ export default function PublishForm({ initialDraft, from }: Props) {
           </div>
         </div>
       </div>
+      {/* WAS-131: Listing fee modal */}
+      {showFeeModal && gateData && draftSlug && (
+        <ListingFeeModal
+          slug={draftSlug}
+          listingFee={gateData.listingFee}
+          treasuryAddress={gateData.treasuryAddress}
+          creatorWallet={''}
+          locale={locale}
+          onCancel={() => setShowFeeModal(false)}
+        />
+      )}
     </main>
   )
 }

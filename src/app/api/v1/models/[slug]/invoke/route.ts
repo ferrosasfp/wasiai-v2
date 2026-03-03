@@ -116,13 +116,12 @@ interface X402PaymentHeader {
 }
 
 // WAS-134: settlePaymentDirectly() cubre Fuji (43113) y mainnet (43114) — sin facilitador externo
-async function settleX402(paymentHeader: X402PaymentHeader, model: Record<string, unknown>, priceStr: string, _resourceUrl: string): Promise<SettlementResult | NextResponse> {
+async function settleX402(paymentHeader: X402PaymentHeader, _model: Record<string, unknown>, priceStr: string): Promise<SettlementResult | NextResponse> {
   const evmPayload = paymentHeader?.payload as X402EVMPayload | undefined
   if (!evmPayload?.authorization || !evmPayload?.signature) {
     return NextResponse.json({ error: 'Invalid payment header', code: 'payment_invalid' }, { status: 402 })
   }
   const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
-  void model // unused after WAS-134 — kept for signature compatibility
   return settlePaymentDirectly(evmPayload, atomicRequired)
 }
 
@@ -326,7 +325,7 @@ export async function POST(
   }
 
   // ── 4. Verify + Settle (A-01: extracted to settleX402 helper) ─────────────
-  const settlementOrError = await settleX402(paymentHeader, model, priceStr, resourceUrl)
+  const settlementOrError = await settleX402(paymentHeader, model, priceStr)
 
   // If helper returned a NextResponse (error), return it directly
   if (settlementOrError instanceof NextResponse) return settlementOrError
