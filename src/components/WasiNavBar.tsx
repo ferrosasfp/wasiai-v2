@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -15,6 +15,7 @@ interface WasiNavBarProps {
 
 export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const locale = pathname.split('/')[1] || 'en'
 
   const tNav  = useTranslations('nav')
@@ -50,9 +51,13 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
       // SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED: siempre actualizar
       setUserEmail(session?.user?.email ?? null)
       setLoading(false)
+      // Forzar re-render del Server Component para actualizar navbar en producción
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        router.refresh()
+      }
     })
     return () => subscription?.unsubscribe()
-  }, [])
+  }, [router])
 
   // Close dropdowns on outside click
   useEffect(() => {
