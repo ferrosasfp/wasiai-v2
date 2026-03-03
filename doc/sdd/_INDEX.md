@@ -33,3 +33,4 @@
 | 029 | 2026-03-03 | WAS-120 | Playwright CI — e2e tests en GitHub Actions (navigation + language-switcher) | ci | QUALITY | DONE | master |
 | 030 | 2026-03-03 | WAS-118 | refundExpired() trustless en WasiEscrow — payer retira tras 24h sin operador | feature | QUALITY | DONE | master |
 | 031 | 2026-03-03 | WAS-119 | Pre-deploy checklist + env validation script (validate-env.js) | ops | QUALITY | DONE | master |
+| 032 | 2026-03-03 | WAS-121 | Fix íconos cards Home — onError fallback emoji en ModelCard | bugfix | FAST | DONE | master |
