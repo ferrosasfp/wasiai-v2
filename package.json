@@ -26,7 +26,8 @@
     "qa:hybrid": "npm run qa && npm run contracts:build && npm run contracts:test",
     "test:e2e:fuji": "npx tsx scripts/test-e2e-fuji.ts",
     "test:api": "bash scripts/test-api.sh",
-    "verify:receipt": "npx tsx scripts/verify-receipt.ts"
+    "verify:receipt": "npx tsx scripts/verify-receipt.ts",
+    "validate:env": "node scripts/validate-env.js"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.40.0",
