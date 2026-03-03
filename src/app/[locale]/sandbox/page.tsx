@@ -6,7 +6,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface AgentOption {
@@ -40,9 +39,6 @@ function formatUsdc(value: number | string): string {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function SandboxPage() {
-  const params = useParams<{ locale: string }>()
-  const _locale = params?.locale ?? 'es'
-
   const [agents, setAgents]               = useState<AgentOption[]>([])
   const [selectedSlug, setSelectedSlug]   = useState<string>('')
   const [inputText, setInputText]         = useState<string>('')

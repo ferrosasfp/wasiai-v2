@@ -70,7 +70,7 @@ export function PipelinePageClient({ availableAgents, userId }: PipelinePageClie
   const [runState, setRunState] = useState<PipelineRunState>(INITIAL_RUN_STATE)
   const [historyKey, setHistoryKey] = useState(0)
 
-  async function handleRun(steps: ComposeStep[], apiKey: string, _mode: 'sync' | 'async') {
+  async function handleRun(steps: ComposeStep[], apiKey: string) {
     setRunState({ ...INITIAL_RUN_STATE, status: 'running' })
 
     try {
