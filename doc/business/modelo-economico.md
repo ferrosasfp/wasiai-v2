@@ -111,8 +111,8 @@ El precio de AVAX se lee del feed Chainlink `CHAINLINK_AVAX_USD_FEED` (ya integr
 ### Cuándo se aplica
 
 - Solo en el flujo x402
-- Solo cuando precio del agente < umbral configurable (ver `PLATFORM_X402_GAS_FEE_THRESHOLD_USDC` en env)
-- Agentes de precio alto (> umbral) absorben el gas fee en el margen del 10%
+- Siempre — el gas fee aplica a todas las invocaciones x402 sin excepción
+- El gas fee aplica a todas las invocaciones x402 sin excepción ni umbral de precio
 
 ---
 
@@ -255,7 +255,7 @@ Valores que pueden cambiar sin redeploy. Viven en Supabase `platform_config` o e
 | Parámetro | Dónde vive | Valor actual | Quién puede cambiar |
 |-----------|-----------|-------------|---------------------|
 | `listing_fee_usdc` | Supabase `platform_config` | Por definir | Owner via Supabase |
-| `PLATFORM_X402_GAS_FEE_THRESHOLD_USDC` | Env var Vercel | Por definir | Owner via Vercel |
+| ~~`PLATFORM_X402_GAS_FEE_THRESHOLD_USDC`~~ | Eliminado — gas fee aplica siempre en x402 | — | — |
 | `platformFeeBps` | Contrato on-chain | 1000 (10%) | Owner via Safe multisig + 48h timelock |
 | Early creator fee (0%) | Contrato on-chain | Por creator | Owner via Safe multisig |
 
