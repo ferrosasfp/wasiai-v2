@@ -36,3 +36,4 @@
 | 032 | 2026-03-03 | WAS-121 | Fix íconos cards Home — onError fallback emoji en ModelCard | bugfix | FAST | DONE | master |
 | 033 | 2026-03-03 | WAS-122 | `_callEscrow()` helper + `estimated_completion` dinámico en invoke-long | refactor | FAST | DONE | master |
 | 034 | 2026-03-03 | WAS-134 | Rate limiter fail-closed — 503 + Retry-After:60 cuando Upstash no disponible | improvement | QUALITY | DONE | master |
+| 035 | 2026-03-03 | WAS-132 | Eliminar recordInvocation() del hot path — Supabase como fuente de verdad | improvement | QUALITY | DONE | master |
