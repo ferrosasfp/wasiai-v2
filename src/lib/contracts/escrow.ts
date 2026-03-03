@@ -112,6 +112,36 @@ function getEscrowAddress(): Address | null {
   return addr as Address
 }
 
+// ─── Internal helper ──────────────────────────────────────────────────────────
+
+async function _callEscrow(
+  functionName: string,
+  args: unknown[]
+): Promise<string | null> {
+  const address = getEscrowAddress()
+  if (!address) {
+    logger.warn(`[escrow] WASI_ESCROW_ADDRESS not configured — skipping ${functionName}`)
+    return null
+  }
+
+  try {
+    const { wallet, public: pub, account } = getEscrowClient()
+    const { request } = await pub.simulateContract({
+      address,
+      abi: ESCROW_ABI,
+      functionName: functionName as never,
+      account,
+      args: args as never,
+    })
+    const txHash = await wallet.writeContract(request)
+    logger.info(`[escrow] ${functionName} tx`, { txHash, escrowId: args[0] })
+    return txHash
+  } catch (err) {
+    logger.error(`[escrow] ${functionName} failed`, { err: String(err).slice(0, 300) })
+    return null
+  }
+}
+
 // ─── Public functions ─────────────────────────────────────────────────────────
 
 /**
@@ -130,112 +160,37 @@ export async function createEscrowOnChain(params: {
   r:           `0x${string}`
   s:           `0x${string}`
 }): Promise<string | null> {
-  const address = getEscrowAddress()
-  if (!address) {
-    logger.warn('[escrow] WASI_ESCROW_ADDRESS not configured — skipping createEscrow')
-    return null
-  }
-
-  try {
-    const { wallet, public: pub, account } = getEscrowClient()
-    const { request } = await pub.simulateContract({
-      address,
-      abi:          ESCROW_ABI,
-      functionName: 'createEscrow',
-      account,
-      args: [
-        params.escrowId,
-        params.slug,
-        params.payer,
-        params.amount,
-        params.validAfter,
-        params.validBefore,
-        params.nonce,
-        params.v,
-        params.r,
-        params.s,
-      ],
-    })
-    const txHash = await wallet.writeContract(request)
-    logger.info('[escrow] createEscrow tx', { txHash, escrowId: params.escrowId })
-    return txHash
-  } catch (err) {
-    logger.error('[escrow] createEscrow failed', { err: String(err).slice(0, 300) })
-    return null
-  }
+  return _callEscrow('createEscrow', [
+    params.escrowId,
+    params.slug,
+    params.payer,
+    params.amount,
+    params.validAfter,
+    params.validBefore,
+    params.nonce,
+    params.v,
+    params.r,
+    params.s,
+  ])
 }
 
 /**
  * Release escrow to Marketplace (operator only).
  */
 export async function releaseEscrowOnChain(escrowId: `0x${string}`): Promise<string | null> {
-  const address = getEscrowAddress()
-  if (!address) {
-    logger.warn('[escrow] WASI_ESCROW_ADDRESS not configured — skipping releaseEscrow')
-    return null
-  }
-
-  try {
-    const { wallet, public: pub, account } = getEscrowClient()
-    const { request } = await pub.simulateContract({
-      address, abi: ESCROW_ABI, functionName: 'releaseEscrow', account,
-      args: [escrowId],
-    })
-    const txHash = await wallet.writeContract(request)
-    logger.info('[escrow] releaseEscrow tx', { txHash, escrowId })
-    return txHash
-  } catch (err) {
-    logger.error('[escrow] releaseEscrow failed', { err: String(err).slice(0, 300) })
-    return null
-  }
+  return _callEscrow('releaseEscrow', [escrowId])
 }
 
 /**
  * Trustless release after 24h timeout. Anyone can call.
  */
 export async function releaseExpiredOnChain(escrowId: `0x${string}`): Promise<string | null> {
-  const address = getEscrowAddress()
-  if (!address) {
-    logger.warn('[escrow] WASI_ESCROW_ADDRESS not configured — skipping releaseExpired')
-    return null
-  }
-
-  try {
-    const { wallet, public: pub, account } = getEscrowClient()
-    const { request } = await pub.simulateContract({
-      address, abi: ESCROW_ABI, functionName: 'releaseExpired', account,
-      args: [escrowId],
-    })
-    const txHash = await wallet.writeContract(request)
-    logger.info('[escrow] releaseExpired tx', { txHash, escrowId })
-    return txHash
-  } catch (err) {
-    logger.error('[escrow] releaseExpired failed', { err: String(err).slice(0, 300) })
-    return null
-  }
+  return _callEscrow('releaseExpired', [escrowId])
 }
 
 /**
  * Refund escrow to payer (operator only, on agent failure).
  */
 export async function refundEscrowOnChain(escrowId: `0x${string}`): Promise<string | null> {
-  const address = getEscrowAddress()
-  if (!address) {
-    logger.warn('[escrow] WASI_ESCROW_ADDRESS not configured — skipping refundEscrow')
-    return null
-  }
-
-  try {
-    const { wallet, public: pub, account } = getEscrowClient()
-    const { request } = await pub.simulateContract({
-      address, abi: ESCROW_ABI, functionName: 'refundEscrow', account,
-      args: [escrowId],
-    })
-    const txHash = await wallet.writeContract(request)
-    logger.info('[escrow] refundEscrow tx', { txHash, escrowId })
-    return txHash
-  } catch (err) {
-    logger.error('[escrow] refundEscrow failed', { err: String(err).slice(0, 300) })
-    return null
-  }
+  return _callEscrow('refundEscrow', [escrowId])
 }

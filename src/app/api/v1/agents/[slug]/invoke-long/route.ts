@@ -146,7 +146,11 @@ export async function POST(
 
   // ── Insert into escrow_transactions ───────────────────────────────────────
   const amountUsdc = Number(amount) / 1_000_000
-  const estimatedCompletion = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  const LONG_RUNNING_MS = 24 * 60 * 60 * 1000  // 24h
+  const STANDARD_MS = 90 * 1000                  // 90s
+  const estimatedCompletion = new Date(
+    Date.now() + (agent.long_running ? LONG_RUNNING_MS : STANDARD_MS)
+  ).toISOString()
 
   const { error: insertError } = await svc
     .from('escrow_transactions')
