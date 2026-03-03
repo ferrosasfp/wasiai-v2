@@ -10,19 +10,19 @@ const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x
 /**
  * GET /api/admin/status
  * Sin auth requerida — el panel verifica ownership en cliente con wallet.
- * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement, pendingRecordings }
+ * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement }
  */
 export async function GET() {
   try {
     const supabase = createServiceClient()
     const client   = getPublicClient()
 
+    // WAS-132: pendingRecordings eliminado — recordInvocation() ya no existe
     const [
       avaxBalanceRaw,
       platformFeeBpsRaw,
       { data: configRow },
       { data: lastSettlement },
-      { count: pendingRecordings },
     ] = await Promise.all([
       OPERATOR_ADDRESS
         ? client.getBalance({ address: OPERATOR_ADDRESS }).catch(() => 0n)
@@ -42,25 +42,19 @@ export async function GET() {
       supabase
         .from('agent_calls')
         .select('called_at')
-        .eq('on_chain_recorded', true)
         .order('called_at', { ascending: false })
         .limit(1)
         .single(),
-      supabase
-        .from('pending_recordings')
-        .select('id', { count: 'exact', head: true })
-        .is('resolved_at', null),
     ])
 
     const avaxBalance = Number(avaxBalanceRaw) / 1e18
 
     return NextResponse.json({
-      platformFeeBps:    Number(platformFeeBpsRaw),
+      platformFeeBps: Number(platformFeeBpsRaw),
       avaxBalance,
-      avaxBalanceLow:    avaxBalance < 0.5,
-      settlementMode:    configRow?.value ?? 'vercel',
-      lastSettlement:    lastSettlement?.called_at ?? null,
-      pendingRecordings: pendingRecordings ?? 0,
+      avaxBalanceLow: avaxBalance < 0.5,
+      settlementMode: configRow?.value ?? 'vercel',
+      lastSettlement: lastSettlement?.called_at ?? null,
     })
   } catch (err) {
     logger.error('[admin/status] error', { err })

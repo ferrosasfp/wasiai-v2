@@ -6,7 +6,7 @@ import {
   extractPaymentFromHeaders,
   X402_CORS_HEADERS,
 } from 'uvd-x402-sdk/backend'
-import { recordInvocationOnChain, keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
+import { keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
 import { signReceipt } from '@/lib/receipts/signReceipt'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
@@ -15,7 +15,7 @@ import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
 import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits } from '@/lib/ratelimit'
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
 import { logger } from '@/lib/logger'
-import { enqueuePendingRecording } from '@/lib/chain/pendingRecordings'
+
 import { calcPlatformOverhead } from '@/lib/pricing/overhead'
 import { triggerAgentEvent } from '@/lib/webhooks/triggerAgentEvent'
 
@@ -115,35 +115,8 @@ async function settleX402(paymentHeader: X402PaymentHeader, model: Record<string
   }
 }
 
-/**
- * Record successful invocation on-chain and update the DB flag.
- */
-async function recordOnChain(supabase: SupabaseServiceClient, slug: string, model: Record<string, unknown>, paymentHeader: unknown, txHash: string): Promise<void> {
-  const ph = paymentHeader as X402PaymentHeader | undefined
-  const payerAddress = ph?.payload?.authorization?.from ?? '0x0000000000000000000000000000000000000000'
-  // WAS-93: canonical paymentId = computePaymentId(slug, payer, amount, nonce, chainId)
-  // Deterministic and off-chain verifiable — anyone can recompute with Supabase data.
-  const { computePaymentId, generateNonce } = await import('@/lib/payments/computePaymentId')
-  const nonce = generateNonce()
-  const amountAtomic = BigInt(model.price_per_call as number)
-  const paymentId = computePaymentId(slug, payerAddress as `0x${string}`, amountAtomic, nonce)
-  try {
-    const onChainTxHash = await recordInvocationOnChain({ slug, payerAddress, amountUSDC: model.price_per_call as number, paymentId })
-    if (onChainTxHash) {
-      await supabase.from('agent_calls').update({
-        on_chain_recorded: true,
-        on_chain_tx_hash:  onChainTxHash,
-        payment_id:        paymentId,
-        payment_nonce:     nonce,
-      }).eq('tx_hash', txHash)
-    }
-  } catch (err) {
-    logger.error('[invoke] on-chain recording failed — enqueueing for retry', { err })
-    // T-07: Non-fatal: enqueue for retry with exponential backoff
-    const { data: callRecord } = await supabase.from('agent_calls').select('id').eq('tx_hash', txHash).single()
-    await enqueuePendingRecording({ agentCallId: callRecord?.id, slug, payerAddress, amountUsdc: model.price_per_call as number })
-  }
-}
+// WAS-132: recordOnChain() eliminado — Supabase agent_calls es la fuente de verdad.
+// recordInvocationOnChain() on-chain era auditoría duplicada con costo de gas por invocación.
 
 /**
  * POST /api/v1/models/:slug/invoke
@@ -368,11 +341,6 @@ export async function POST(
   // ── 5. Payment valid — call the upstream model ────────────────────────────
   const result = await callUpstream(model, request, slug)
   await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
-
-  // ── 6. Record invocation on-chain (A-01: extracted to recordOnChain helper) ─
-  if (result.status === 'success' && settlement.transactionHash) {
-    await recordOnChain(supabase, slug, model, paymentHeader, settlement.transactionHash)
-  }
 
   // WAS-74: Fire-and-forget webhook trigger — never await, never blocks TTFB
   if (model.creator_id) {
