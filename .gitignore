@@ -22,7 +22,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
+# local env files — ALL variants (NA-002)
+.env
+.env.*
+!.env.example
 .env*.local
 .env.local
 
