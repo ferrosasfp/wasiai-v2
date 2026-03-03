@@ -28,7 +28,7 @@ interface AvailableAgent {
 }
 
 export interface PipelineBuilderProps {
-  onRun:           (steps: ComposeStep[], apiKey: string, mode: 'sync' | 'async') => void
+  onRun:           (steps: ComposeStep[], apiKey: string) => void
   isRunning:       boolean
   availableAgents: AvailableAgent[]
 }
@@ -96,7 +96,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
       if (s.parallel) step.parallel = true
       return step
     })
-    onRun(cleaned, apiKey, 'sync')
+    onRun(cleaned, apiKey)
   }
 
   const canRun = !isRunning && steps.length > 0 && apiKey.trim().length > 0
