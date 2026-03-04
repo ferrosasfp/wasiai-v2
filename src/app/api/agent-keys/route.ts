@@ -6,7 +6,7 @@ import { validateCsrf } from '@/lib/security/csrf'
 
 const createSchema = z.object({
   name: z.string().min(1).max(64),
-  budget_usdc: z.number().min(1).max(1000).default(10),
+  budget_usdc: z.number().min(0).max(1000).default(0),
 })
 
 export async function GET() {
