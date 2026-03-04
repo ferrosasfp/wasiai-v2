@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import type { PaymentFlowState } from '../types/payment-flow.types'
 
 interface WalletStatusBarProps {
@@ -23,8 +24,20 @@ export function WalletStatusBar({
   onConnect,
   onDisconnect,
 }: WalletStatusBarProps) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   const handleDisconnect = () => {
     onDisconnect()
+  }
+
+  // SSR guard: evitar hydration mismatch — wallet state solo existe en cliente
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm">
+        <span className="text-gray-400">Cargando wallet…</span>
+      </div>
+    )
   }
 
   if (flowState === 'no_wallet') {
