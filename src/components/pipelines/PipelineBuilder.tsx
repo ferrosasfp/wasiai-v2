@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useReducer, useRef } from 'react'
 import { Trash2, Plus, ArrowDown, Play, Loader2 } from 'lucide-react'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -56,25 +56,31 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
     { _id: newStepId(), agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: false, parallel: false },
   ])
   const [validationError, setValidationError] = useState<string | null>(null)
-  const [apiKey, setApiKey] = useState(() => {
-    if (typeof window === 'undefined') return ''
+  const [mounted, markMounted] = useReducer(() => true, false)
+  useEffect(markMounted, [markMounted])
+
+  const [apiKey, setApiKey] = useState('')
+
+  // Leer localStorage después de hidratación via callback ref en el input
+  // (evita setState-in-effect que el React compiler prohíbe)
+  const apiKeyInitialized = useRef(false)
+  function initApiKeyFromStorage() {
+    if (apiKeyInitialized.current) return
+    apiKeyInitialized.current = true
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
     const raw = localStorage.getItem(API_KEY_STORAGE_KEY)
-    if (!raw) return ''
+    if (!raw) return
     try {
       const entry = JSON.parse(raw) as { key: string; savedAt: number }
       if (typeof entry.key === 'string' && typeof entry.savedAt === 'number') {
-        if (Date.now() - entry.savedAt < THIRTY_DAYS_MS) return entry.key
+        if (Date.now() - entry.savedAt < THIRTY_DAYS_MS) { setApiKey(entry.key); return }
         localStorage.removeItem(API_KEY_STORAGE_KEY)
-        return ''
       }
     } catch {
-      const entry = { key: raw, savedAt: Date.now() }
-      localStorage.setItem(API_KEY_STORAGE_KEY, JSON.stringify(entry))
-      return raw
+      localStorage.setItem(API_KEY_STORAGE_KEY, JSON.stringify({ key: raw, savedAt: Date.now() }))
+      setApiKey(raw)
     }
-    return ''
-  })
+  }
 
   function handleApiKeyChange(value: string) {
     setApiKey(value)
@@ -149,11 +155,14 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
           type="password"
           value={apiKey}
           onChange={e => handleApiKeyChange(e.target.value)}
+          onFocus={initApiKeyFromStorage}
+          ref={el => { if (el) initApiKeyFromStorage() }}
           placeholder="wasi_..."
           className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-avax-400"
+          suppressHydrationWarning
         />
-        {!apiKey.trim() && (
-          <p className="text-xs text-amber-600 mt-1">
+        {mounted && !apiKey.trim() && (
+          <p className="text-xs text-amber-600 mt-1" suppressHydrationWarning>
             Ingresa tu API key para ejecutar el pipeline.
           </p>
         )}
