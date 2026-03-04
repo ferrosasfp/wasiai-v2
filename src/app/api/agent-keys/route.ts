@@ -12,9 +12,10 @@ const createSchema = z.object({
 export async function GET() {
   try {
     const keys = await getAgentKeys()
-    // Never expose raw keys
+    // WAS-141: key_hash (SHA-256, not raw key) exposed to owner for on-chain withdrawKey call
+    // raw_key is never stored — key_hash is safe to expose to authenticated owner
     // P-11: Private cache — user-specific data, 30s browser cache
-    return NextResponse.json(keys.map(k => ({ ...k, key_hash: undefined })), {
+    return NextResponse.json(keys.map(k => ({ ...k })), {
       headers: { 'Cache-Control': 'private, max-age=30' },
     })
   } catch {

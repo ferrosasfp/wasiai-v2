@@ -13,6 +13,7 @@ interface AgentKey {
   last_used_at: string | null
   created_at: string
   raw_key?: string
+  key_hash?: string  // WAS-141: exposed to owner for on-chain withdrawKey call
 }
 
 // USDC contract addresses by chain
@@ -270,23 +271,108 @@ interface CloseKeyModalProps {
   onSuccess: (txHash: string | null) => void
 }
 
-// ── WithdrawModal ─────────────────────────────────────────────────────────────
-function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
-  keyId: string; keyName: string; balance: number
+// ── WithdrawModal — WAS-141 ────────────────────────────────────────────────────
+// Creator firma withdrawKey on-chain directamente (msg.sender, paga gas en AVAX)
+// Soporta retiro parcial o total. Si retira todo → key se cierra en DB.
+function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }: {
+  keyId: string; keyName: string; balance: number; keyHash: string
   onClose: () => void; onSuccess: () => void
 }) {
-  const [status,   setStatus]   = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [amount,   setAmount]   = useState(balance)
+  const [status,   setStatus]   = useState<'idle' | 'signing' | 'submitted' | 'polling' | 'success' | 'error'>('idle')
+  const [txHash,   setTxHash]   = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
+  // CD-3: keyHashToBytes32 inline
+  function toBytes32(hash: string): string {
+    const hex = hash.replace(/^0x/i, '').toLowerCase()
+    return '0x' + hex.padEnd(64, '0').slice(0, 64)
+  }
+
   async function handleWithdraw() {
-    setStatus('loading')
     setErrorMsg('')
+
+    if (!keyHash) {
+      setErrorMsg('No se encontró el identificador de la key. Recarga la página.')
+      return
+    }
+    if (amount <= 0 || amount > balance) {
+      setErrorMsg(`El monto debe ser entre $0.01 y $${balance.toFixed(4)} USDC`)
+      return
+    }
+    if (!MARKETPLACE_ADDRESS) {
+      setErrorMsg('Contrato no configurado. Contacta soporte.')
+      return
+    }
+
+    const win = window as typeof window & {
+      ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }
+    }
+    if (!win.ethereum) {
+      setErrorMsg('No se detectó wallet. Instala Core o MetaMask.')
+      return
+    }
+
     try {
-      const res  = await fetch(`/api/agent-keys/${keyId}/refund`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      // 1. Conectar wallet
+      setStatus('signing')
+      const accounts = await win.ethereum.request({ method: 'eth_requestAccounts' }) as string[]
+      const from = accounts[0]
+      if (!from) throw new Error('No se pudo obtener la cuenta.')
+
+      // 2. Verificar chain
+      const chainIdHex = await win.ethereum.request({ method: 'eth_chainId' }) as string
+      if (parseInt(chainIdHex, 16) !== CHAIN_ID) {
+        throw new Error(`Cambia a la red correcta (Chain ID: ${CHAIN_ID})`)
+      }
+
+      // 3. CD-4: USDC atomics (6 decimals)
+      const atomicAmount = BigInt(Math.floor(amount * 1_000_000))
+      const bytes32KeyId = toBytes32(keyHash)
+
+      // 4. CD-7: ABI encode withdrawKey(bytes32, uint256) manualmente
+      // Selector: keccak256("withdrawKey(bytes32,uint256)").slice(0,4)
+      const selector = '0x55665727'  // verified: keccak256("withdrawKey(bytes32,uint256)")
+      const keyIdPadded    = bytes32KeyId.slice(2).padStart(64, '0')
+      const amountPadded   = atomicAmount.toString(16).padStart(64, '0')
+      const data           = selector + keyIdPadded + amountPadded
+
+      // 5. eth_sendTransaction — creator paga gas en AVAX
+      const txHashResult = await win.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to:   MARKETPLACE_ADDRESS,
+          data,
+        }],
+      }) as string
+
+      setTxHash(txHashResult)
+      setStatus('polling')
+
+      // 6. Poll receipt cada 2s (max 60s)
+      let receipt = null
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000))
+        receipt = await win.ethereum!.request({
+          method: 'eth_getTransactionReceipt',
+          params: [txHashResult],
+        })
+        if (receipt) break
+      }
+
+      if (!receipt) throw new Error('Timeout esperando confirmación. Verifica la tx en el explorador.')
+
+      // 7. Sync DB
+      setStatus('submitted')
+      const res = await fetch(`/api/agent-keys/${keyId}/withdraw`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ txHash: txHashResult, amount }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`)
+      const data2 = await res.json() as { error?: string }
+      if (!res.ok) throw new Error(data2.error ?? `Error ${res.status}`)
+
       setStatus('success')
       setTimeout(onSuccess, 1500)
     } catch (err: unknown) {
@@ -294,6 +380,14 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
       setStatus('error')
     }
   }
+
+  const isLoading = ['signing', 'submitted', 'polling'].includes(status)
+
+  const statusLabel = {
+    signing:   'Esperando firma…',
+    submitted: 'Sincronizando…',
+    polling:   'Confirmando tx…',
+  }[status as string] ?? `Retirar $${amount.toFixed(4)}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -303,42 +397,90 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
             <h2 className="text-lg font-bold text-gray-900">Retirar fondos</h2>
             <p className="text-sm text-gray-500">{keyName}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <button onClick={onClose} disabled={isLoading} className="text-gray-400 hover:text-gray-600 text-xl leading-none disabled:opacity-30">✕</button>
         </div>
 
         {status === 'success' ? (
           <div className="text-center space-y-3">
             <div className="text-4xl">✅</div>
-            <p className="font-semibold text-green-700">Fondos retirados exitosamente</p>
+            <p className="font-semibold text-green-700">Retiro exitoso</p>
             <p className="text-sm text-gray-500">
-              ${balance.toFixed(4)} USDC movidos a tus Earnings. Reclámalos desde el dashboard.
+              ${amount.toFixed(4)} USDC enviados a tu wallet.
             </p>
+            {txHash && (
+              <a
+                href={`${IS_FUJI ? 'https://testnet.snowtrace.io' : 'https://snowtrace.io'}/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-avax-500 underline"
+              >
+                Ver tx en explorer →
+              </a>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-4 text-center">
               <p className="text-xs text-gray-500 mb-1">Fondos disponibles</p>
-              <p className="text-3xl font-extrabold text-green-700">${balance.toFixed(4)} <span className="text-base font-medium text-green-500">USDC</span></p>
+              <p className="text-3xl font-extrabold text-green-700">
+                ${balance.toFixed(4)} <span className="text-base font-medium text-green-500">USDC</span>
+              </p>
             </div>
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 space-y-1">
-              <p>⚠️ Al retirar, esta key quedará cerrada. Si quieres seguir usándola, deposita de nuevo.</p>
-              <p className="text-amber-600">🔜 Próximamente: retiro parcial con monto configurable, sin cerrar la key.</p>
+
+            {/* Monto a retirar */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Monto a retirar (USDC)
+              </label>
+              <div className="flex items-center overflow-hidden rounded-xl border border-gray-200 focus-within:border-avax-400">
+                <span className="border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-400">$</span>
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0.01"
+                  max={balance}
+                  value={amount}
+                  onChange={e => setAmount(Math.min(balance, Math.max(0, parseFloat(e.target.value) || 0)))}
+                  disabled={isLoading}
+                  className="flex-1 px-3 py-2.5 text-sm focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAmount(balance)}
+                  className="px-3 py-2.5 text-xs text-avax-500 hover:text-avax-600 font-medium"
+                >
+                  Max
+                </button>
+              </div>
+              {amount >= balance && (
+                <p className="mt-1 text-xs text-amber-600">⚠️ Retiro total — la key quedará cerrada.</p>
+              )}
             </div>
+
+            <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-800">
+              💡 Los USDC irán directo a tu wallet. Necesitas AVAX para el gas.
+            </div>
+
             {errorMsg && (
               <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
                 <p className="text-xs text-red-700">{errorMsg}</p>
               </div>
             )}
+
             <div className="flex gap-3">
-              <button onClick={onClose} className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+              <button
+                onClick={onClose}
+                disabled={isLoading}
+                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
                 Cancelar
               </button>
               <button
                 onClick={handleWithdraw}
-                disabled={status === 'loading'}
+                disabled={isLoading || amount <= 0 || amount > balance}
                 className="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition"
               >
-                {status === 'loading' ? 'Retirando…' : `Retirar $${balance.toFixed(4)}`}
+                {isLoading ? statusLabel : `Retirar $${amount.toFixed(4)}`}
               </button>
             </div>
           </div>
@@ -347,6 +489,8 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
     </div>
   )
 }
+
+const IS_FUJI = CHAIN_ID === 43113
 
 // ── CloseKeyModal ─────────────────────────────────────────────────────────────
 function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKeyModalProps) {
@@ -506,7 +650,7 @@ export default function AgentKeysPage() {
   // Modal state
   const [depositKey,  setDepositKey]  = useState<{ id: string; name: string } | null>(null)
   const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number } | null>(null)
-  const [withdrawKey, setWithdrawKey] = useState<{ id: string; name: string; balance: number } | null>(null)
+  const [withdrawKey, setWithdrawKey] = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
 
   const loadKeys = useCallback(() => {
     fetch('/api/agent-keys')
@@ -686,7 +830,7 @@ export default function AgentKeysPage() {
                           </button>
                           {available > 0 && (
                             <button
-                              onClick={() => setWithdrawKey({ id: key.id, name: key.name, balance: available })}
+                              onClick={() => setWithdrawKey({ id: key.id, name: key.name, balance: available, keyHash: key.key_hash ?? '' })}
                               className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
                             >
                               Retirar ${available.toFixed(2)}
@@ -740,6 +884,7 @@ Content-Type: application/json
           keyId={withdrawKey.id}
           keyName={withdrawKey.name}
           balance={withdrawKey.balance}
+          keyHash={withdrawKey.keyHash}
           onClose={() => setWithdrawKey(null)}
           onSuccess={() => { setWithdrawKey(null); setTimeout(loadKeys, 1500) }}
         />

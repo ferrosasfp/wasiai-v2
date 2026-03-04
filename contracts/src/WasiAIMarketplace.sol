@@ -154,6 +154,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     event KeyFunded(bytes32 indexed keyId, address indexed owner, uint256 amount);
     event KeyCallSettled(bytes32 indexed keyId, string slug, uint256 amount, uint256 creatorShare, uint256 platformShare);
     event KeyRefunded(bytes32 indexed keyId, address indexed owner, uint256 amount);
+    /// @notice Emitted when a key owner withdraws USDC directly from their key balance.
+    event KeyWithdrawn(bytes32 indexed keyId, address indexed owner, uint256 amount);
 
     // ─── Modifiers ────────────────────────────────────────────────────────────
 
@@ -499,6 +501,25 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
      * @dev flow: Key (trustless exit — no operator permission required)
      * @dev Trustless exit — no requiere permiso del operador.
      */
+    /**
+     * @notice Creator withdraws USDC directly from their key balance.
+     * @dev    Partial or full withdrawal — key stays active unless fully drained.
+     *         No whenNotPaused: users must always be able to recover their funds.
+     * @param keyId  bytes32 key identifier (SHA-256 of raw key, padded)
+     * @param amount USDC amount in atomic units (6 decimals)
+     */
+    function withdrawKey(bytes32 keyId, uint256 amount) external nonReentrant {
+        require(keyOwners[keyId] == msg.sender,    "WasiAI: not key owner");
+        require(amount > 0,                         "WasiAI: amount must be > 0");
+        require(keyBalances[keyId] >= amount,       "WasiAI: insufficient key balance");
+
+        keyBalances[keyId] -= amount;
+        totalKeyBalances   -= amount;
+        usdc.safeTransfer(msg.sender, amount);
+
+        emit KeyWithdrawn(keyId, msg.sender, amount);
+    }
+
     function emergencyWithdrawKey(bytes32 keyId) external nonReentrant {
         require(
             block.timestamp > lastOperatorActivity + EMERGENCY_TIMEOUT,
