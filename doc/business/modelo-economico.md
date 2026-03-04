@@ -275,3 +275,34 @@ Valores que pueden cambiar sin redeploy. Viven en Supabase `platform_config` o e
 ---
 
 *Documento generado por San (SM/Analyst) · Revisado y aprobado por Fer (PO) · 2026-03-03*
+
+---
+
+## Actualización 2026-03-03 — Decisiones de PO confirmadas
+
+### Lo que paga el usuario (transparente)
+```
+Total = creatorPrice + gasFee (Chainlink)
+
+Ejemplo: agente $0.20
+  $0.2000  precio del agente
++ $0.0012  gas on-chain (variable, Chainlink AVAX/USD)
+= $0.2012  total que paga el usuario
+```
+
+### Distribución interna (no visible al usuario)
+```
+De los $0.2000 del creator price:
+  Creator recibe:  $0.18  (90%)
+  WasiAI Treasury: $0.02  (10%, configurable via platform_fee_bps en system_config)
+```
+
+### Lo que WasiAI NO cobra
+- ❌ Inference cost — el creator paga su propio backend de IA
+- ❌ Fee adicional sobre el gas — el gas se traslada al usuario a precio real
+
+### Configuración en system_config (Supabase)
+| Key | Valor actual | Descripción |
+|-----|-------------|-------------|
+| `platform_fee_bps` | `1000` | 10% fee de plataforma (100 bps = 1%) |
+| `listing_fee_usdc` | `0` | Fee por publicar 2do+ agente (activar cuando PO decida) |

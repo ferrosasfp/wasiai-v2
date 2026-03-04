@@ -31,10 +31,9 @@ export async function GET(
   return NextResponse.json(
     {
       creatorPrice,
-      gasFee:     result.overhead,   // overhead total: gas + inference + buffer
+      gasFee:    result.breakdown.gas,
       totalPrice: creatorPrice + result.overhead,
-      breakdown:  result.breakdown,  // detalle interno por si se necesita
-      cached:     result.cached,
+      cached:    result.cached,
     },
     {
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
