@@ -58,7 +58,7 @@ export function PricingBadge({ slug, basePrice }: Props) {
         ~${fmtPrice(data.totalPrice)} USDC
       </span>
       <span className="text-xs text-gray-500">
-        ${fmtPrice(data.creatorPrice)} agente + ${fmtPrice(data.gasFee)} gas
+        ${fmtPrice(data.creatorPrice)} agente + ${fmtPrice(data.gasFee)} fee plataforma
       </span>
     </div>
   )

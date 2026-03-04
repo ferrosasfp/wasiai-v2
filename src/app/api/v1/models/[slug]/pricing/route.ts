@@ -31,9 +31,9 @@ export async function GET(
   return NextResponse.json(
     {
       creatorPrice,
-      gasFee:     result.breakdown.gas,
+      gasFee:     result.overhead,   // overhead total: gas + inference + buffer
       totalPrice: creatorPrice + result.overhead,
-      breakdown:  result.breakdown,
+      breakdown:  result.breakdown,  // detalle interno por si se necesita
       cached:     result.cached,
     },
     {
