@@ -21,6 +21,8 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const pendingPayRef = useRef(false)
   const [input, setInput] = useState('')
   const [showWalletModal, setShowWalletModal] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   const {
     ctx,
@@ -130,17 +132,19 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
         onConnected={handleWalletConnected}
       />
 
-      {/* Wallet status bar — always visible */}
-      <WalletStatusBar
-        flowState={ctx.state}
-        address={ctx.address}
-        chainName={ctx.chainName}
-        usdcBalance={ctx.usdcBalance}
-        priceUsdc={model.price_per_call}
-        onSwitchChain={switchToFuji}
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
-      />
+      {/* Wallet status bar — solo en cliente para evitar hydration mismatch */}
+      {mounted && (
+        <WalletStatusBar
+          flowState={ctx.state}
+          address={ctx.address}
+          chainName={ctx.chainName}
+          usdcBalance={ctx.usdcBalance}
+          priceUsdc={model.price_per_call}
+          onSwitchChain={switchToFuji}
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
+        />
+      )}
 
       {/* Input */}
       <textarea

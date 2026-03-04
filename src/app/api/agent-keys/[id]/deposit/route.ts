@@ -81,13 +81,11 @@ export async function POST(
       .single()
 
     if (!creatorProfile?.wallet_address) {
-      return NextResponse.json(
-        { error: 'No wallet configured. Set up your wallet in /creator/dashboard first.' },
-        { status: 400 },
-      )
-    }
-
-    if (body.ownerAddress.toLowerCase() !== creatorProfile.wallet_address.toLowerCase()) {
+      // Auto-registrar wallet_address si el creator no lo tiene configurado aún
+      await supabase
+        .from('creator_profiles')
+        .upsert({ user_id: user.id, wallet_address: body.ownerAddress }, { onConflict: 'user_id' })
+    } else if (body.ownerAddress.toLowerCase() !== creatorProfile.wallet_address.toLowerCase()) {
       return NextResponse.json(
         { error: 'ownerAddress does not match your configured wallet address' },
         { status: 403 },
