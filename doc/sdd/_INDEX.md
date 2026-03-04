@@ -44,3 +44,4 @@
 | 039b | 2026-03-04 | WAS-138 | Fix 10 tests — mocks desactualizados tras HU-3.3 (use_trial RPC, runSettlement) | hotfix | hotfix | DONE | master |
 | 040 | 2026-03-04 | WAS-137 | Edit agent — cover_image, capabilities, free_trial, max_rpm/rpd | improvement | QUALITY | DONE | master |
 | 041 | 2026-03-04 | WAS-139 | Perfiles públicos — excluir /creator/[username] del auth guard en middleware | hotfix | hotfix | DONE | master |
+| 042 | 2026-03-04 | WAS-140 | Pagos autónomos agente→agente — agentPay.ts + invoke-agent route | feature | QUALITY | DONE | master |
