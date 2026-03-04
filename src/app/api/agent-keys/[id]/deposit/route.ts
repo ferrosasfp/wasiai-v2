@@ -93,7 +93,16 @@ export async function POST(
     }
 
     // 4. Submit ERC-3009 deposit on-chain (operator-mediated)
-    logger.info('[deposit] initiating depositForKey', { keyId: keyRow.key_hash.slice(0, 8), amount: body.amount })
+    logger.info('[deposit] initiating depositForKey', {
+      keyId:       keyRow.key_hash.slice(0, 8),
+      amount:      body.amount,
+      owner:       body.ownerAddress,
+      v:           body.v,
+      r:           body.r.slice(0, 10),
+      s:           body.s.slice(0, 10),
+      validBefore: body.validBefore,
+      nonce:       body.nonce.slice(0, 10),
+    })
 
     const txHash = await depositForKeyOnChain({
       keyId:        keyRow.key_hash,
