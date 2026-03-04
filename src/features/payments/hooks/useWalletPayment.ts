@@ -63,7 +63,9 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     }
     if (!isConnected)       return 'no_wallet'
     if (!isCorrectChain)    return 'wrong_network'
-    if (!hasEnoughBalance)  return 'insufficient_balance'
+    // Solo evaluar balance cuando ya terminó de cargar — evita hydration mismatch
+    // (usdcBalance === undefined significa que aún está cargando o no hay wallet)
+    if (!balanceLoading && usdcBalance !== undefined && !hasEnoughBalance) return 'insufficient_balance'
     return flowState  // 'idle', 'eip3009_failed', 'success', 'error', etc.
   }
 
