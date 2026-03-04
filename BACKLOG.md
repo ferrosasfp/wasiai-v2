@@ -267,5 +267,6 @@ Dependencia: HU-5.1 síncrona completada.
   - **Total:** retira todo → key se cierra automáticamente
 - **Limitación actual:** `refundKeyToEarnings` requiere `onlyOperator`. El operador paga el gas y siempre cierra la key completa.
 - **Solución:** Nueva función en contrato: `withdrawKey(bytes32 keyId, uint256 amount)` con `msg.sender == keyOwners[keyId]`. Si `amount == balance` → cerrar key. Si `amount < balance` → key activa con saldo restante.
+- **Cubre también:** Cerrar key con fondos → creator firma y paga gas (actualmente el operador cubre el gas del cierre).
 - **Prioridad:** P1 — Sprint 22 (junto con WAS-140)
 - **Fecha:** 2026-03-03

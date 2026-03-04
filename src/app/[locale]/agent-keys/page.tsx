@@ -425,8 +425,11 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
                   Tienes <strong>${balance.toFixed(4)} USDC</strong> sin retirar
                 </p>
                 <p className="mt-2 text-xs text-red-700 text-center">
-                  Si cierras esta key sin retirar tus fondos, el saldo se moverá a tus Earnings en el contrato.
+                  Si cierras esta key, el saldo se moverá a tus Earnings en el contrato.
                   Retira primero para recibirlos directamente en tu wallet.
+                </p>
+                <p className="mt-1 text-xs text-red-500 text-center">
+                  🔜 Próximamente: tú pagarás el gas de este cierre desde tu wallet.
                 </p>
               </div>
             ) : (
