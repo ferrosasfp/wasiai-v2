@@ -42,7 +42,7 @@ export function EndpointCard({
         <code className="text-sm font-mono text-gray-800">{path}</code>
         {auth && (
           <span className="ml-auto text-xs text-gray-400 flex items-center gap-1">
-            🔒 Auth required
+            Auth required
           </span>
         )}
       </div>

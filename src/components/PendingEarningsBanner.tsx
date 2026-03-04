@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { WalletSetup } from '@/components/WalletSetup'
+import { Wallet } from 'lucide-react'
 
 interface Props {
   /** pending_earnings_usdc from creator_profiles (raw numeric, 6 decimals) */
@@ -24,7 +25,7 @@ export function PendingEarningsBanner({ pendingEarnings }: Props) {
     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="text-2xl">💰</div>
+          <Wallet size={22} className="text-green-600 shrink-0" />
           <div>
             <p className="font-semibold text-amber-800">
               {t('pendingEarnings', { amount: formatUsdc(pendingEarnings) })}

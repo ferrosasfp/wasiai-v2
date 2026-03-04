@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { setOnboardingStep } from '@/app/[locale]/onboarding/actions'
+import { Rocket } from 'lucide-react'
 
 interface Props {
   locale: string
@@ -17,7 +18,7 @@ export async function OnboardingStep2({ locale }: Props) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
       <div className="mb-6 text-center">
-        <div className="text-4xl mb-3">🚀</div>
+        <div className="flex justify-center mb-3"><Rocket size={40} className="text-avax-500" /></div>
         <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
         <p className="mt-1 text-sm text-gray-500">{t('subtitle')}</p>
       </div>

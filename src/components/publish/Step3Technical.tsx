@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CreateModelDraft } from '@/lib/schemas/model.schema'
+import { DollarSign, Rocket } from 'lucide-react'
 
 interface Props {
   data: Partial<CreateModelDraft>
@@ -175,7 +176,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
 
       {/* Info box */}
       <div className="rounded-xl bg-avax-50 p-4 text-sm text-avax-700">
-        💰 Ganas el <strong>90%</strong> de cada llamada · WasiAI toma el 10% · Pagado en USDC
+        <span className="inline-flex items-center gap-1"><DollarSign size={12} />Ganas el <strong>90%</strong> de cada llamada · WasiAI toma el 10% · Pagado en USDC</span>
       </div>
 
       {/* General error */}
@@ -199,7 +200,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
           disabled={publishing}
           className="rounded-xl bg-avax-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition disabled:opacity-50"
         >
-          {publishing ? t('cta.publishing') : t('cta.publish')} 🚀
+          <span className="inline-flex items-center gap-2">{publishing ? t('cta.publishing') : t('cta.publish')} <Rocket size={14} /></span>
         </button>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
+import { MessageSquare, Eye, Music, Code2, Bot, BarChart2 } from 'lucide-react'
 
 const CATEGORY_COLORS: Record<string, string> = {
   nlp:        'bg-blue-100 text-blue-700',
@@ -12,8 +13,13 @@ const CATEGORY_COLORS: Record<string, string> = {
   data:       'bg-yellow-100 text-yellow-700',
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  nlp: '💬', vision: '👁️', audio: '🎵', code: '💻', multimodal: '🤖', data: '📊',
+const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  nlp:        <MessageSquare size={16} />,
+  vision:     <Eye           size={16} />,
+  audio:      <Music         size={16} />,
+  code:       <Code2         size={16} />,
+  multimodal: <Bot           size={16} />,
+  data:       <BarChart2     size={16} />,
 }
 
 interface Props {
@@ -56,7 +62,7 @@ export function AgentCardPreview({ data }: Props) {
               sizes="40px"
             />
           ) : (
-            <span>{CATEGORY_ICONS[data.category ?? ''] ?? '🤖'}</span>
+            <span>{CATEGORY_ICONS[data.category ?? ''] ?? <Bot size={16} />}</span>
           )}
         </div>
         <div className="min-w-0">

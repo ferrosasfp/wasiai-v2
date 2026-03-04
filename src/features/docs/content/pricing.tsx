@@ -3,6 +3,7 @@
  * WAS-135: Documentar el modelo de negocio de forma clara y honesta para el usuario.
  * Basado en doc/business/modelo-economico.md
  */
+import { KeyRound, Zap } from 'lucide-react'
 
 export function PricingSection() {
   return (
@@ -44,7 +45,7 @@ export function PricingSection() {
           {/* WasiAI Key */}
           <div className="rounded-2xl border-2 border-avax-200 bg-avax-50 p-5">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">🔑</span>
+              <KeyRound size={18} className="text-avax-500" />
               <h4 className="font-bold text-gray-900">WasiAI Key</h4>
               <span className="ml-auto rounded-full bg-avax-500 px-2 py-0.5 text-xs font-semibold text-white">Recommended</span>
             </div>
@@ -66,7 +67,7 @@ export function PricingSection() {
           {/* x402 */}
           <div className="rounded-2xl border border-gray-200 bg-white p-5">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">⚡</span>
+              <Zap size={18} className="text-avax-500" />
               <h4 className="font-bold text-gray-900">x402 Pay-per-use</h4>
             </div>
             <p className="text-sm text-gray-600 mb-4">

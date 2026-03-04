@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { setRequestLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
+import { Search, Bot } from 'lucide-react'
 
 // P-10: ISR — revalidate every 5 minutes (increased from 60s)
 export const revalidate = 300
@@ -151,7 +152,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             ) : (
               // Mantener el empty state ACTUAL para marketplace vacío (sin búsqueda)
               <div className="rounded-2xl border-2 border-dashed border-gray-200 py-16 text-center">
-                <p className="text-4xl mb-4">🔍</p>
+                <div className="flex justify-center mb-4"><Search size={40} className="text-gray-300" /></div>
                 <p className="text-gray-600 font-medium text-lg">
                   {category ? t('noModelsFiltered') : t('noModels')}
                 </p>
@@ -235,7 +236,7 @@ export default async function HomePage({ params, searchParams }: Props) {
         <div className="mx-auto max-w-4xl">
           <div className="mb-10 text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-avax-500/20 px-4 py-1.5 text-sm text-avax-300">
-              <span>🤖</span><span>{t('agentKitBadge')}</span>
+              <Bot size={14} /><span>{t('agentKitBadge')}</span>
             </div>
             <h2 className="text-3xl font-bold">{t('builtForAgents')}</h2>
             <p className="mt-3 max-w-xl mx-auto text-gray-400">
