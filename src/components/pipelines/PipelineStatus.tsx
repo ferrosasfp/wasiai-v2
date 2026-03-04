@@ -1,5 +1,7 @@
 'use client'
 
+import { AlertTriangle } from 'lucide-react'
+
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface StepReceipt {
@@ -116,18 +118,18 @@ export function PipelineStatus({ runState, onReset }: PipelineStatusProps) {
       {status === 'failed' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-red-600">
-            <span className="text-lg">❌</span>
+            <AlertTriangle size={18} />
             <span className="text-sm font-medium">Pipeline fallido</span>
           </div>
 
           {/* Detalles del error */}
-          <div className="bg-red-50 border border-red-200 rounded-md px-4 py-3 space-y-1">
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 space-y-2">
             {error && (
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-red-700 leading-relaxed">{error}</p>
             )}
             {stepsExecuted > 0 && (
-              <p className="text-xs text-red-500">
-                Steps completados antes del error: {stepsExecuted}
+              <p className="text-xs text-red-400">
+                ✓ {stepsExecuted} step{stepsExecuted !== 1 ? 's' : ''} completado{stepsExecuted !== 1 ? 's' : ''} antes del error
               </p>
             )}
           </div>
