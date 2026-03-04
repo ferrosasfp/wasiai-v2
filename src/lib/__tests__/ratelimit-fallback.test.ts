@@ -28,15 +28,12 @@ vi.mock('@/lib/logger', () => ({
 // ---------------------------------------------------------------------------
 // Import DESPUÉS de mocks
 // ---------------------------------------------------------------------------
-import { checkRateLimit, checkCreatorRateLimits, getInvokeLimit, getCreatorRpmLimit, getCreatorRpdLimit } from '@/lib/ratelimit'
+import { checkRateLimit, checkCreatorRateLimits, getInvokeLimit } from '@/lib/ratelimit'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function makeNextResponse(status: number, headers?: Record<string, string>) {
-  // Simular NextResponse — en tests retorna objeto plano mockeado
-  return { status, headers: headers ?? {} }
-}
+
 
 // ---------------------------------------------------------------------------
 // Tests
