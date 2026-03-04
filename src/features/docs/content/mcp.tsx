@@ -186,7 +186,7 @@ export function McpSection() {
         <CodeBlock tabs={VERIFY_CONFIG} />
         <p className="text-sm text-gray-600">
           In Claude Desktop: look for the MCP tools icon (
-          <span className="text-xs bg-gray-100 rounded px-1 py-0.5">🔧</span>) in the
+          <span className="text-xs bg-gray-100 rounded px-1 py-0.5">⚙</span>) in the
           composer — WasiAI agents will appear as available tools. In Cursor: open the MCP panel in
           Settings to confirm the server is connected.
         </p>

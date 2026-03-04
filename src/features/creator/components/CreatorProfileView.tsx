@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import type { CreatorPublicProfile, CreatorAgentCard } from '../lib/getCreatorByUsername'
+import { MessageSquare, Eye, Music, Code2, Bot, BarChart2 } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 interface Props {
   creator: CreatorPublicProfile
@@ -16,8 +18,13 @@ const CATEGORY_COLORS: Record<string, string> = {
   data:       'bg-yellow-100 text-yellow-700',
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  nlp: '💬', vision: '👁️', audio: '🎵', code: '💻', multimodal: '🤖', data: '📊',
+const CATEGORY_ICONS: Record<string, ReactNode> = {
+  nlp:        <MessageSquare size={16} />,
+  vision:     <Eye           size={16} />,
+  audio:      <Music         size={16} />,
+  code:       <Code2         size={16} />,
+  multimodal: <Bot           size={16} />,
+  data:       <BarChart2     size={16} />,
 }
 
 export function CreatorProfileView({ creator, locale }: Props) {
@@ -114,7 +121,7 @@ function AgentCardPublic({
               priority={index < 3}
             />
           ) : (
-            CATEGORY_ICONS[agent.category] ?? '🤖'
+            CATEGORY_ICONS[agent.category] ?? <Bot size={16} />
           )}
         </div>
         <div className="min-w-0 flex-1">

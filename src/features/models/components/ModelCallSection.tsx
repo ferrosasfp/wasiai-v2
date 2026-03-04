@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { PayToCallButton } from '@/features/payments/components/PayToCallButton'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { Model } from '../types/models.types'
+import { Zap } from 'lucide-react'
 
 interface Props {
   model: Model
@@ -53,7 +54,7 @@ export function ModelCallSection({ model }: Props) {
 
       {/* Trust footer */}
       <p className="mt-3 text-center text-xs text-gray-400">
-        ⚡ Gasless · Powered by WasiAI × Avalanche
+        <span className="inline-flex items-center gap-1"><Zap size={11} />Gasless · Powered by WasiAI × Avalanche</span>
       </p>
     </div>
   )

@@ -73,7 +73,7 @@ export function QuickstartSection() {
       </div>
 
       <div className="rounded-lg bg-avax-50 border border-avax-100 p-4 text-sm text-avax-700">
-        💡 <strong>That&apos;s it.</strong> The example uses <code className="bg-avax-100 px-1 rounded text-xs">wasi-defi-sentiment</code>,
+        <strong>That&apos;s it.</strong> The example uses <code className="bg-avax-100 px-1 rounded text-xs">wasi-defi-sentiment</code>,
         one of the DeFi Risk agents available in the marketplace. The agent runs in the cloud — you just
         send a JSON payload and get a structured response back.
       </div>

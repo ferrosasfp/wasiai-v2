@@ -12,6 +12,7 @@ import { EscrowInfoBanner } from '@/features/agents/components/EscrowInfoBanner'
 import { PricingBadge }    from '@/features/agents/components/PricingBadge'
 import { WasiKeyBanner }   from '@/features/agents/components/WasiKeyBanner'
 import Link from 'next/link'
+import { Bot } from 'lucide-react'
 
 // PERF-04: ISR — revalidate detail pages every 5 minutes
 export const revalidate = 300
@@ -60,8 +61,8 @@ export default async function ModelDetailPage({ params }: Props) {
             {/* Header */}
             <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
               <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-avax-500 to-avax-700 text-2xl shrink-0">
-                  🤖
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-avax-500 to-avax-700 shrink-0">
+                  <Bot size={28} className="text-white" />
                 </div>
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -153,7 +154,7 @@ export default async function ModelDetailPage({ params }: Props) {
 
             {/* Agent API — both auth methods */}
             <div className="rounded-2xl bg-gray-900 p-6 text-white">
-              <h2 className="mb-4 font-semibold text-gray-100">🤖 Agent API</h2>
+              <h2 className="mb-4 font-semibold text-gray-100 flex items-center gap-2"><Bot size={16} /> Agent API</h2>
 
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                 {tDetail('optionA')}
