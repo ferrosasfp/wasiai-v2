@@ -1,80 +1,80 @@
-import { getPublicClient }   from '@/shared/lib/web3/client'
+/**
+ * overhead.ts — Calcula el costo de gas on-chain por invocación
+ *
+ * Modelo económico WasiAI:
+ *   - El usuario paga: creatorPrice + gasFee
+ *   - El 10% de platform fee es INTERNO (WasiAI retiene del pago al creator)
+ *   - WasiAI NO cobra por inferencia — eso es costo del creator
+ *   - El gas (AVAX) lo cubre WasiAI operationally, pero se le traslada al usuario en USDC
+ *
+ * gasFee = costo real on-chain (Chainlink AVAX/USD × 80k gas units)
+ */
 import { readChainlinkFeed } from '@/lib/defi-risk/chainlink'
 import { getSharedRedis }    from '@/lib/ratelimit'
+import { getPublicClient }   from '@/shared/lib/web3/client'
 
-const CACHE_KEY = 'wasiai:overhead:cache'
+const CACHE_KEY = 'wasiai:gas:v1'
 const CACHE_TTL = 60  // segundos
 
 export interface OverheadResult {
-  overhead:        number
-  breakdown:       { gas: number; inference: number; buffer: number }
-  circuitBreaker:  boolean
-  cached:          boolean
+  overhead:       number   // = gasFee (lo que se suma al creatorPrice)
+  breakdown:      { gas: number }
+  circuitBreaker: boolean
+  cached:         boolean
 }
 
 export async function calcPlatformOverhead(creatorPrice: number): Promise<OverheadResult> {
-  // 1. Intentar cache Redis (TTL 60s — evita 2 calls on-chain por request)
+  // 1. Cache Redis (TTL 60s — evita calls on-chain por cada request)
   try {
-    const cached = await getSharedRedis().get<OverheadResult>(CACHE_KEY)
-    if (cached) {
+    const cached = await getSharedRedis().get<number>(CACHE_KEY)
+    if (cached !== null && cached !== undefined) {
       return {
-        ...cached,
-        circuitBreaker: cached.overhead > creatorPrice,
-        cached: true,
+        overhead:       cached,
+        breakdown:      { gas: cached },
+        circuitBreaker: cached > creatorPrice,
+        cached:         true,
       }
     }
   } catch { /* cache miss — continuar */ }
 
-  // 2. Calcular con timeout de 2s — FAIL-OPEN si falla
+  // 2. Calcular con timeout 2s — FAIL-OPEN si falla
   try {
-    const result = await Promise.race([
-      _calculate(),
+    const gas = await Promise.race([
+      _calcGasFee(),
       new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error('overhead timeout')), 2000)
+        setTimeout(() => reject(new Error('gas timeout')), 2000)
       ),
     ])
-    if (!result) throw new Error('timeout')
+    if (gas === null) throw new Error('timeout')
 
-    // 3. Cachear en Redis
-    try {
-      await getSharedRedis().set(CACHE_KEY, result, { ex: CACHE_TTL })
-    } catch { /* cache write falla — no bloquear */ }
+    try { await getSharedRedis().set(CACHE_KEY, gas, { ex: CACHE_TTL }) } catch { /* ignorar */ }
 
-    return { ...result, circuitBreaker: result.overhead > creatorPrice, cached: false }
-  } catch {
-    // FAIL-OPEN: si Chainlink o gasPrice fallan, usar INFERENCE_COST como piso mínimo
-    // Nunca retornar 0 — el overhead siempre existe aunque no podamos calcular gas
-    const inferenceFloor = Number(process.env.INFERENCE_COST_USDC ?? '0.001')
-    const overhead       = Math.round(inferenceFloor * 1.20 * 1_000_000) / 1_000_000
     return {
-      overhead,
-      breakdown:      { gas: 0, inference: inferenceFloor, buffer: inferenceFloor * 0.20 },
+      overhead:       gas,
+      breakdown:      { gas },
+      circuitBreaker: gas > creatorPrice,
+      cached:         false,
+    }
+  } catch {
+    // FAIL-OPEN: si Chainlink falla, gas = 0
+    // El usuario paga solo el precio del creator — nunca se bloquea una invocación
+    return {
+      overhead:       0,
+      breakdown:      { gas: 0 },
       circuitBreaker: false,
       cached:         false,
     }
   }
 }
 
-async function _calculate(): Promise<Omit<OverheadResult, 'circuitBreaker' | 'cached'>> {
+async function _calcGasFee(): Promise<number> {
   const client = getPublicClient()
-
   const [gasPrice, chainlinkResult] = await Promise.all([
     client.getGasPrice(),
     readChainlinkFeed(process.env.CHAINLINK_AVAX_USD_FEED!),
   ])
-
-  // ChainlinkResult uses price_usd (not currentPrice)
-  const avaxUsd   = chainlinkResult.price_usd
-  const GAS_UNITS = 80_000n
+  const avaxUsd     = chainlinkResult.price_usd
+  const GAS_UNITS   = 80_000n
   const gasCostAvax = Number(gasPrice * GAS_UNITS) / 1e18
-  const gasCostUsdc = gasCostAvax * avaxUsd
-
-  const INFERENCE_COST = Number(process.env.INFERENCE_COST_USDC ?? '0.001')
-  const base   = gasCostUsdc + INFERENCE_COST
-  const buffer = base * 0.20
-
-  return {
-    overhead:  Math.round((base + buffer) * 1_000_000) / 1_000_000,
-    breakdown: { gas: gasCostUsdc, inference: INFERENCE_COST, buffer },
-  }
+  return Math.round(gasCostAvax * avaxUsd * 1_000_000) / 1_000_000
 }

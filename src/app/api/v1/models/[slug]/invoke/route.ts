@@ -508,7 +508,7 @@ interface PricingInfo {
   creatorPrice: number
   overhead:     number
   totalPrice:   number
-  breakdown:    { gas: number; inference: number; buffer: number }
+  breakdown:    { gas: number }
 }
 
 function buildResponse(
