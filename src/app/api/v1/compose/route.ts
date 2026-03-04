@@ -277,7 +277,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       const res = await fetch(agent.endpoint_url, {
         method:   'POST',
-        headers:  { 'Content-Type': 'application/json', 'X-Pipeline-Id': pipelineId, 'X-Pipeline-Step': String(stepIndex) },
+        headers:  { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Pipeline-Id': pipelineId, 'X-Pipeline-Step': String(stepIndex) },
         body:     JSON.stringify({ input: stepInput }),
         signal:   AbortSignal.timeout(STEP_TIMEOUT_MS),
         redirect: 'error',
