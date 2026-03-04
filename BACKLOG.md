@@ -260,3 +260,10 @@ Dependencia: HU-5.1 síncrona completada.
 - **Campos a agregar:** capabilities, agent_type, mcp_tool_name, mcp_description, framework, version
 - **Prioridad:** P2 — Sprint 21
 - **Fecha:** 2026-03-03
+
+## WAS-141: Retiro parcial de Agent Key — creator firma y paga gas
+- **Síntoma/Necesidad:** El creator debe poder retirar cualquier monto (≤ balance) de su Agent Key, firmar la tx desde su wallet y pagar el gas en AVAX.
+- **Causa/Limitación actual:** El contrato solo tiene `refundKeyToEarnings(bytes32)` que requiere `onlyOperator`. El operador paga el gas.
+- **Solución:** Nueva función en contrato: `withdrawKeyPartial(bytes32 keyId, uint256 amount)` con validación `msg.sender == keyOwners[keyId]`. La key permanece activa después del retiro parcial.
+- **Prioridad:** P1 — Sprint 22 (junto con WAS-140)
+- **Fecha:** 2026-03-03

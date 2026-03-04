@@ -320,8 +320,9 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
               <p className="text-xs text-gray-500 mb-1">Fondos disponibles</p>
               <p className="text-3xl font-extrabold text-green-700">${balance.toFixed(4)} <span className="text-base font-medium text-green-500">USDC</span></p>
             </div>
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 space-y-1">
               <p>⚠️ Al retirar, esta key quedará cerrada. Si quieres seguir usándola, deposita de nuevo.</p>
+              <p className="text-amber-600">🔜 Próximamente: retiro parcial con monto configurable, sin cerrar la key.</p>
             </div>
             {errorMsg && (
               <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
