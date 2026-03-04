@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { useState, useEffect, useRef, startTransition } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ActionSheet } from '@/features/auth/components/ActionSheet'
+import { Package, GitBranch, KeyRound, User, BookOpen, Globe, LogOut, Sparkles } from 'lucide-react'
 
 interface BottomTabBarProps {
   locale: string
@@ -61,29 +62,28 @@ export function BottomTabBar({ locale: _locale, initialEmail = null }: BottomTab
 
   const createItems = isLoggedIn
     ? [
-        { icon: '📦', label: t('publishAgent'), href: `/${locale}/publish` },
-        { icon: '🔗', label: t('pipelines'), href: `/${locale}/pipelines` },
-        { icon: '🔑', label: t('agentKeys'), href: `/${locale}/agent-keys` },
+        { icon: <Package  size={18} />, label: t('publishAgent'), href: `/${locale}/publish` },
+        { icon: <GitBranch size={18} />, label: t('pipelines'),   href: `/${locale}/pipelines` },
+        { icon: <KeyRound  size={18} />, label: t('agentKeys'),   href: `/${locale}/agent-keys` },
       ]
     : [
-        { icon: '🔑', label: t('login'), href: `/${locale}/login` },
+        { icon: <KeyRound size={18} />, label: t('login'), href: `/${locale}/login` },
       ]
 
   const meItems = isLoggedIn
     ? [
-        { icon: '👤', label: t('profile'), href: `/${locale}/profile` },
-
-        { icon: '📖', label: t('docs'), href: `/${locale}/docs` },
+        { icon: <User     size={18} />, label: t('profile'), href: `/${locale}/profile` },
+        { icon: <BookOpen size={18} />, label: t('docs'),    href: `/${locale}/docs` },
         {
-          icon: '🌐',
+          icon: <Globe size={18} />,
           label: `${currentLang}`,
           href: `/${locale === 'en' ? 'es' : 'en'}${pathname.replace(new RegExp(`^/${locale}`), '')}`,
         },
-        { icon: '🚪', label: t('signout'), onClick: handleSignout, danger: true },
+        { icon: <LogOut size={18} />, label: t('signout'), onClick: handleSignout, danger: true },
       ]
     : [
-        { icon: '🔑', label: t('login'), href: `/${locale}/login` },
-        { icon: '✨', label: t('signup'), href: `/${locale}/signup` },
+        { icon: <KeyRound  size={18} />, label: t('login'),  href: `/${locale}/login` },
+        { icon: <Sparkles  size={18} />, label: t('signup'), href: `/${locale}/signup` },
       ]
 
   return (

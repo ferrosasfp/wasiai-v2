@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
+import type { ReactNode } from 'react'
 
 interface ActionSheetItem {
-  icon: string
+  icon: ReactNode
   label: string
   href?: string
   onClick?: () => void

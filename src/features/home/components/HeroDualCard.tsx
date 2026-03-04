@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { Zap, Search, Rocket } from 'lucide-react'
 
 interface HeroDualCardProps {
   locale: string
@@ -41,7 +42,7 @@ export function HeroDualCard({
 
       {/* Badge */}
       <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-avax-50 border border-avax-100 px-4 py-1.5 text-sm text-avax-600 font-medium">
-        <span>⚡</span>
+        <Zap size={14} />
         <span>{badge}</span>
       </div>
 
@@ -102,7 +103,7 @@ export function HeroDualCard({
             if (e.key === 'Enter' || e.key === ' ') setActive('consumer')
           }}
         >
-          <div className="mb-3 text-2xl">🔍</div>
+          <div className="mb-3 flex justify-center"><Search size={28} className="text-avax-500" /></div>
           <p className="text-base font-medium text-gray-800 mb-4 leading-relaxed">
             {subtitleConsumer}
           </p>
@@ -145,7 +146,7 @@ export function HeroDualCard({
             if (e.key === 'Enter' || e.key === ' ') setActive('creator')
           }}
         >
-          <div className="mb-3 text-2xl">🚀</div>
+          <div className="mb-3 flex justify-center"><Rocket size={28} className="text-avax-500" /></div>
           <p className="text-base font-medium text-gray-800 mb-4 leading-relaxed">
             {subtitleCreator}
           </p>

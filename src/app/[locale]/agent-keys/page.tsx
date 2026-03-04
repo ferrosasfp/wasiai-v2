@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { AlertTriangle, Info, KeyRound, Bot } from 'lucide-react'
 
 interface AgentKey {
   id: string
@@ -453,12 +454,12 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
                 </button>
               </div>
               {amount >= balance && (
-                <p className="mt-1 text-xs text-amber-600">⚠️ Retiro total — la key quedará cerrada.</p>
+                <p className="mt-1 text-xs text-amber-600 flex items-center gap-1"><AlertTriangle size={12} /> Retiro total — la key quedará cerrada.</p>
               )}
             </div>
 
             <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-800">
-              💡 Los USDC irán directo a tu wallet. Necesitas AVAX para el gas.
+              <Info size={13} className="shrink-0" /> Los USDC irán directo a tu wallet. Necesitas AVAX para el gas.
             </div>
 
             {errorMsg && (
@@ -564,7 +565,7 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
             {/* Advertencia fondos pendientes — bloquea cierre */}
             {balance > 0 ? (
               <div className="rounded-xl bg-red-50 border border-red-300 px-4 py-4 text-sm">
-                <p className="text-2xl text-center mb-2">⚠️</p>
+                <div className="flex justify-center mb-2"><AlertTriangle size={24} className="text-red-400" /></div>
                 <p className="font-semibold text-red-800 text-center">
                   Tienes <strong>${balance.toFixed(4)} USDC</strong> sin retirar
                 </p>
@@ -704,7 +705,7 @@ export default function AgentKeysPage() {
         {newKey?.raw_key && (
           <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-5">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">🔑</span>
+              <KeyRound size={20} className="text-gray-400" />
               <div className="flex-1">
                 <p className="font-semibold text-green-800">{t('keyCreated')}</p>
                 <p className="text-sm text-green-600">{t('keyOnce')}</p>
@@ -770,7 +771,7 @@ export default function AgentKeysPage() {
             <div className="py-12 text-center text-gray-400">{tCommon('loading')}</div>
           ) : keys.length === 0 ? (
             <div className="py-12 text-center">
-              <div className="text-4xl mb-3">🤖</div>
+              <div className="flex justify-center mb-3"><Bot size={40} className="text-gray-200" /></div>
               <p className="text-gray-500 text-sm">{t('noKeys')}</p>
               <button
                 onClick={() => setShowForm(true)}

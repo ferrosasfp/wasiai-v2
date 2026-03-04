@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { memo, useState } from 'react'
 import type { Model } from '../types/models.types'
+import { MessageSquare, Eye, Music, Code2, Bot, BarChart2, Zap } from 'lucide-react'
 
 const CATEGORY_COLORS: Record<string, string> = {
   nlp:        'bg-blue-100 text-blue-700',
@@ -14,8 +15,13 @@ const CATEGORY_COLORS: Record<string, string> = {
   data:       'bg-yellow-100 text-yellow-700',
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  nlp: '💬', vision: '👁️', audio: '🎵', code: '💻', multimodal: '🤖', data: '📊',
+const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  nlp:        <MessageSquare size={18} />,
+  vision:     <Eye           size={18} />,
+  audio:      <Music         size={18} />,
+  code:       <Code2         size={18} />,
+  multimodal: <Bot           size={18} />,
+  data:       <BarChart2     size={18} />,
 }
 
 interface ModelCardProps {
@@ -53,7 +59,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
                 onError={() => setImgError(true)}
               />
             ) : (
-              CATEGORY_ICONS[model.category] ?? '🤖'
+              CATEGORY_ICONS[model.category] ?? <Bot size={18} />
             )}
           </div>
           <div className="min-w-0">
@@ -97,7 +103,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
       {/* Footer */}
       <div className="mt-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
-          <span className="shrink-0">⚡ {remaining.toLocaleString('en-US')} calls</span>
+          <span className="shrink-0 flex items-center gap-1"><Zap size={11} className="text-avax-500" />{remaining.toLocaleString('en-US')} calls</span>
           {model.is_featured && (
             <span className="rounded-full bg-avax-50 px-2 py-0.5 text-avax-600 font-medium shrink-0">Featured</span>
           )}
