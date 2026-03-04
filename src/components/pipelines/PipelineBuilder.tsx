@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Trash2, Plus, ArrowDown, Play, Loader2 } from 'lucide-react'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -36,12 +37,25 @@ export interface PipelineBuilderProps {
 const API_KEY_STORAGE_KEY = 'wasi_pipeline_api_key'
 const MAX_STEPS = 5
 
+// ── Validación client-side ────────────────────────────────────────────────────
+function validateStepsClient(steps: LocalStep[]): string | null {
+  for (let i = 0; i < steps.length; i++) {
+    if (!steps[i].agent_slug) return `Step ${i + 1}: selecciona un agente.`
+    // Step sin pass_output debe tener input no vacío
+    if (!steps[i].pass_output && !steps[i].input?.trim()) {
+      return `Step ${i + 1}: escribe un input o activa "Usar output del step anterior".`
+    }
+  }
+  return null
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineBuilderProps) {
   const [steps, setSteps] = useState<LocalStep[]>([
     { _id: newStepId(), agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: false, parallel: false },
   ])
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window === 'undefined') return ''
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
@@ -55,7 +69,6 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
         return ''
       }
     } catch {
-      // Formato viejo (string plano) — migrar al nuevo formato
       const entry = { key: raw, savedAt: Date.now() }
       localStorage.setItem(API_KEY_STORAGE_KEY, JSON.stringify(entry))
       return raw
@@ -71,21 +84,39 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
 
   function addStep() {
     if (steps.length >= MAX_STEPS) return
+    setValidationError(null)
     setSteps(prev => [
       ...prev,
-      { _id: newStepId(), agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: false, parallel: false },
+      // Steps 2+ tienen pass_output:true por default — encadenar es el caso de uso principal
+      { _id: newStepId(), agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: true, parallel: false },
     ])
   }
 
   function removeStep(index: number) {
-    setSteps(prev => prev.filter((_, i) => i !== index))
+    setValidationError(null)
+    setSteps(prev => {
+      const next = prev.filter((_, i) => i !== index)
+      // Si el nuevo step 0 tenía pass_output:true, lo desactivamos (step 0 no puede usar output previo)
+      if (next[0]?.pass_output) {
+        next[0] = { ...next[0], pass_output: false }
+      }
+      return next
+    })
   }
 
   function updateStep(index: number, patch: Partial<LocalStep>) {
+    setValidationError(null)
     setSteps(prev => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)))
   }
 
   function handleRun() {
+    const err = validateStepsClient(steps)
+    if (err) {
+      setValidationError(err)
+      return
+    }
+    setValidationError(null)
+
     const cleaned: ComposeStep[] = steps.map((s: LocalStep) => {
       const step: ComposeStep = { agent_slug: s.agent_slug }
       if (s.pass_output) {
@@ -98,6 +129,11 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
     })
     onRun(cleaned, apiKey)
   }
+
+  const totalCost = steps.reduce((acc, s) => {
+    const agent = availableAgents.find(a => a.slug === s.agent_slug)
+    return acc + (agent?.price_per_call ?? 0)
+  }, 0)
 
   const canRun = !isRunning && steps.length > 0 && apiKey.trim().length > 0
   const atMaxSteps = steps.length >= MAX_STEPS
@@ -114,7 +150,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
           value={apiKey}
           onChange={e => handleApiKeyChange(e.target.value)}
           placeholder="wasi_..."
-          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-avax-400"
         />
         {!apiKey.trim() && (
           <p className="text-xs text-amber-600 mt-1">
@@ -124,105 +160,162 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
       </div>
 
       {/* Steps */}
-      <div className="space-y-4">
+      <div className="space-y-2">
         {steps.map((step, index) => (
-          <div key={step._id} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-600">Step {index + 1}</span>
-              {steps.length > 1 && (
-                <button
-                  onClick={() => removeStep(index)}
-                  className="text-xs text-red-500 hover:text-red-700"
+          <div key={step._id}>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3 shadow-sm">
+              {/* Header del step */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-avax-100 text-xs font-bold text-avax-600">
+                    {index + 1}
+                  </span>
+                  <span className="text-sm font-semibold text-gray-700">Step {index + 1}</span>
+                  {step.pass_output && index > 0 && (
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 font-medium">
+                      encadenado
+                    </span>
+                  )}
+                  {step.parallel && (
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700 font-medium">
+                      paralelo
+                    </span>
+                  )}
+                </div>
+                {steps.length > 1 && (
+                  <button
+                    onClick={() => removeStep(index)}
+                    className="text-gray-400 hover:text-red-500 transition"
+                    title="Eliminar step"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+
+              {/* Selector de agente */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Agente</label>
+                <select
+                  value={step.agent_slug}
+                  onChange={e => updateStep(index, { agent_slug: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-avax-400"
                 >
-                  Eliminar
-                </button>
+                  {availableAgents.map(agent => (
+                    <option key={agent.slug} value={agent.slug}>
+                      {agent.name} — ${agent.price_per_call.toFixed(6)} USDC
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Toggles — pass_output + parallel */}
+              {index > 0 && (
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={step.pass_output ?? false}
+                      onChange={e => updateStep(index, { pass_output: e.target.checked, input: '' })}
+                      className="rounded accent-avax-500"
+                    />
+                    Usar output del step anterior
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={step.parallel ?? false}
+                      onChange={e => updateStep(index, { parallel: e.target.checked })}
+                      className="rounded accent-avax-500"
+                    />
+                    Ejecutar en paralelo
+                  </label>
+                </div>
+              )}
+
+              {/* Input — solo si pass_output=false */}
+              {!step.pass_output && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Input{index === 0 ? ' (requerido)' : ' (requerido si no encadenas)'}
+                  </label>
+                  <textarea
+                    value={step.input ?? ''}
+                    onChange={e => updateStep(index, { input: e.target.value })}
+                    rows={3}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-avax-400 ${
+                      !step.input?.trim() ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
+                    }`}
+                    placeholder="Texto de entrada para este step…"
+                  />
+                  {!step.input?.trim() && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      Este step necesita un input, o activa &quot;Usar output del step anterior&quot;.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
-            {/* Selector de agente */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Agente</label>
-              <select
-                value={step.agent_slug}
-                onChange={e => updateStep(index, { agent_slug: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {availableAgents.map(agent => (
-                  <option key={agent.slug} value={agent.slug}>
-                    {agent.name} — ${agent.price_per_call.toFixed(6)} USDC
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Input — solo si pass_output=false */}
-            {!step.pass_output && (
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Input</label>
-                <textarea
-                  value={step.input ?? ''}
-                  onChange={e => updateStep(index, { input: e.target.value })}
-                  rows={3}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Texto de entrada para este step..."
-                />
+            {/* Conector visual entre steps */}
+            {index < steps.length - 1 && (
+              <div className="flex justify-center py-1">
+                <ArrowDown size={16} className="text-gray-300" />
               </div>
             )}
-
-            {/* Toggles */}
-            <div className="flex flex-wrap gap-4">
-              {index > 0 && (
-                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={step.pass_output ?? false}
-                    onChange={e => updateStep(index, { pass_output: e.target.checked })}
-                    className="rounded"
-                  />
-                  Usar output del step anterior
-                </label>
-              )}
-              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={step.parallel ?? false}
-                  onChange={e => updateStep(index, { parallel: e.target.checked })}
-                  className="rounded"
-                />
-                Ejecutar en paralelo
-              </label>
-            </div>
           </div>
         ))}
       </div>
 
-      {/* Botones de acción */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <button
-          onClick={addStep}
-          disabled={atMaxSteps}
-          className="text-sm px-4 py-2 border border-indigo-300 text-indigo-600 rounded-md hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          + Agregar step
-        </button>
-        {atMaxSteps && (
-          <span className="text-xs text-amber-600">Máximo 5 steps</span>
-        )}
-        <button
-          onClick={handleRun}
-          disabled={!canRun}
-          className="text-sm px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {isRunning ? (
-            <>
-              <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full inline-block" />
-              Ejecutando...
-            </>
-          ) : (
-            'Ejecutar pipeline'
+      {/* Error de validación */}
+      {validationError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {validationError}
+        </div>
+      )}
+
+      {/* Footer — costo total + botones */}
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={addStep}
+            disabled={atMaxSteps || isRunning}
+            className="flex items-center gap-1.5 text-sm px-4 py-2 border border-avax-300 text-avax-600 rounded-xl hover:bg-avax-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            <Plus size={14} /> Agregar step
+          </button>
+          {atMaxSteps && (
+            <span className="text-xs text-amber-600">Máximo 5 steps</span>
           )}
-        </button>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {steps.length > 1 && (
+            <span className="text-xs text-gray-500">
+              Costo estimado: <strong className="text-gray-700">${totalCost.toFixed(6)} USDC</strong>
+            </span>
+          )}
+          <button
+            onClick={handleRun}
+            disabled={!canRun}
+            className="flex items-center gap-2 text-sm px-6 py-2.5 bg-avax-500 text-white rounded-xl hover:bg-avax-600 disabled:opacity-50 disabled:cursor-not-allowed transition font-semibold shadow-sm"
+          >
+            {isRunning ? (
+              <><Loader2 size={14} className="animate-spin" /> Ejecutando…</>
+            ) : (
+              <><Play size={14} /> Ejecutar pipeline</>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Leyenda rápida si hay más de 1 step */}
+      {steps.length > 1 && (
+        <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-700 space-y-1">
+          <p><strong>Encadenado</strong> — el output del step anterior se pasa como input automáticamente.</p>
+          <p><strong>Paralelo</strong> — steps consecutivos marcados así se ejecutan al mismo tiempo.</p>
+        </div>
+      )}
     </div>
   )
 }

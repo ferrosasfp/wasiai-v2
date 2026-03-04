@@ -287,7 +287,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         stepOutput = ct.includes('application/json') ? await res.json() : await res.text()
       } else {
         stepStatus      = 'error'
-        stepErrorReason = `Upstream ${res.status}`
+        stepErrorReason = `El agente "${agent.slug}" respondió con error ${res.status}. Verifica que su endpoint esté activo y acepte { "input": "..." }.`
         stepOutput      = { error: stepErrorReason }
       }
     } catch (err) {
@@ -451,6 +451,10 @@ export function validateSteps(steps: unknown): string | null {
     }
     if (i === 0 && s.pass_output === true) {
       return 'Step 0 cannot use pass_output (no previous output exists)'
+    }
+    // Step sin pass_output debe tener input no vacío
+    if (!s.pass_output && (s.input === undefined || s.input.trim() === '')) {
+      return `Step ${i}: input is required when pass_output is false`
     }
   }
   return null
