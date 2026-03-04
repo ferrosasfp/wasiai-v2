@@ -337,16 +337,28 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-              <p className="font-medium">{t('close.warning')}</p>
-              <ul className="mt-2 space-y-1 text-xs text-amber-700 list-disc list-inside">
-                <li>{t('close.warn1')}</li>
-                {balance > 0 && (
-                  <li>{t('close.warn2', { amount: balance.toFixed(4) })}</li>
-                )}
-                <li>{t('close.warn3')}</li>
-              </ul>
-            </div>
+
+            {/* Advertencia fondos pendientes — bloquea cierre */}
+            {balance > 0 ? (
+              <div className="rounded-xl bg-red-50 border border-red-300 px-4 py-4 text-sm">
+                <p className="text-2xl text-center mb-2">⚠️</p>
+                <p className="font-semibold text-red-800 text-center">
+                  Tienes <strong>${balance.toFixed(4)} USDC</strong> sin retirar
+                </p>
+                <p className="mt-2 text-xs text-red-700 text-center">
+                  Si cierras esta key sin retirar tus fondos, el saldo se moverá a tus Earnings en el contrato.
+                  Retira primero para recibirlos directamente en tu wallet.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                <p className="font-medium">{t('close.warning')}</p>
+                <ul className="mt-2 space-y-1 text-xs text-amber-700 list-disc list-inside">
+                  <li>{t('close.warn1')}</li>
+                  <li>{t('close.warn3')}</li>
+                </ul>
+              </div>
+            )}
 
             {errorMsg && (
               <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
@@ -354,21 +366,41 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
               </div>
             )}
 
-            <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
-              >
-                {tCommon('cancel')}
-              </button>
-              <button
-                onClick={handleClose}
-                disabled={status === 'loading'}
-                className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
-              >
-                {status === 'loading' ? t('close.closing') : t('close.confirmBtn')}
-              </button>
-            </div>
+            {balance > 0 ? (
+              // Con fondos: CTA principal = cerrar de todos modos (con advertencia)
+              // El backend mueve fondos a Earnings automáticamente (HAL-025)
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleClose}
+                  disabled={status === 'loading'}
+                  className="w-full rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
+                >
+                  {status === 'loading' ? t('close.closing') : 'Cerrar key (fondos van a Earnings)'}
+                </button>
+                <button
+                  onClick={onClose}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancelar — quiero retirar primero
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  {tCommon('cancel')}
+                </button>
+                <button
+                  onClick={handleClose}
+                  disabled={status === 'loading'}
+                  className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
+                >
+                  {status === 'loading' ? t('close.closing') : t('close.confirmBtn')}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -569,6 +601,14 @@ export default function AgentKeysPage() {
                           >
                             {t('addUsdc')}
                           </button>
+                          {available > 0 && (
+                            <button
+                              onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
+                              className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
+                            >
+                              Retirar ${available.toFixed(2)}
+                            </button>
+                          )}
                           <button
                             onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
                             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
