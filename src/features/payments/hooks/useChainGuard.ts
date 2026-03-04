@@ -2,11 +2,14 @@ import { useAccount, useWalletClient, useSwitchChain } from 'wagmi'
 import { FUJI_CHAIN_ID, FUJI_CHAIN_PARAMS } from '@/shared/lib/web3/fuji'
 
 export function useChainGuard() {
-  const { isConnected, chain } = useAccount()
+  const { isConnected, isReconnecting, chain } = useAccount()
   const { data: walletClient } = useWalletClient()
   const { switchChainAsync } = useSwitchChain()
 
-  const isCorrectChain = isConnected && chain?.id === FUJI_CHAIN_ID
+  // Esperar a que wagmi estabilice el chain antes de evaluar red incorrecta.
+  // isReconnecting=true o chain=undefined justo después de conectar → no es wrong_network todavía.
+  const chainSettled = isConnected && !isReconnecting && chain !== undefined
+  const isCorrectChain = chainSettled ? chain.id === FUJI_CHAIN_ID : true
 
   /** CRÍTICO: esta función SOLO debe llamarse desde un onClick del usuario.
    *  NUNCA llamarla desde un useEffect — los browsers bloquean el popup de wallet. */
