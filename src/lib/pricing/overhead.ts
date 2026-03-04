@@ -42,11 +42,13 @@ export async function calcPlatformOverhead(creatorPrice: number): Promise<Overhe
 
     return { ...result, circuitBreaker: result.overhead > creatorPrice, cached: false }
   } catch {
-    // FAIL-OPEN: si Chainlink o gasPrice fallan, overhead = 0
-    // Las llamadas nunca se bloquean por fallo del cálculo
+    // FAIL-OPEN: si Chainlink o gasPrice fallan, usar INFERENCE_COST como piso mínimo
+    // Nunca retornar 0 — el overhead siempre existe aunque no podamos calcular gas
+    const inferenceFloor = Number(process.env.INFERENCE_COST_USDC ?? '0.001')
+    const overhead       = Math.round(inferenceFloor * 1.20 * 1_000_000) / 1_000_000
     return {
-      overhead:       0,
-      breakdown:      { gas: 0, inference: 0, buffer: 0 },
+      overhead,
+      breakdown:      { gas: 0, inference: inferenceFloor, buffer: inferenceFloor * 0.20 },
       circuitBreaker: false,
       cached:         false,
     }
