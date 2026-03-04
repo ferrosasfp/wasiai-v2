@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, startTransition } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAccount, useDisconnect } from 'wagmi'
 import { WalletConnectModal } from './WalletConnectModal'
 import { useTranslations } from 'next-intl'
@@ -21,8 +21,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const pendingPayRef = useRef(false)
   const [input, setInput] = useState('')
   const [showWalletModal, setShowWalletModal] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { startTransition(() => setMounted(true)) }, [])
+
 
   const {
     ctx,
@@ -87,12 +86,8 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
     reset()
   }
 
-  // SSR-safe defaults — server y cliente deben coincidir hasta que monte
-  const defaultLabel   = `Pagar $${model.price_per_call} USDC`
-  const defaultDisabled = false
-
-  // CTA button label — solo en cliente (post-mount)
-  const buttonLabel = !mounted ? defaultLabel :
+  // CTA button label
+  const buttonLabel =
     ctx.state === 'no_wallet'            ? t('connectWallet')   :
     ctx.state === 'wrong_network'        ? t('switchNetwork')   :
     ctx.state === 'insufficient_balance' ? 'USDC insuficiente'  :
@@ -101,21 +96,20 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
     ctx.state === 'approving'            ? 'Aprobando...'       :
     ctx.state === 'success'              ? t('done')            :
     ctx.state === 'error'                ? t('retry')           :
-    defaultLabel
+    `Pagar $${model.price_per_call} USDC`
 
-  const isProcessing = mounted && (
+  const isProcessing = (
     ctx.state === 'signing_eip3009' ||
     ctx.state === 'calling'         ||
     ctx.state === 'approving'       ||
     ctx.state === 'switching_network'
   )
 
-  const isDisabled = !mounted ? defaultDisabled : (
+  const isDisabled =
     isProcessing                                        ||
     ctx.state === 'insufficient_balance'                ||
     ctx.state === 'wrong_network'                       ||
     (ctx.state === 'idle' && !input.trim())
-  )
 
   // Fallback approve flow: visible during eip3009_failed, approving, or after confirm
   const showFallback = (
@@ -137,19 +131,17 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
         onConnected={handleWalletConnected}
       />
 
-      {/* Wallet status bar — solo en cliente para evitar hydration mismatch */}
-      {mounted && (
-        <WalletStatusBar
-          flowState={ctx.state}
-          address={ctx.address}
-          chainName={ctx.chainName}
-          usdcBalance={ctx.usdcBalance}
-          priceUsdc={model.price_per_call}
-          onSwitchChain={switchToFuji}
-          onConnect={handleConnect}
-          onDisconnect={handleDisconnect}
-        />
-      )}
+      {/* Wallet status bar */}
+      <WalletStatusBar
+        flowState={ctx.state}
+        address={ctx.address}
+        chainName={ctx.chainName}
+        usdcBalance={ctx.usdcBalance}
+        priceUsdc={model.price_per_call}
+        onSwitchChain={switchToFuji}
+        onConnect={handleConnect}
+        onDisconnect={handleDisconnect}
+      />
 
       {/* Input */}
       <textarea
