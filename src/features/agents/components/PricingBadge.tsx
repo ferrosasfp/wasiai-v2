@@ -44,13 +44,21 @@ export function PricingBadge({ slug, basePrice }: Props) {
     )
   }
 
+  // Usar suficientes decimales para que el gas siempre sea visible
+  function fmtPrice(n: number): string {
+    if (n === 0) return '0.0000'
+    if (n >= 0.0001) return n.toFixed(4)
+    // Valores muy pequeños (<0.0001): mostrar hasta 6 decimales
+    return n.toFixed(6)
+  }
+
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-sm font-semibold text-gray-900">
-        ~${data.totalPrice.toFixed(4)} USDC
+        ~${fmtPrice(data.totalPrice)} USDC
       </span>
       <span className="text-xs text-gray-500">
-        ${data.creatorPrice.toFixed(4)} agente + ${data.gasFee.toFixed(4)} gas
+        ${fmtPrice(data.creatorPrice)} agente + ${fmtPrice(data.gasFee)} gas
       </span>
     </div>
   )
