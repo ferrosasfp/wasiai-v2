@@ -40,3 +40,4 @@
 | 036 | 2026-03-03 | WAS-134 | Facilitador x402 propio en mainnet — elimina dependencia UltravioletaDAO | improvement | QUALITY | DONE | master |
 | 037 | 2026-03-03 | WAS-133 | Gas fee dinámico Chainlink + banner WasiAI Key en detail page | feature | QUALITY | DONE | master |
 | 038 | 2026-03-03 | WAS-131 | Freemium publish — primer agente gratis, listing fee x402 real para siguientes | feature | QUALITY | DONE | master |
+| 039 | 2026-03-04 | WAS-136 | Fix flash wrong_network en Core Wallet — chainSettled guard en useChainGuard | hotfix | hotfix | DONE | master |
