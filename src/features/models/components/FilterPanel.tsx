@@ -2,21 +2,23 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { Brain, BookMarked, Wrench, LayoutGrid, MessageSquare, Eye, Music, Code2, Bot, BarChart2 } from 'lucide-react'
+import type { ReactNode } from 'react'
 
-const AGENT_TYPES = [
-  { value: 'llm',        label: 'LLM',        icon: '🧠' },
-  { value: 'rag',        label: 'RAG',         icon: '📚' },
-  { value: 'tool',       label: 'Tool',        icon: '🔧' },
+const AGENT_TYPES: { value: string; label: string; icon: ReactNode }[] = [
+  { value: 'llm',  label: 'LLM',  icon: <Brain      size={14} /> },
+  { value: 'rag',  label: 'RAG',  icon: <BookMarked size={14} /> },
+  { value: 'tool', label: 'Tool', icon: <Wrench     size={14} /> },
 ]
 
-const CATEGORIES = [
-  { value: 'all',        label: 'All',         icon: '✨' },
-  { value: 'nlp',        label: 'NLP',         icon: '💬' },
-  { value: 'vision',     label: 'Vision',      icon: '👁' },
-  { value: 'audio',      label: 'Audio',       icon: '🎵' },
-  { value: 'code',       label: 'Code',        icon: '💻' },
-  { value: 'multimodal', label: 'Multimodal',  icon: '🤖' },
-  { value: 'data',       label: 'Data',        icon: '📊' },
+const CATEGORIES: { value: string; label: string; icon: ReactNode }[] = [
+  { value: 'all',        label: 'All',        icon: <LayoutGrid  size={14} /> },
+  { value: 'nlp',        label: 'NLP',        icon: <MessageSquare size={14} /> },
+  { value: 'vision',     label: 'Vision',     icon: <Eye         size={14} /> },
+  { value: 'audio',      label: 'Audio',      icon: <Music       size={14} /> },
+  { value: 'code',       label: 'Code',       icon: <Code2       size={14} /> },
+  { value: 'multimodal', label: 'Multimodal', icon: <Bot         size={14} /> },
+  { value: 'data',       label: 'Data',       icon: <BarChart2   size={14} /> },
 ]
 
 export function FilterPanel() {

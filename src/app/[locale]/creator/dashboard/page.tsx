@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { Package, CheckCircle2, Zap, DollarSign, Inbox, Activity } from 'lucide-react'
+import type { ReactNode } from 'react'
 // WithdrawButton and WalletSetup are used inside EarningsSection sub-component
 // A-02: Sub-component with Suspense for streaming — async blockchain call isolated
 import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection'
@@ -123,13 +125,13 @@ export default async function CreatorDashboardPage({
 
         {/* Stats cards */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatCard label={t('totalAgents')} value={safeModels.length.toString()} icon="📦" />
-          <StatCard label={t('active')} value={activeModels.toString()} icon="✅" />
-          <StatCard label={t('totalCalls')} value={totalCalls.toLocaleString('en-US')} icon="⚡" />
+          <StatCard label={t('totalAgents')} value={safeModels.length.toString()} icon={<Package size={22} className="text-gray-400" />} />
+          <StatCard label={t('active')} value={activeModels.toString()} icon={<CheckCircle2 size={22} className="text-green-400" />} />
+          <StatCard label={t('totalCalls')} value={totalCalls.toLocaleString('en-US')} icon={<Zap size={22} className="text-avax-400" />} />
           <StatCard
             label={t('revenue')}
             value={`$${totalRevenue.toFixed(2)}`}
-            icon="💰"
+            icon={<DollarSign size={22} className="text-green-500" />}
             highlight
           />
         </div>
@@ -156,7 +158,7 @@ export default async function CreatorDashboardPage({
 
           {safeModels.length === 0 ? (
             <EmptyState
-              icon="📭"
+              icon={<Inbox size={36} className="text-gray-300" />}
               title={t('noAgents')}
               subtitle={t('noAgentsSubtitle')}
               cta={{ label: t('publishAgent'), href: `/${locale}/publish` }}
@@ -236,7 +238,7 @@ export default async function CreatorDashboardPage({
 
           {recentCalls.length === 0 && callsPage === 1 ? (
             <EmptyState
-              icon="⚡"
+              icon={<Activity size={36} className="text-gray-300" />}
               title={t('noCalls')}
               subtitle={t('noCallsSubtitle')}
             />
@@ -336,7 +338,7 @@ function StatCard({
 }: {
   label: string
   value: string
-  icon: string
+  icon: ReactNode
   highlight?: boolean
 }) {
   return (
@@ -345,7 +347,7 @@ function StatCard({
         ? 'border-green-200 bg-green-50'
         : 'border-gray-100 bg-white'
     }`}>
-      <div className="text-2xl">{icon}</div>
+      <div className="flex items-center">{icon}</div>
       <div className={`mt-2 text-2xl font-bold ${highlight ? 'text-green-700' : 'text-gray-900'}`}>
         {value}
       </div>
@@ -388,14 +390,14 @@ function StatusBadge({ status }: { status: string }) {
 function EmptyState({
   icon, title, subtitle, cta,
 }: {
-  icon: string
+  icon: ReactNode
   title: string
   subtitle: string
   cta?: { label: string; href: string }
 }) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white py-12 text-center shadow-sm">
-      <div className="text-4xl">{icon}</div>
+      <div className="flex justify-center">{icon}</div>
       <p className="mt-3 font-medium text-gray-700">{title}</p>
       <p className="text-sm text-gray-400">{subtitle}</p>
       {cta && (

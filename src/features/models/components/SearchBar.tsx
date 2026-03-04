@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import { useAgentSearch, type AgentSearchResult } from '../hooks/useAgentSearch'
+import { Search } from 'lucide-react'
 
 interface SearchBarProps {
   defaultValue?: string
@@ -56,7 +57,7 @@ export function SearchBar({
             className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             aria-label="Buscar"
           >
-            🔍
+            <Search size={16} />
           </button>
         </div>
       </form>

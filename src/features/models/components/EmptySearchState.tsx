@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { ModelCard } from './ModelCard'
 import type { Model } from '../types/models.types'
+import { Search } from 'lucide-react'
 
 interface EmptySearchStateProps {
   search?: string
@@ -30,7 +31,7 @@ export function EmptySearchState({
     <div className="py-16">
       {/* Mensaje principal */}
       <div className="text-center mb-10">
-        <p className="text-5xl mb-4">🔍</p>
+        <div className="flex justify-center mb-4"><Search size={48} className="text-gray-300" /></div>
         <h2 className="text-xl font-semibold text-gray-900 mb-2">
           {texts.noResults}
         </h2>

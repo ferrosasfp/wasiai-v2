@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { Package, GitBranch, KeyRound, User, Wallet, Globe } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -98,9 +99,9 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   ]
 
   const createItems = [
-    { icon: '📦', label: tNav('publishAgent'),  href: `/${locale}/publish`            },
-    { icon: '🔗', label: tNav('pipelines'),     href: `/${locale}/pipelines`          },
-    { icon: '🔑', label: tNav('agentKeys'),     href: `/${locale}/agent-keys`         },
+    { icon: <Package  size={15} />, label: tNav('publishAgent'),  href: `/${locale}/publish`            },
+    { icon: <GitBranch size={15} />, label: tNav('pipelines'),    href: `/${locale}/pipelines`          },
+    { icon: <KeyRound  size={15} />, label: tNav('agentKeys'),    href: `/${locale}/agent-keys`         },
   ]
 
   return (
@@ -253,12 +254,12 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
                       <p className="truncate text-xs text-gray-400" title={userEmail ?? ''}>{userEmail}</p>
                     </div>
 
-                    <Link href={`/${locale}/profile`}    onClick={() => setMeOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><span>👤</span>{tNav('profile')}</Link>
-                    <Link href={`/${locale}/creator/dashboard`} onClick={() => setMeOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><span>💰</span>{tNav('wallet')}</Link>
+                    <Link href={`/${locale}/profile`}    onClick={() => setMeOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><User size={15} className="shrink-0 text-gray-400" />{tNav('profile')}</Link>
+                    <Link href={`/${locale}/creator/dashboard`} onClick={() => setMeOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><Wallet size={15} className="shrink-0 text-gray-400" />{tNav('wallet')}</Link>
 
                     {/* Language switcher inline */}
                     <div className="flex items-center gap-2.5 border-t border-gray-100 px-4 py-2.5">
-                      <span>🌐</span>
+                      <Globe size={15} className="shrink-0 text-gray-400" />
                       <LanguageSwitcher />
                     </div>
 
