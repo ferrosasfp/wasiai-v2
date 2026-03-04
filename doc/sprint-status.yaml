@@ -1,42 +1,14 @@
-sprint: 21
-periodo: "2026-03-03 → 2026-03-04"
-estado: CERRADO
-goal: "Cleanup & Perfiles — estabilizar tests, UI edit agent, perfiles públicos"
-goal_cumplido: true
+sprint: 22
+periodo: "2026-03-04 → TBD"
+estado: ACTIVO
+goal: "Pagos autónomos agente→agente en Fuji (1 hop)"
+goal_cumplido: false
 
-completadas:
-  - id: WAS-136
-    hu: Flash red Core Wallet — chainSettled guard en useChainGuard
-    modo: Hotfix
-    estado: DONE
-    commit: 155b876
-
-  - id: WAS-138
-    hu: Fix 10 tests desactualizados — trial + settle-key-batches
-    modo: Hotfix
-    estado: DONE
-    commit: b294ab1
-
-  - id: WAS-137
-    hu: Edit agent — cover_image, capabilities, free_trial, max_rpm/rpd
+en_progreso:
+  - id: WAS-140
+    hu: Pagos autónomos agente→agente — wallet del agente paga servicios de otros agentes
     modo: QUALITY
-    estado: DONE
-    commit: e4ebb3a
-
-  - id: WAS-139
-    hu: Perfiles públicos — excluir /creator/[username] del auth guard
-    modo: Hotfix
-    estado: DONE
-    commit: 1da15bd
+    fase: F0
 
 carry_over: []
-
-deuda_tecnica_nueva:
-  - descripcion: "AB-014: Tests deben actualizarse en el mismo sprint que cambia el contrato del route"
-    severidad: MENOR
-    sprint_objetivo: 22
-  - descripcion: "AB-015: Reproducir bug con evidencia (curl/log) antes de iniciar hotfix"
-    severidad: MENOR
-    sprint_objetivo: 22
-
-proxima_ceremonia: "Sprint 22 Planning — WAS-140 Pagos agente→agente (Fuji, 1 hop)"
+proxima_ceremonia: "Status Meeting — Miércoles"
