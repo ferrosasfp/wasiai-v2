@@ -270,6 +270,84 @@ interface CloseKeyModalProps {
   onSuccess: (txHash: string | null) => void
 }
 
+// ── WithdrawModal ─────────────────────────────────────────────────────────────
+function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
+  keyId: string; keyName: string; balance: number
+  onClose: () => void; onSuccess: () => void
+}) {
+  const [status,   setStatus]   = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
+
+  async function handleWithdraw() {
+    setStatus('loading')
+    setErrorMsg('')
+    try {
+      const res  = await fetch(`/api/agent-keys/${keyId}/refund`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`)
+      setStatus('success')
+      setTimeout(onSuccess, 1500)
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : String(err))
+      setStatus('error')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Retirar fondos</h2>
+            <p className="text-sm text-gray-500">{keyName}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {status === 'success' ? (
+          <div className="text-center space-y-3">
+            <div className="text-4xl">✅</div>
+            <p className="font-semibold text-green-700">Fondos retirados exitosamente</p>
+            <p className="text-sm text-gray-500">
+              ${balance.toFixed(4)} USDC movidos a tus Earnings. Reclámalos desde el dashboard.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-4 text-center">
+              <p className="text-xs text-gray-500 mb-1">Fondos disponibles</p>
+              <p className="text-3xl font-extrabold text-green-700">${balance.toFixed(4)} <span className="text-base font-medium text-green-500">USDC</span></p>
+            </div>
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+              <p>⚠️ Al retirar, esta key quedará cerrada. Si quieres seguir usándola, deposita de nuevo.</p>
+            </div>
+            {errorMsg && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+                <p className="text-xs text-red-700">{errorMsg}</p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button
+                onClick={handleWithdraw}
+                disabled={status === 'loading'}
+                className="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition"
+              >
+                {status === 'loading' ? 'Retirando…' : `Retirar $${balance.toFixed(4)}`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── CloseKeyModal ─────────────────────────────────────────────────────────────
 function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKeyModalProps) {
   const t = useTranslations('agentKeys')
   const tCommon = useTranslations('common')
@@ -422,8 +500,9 @@ export default function AgentKeysPage() {
   const [copied, setCopied]     = useState(false)
 
   // Modal state
-  const [depositKey, setDepositKey] = useState<{ id: string; name: string } | null>(null)
-  const [closeKey, setCloseKey]     = useState<{ id: string; name: string; balance: number } | null>(null)
+  const [depositKey,  setDepositKey]  = useState<{ id: string; name: string } | null>(null)
+  const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number } | null>(null)
+  const [withdrawKey, setWithdrawKey] = useState<{ id: string; name: string; balance: number } | null>(null)
 
   const loadKeys = useCallback(() => {
     fetch('/api/agent-keys')
@@ -603,7 +682,7 @@ export default function AgentKeysPage() {
                           </button>
                           {available > 0 && (
                             <button
-                              onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
+                              onClick={() => setWithdrawKey({ id: key.id, name: key.name, balance: available })}
                               className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
                             >
                               Retirar ${available.toFixed(2)}
@@ -652,6 +731,16 @@ Content-Type: application/json
       </div>
 
       {/* Deposit Modal */}
+      {withdrawKey && (
+        <WithdrawModal
+          keyId={withdrawKey.id}
+          keyName={withdrawKey.name}
+          balance={withdrawKey.balance}
+          onClose={() => setWithdrawKey(null)}
+          onSuccess={() => { setWithdrawKey(null); setTimeout(loadKeys, 1500) }}
+        />
+      )}
+
       {depositKey && (
         <DepositModal
           keyId={depositKey.id}
