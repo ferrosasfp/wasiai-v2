@@ -293,6 +293,26 @@ export const WASIAI_MARKETPLACE_ABI = [
       { name: 'amount', type: 'uint256', indexed: false },
     ],
   },
+  // WAS-141: Creator withdraws USDC directly from key balance
+  {
+    name: 'withdrawKey',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'keyId',  type: 'bytes32' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'KeyWithdrawn',
+    type: 'event',
+    inputs: [
+      { name: 'keyId',  type: 'bytes32', indexed: true  },
+      { name: 'owner',  type: 'address', indexed: true  },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
 ] as const
 
 // ── Contract address helper ────────────────────────────────────────────────
