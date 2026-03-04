@@ -6,11 +6,12 @@ import { logger } from '@/lib/logger'
 
 const depositSchema = z.object({
   ownerAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid Ethereum address'),
-  amount:       z.number().min(1).max(1000),
+  amount:       z.number().min(0.01).max(1000),
   validAfter:   z.number().int().min(0),
   validBefore:  z.number().int().min(1),
   nonce:        z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid nonce (must be 0x + 64 hex chars)'),
-  v:            z.number().int().min(27).max(28),
+  // Core Wallet puede devolver v = 0 o 1 — normalizamos a 27/28
+  v:            z.number().int().min(0).max(28).transform(v => v < 27 ? v + 27 : v),
   r:            z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid r value'),
   s:            z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid s value'),
 })
