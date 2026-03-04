@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useReducer } from 'react'
 import type { PaymentFlowState } from '../types/payment-flow.types'
 
 interface WalletStatusBarProps {
@@ -24,8 +24,8 @@ export function WalletStatusBar({
   onConnect,
   onDisconnect,
 }: WalletStatusBarProps) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  const [mounted, markMounted] = useReducer(() => true, false)
+  useEffect(markMounted, [markMounted])
 
   const handleDisconnect = () => {
     onDisconnect()
