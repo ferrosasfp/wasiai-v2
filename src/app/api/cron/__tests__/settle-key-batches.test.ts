@@ -149,7 +149,9 @@ const sampleCall: AgentCall = {
   amount_paid:  '5.000000',
 }
 
-const sampleAgent = { slug: 'test-agent', creator_id: 'creator-1' }
+// sampleAgent: reserved for future test expansion
+const _sampleAgent = { slug: 'test-agent', creator_id: 'creator-1' }
+void _sampleAgent
 const sampleKeyRow = { key_hash: '0xkeyhash' }
 
 const CRON_SECRET = 'test-cron-secret'

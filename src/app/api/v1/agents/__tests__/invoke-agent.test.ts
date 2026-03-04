@@ -52,7 +52,7 @@ import { AgentPayError } from '@/lib/agent-wallets/agentPay'
 // Fixtures
 // ---------------------------------------------------------------------------
 const VALID_KEY     = 'wai_test_key_123'
-const KEY_HASH      = '45f5e4e86e0e06b1bdb7f0bd4ec01bc5327d33cb5d99c28b4aa0d2c30bbd1e5c' // sha256 placeholder
+// KEY_HASH: reserved for future hash-verification tests
 const CREATOR_ID    = 'creator-uuid-001'
 const CALLER_AGENT  = { id: 'agent-uuid-001', slug: 'caller-agent', status: 'active', creator_id: CREATOR_ID }
 const KEY_ROW       = { id: 'key-uuid-001', owner_id: CREATOR_ID, is_active: true }
