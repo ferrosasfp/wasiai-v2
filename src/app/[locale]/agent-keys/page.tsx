@@ -619,7 +619,8 @@ Content-Type: application/json
           onClose={() => setDepositKey(null)}
           onSuccess={() => {
             setDepositKey(null)
-            loadKeys()
+            // Pequeño delay para que la DB confirme el update antes de recargar
+            setTimeout(loadKeys, 1500)
           }}
         />
       )}
