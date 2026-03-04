@@ -73,7 +73,6 @@ export function BottomTabBar({ locale: _locale, initialEmail = null }: BottomTab
     ? [
         { icon: '👤', label: t('profile'), href: `/${locale}/profile` },
 
-        { icon: '📦', label: t('storage'), href: `/${locale}/storage` },
         { icon: '📖', label: t('docs'), href: `/${locale}/docs` },
         {
           icon: '🌐',
