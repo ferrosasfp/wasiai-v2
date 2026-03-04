@@ -1,6 +1,7 @@
 'use client'
 
-import { AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, Copy, Check } from 'lucide-react'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,14 @@ export interface PipelineStatusProps {
 
 export function PipelineStatus({ runState, onReset }: PipelineStatusProps) {
   const { status, result, receipts, totalCost, error, stepsExecuted, pipelineId } = runState
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    void navigator.clipboard.writeText(JSON.stringify(result, null, 2)).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   if (status === 'idle') return null
 
@@ -84,7 +93,17 @@ export function PipelineStatus({ runState, onReset }: PipelineStatusProps) {
 
           {/* Resultado */}
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Resultado</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-700">Resultado</h3>
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors px-2 py-1 rounded hover:bg-gray-700"
+                title="Copiar resultado"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? 'Copiado' : 'Copiar'}
+              </button>
+            </div>
             <pre className="bg-gray-900 text-gray-100 rounded-md p-4 text-xs overflow-auto max-h-64">
               {JSON.stringify(result, null, 2)}
             </pre>
