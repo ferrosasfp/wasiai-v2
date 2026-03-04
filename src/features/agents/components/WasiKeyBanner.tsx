@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   locale:       string
@@ -19,16 +20,19 @@ export function WasiKeyBanner({ locale, creatorPrice }: Props) {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    fetch('/api/agent-keys')
-      .then(r => {
-        if (!r.ok) { setShow(true); return [] }
-        return r.json() as Promise<Array<{ status: string }>>
-      })
-      .then((keys) => {
-        const hasActive = keys.some((k) => k.status === 'active')
-        setShow(!hasActive)
-      })
-      .catch(() => setShow(true)) // sin sesión o error → mostrar banner
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      // Usuario no autenticado → no mostrar banner (no tiene sentido invitarle a crear key)
+      if (!user) return
+
+      fetch('/api/agent-keys')
+        .then(r => r.ok ? r.json() as Promise<Array<{ is_active: boolean }>> : [])
+        .then((keys) => {
+          const hasActive = keys.some((k) => k.is_active)
+          setShow(!hasActive)
+        })
+        .catch(() => setShow(true))
+    })
   }, [])
 
   if (!show) return null
