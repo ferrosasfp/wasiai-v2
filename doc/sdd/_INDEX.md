@@ -41,3 +41,4 @@
 | 037 | 2026-03-03 | WAS-133 | Gas fee dinámico Chainlink + banner WasiAI Key en detail page | feature | QUALITY | DONE | master |
 | 038 | 2026-03-03 | WAS-131 | Freemium publish — primer agente gratis, listing fee x402 real para siguientes | feature | QUALITY | DONE | master |
 | 039 | 2026-03-04 | WAS-136 | Fix flash wrong_network en Core Wallet — chainSettled guard en useChainGuard | hotfix | hotfix | DONE | master |
+| 040 | 2026-03-04 | WAS-137 | Edit agent — cover_image, capabilities, free_trial, max_rpm/rpd | improvement | QUALITY | DONE | master |
