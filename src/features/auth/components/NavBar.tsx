@@ -10,7 +10,6 @@ const NAV_ITEMS = [
   { href: '/dashboard', key: 'dashboard' },
   { href: '/wallet', key: 'wallet' },
   { href: '/contracts', key: 'contracts' },
-  { href: '/storage', key: 'storage' },
   { href: '/sandbox', key: 'sandbox' },
   { href: '/pipelines', key: 'pipelines' },
   { href: '/profile', key: 'profile' },

@@ -255,7 +255,6 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
 
                     <Link href={`/${locale}/profile`}    onClick={() => setMeOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><span>👤</span>{tNav('profile')}</Link>
                     <Link href={`/${locale}/creator/dashboard`} onClick={() => setMeOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><span>💰</span>{tNav('wallet')}</Link>
-                    <Link href={`/${locale}/storage`}    onClick={() => setMeOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><span>📦</span>{tNav('storage')}</Link>
 
                     {/* Language switcher inline */}
                     <div className="flex items-center gap-2.5 border-t border-gray-100 px-4 py-2.5">
