@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, startTransition } from 'react'
 import { useAccount, useDisconnect } from 'wagmi'
 import { WalletConnectModal } from './WalletConnectModal'
 import { useTranslations } from 'next-intl'
@@ -22,7 +22,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const [input, setInput] = useState('')
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  useEffect(() => { startTransition(() => setMounted(true)) }, [])
 
   const {
     ctx,
@@ -87,8 +87,12 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
     reset()
   }
 
-  // CTA button label
-  const buttonLabel =
+  // SSR-safe defaults — server y cliente deben coincidir hasta que monte
+  const defaultLabel   = `Pagar $${model.price_per_call} USDC`
+  const defaultDisabled = false
+
+  // CTA button label — solo en cliente (post-mount)
+  const buttonLabel = !mounted ? defaultLabel :
     ctx.state === 'no_wallet'            ? t('connectWallet')   :
     ctx.state === 'wrong_network'        ? t('switchNetwork')   :
     ctx.state === 'insufficient_balance' ? 'USDC insuficiente'  :
@@ -97,20 +101,21 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
     ctx.state === 'approving'            ? 'Aprobando...'       :
     ctx.state === 'success'              ? t('done')            :
     ctx.state === 'error'                ? t('retry')           :
-    `Pagar $${model.price_per_call} USDC`
+    defaultLabel
 
-  const isProcessing = (
+  const isProcessing = mounted && (
     ctx.state === 'signing_eip3009' ||
     ctx.state === 'calling'         ||
     ctx.state === 'approving'       ||
     ctx.state === 'switching_network'
   )
 
-  const isDisabled =
+  const isDisabled = !mounted ? defaultDisabled : (
     isProcessing                                        ||
     ctx.state === 'insufficient_balance'                ||
     ctx.state === 'wrong_network'                       ||
     (ctx.state === 'idle' && !input.trim())
+  )
 
   // Fallback approve flow: visible during eip3009_failed, approving, or after confirm
   const showFallback = (

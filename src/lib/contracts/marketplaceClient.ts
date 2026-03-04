@@ -338,7 +338,11 @@ export async function depositForKeyOnChain(params: {
     logger.info('[marketplace] depositForKey tx', { txHash, keyId: params.keyId.slice(0, 8) })
     return txHash
   } catch (err) {
-    logger.error('[marketplace] depositForKey failed', { err: String(err).slice(0, 300) })
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.error('[marketplace] depositForKey failed', {
+      message: msg.slice(0, 500),
+      cause:   (err as { cause?: unknown })?.cause ? String((err as { cause?: unknown }).cause).slice(0, 300) : undefined,
+    })
     return null
   }
 }
