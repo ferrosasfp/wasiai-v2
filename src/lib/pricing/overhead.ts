@@ -67,14 +67,51 @@ export async function calcPlatformOverhead(creatorPrice: number): Promise<Overhe
   }
 }
 
+const GAS_UNITS = 80_000n
+
 async function _calcGasFee(): Promise<number> {
   const client = getPublicClient()
-  const [gasPrice, chainlinkResult] = await Promise.all([
+
+  const [gasPrice, avaxUsd] = await Promise.all([
     client.getGasPrice(),
-    readChainlinkFeed(process.env.CHAINLINK_AVAX_USD_FEED!),
+    _getAvaxUsd(),
   ])
-  const avaxUsd     = chainlinkResult.price_usd
-  const GAS_UNITS   = 80_000n
+
   const gasCostAvax = Number(gasPrice * GAS_UNITS) / 1e18
   return Math.round(gasCostAvax * avaxUsd * 1_000_000) / 1_000_000
+}
+
+/**
+ * Obtiene precio AVAX/USD.
+ * 1. Chainlink on-chain (confiable en mainnet)
+ * 2. CoinGecko free API (fallback — funciona en testnet)
+ * 3. Env var AVAX_USD_FALLBACK (último recurso)
+ */
+async function _getAvaxUsd(): Promise<number> {
+  // Intento 1: Chainlink
+  if (process.env.CHAINLINK_AVAX_USD_FEED) {
+    try {
+      const result = await readChainlinkFeed(process.env.CHAINLINK_AVAX_USD_FEED)
+      if (result.price_usd > 0) return result.price_usd
+    } catch { /* fallback */ }
+  }
+
+  // Intento 2: CoinGecko free API
+  try {
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=avalanche-2&vs_currencies=usd',
+      { next: { revalidate: 60 } },
+    )
+    if (res.ok) {
+      const data = await res.json() as { 'avalanche-2'?: { usd?: number } }
+      const price = data['avalanche-2']?.usd
+      if (price && price > 0) return price
+    }
+  } catch { /* fallback */ }
+
+  // Intento 3: env var configurada manualmente
+  const fallback = Number(process.env.AVAX_USD_FALLBACK ?? '0')
+  if (fallback > 0) return fallback
+
+  throw new Error('No AVAX/USD price available')
 }
