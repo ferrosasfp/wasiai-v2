@@ -183,7 +183,7 @@ export default async function HomePage({ params, searchParams }: Props) {
                     locale={locale}
                     index={i}
                     reputationBadge={
-                      <Suspense fallback={null}>
+                      <Suspense key={model.id} fallback={null}>
                         <ReputationBadge agentId={model.id} />
                       </Suspense>
                     }

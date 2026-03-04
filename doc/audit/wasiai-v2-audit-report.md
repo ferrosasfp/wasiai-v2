@@ -100,7 +100,17 @@ El protocolo WasiAI v2 demuestra un nivel de madurez de seguridad alto para un p
 - **Attack Path:** Atacante obtiene `OPERATOR_PRIVATE_KEY` (ej. leak de CI/CD, acceso al server) → firma un `AdminAction` EIP-712 con `action: 'setPlatformFee'` → puede modificar fees de la plataforma → combinado con front-running, puede maximizar extracción antes de que el owner lo detecte.
 - **Impact:** Compromiso del operador escala a privilegios admin. Permite proponer fees hasta 30% e intentar ejecutarlos (aunque el timelock de 48h mitiga en el contrato, la propuesta maliciosa queda registrada).
 - **Fix Type:** HU-MINOR
-- **Recommendation:** Separar roles: `WASIAI_OWNER_ADDRESS` debe ser la única dirección autorizada para acciones admin. Eliminar `NEXT_PUBLIC_OPERATOR_ADDRESS` del array `ALLOWED_ADDRESSES`. Documentar que el Owner debe ser una cold wallet / multisig.
+- **Recommendation:**
+  1. **Crear un Safe multisig (Gnosis Safe) en Base** como la dirección owner del protocolo:
+     - Threshold recomendado: **2 de 3 firmantes**
+     - Firmantes sugeridos: owner principal, cofundador/persona de confianza, wallet de backup en dispositivo distinto
+     - Deployment: [app.safe.global](https://app.safe.global) — gratis, compatible con Base
+  2. **Transferir ownership del contrato** al Safe address usando `Ownable2Step.transferOwnership()` (requiere aceptación explícita desde el Safe — no hay riesgo de ownership perdido).
+  3. **Actualizar variables de entorno:**
+     - `WASIAI_OWNER_ADDRESS` → dirección del Safe multisig
+     - `NEXT_PUBLIC_WASIAI_OWNER` → dirección del Safe multisig
+  4. **Eliminar `NEXT_PUBLIC_OPERATOR_ADDRESS`** del array `ALLOWED_ADDRESSES` en `verifyAdminSignature.ts` — el operador NO debe tener privilegios admin.
+  5. Documentar en el README que todas las acciones admin requieren aprobación del multisig (2 de 3).
 
 ---
 
