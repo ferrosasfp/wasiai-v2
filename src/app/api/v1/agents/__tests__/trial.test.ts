@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   validateEndpointUrl: vi.fn(),
   limitFn:             vi.fn(),
   fetchFn:             vi.fn(),
+  rpc:                 vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -24,7 +25,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(() =>
     Promise.resolve({ auth: { getUser: mocks.getUser } }),
   ),
-  createServiceClient: vi.fn(() => ({ from: mockSvcFrom })),
+  createServiceClient: vi.fn(() => ({ from: mockSvcFrom, rpc: mocks.rpc })),
 }))
 
 vi.mock('@/lib/security/validateEndpointUrl', () => ({
@@ -65,7 +66,13 @@ import { GET, POST } from '@/app/api/v1/agents/[slug]/trial/route'
 // ---------------------------------------------------------------------------
 
 const TEST_USER = { id: 'user-abc-123' }
-const AGENT     = { id: 'agent-uuid', endpoint_url: 'https://example.com/invoke', name: 'Test Agent' }
+const AGENT     = {
+  id:                  'agent-uuid',
+  endpoint_url:        'https://example.com/invoke',
+  name:                'Test Agent',
+  free_trial_enabled:  true,   // HU-3.3: requerido por el route
+  free_trial_limit:    1,
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -121,6 +128,9 @@ beforeEach(() => {
   // Rate limit OK por defecto
   mocks.limitFn.mockResolvedValue({ success: true, limit: 3, reset: Date.now() + 3600000 })
 
+  // use_trial RPC OK por defecto (retorna 1 = trial consumido exitosamente)
+  mocks.rpc.mockResolvedValue({ data: 1, error: null })
+
   // validateEndpointUrl no lanza (URL válida) por defecto
   mocks.validateEndpointUrl.mockReturnValue(undefined)
 
@@ -175,7 +185,8 @@ describe('GET /api/v1/agents/[slug]/trial', () => {
     const usedAt = '2026-02-25T10:00:00.000Z'
     mockSvcFrom
       .mockReturnValueOnce(makeChain({ data: AGENT, error: null }))
-      .mockReturnValueOnce(makeChain({ data: { used_at: usedAt }, error: null }))
+      // HU-3.3: times_used >= limit → used = true
+      .mockReturnValueOnce(makeChain({ data: { times_used: 1, used_at: usedAt }, error: null }))
 
     const res = await GET(makeGetRequest('test-agent'), makeParams('test-agent'))
 
@@ -267,16 +278,17 @@ describe('POST /api/v1/agents/[slug]/trial', () => {
   // =========================================================================
   // Trial ya usado
   // =========================================================================
-  it('retorna 409 { error: "already_used" } si el trial ya fue utilizado', async () => {
+  it('retorna 409 { error: "trial_exhausted" } si el trial ya fue utilizado', async () => {
+    // HU-3.3: el route usa use_trial RPC — retorna -1 cuando el límite se agotó
     mockSvcFrom
-      .mockReturnValueOnce(makeChain({ data: AGENT, error: null }))                    // agents
-      .mockReturnValueOnce(makeChain({ data: { id: 'trial-id' }, error: null }))      // agent_trials → existing
+      .mockReturnValueOnce(makeChain({ data: AGENT, error: null })) // agents
+    mocks.rpc.mockResolvedValueOnce({ data: -1, error: null })      // use_trial → agotado
 
     const res = await POST(makePostRequest('test-agent', { input: 'test' }), makeParams('test-agent'))
 
     expect(res.status).toBe(409)
     const body = await res.json()
-    expect(body).toMatchObject({ error: 'already_used' })
+    expect(body).toMatchObject({ error: 'trial_exhausted' })
   })
 
   // =========================================================================
