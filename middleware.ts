@@ -54,8 +54,10 @@ export async function middleware(request: NextRequest) {
   const locale = extractLocaleFromPath(pathname) ?? routing.defaultLocale
   const pathWithoutLocale = stripLocale(pathname, locale)
 
+  // WAS-139: /creator/[username] es público — solo proteger rutas de gestión
   const isProtectedRoute =
-    pathWithoutLocale.startsWith('/creator') ||
+    pathWithoutLocale.startsWith('/creator/dashboard') ||
+    pathWithoutLocale.startsWith('/creator/agents') ||
     pathWithoutLocale.startsWith('/publish') ||
     pathWithoutLocale.startsWith('/agent-keys')
 
