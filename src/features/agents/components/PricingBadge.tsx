@@ -52,13 +52,16 @@ export function PricingBadge({ slug, basePrice }: Props) {
     return n.toFixed(6)
   }
 
+  const gasVisible = data.gasFee >= 0.000001
+
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-sm font-semibold text-gray-900">
         ~${fmtPrice(data.totalPrice)} USDC
       </span>
       <span className="text-xs text-gray-500">
-        ${fmtPrice(data.creatorPrice)} agente + ${fmtPrice(data.gasFee)} gas
+        ${fmtPrice(data.creatorPrice)} agente
+        {gasVisible && <> + ${fmtPrice(data.gasFee)} gas</>}
       </span>
     </div>
   )
