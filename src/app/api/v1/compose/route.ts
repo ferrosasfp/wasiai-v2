@@ -231,6 +231,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const pipelineId = randomUUID()
   const receipts: StepReceipt[] = []
   let lastOutput: string | null = null
+  // Contexto propagado entre steps (token_address, token_symbol, etc.)
+  const pipelineCtx: Record<string, string> = {}
   const groups = groupSteps(steps)
   let globalStepIndex = 0
 
@@ -278,7 +280,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const res = await fetch(agent.endpoint_url, {
         method:   'POST',
         headers:  { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Pipeline-Id': pipelineId, 'X-Pipeline-Step': String(stepIndex) },
-        body:     JSON.stringify({ input: stepInput }),
+        body:     JSON.stringify({ input: stepInput, ...pipelineCtx }),
         signal:   AbortSignal.timeout(STEP_TIMEOUT_MS),
         redirect: 'error',
       })
@@ -319,6 +321,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (stepStatus === 'error') return { receipt: null, output: null, status: 'error', reason: stepErrorReason }
 
     const output = typeof stepOutput === 'string' ? stepOutput : JSON.stringify(stepOutput)
+
+    // Propagar campos clave entre steps (token_address, token_symbol)
+    if (stepOutput && typeof stepOutput === 'object') {
+      const out = stepOutput as Record<string, unknown>
+      if (typeof out.token_address === 'string' && out.token_address) pipelineCtx.token_address = out.token_address
+      if (typeof out.token_symbol  === 'string' && out.token_symbol)  pipelineCtx.token_symbol  = out.token_symbol
+    }
     supabase.rpc('increment_agent_stats', { p_agent_id: agent.id, p_amount: agent.price_per_call }).then(undefined, () => {})
 
     return {
