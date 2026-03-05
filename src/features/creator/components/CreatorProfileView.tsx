@@ -3,6 +3,7 @@ import Image from 'next/image'
 import type { CreatorPublicProfile, CreatorAgentCard } from '../lib/getCreatorByUsername'
 import { MessageSquare, Eye, Music, Code2, Bot, BarChart2 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface Props {
   creator: CreatorPublicProfile
@@ -28,6 +29,7 @@ const CATEGORY_ICONS: Record<string, ReactNode> = {
 }
 
 export function CreatorProfileView({ creator, locale }: Props) {
+  const t = useTranslations('creatorProfile')
   const year = new Date(creator.memberSince).getFullYear()
   const initial = creator.displayName[0]?.toUpperCase() ?? '?'
 
@@ -78,11 +80,11 @@ export function CreatorProfileView({ creator, locale }: Props) {
 
         {/* Agents Grid */}
         <section>
-          <h2 className="mb-4 font-semibold text-gray-900">Agentes publicados</h2>
+          <h2 className="mb-4 font-semibold text-gray-900">{t('publishedAgents')}</h2>
 
           {creator.agents.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center shadow-sm">
-              <p className="text-gray-500 text-sm">Este creator aún no ha publicado agentes.</p>
+              <p className="text-gray-500 text-sm">{t('noAgents')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

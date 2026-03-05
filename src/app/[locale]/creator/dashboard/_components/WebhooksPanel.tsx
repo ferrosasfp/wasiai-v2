@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { WEBHOOK_EVENTS } from '@/lib/webhooks/events'
+import { useTranslations } from 'next-intl'
 
 interface Webhook {
   id: string
@@ -24,6 +25,7 @@ interface Delivery {
 }
 
 export function WebhooksPanel() {
+  const t = useTranslations('webhooks')
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -122,7 +124,7 @@ export function WebhooksPanel() {
   if (loading) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6">
-        <p className="text-sm text-gray-400">Cargando webhooks...</p>
+        <p className="text-sm text-gray-400">{t('loading')}</p>
       </div>
     )
   }
@@ -130,7 +132,7 @@ export function WebhooksPanel() {
   return (
     <section className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-gray-900">Webhooks</h2>
+        <h2 className="font-semibold text-gray-900">{t('title')}</h2>
         <button
           onClick={() => { setShowForm(s => !s); setError(null) }}
           className="rounded-xl bg-avax-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-avax-600 transition"
@@ -153,14 +155,14 @@ export function WebhooksPanel() {
               onClick={() => { void navigator.clipboard.writeText(newSecret) }}
               className="shrink-0 rounded-lg border border-yellow-300 px-2 py-1 text-xs text-yellow-700 hover:bg-yellow-100"
             >
-              Copiar
+              {t('copy')}
             </button>
           </div>
           <button
             onClick={() => setNewSecret(null)}
             className="text-xs text-yellow-700 underline"
           >
-            Ya lo guardé, cerrar
+            {t('saved')}
           </button>
         </div>
       )}
@@ -169,7 +171,7 @@ export function WebhooksPanel() {
       {showForm && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">URL del endpoint</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t('urlLabel')}</label>
             <input
               type="url"
               placeholder="https://mi-servidor.com/webhook"
@@ -179,7 +181,7 @@ export function WebhooksPanel() {
             />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-700 mb-2">Eventos</p>
+            <p className="text-xs font-medium text-gray-700 mb-2">{t('events')}</p>
             <div className="space-y-1">
               {WEBHOOK_EVENTS.map(ev => (
                 <label key={ev} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
