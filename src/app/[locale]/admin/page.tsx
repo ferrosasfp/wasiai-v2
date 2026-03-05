@@ -58,6 +58,7 @@ export default function AdminPage() {
   const [newBps, setNewBps]       = useState<string>('')
   const [feeMsg, setFeeMsg]       = useState<string>('')
   const [settleMsg, setSettleMsg] = useState<string>('')
+  const [drainMsg, setDrainMsg]   = useState<string>('')
 
   const isOwner = isConnected && !!address && ADMIN_ALLOWED.includes(address.toLowerCase())
 
@@ -210,6 +211,50 @@ export default function AdminPage() {
       }
     } catch (err) {
       setSettleMsg(`❌ ${String(err)}`)
+    }
+  }
+
+  async function handleDrainKeys() {
+    setDrainMsg('Conectando wallet…')
+    const win = window as typeof window & { ethereum?: { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> } }
+    if (!win.ethereum) { setDrainMsg('❌ No se detectó wallet'); return }
+
+    const MARKETPLACE = process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI ?? ''
+    if (!MARKETPLACE) { setDrainMsg('❌ Contrato no configurado'); return }
+
+    try {
+      const accounts = await win.ethereum.request({ method: 'eth_requestAccounts' }) as string[]
+      const from = accounts[0]
+      const chainHex = await win.ethereum.request({ method: 'eth_chainId' }) as string
+      if (parseInt(chainHex, 16) !== 43113) { setDrainMsg('❌ Cambia a Fuji (chain 43113)'); return }
+
+      // Keys con balance conocido — obtenidos del contrato
+      const KEYS_WITH_BALANCE: Array<{ keyId: `0x${string}`; owner: `0x${string}` }> = [
+        { keyId: '0x08bdf88cf88c4bc3f4fdfb73451851d9c6ef858896a01b86d489fd763c51c2330', owner: '0xfb652f4506731aC58E51b39DCa4F5ECDcb2C1543' },
+      ]
+
+      // Selectors verificados: keccak256("refundKeyToEarnings(bytes32)").slice(0,4)
+      const refundSelector     = '0x541f593c'
+      // keccak256("withdrawFor(address)").slice(0,4)
+      const withdrawForSelector = '0x9eca672c'
+
+      let step = 1
+      for (const { keyId, owner } of KEYS_WITH_BALANCE) {
+        setDrainMsg(`Paso ${step}/${KEYS_WITH_BALANCE.length * 2}: refundKeyToEarnings…`)
+        const refundData = refundSelector + keyId.slice(2).padStart(64, '0')
+        await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: refundData }] })
+
+        setDrainMsg(`Paso ${step + 1}/${KEYS_WITH_BALANCE.length * 2}: withdrawFor…`)
+        const withdrawData = withdrawForSelector + owner.slice(2).padStart(64, '0')
+        await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: withdrawData }] })
+        step += 2
+      }
+
+      setDrainMsg('✅ Contrato limpio — recarga el dashboard')
+      setTimeout(() => void loadTreasury(), 4000)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err && typeof err === 'object' && 'message' in err) ? String((err as { message: unknown }).message) : String(err)
+      setDrainMsg(`❌ ${msg}`)
     }
   }
 
@@ -399,6 +444,21 @@ export default function AdminPage() {
                     className="rounded-lg bg-avax-500 px-4 py-2 text-sm font-medium text-white hover:bg-avax-600 transition whitespace-nowrap"
                   >
                     Run Settlement
+                  </button>
+                </div>
+
+                {/* Limpiar balances */}
+                <div className="flex items-center gap-3 rounded-lg bg-red-950/40 border border-red-800 p-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-300">Limpiar balances del contrato</p>
+                    <p className="text-xs text-red-400 mt-0.5">Devuelve USDC de keys huérfanas a sus owners — deja el contrato en cero. Requiere wallet del operador.</p>
+                    {drainMsg && <p className="text-xs text-gray-300 mt-1">{drainMsg}</p>}
+                  </div>
+                  <button
+                    onClick={() => void handleDrainKeys()}
+                    className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition whitespace-nowrap"
+                  >
+                    Limpiar
                   </button>
                 </div>
 
