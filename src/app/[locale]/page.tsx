@@ -64,11 +64,13 @@ export default async function HomePage({ params, searchParams }: Props) {
   const supabase = isFirstPage ? await createClient() : null
   const fourteenDaysAgo = getFourteenDaysAgo()
 
-  const [freeTrialAgents, topRatedAgents, newAgents] = isFirstPage && supabase
+  const [freeTrialAgents, trendingAgents, topRatedAgents, newAgents] = isFirstPage && supabase
     ? await Promise.all([
         supabase.from('agents').select('*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)')
           .eq('status', 'active').eq('free_trial_enabled', true)
           .order('total_calls', { ascending: false }).limit(6)
+          .then(r => r.data ?? []),
+        supabase.rpc('get_trending_agents', { days: 7, limit_count: 6 })
           .then(r => r.data ?? []),
         supabase.from('agents').select('*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)')
           .eq('status', 'active').not('reputation_score', 'is', null)
@@ -80,7 +82,7 @@ export default async function HomePage({ params, searchParams }: Props) {
           .order('created_at', { ascending: false }).limit(6)
           .then(r => r.data ?? []),
       ])
-    : [[], [], []]
+    : [[], [], [], []]
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const hasNext    = page < totalPages
@@ -262,7 +264,7 @@ export default async function HomePage({ params, searchParams }: Props) {
       </section>
 
       {/* ── Curated sections (CM-01/02) ────────────────────────────────── */}
-      {isFirstPage && (freeTrialAgents.length > 0 || topRatedAgents.length > 0 || newAgents.length > 0) && (
+      {isFirstPage && (freeTrialAgents.length > 0 || trendingAgents.length > 0 || topRatedAgents.length > 0 || newAgents.length > 0) && (
         <section className="px-6 py-8 bg-white border-t border-gray-100">
           <div className="mx-auto max-w-6xl space-y-10">
             {freeTrialAgents.length > 0 && (
@@ -270,6 +272,16 @@ export default async function HomePage({ params, searchParams }: Props) {
                 <h3 className="text-lg font-bold text-gray-900 mb-4">{t('freeToTry')}</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {freeTrialAgents.map((agent: Record<string, unknown>, i: number) => (
+                    <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {trendingAgents.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">{t('trending')}</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {trendingAgents.map((agent: Record<string, unknown>, i: number) => (
                     <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
                   ))}
                 </div>
