@@ -264,6 +264,8 @@ export default function AdminPage() {
     }
   }
 
+  if (!mounted) return <div className="mx-auto max-w-3xl p-8 space-y-8" />
+
   return (
     <div className="mx-auto max-w-3xl p-8 space-y-8">
       {/* Header */}
