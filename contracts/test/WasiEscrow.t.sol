@@ -103,17 +103,27 @@ contract WasiEscrowTest is Test {
         assertEq(uint(escrow.getEscrow(escrowId).status), uint(WasiEscrow.EscrowStatus.Refunded));
     }
 
-    function test_ReleaseExpired_After24h() public {
+    // NA-204 FIX: RELEASE_TIMEOUT ahora es 72h (no 24h), solo operador/owner/marketplace
+    function test_ReleaseExpired_After72h_ByOperator() public {
         _createEscrow();
-        vm.warp(block.timestamp + 25 hours);
-        // cualquier address puede llamar
-        vm.prank(stranger);
+        vm.warp(block.timestamp + 73 hours);
+        vm.prank(operator);
         escrow.releaseExpired(escrowId);
         assertEq(usdc.balanceOf(marketplace), AMOUNT);
     }
 
-    function test_ReleaseExpired_Before24h_Reverts() public {
+    function test_ReleaseExpired_After72h_ByStranger_Reverts() public {
         _createEscrow();
+        vm.warp(block.timestamp + 73 hours);
+        vm.prank(stranger);
+        vm.expectRevert("WasiEscrow: not authorized");
+        escrow.releaseExpired(escrowId);
+    }
+
+    function test_ReleaseExpired_Before72h_Reverts() public {
+        _createEscrow();
+        vm.warp(block.timestamp + 25 hours); // antes de 72h
+        vm.prank(operator);
         vm.expectRevert("WasiEscrow: timeout not reached");
         escrow.releaseExpired(escrowId);
     }
@@ -164,32 +174,107 @@ contract WasiEscrowTest is Test {
         assertEq(uint(escrow.getEscrow(escrowId).status), uint(WasiEscrow.EscrowStatus.Disputed));
     }
 
-    // ── WAS-118: refundExpired ────────────────────────────────────────────────
+    // ── NA-204 FIX: refundExpired ─────────────────────────────────────────────
 
-    function test_RefundExpired_After24h_ByStranger() public {
+    function test_RefundExpired_After72h_ByPayer() public {
         _createEscrow();
         uint256 payerBefore = usdc.balanceOf(payer);
-        vm.warp(block.timestamp + 25 hours);
-        vm.prank(stranger);
+        vm.warp(block.timestamp + 73 hours);
+        vm.prank(payer);
         escrow.refundExpired(escrowId);
         assertEq(usdc.balanceOf(payer), payerBefore + AMOUNT);
         assertEq(uint(escrow.getEscrow(escrowId).status), uint(WasiEscrow.EscrowStatus.Refunded));
     }
 
-    function test_RefundExpired_Before24h_Reverts() public {
+    function test_RefundExpired_After72h_ByOperator() public {
         _createEscrow();
+        uint256 payerBefore = usdc.balanceOf(payer);
+        vm.warp(block.timestamp + 73 hours);
+        vm.prank(operator);
+        escrow.refundExpired(escrowId);
+        assertEq(usdc.balanceOf(payer), payerBefore + AMOUNT);
+    }
+
+    function test_RefundExpired_After72h_ByStranger_Reverts() public {
+        _createEscrow();
+        vm.warp(block.timestamp + 73 hours);
         vm.prank(stranger);
+        vm.expectRevert("WasiEscrow: not authorized");
+        escrow.refundExpired(escrowId);
+    }
+
+    function test_RefundExpired_Before72h_Reverts() public {
+        _createEscrow();
+        vm.prank(payer);
         vm.expectRevert("WasiEscrow: timeout not reached");
         escrow.refundExpired(escrowId);
     }
 
     function test_RefundExpired_AlreadyRefunded_Reverts() public {
         _createEscrow();
-        vm.warp(block.timestamp + 25 hours);
-        vm.prank(stranger);
+        vm.warp(block.timestamp + 73 hours);
+        vm.prank(payer);
         escrow.refundExpired(escrowId);
-        vm.prank(stranger);
+        vm.prank(payer);
         vm.expectRevert("WasiEscrow: not pending");
         escrow.refundExpired(escrowId);
+    }
+
+    // ── NA-204: emergencyRefund (30 days) ─────────────────────────────────────
+
+    function test_EmergencyRefund_After30Days_ByAnyone() public {
+        _createEscrow();
+        uint256 payerBefore = usdc.balanceOf(payer);
+        vm.warp(block.timestamp + 31 days);
+        vm.prank(stranger); // cualquiera puede llamar
+        escrow.emergencyRefund(escrowId);
+        assertEq(usdc.balanceOf(payer), payerBefore + AMOUNT);
+    }
+
+    function test_EmergencyRefund_Before30Days_Reverts() public {
+        _createEscrow();
+        vm.warp(block.timestamp + 29 days);
+        vm.prank(stranger);
+        vm.expectRevert("WasiEscrow: emergency not active");
+        escrow.emergencyRefund(escrowId);
+    }
+
+    // ── NA-208: resolveDispute ────────────────────────────────────────────────
+
+    function test_ResolveDispute_Release_ByOwner() public {
+        _createEscrow();
+        vm.prank(operator);
+        escrow.disputeEscrow(escrowId);
+        vm.prank(owner);
+        escrow.resolveDispute(escrowId, true); // release to marketplace
+        assertEq(usdc.balanceOf(marketplace), AMOUNT);
+        assertEq(uint(escrow.getEscrow(escrowId).status), uint(WasiEscrow.EscrowStatus.Released));
+    }
+
+    function test_ResolveDispute_Refund_ByOwner() public {
+        _createEscrow();
+        vm.prank(operator);
+        escrow.disputeEscrow(escrowId);
+        uint256 payerBefore = usdc.balanceOf(payer);
+        vm.prank(owner);
+        escrow.resolveDispute(escrowId, false); // refund to payer
+        assertEq(usdc.balanceOf(payer), payerBefore + AMOUNT);
+        assertEq(uint(escrow.getEscrow(escrowId).status), uint(WasiEscrow.EscrowStatus.Refunded));
+    }
+
+    function test_ResolveDispute_ByOperator_Reverts() public {
+        _createEscrow();
+        vm.prank(operator);
+        escrow.disputeEscrow(escrowId);
+        vm.prank(operator); // operador NO puede resolver disputas
+        vm.expectRevert();
+        escrow.resolveDispute(escrowId, true);
+    }
+
+    function test_ResolveDispute_NotDisputed_Reverts() public {
+        _createEscrow();
+        vm.prank(owner);
+        vm.expectRevert("WasiEscrow: not disputed");
+        escrow.resolveDispute(escrowId, true);
     }
 }

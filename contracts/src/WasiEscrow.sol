@@ -45,7 +45,10 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
     mapping(bytes32 => EscrowTx)  public escrows;
     mapping(address => bool)      public operators;
 
-    uint256 public constant RELEASE_TIMEOUT = 24 hours;
+    // NA-204: Timeout extendido de 24h → 72h (da tiempo al operador para procesar resultados)
+    uint256 public constant RELEASE_TIMEOUT  = 72 hours;
+    // NA-204: Escape hatch — si nadie actúa en 30 días, cualquiera puede refund al payer
+    uint256 public constant EMERGENCY_TIMEOUT = 30 days;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -53,6 +56,7 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
     event EscrowReleased(bytes32 indexed escrowId, address indexed to, uint256 amount);
     event EscrowRefunded(bytes32 indexed escrowId, address indexed payer, uint256 amount);
     event EscrowDisputed(bytes32 indexed escrowId);
+    event DisputeResolved(bytes32 indexed escrowId, string resolution);
     event OperatorSet(address indexed operator, bool active);
 
     // ─── Modifiers ────────────────────────────────────────────────────────────
@@ -140,8 +144,8 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
     }
 
     /**
-     * @notice Trustless release: cualquiera puede llamar tras RELEASE_TIMEOUT.
-     *         Protege al payer si el operador desaparece.
+     * @notice NA-204: Solo operador o marketplace pueden release después de timeout.
+     *         Previene race condition: antes cualquiera podía llamar y decidir el destino.
      */
     function releaseExpired(bytes32 escrowId)
         external
@@ -153,13 +157,16 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
             block.timestamp >= escrows[escrowId].createdAt + RELEASE_TIMEOUT,
             "WasiEscrow: timeout not reached"
         );
+        // NA-204: Solo operador/marketplace pueden release (verificaron resultado off-chain)
+        require(
+            operators[msg.sender] || msg.sender == owner() || msg.sender == marketplace,
+            "WasiEscrow: not authorized"
+        );
         _release(escrowId);
     }
 
     /**
-     * @notice Trustless refund: cualquiera puede llamar tras RELEASE_TIMEOUT
-     *         y devolver los fondos al payer original.
-     *         Protege al payer si el operador desaparece y la tarea falló.
+     * @notice NA-204: Solo payer original u operador pueden refund después de timeout.
      * @dev    CEI pattern: estado → Refunded ANTES del safeTransfer.
      */
     function refundExpired(bytes32 escrowId)
@@ -173,8 +180,33 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
             "WasiEscrow: timeout not reached"
         );
         EscrowTx storage e = escrows[escrowId];
+        // NA-204: Solo payer o operador pueden refund (evita que terceros elijan ganador)
+        require(
+            msg.sender == e.payer || operators[msg.sender] || msg.sender == owner(),
+            "WasiEscrow: not authorized"
+        );
         e.status = EscrowStatus.Refunded;              // CEI: Effect primero
         usdc.safeTransfer(e.payer, e.amount);           // Interaction después
+        emit EscrowRefunded(escrowId, e.payer, e.amount);
+    }
+
+    /**
+     * @notice NA-204: Escape hatch — si nadie actúa en 30 días, CUALQUIERA puede
+     *         refund al payer. Preserva propiedad trustless del diseño original.
+     */
+    function emergencyRefund(bytes32 escrowId)
+        external
+        nonReentrant
+        escrowExists(escrowId)
+        isPending(escrowId)
+    {
+        require(
+            block.timestamp >= escrows[escrowId].createdAt + EMERGENCY_TIMEOUT,
+            "WasiEscrow: emergency not active"
+        );
+        EscrowTx storage e = escrows[escrowId];
+        e.status = EscrowStatus.Refunded;
+        usdc.safeTransfer(e.payer, e.amount);
         emit EscrowRefunded(escrowId, e.payer, e.amount);
     }
 
@@ -195,7 +227,7 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
     }
 
     /**
-     * @notice Marca como Disputed. Resolución manual off-chain.
+     * @notice Marca como Disputed. Resolución via resolveDispute().
      */
     function disputeEscrow(bytes32 escrowId)
         external
@@ -205,6 +237,34 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
     {
         escrows[escrowId].status = EscrowStatus.Disputed;
         emit EscrowDisputed(escrowId);
+    }
+
+    /**
+     * @notice NA-208: Resuelve una disputa — solo el owner (no operador) puede resolver.
+     *         Separación de roles: operador puede abrir disputas, owner las cierra.
+     * @param releaseToMarketplace  true → release al marketplace; false → refund al payer
+     */
+    function resolveDispute(bytes32 escrowId, bool releaseToMarketplace)
+        external
+        onlyOwner
+        nonReentrant
+        escrowExists(escrowId)
+    {
+        require(
+            escrows[escrowId].status == EscrowStatus.Disputed,
+            "WasiEscrow: not disputed"
+        );
+
+        if (releaseToMarketplace) {
+            _release(escrowId);
+            emit DisputeResolved(escrowId, "released");
+        } else {
+            EscrowTx storage e = escrows[escrowId];
+            e.status = EscrowStatus.Refunded;           // CEI: Effect primero
+            usdc.safeTransfer(e.payer, e.amount);        // Interaction después
+            emit EscrowRefunded(escrowId, e.payer, e.amount);
+            emit DisputeResolved(escrowId, "refunded");
+        }
     }
 
     // ─── Internal ─────────────────────────────────────────────────────────────
@@ -239,6 +299,7 @@ contract WasiEscrow is Ownable2Step, ReentrancyGuard {
         uint256 amount,
         bytes32 nonce
     ) external view returns (bytes32) {
-        return keccak256(abi.encodePacked(slug, payer, amount, nonce, block.chainid));
+        // NA-209 (escrow): abi.encode evita colisiones de hash
+        return keccak256(abi.encode(slug, payer, amount, nonce, block.chainid));
     }
 }
