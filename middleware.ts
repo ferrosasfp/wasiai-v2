@@ -19,6 +19,19 @@ function stripLocale(pathname: string, locale: string): string {
 }
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // NG-010: Security headers para todas las API routes (sin interferir con su auth propia)
+  if (pathname.startsWith('/api/') || pathname.startsWith('/trpc/')) {
+    const apiResponse = NextResponse.next()
+    apiResponse.headers.set('X-Content-Type-Options', 'nosniff')
+    apiResponse.headers.set('X-Frame-Options', 'DENY')
+    apiResponse.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+    apiResponse.headers.set('X-DNS-Prefetch-Control', 'off')
+    apiResponse.headers.delete('X-Powered-By')
+    return apiResponse
+  }
+
   // Step 1: Run next-intl middleware (handles locale detection + redirect)
   const intlResponse = intlMiddleware(request)
 
@@ -50,9 +63,9 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
-  const locale = extractLocaleFromPath(pathname) ?? routing.defaultLocale
-  const pathWithoutLocale = stripLocale(pathname, locale)
+  const routePathname = request.nextUrl.pathname
+  const locale = extractLocaleFromPath(routePathname) ?? routing.defaultLocale
+  const pathWithoutLocale = stripLocale(routePathname, locale)
 
   // WAS-139: /creator/[username] es público — solo proteger rutas de gestión
   const isProtectedRoute =
@@ -110,6 +123,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|trpc|_next|_vercel|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    // NG-010: Incluir api/ y trpc/ para aplicar security headers (excluir solo _next y archivos estáticos)
+    '/((?!_next|_vercel|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }
