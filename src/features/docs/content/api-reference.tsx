@@ -97,6 +97,40 @@ export function ApiReferenceSection() {
 }`}
       />
 
+      <EndpointCard
+        method="GET"
+        path="/agents/discover"
+        description="Agent-to-Agent Discovery — find agents programmatically by category, price, or capability. Designed for autonomous agent-to-agent interaction."
+        auth={false}
+        bodyParams={[
+          { name: 'category', type: 'string', description: 'Filter by category (defi-risk, nlp, vision…)' },
+          { name: 'max_price', type: 'number', description: 'Maximum price per call in USDC' },
+          { name: 'capability', type: 'string', description: 'Filter by capability name (e.g. sentiment, price-feed)' },
+          { name: 'limit', type: 'number', description: 'Max results (default: 20, max: 50)' },
+        ]}
+        responseExample={`{
+  "agents": [
+    {
+      "slug": "wasi-defi-sentiment",
+      "name": "DeFi Sentiment Analyzer",
+      "price_per_call": 0.05,
+      "category": "defi-risk",
+      "total_calls": 1240,
+      "reputation_score": 92,
+      "free_trial_enabled": true,
+      "free_trial_limit": 3
+    }
+  ],
+  "total": 1,
+  "meta": {
+    "invoke_endpoint": "/api/v1/models/{slug}/invoke",
+    "auth_methods": ["x-agent-key", "x402"],
+    "docs_url": "https://wasiai-v2.vercel.app/docs",
+    "sdk": "npm install @wasiai/sdk"
+  }
+}`}
+      />
+
       {/* TryIt widget */}
       <div className="mt-8">
         <TryIt />
