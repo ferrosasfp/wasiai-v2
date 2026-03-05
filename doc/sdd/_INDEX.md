@@ -48,3 +48,4 @@
 | 043 | 2026-03-04 | WAS-141 | Retiro parcial/total Agent Key — withdrawKey contrato + UI + backend sync | feature | QUALITY | DONE | master |
 | 044 | 2026-03-05 | WAS-153 | Curated Collections — tables, pages, featured landing, navbar | feature | QUALITY | DONE | master |
 | 045 | 2026-03-05 | WAS-154 | Creator CLI — wasiai discover + publish + stats | feature | QUALITY | DONE | master |
+| 046 | 2026-03-05 | WAS-157 | Admin Collections CRUD — API + UI + agent manager | feature | QUALITY | DONE | master |
