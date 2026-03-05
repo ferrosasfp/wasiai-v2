@@ -243,7 +243,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {loading && <p className="text-gray-400">Loading status…</p>}
+      {mounted && loading && <p className="text-gray-400">Loading status…</p>}
 
       {status && (
         <>
