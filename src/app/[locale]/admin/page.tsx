@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useReducer } from 'react'
 import { useAccount } from 'wagmi'
 import { useWalletClient } from 'wagmi'
 import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
@@ -45,6 +45,8 @@ interface AdminStatus {
 }
 
 export default function AdminPage() {
+  const [mounted, markMounted] = useReducer(() => true, false)
+  useEffect(markMounted, [markMounted])
   const { address, isConnected } = useAccount()
   const { data: walletClient }    = useWalletClient()
   const [status, setStatus]       = useState<AdminStatus | null>(null)
@@ -73,8 +75,8 @@ export default function AdminPage() {
     setTreasuryLoading(true)
     try {
       const [t, c] = await Promise.all([
-        fetch('/api/admin/treasury').then(r => r.json()) as Promise<TreasuryData>,
-        fetch('/api/admin/treasury/creators').then(r => r.json()) as Promise<CreatorRow[]>,
+        fetch('/api/admin/treasury').then(r => r.ok ? r.json() : null) as Promise<TreasuryData | null>,
+        fetch('/api/admin/treasury/creators').then(r => r.ok ? r.json() : []) as Promise<CreatorRow[]>,
       ])
       setTreasury(t)
       setCreators(Array.isArray(c) ? c : [])
@@ -217,7 +219,7 @@ export default function AdminPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">WasiAI Admin Panel</h1>
         <div className="text-sm text-gray-400">
-          {isConnected ? (
+          {mounted && isConnected ? (
             <span className="flex items-center gap-2">
               <span className="font-mono">{address?.slice(0, 6)}…{address?.slice(-4)}</span>
               {isOwner ? (
@@ -353,37 +355,37 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="rounded-lg bg-gray-700 p-4 text-center">
                     <p className="text-xs text-gray-400 mb-1">Total en contrato</p>
-                    <p className="text-2xl font-bold text-white">${treasury.total_usdc.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-white">${(treasury.total_usdc ?? 0).toFixed(2)}</p>
                     <p className="text-xs text-gray-500 mt-1">USDC</p>
                   </div>
                   <div className="rounded-lg bg-blue-900/40 border border-blue-700 p-4 text-center">
                     <p className="text-xs text-blue-300 mb-1">
-                      WasiAI ({(treasury.platform_fee_bps / 100).toFixed(0)}%)
+                      WasiAI ({((treasury.platform_fee_bps ?? 1000) / 100).toFixed(0)}%)
                     </p>
                     <p className="text-2xl font-bold text-blue-200">
-                      ${(treasury.total_usdc * treasury.platform_fee_bps / 10000).toFixed(2)}
+                      ${((treasury.total_usdc ?? 0) * (treasury.platform_fee_bps ?? 1000) / 10000).toFixed(2)}
                     </p>
                     <p className="text-xs text-blue-400 mt-1">
-                      Treasury: ${treasury.treasury_balance_usdc.toFixed(2)} disponible
+                      Treasury: ${(treasury.treasury_balance_usdc ?? 0).toFixed(2)} disponible
                     </p>
                   </div>
                   <div className="rounded-lg bg-green-900/40 border border-green-700 p-4 text-center">
                     <p className="text-xs text-green-300 mb-1">
-                      Creators ({(100 - treasury.platform_fee_bps / 100).toFixed(0)}%)
+                      Creators ({(100 - (treasury.platform_fee_bps ?? 1000) / 100).toFixed(0)}%)
                     </p>
                     <p className="text-2xl font-bold text-green-200">
-                      ${(treasury.total_usdc * (10000 - treasury.platform_fee_bps) / 10000).toFixed(2)}
+                      ${((treasury.total_usdc ?? 0) * (10000 - (treasury.platform_fee_bps ?? 1000)) / 10000).toFixed(2)}
                     </p>
                     <p className="text-xs text-green-400 mt-1">
-                      Settled: ${treasury.settled_earnings_usdc.toFixed(2)}
+                      Settled: ${(treasury.settled_earnings_usdc ?? 0).toFixed(2)}
                     </p>
                   </div>
                 </div>
 
                 {/* Key balances info */}
                 <p className="text-xs text-gray-500">
-                  Key balances depositados: <span className="text-gray-300">${treasury.key_balances_usdc.toFixed(2)} USDC</span>
-                  {' · '}Treasury address: <code className="text-gray-400 text-xs">{treasury.treasury_address.slice(0, 10)}…</code>
+                  Key balances depositados: <span className="text-gray-300">${(treasury.key_balances_usdc ?? 0).toFixed(2)} USDC</span>
+                  {' · '}Treasury address: <code className="text-gray-400 text-xs">{(treasury.treasury_address ?? '').slice(0, 10)}…</code>
                 </p>
 
                 {/* Toggle detalle creators */}
