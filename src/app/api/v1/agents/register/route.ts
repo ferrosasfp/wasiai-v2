@@ -91,6 +91,11 @@ export async function POST(request: NextRequest) {
       authMethod = 'jwt'
     }
   } else if (agentKey) {
+    // NG-006: Validar formato del agent key antes de procesar
+    const agentKeySchema = z.string().min(32).max(128).regex(/^[a-zA-Z0-9_-]+$/)
+    if (!agentKeySchema.safeParse(agentKey).success) {
+      return NextResponse.json({ error: 'Invalid agent key format' }, { status: 400 })
+    }
     // HAL-003: Validate agent key — MUST verify before granting access
     const hash = createHash('sha256').update(agentKey).digest('hex')
     const { data: validKey } = await serviceClient
