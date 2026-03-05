@@ -486,7 +486,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
                 disabled={isLoading || amount <= 0 || amount > balance}
                 className="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition"
               >
-                {isLoading ? statusLabel : `Retirar $${amount.toFixed(4)}`}
+                {isLoading ? statusLabel : t('withdraw.withdrawBtn', { amount: amount.toFixed(4) })}
               </button>
             </div>
           </div>
@@ -841,7 +841,7 @@ export default function AgentKeysPage() {
                               onClick={() => setWithdrawKey({ id: key.id, name: key.name, balance: available, keyHash: key.key_hash ?? '' })}
                               className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
                             >
-                              Retirar ${available.toFixed(2)}
+                              {t('withdrawBtn', { amount: available.toFixed(2) })}
                             </button>
                           )}
                           <button

@@ -138,7 +138,7 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
                   rel="noopener noreferrer"
                   className="text-xs text-gray-400 hover:text-gray-600"
                 >
-                  Ver en explorer ↗
+                  {t('viewExplorer')}
                 </a>
               )}
             </div>
@@ -164,7 +164,7 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
               href={`/${locale}/agent-keys`}
               className="inline-block rounded-lg bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-400 transition"
             >
-              Depositar en Agent Key →
+              {t('depositCta')}
             </a>
           </div>
 

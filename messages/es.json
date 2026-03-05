@@ -468,7 +468,9 @@
       "wrongChain": "Cambia a la red correcta (Chain ID: {chainId})",
       "timeout": "Timeout esperando confirmacion. Verifica la tx en el explorador.",
       "max": "Max"
-    }
+    },
+    "withdrawBtn": "Retirar ${amount}",
+    "withdrawBtnShort": "Retirar"
   },
   "editAgent": {
     "backToDashboard": "\u2190 Volver al Dashboard",
@@ -638,7 +640,8 @@
     "title": "Agent Key",
     "subtitle": "Fondos para servicios agenticos",
     "noKey": "No tienes ninguna Agent Key activa. Crea una para que tus agentes puedan invocar servicios de otros agentes.",
-    "available": "Disponible para pagar servicios"
+    "available": "Disponible para pagar servicios",
+    "manage": "Administrar / Depositar m\u00e1s \u2192"
   },
   "webhooks": {
     "title": "Webhooks",
@@ -647,7 +650,7 @@
     "events": "Eventos",
     "copy": "Copiar",
     "saved": "Ya lo guarde, cerrar",
-    "noWebhooks": "No hay webhooks configurados",
+    "noWebhooks": "No tienes webhooks configurados a\u00fan.",
     "addWebhook": "Agregar Webhook",
     "secret": "Secreto",
     "secretHint": "Usa esto para verificar las firmas del webhook",
@@ -712,9 +715,10 @@
     "account": "Cuenta",
     "signIn": "Iniciar sesion",
     "createAccount": "Crear cuenta",
-    "signOut": "Cerrar sesion",
+    "signOut": "Cerrar sesi\u00f3n",
     "settings": "Configuracion",
-    "myProfile": "Mi perfil"
+    "myProfile": "Mi perfil",
+    "publishAgent": "Publicar agente"
   },
   "pipelines": {
     "title": "Constructor de Pipelines",
@@ -755,9 +759,9 @@
     "network": "Fuji Testnet",
     "noWallet": "Este agente no tiene wallet propia. Inicializa una para habilitar pagos autonomos en el futuro.",
     "earningsAddress": "Direccion de earnings",
-    "viewExplorer": "Ver en explorer",
+    "viewExplorer": "Ver en explorer \u2197",
     "agentKeyNote": "Para que tu agente pueda invocar otros agentes en WasiAI, deposita USDC en tu Agent Key. Sin fondos, tu agente no puede comprar servicios de otros agentes.",
-    "depositCta": "Depositar en Agent Key"
+    "depositCta": "Depositar en Agent Key \u2192"
   },
   "earnings": {
     "available": "USDC disponible",
