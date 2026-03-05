@@ -385,8 +385,22 @@ export default function AdminPage() {
                 {/* Key balances info */}
                 <p className="text-xs text-gray-500">
                   Key balances depositados: <span className="text-gray-300">${(treasury.key_balances_usdc ?? 0).toFixed(2)} USDC</span>
-                  {' · '}Treasury address: <code className="text-gray-400 text-xs">{(treasury.treasury_address ?? '').slice(0, 10)}…</code>
+                  {' · '}Treasury: <code className="text-gray-400 text-xs">{(treasury.treasury_address ?? '').slice(0, 10)}…</code>
                 </p>
+
+                {/* Collect fees button */}
+                <div className="flex items-center gap-3 rounded-lg bg-gray-700/60 border border-gray-600 p-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">Cobrar fees al treasury</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Ejecuta el settlement on-chain — transfiere el {((treasury.platform_fee_bps ?? 1000) / 100).toFixed(0)}% directamente al treasury wallet</p>
+                  </div>
+                  <button
+                    onClick={() => { void handleRunSettlement(); void loadTreasury() }}
+                    className="rounded-lg bg-avax-500 px-4 py-2 text-sm font-medium text-white hover:bg-avax-600 transition whitespace-nowrap"
+                  >
+                    Run Settlement
+                  </button>
+                </div>
 
                 {/* Toggle detalle creators */}
                 <button
