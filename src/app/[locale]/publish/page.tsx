@@ -1,17 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import dynamic from 'next/dynamic'
+import { PublishLoading } from './PublishLoading'
 
-// P-06: Dynamic import reduces initial bundle size
+// P-06: Dynamic import reduces initial bundle size — i18n-aware loading via PublishLoading
 const PublishForm = dynamic(() => import('./PublishForm'), {
-  loading: () => (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-avax-600 border-t-transparent" />
-        <p className="text-sm text-gray-500">Cargando editor...</p>
-      </div>
-    </div>
-  ),
+  loading: () => <PublishLoading />,
 })
 
 interface Props {
@@ -21,9 +15,9 @@ interface Props {
 
 // UX-01: Auth gate — redirect to login if not authenticated
 export default async function PublishPage({ params, searchParams }: Props) {
-  const { locale }   = await params
-  const { from }     = await searchParams
-  const supabase     = await createClient()
+  const { locale } = await params
+  const { from }   = await searchParams
+  const supabase   = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {

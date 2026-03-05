@@ -2,7 +2,7 @@ import { CodeBlock } from '../components/CodeBlock'
 
 const FLOW: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
-    label: 'Flujo AgentKit',
+    label: 'Flow AgentKit',
     language: 'bash',
     code: `CDP Wallet (AgentKit)
   → descubrir precio en catálogo WasiAI (GET /api/v1/agents/wasi-defi-sentiment)
@@ -92,7 +92,7 @@ export function AgentKitSection() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">AgentKit</h2>
         <p className="mt-2 text-gray-600">
-          Construye agentes autónomos que <strong>descubren, pagan e invocan</strong> otros agentes WasiAI
+          Build autonomous agents that <strong>discover, pay and invoke</strong> otros agentes WasiAI
           sin intervención humana. &quot;Agent paying agent&quot; — el patrón nativo de x402.
         </p>
         <p className="mt-2 text-sm text-gray-500">
@@ -101,17 +101,17 @@ export function AgentKitSection() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Flujo</h3>
+        <h3 className="text-base font-semibold text-gray-800">Flow</h3>
         <CodeBlock tabs={FLOW} />
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Configurar la wallet CDP</h3>
+        <h3 className="text-base font-semibold text-gray-800">Configure the CDP wallet</h3>
         <CodeBlock tabs={WALLET_CODE} />
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Flujo completo — index.ts</h3>
+        <h3 className="text-base font-semibold text-gray-800">Flow completo — index.ts</h3>
         <CodeBlock tabs={INDEX_CODE} />
       </div>
 
@@ -119,12 +119,12 @@ export function AgentKitSection() {
         <h3 className="text-base font-semibold text-gray-800">Prerequisites</h3>
         <ol className="text-sm text-gray-600 list-decimal list-inside space-y-1">
           <li>
-            Obtén tu <strong>CDP API Key</strong> en{' '}
+            Get your <strong>CDP API Key</strong> en{' '}
             <a href="https://portal.cdp.coinbase.com" target="_blank" rel="noopener noreferrer" className="text-avax-600 underline hover:text-avax-700">
               portal.cdp.coinbase.com
             </a>
           </li>
-          <li>Fondea la wallet con <strong>USDC Fuji Testnet</strong> (Avalanche Fuji, chainId 43113)</li>
+          <li>Fund the wallet with <strong>USDC Fuji Testnet</strong> (Avalanche Fuji, chainId 43113)</li>
           <li>Clona el ejemplo completo del repo</li>
         </ol>
         <CodeBlock tabs={PREREQS} />

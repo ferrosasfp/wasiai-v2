@@ -6,6 +6,7 @@
  * Patrón: mismo que WebhooksPanel.tsx (client component, fetch directo)
  */
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface WalletData {
   address: string | null
@@ -21,6 +22,7 @@ interface AgentWalletSectionProps {
 }
 
 export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: AgentWalletSectionProps) {
+  const t = useTranslations('agentWallet')
   const [wallet, setWallet]     = useState<WalletData | null>(null)
   const [loading, setLoading]   = useState(true)
   const [initializing, setInit] = useState(false)
@@ -82,10 +84,10 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
     <section className="rounded-2xl border border-gray-200 bg-white p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Wallet del Agente</p>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">{t('title')}</p>
           <h3 className="text-base font-semibold text-gray-900">{agentName ?? agentSlug}</h3>
         </div>
-        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Fuji Testnet</span>
+        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{t('network')}</span>
       </div>
 
       {error && (
@@ -95,7 +97,7 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
       {!wallet?.address ? (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-gray-500">
-            Este agente no tiene wallet propia. Inicializa una para habilitar pagos autónomos en el futuro.
+            {t('noWallet')}
           </p>
           <button
             onClick={initWallet}
@@ -110,7 +112,7 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
 
           {/* Dirección con tooltip + copiar */}
           <div className="flex flex-col gap-1">
-            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Dirección de earnings</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">{t('earningsAddress')}</p>
             <div className="flex items-center gap-2">
               <div className="relative group">
                 <code className="text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded font-mono cursor-default">
@@ -156,7 +158,7 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
               ¿Tu agente necesita pagar otros servicios?
             </p>
             <p className="text-xs text-gray-500 mb-3">
-              Para que tu agente pueda invocar otros agentes en WasiAI, deposita USDC en tu Agent Key. Sin fondos, tu agente no puede comprar servicios de otros agentes.
+              {t('agentKeyNote')}
             </p>
             <a
               href={`/${locale}/agent-keys`}

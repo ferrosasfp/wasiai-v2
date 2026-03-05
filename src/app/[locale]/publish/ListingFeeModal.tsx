@@ -8,6 +8,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 interface Props {
   slug:            string
@@ -24,6 +25,7 @@ export default function ListingFeeModal({
   slug, listingFee, treasuryAddress, creatorWallet, locale, onCancel,
 }: Props) {
   const router            = useRouter()
+  const t                 = useTranslations('publish')
   const [step, setStep]   = useState<Step>('confirm')
   const [error, setError] = useState<string | null>(null)
 
@@ -122,27 +124,25 @@ export default function ListingFeeModal({
 
         {step === 'confirm' && (
           <>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Listing fee requerido</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Tu segundo agente (y siguientes) requieren un listing fee para publicarse en WasiAI.
-            </p>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">{t('listingFee.title')}</h2>
+            <p className="text-sm text-gray-600 mb-4">{t('listingFee.description')}</p>
             <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 mb-6">
-              <p className="text-xs text-gray-500">Fee de publicación</p>
+              <p className="text-xs text-gray-500">{t('listingFee.feeLabel')}</p>
               <p className="text-2xl font-bold text-gray-900">${listingFee.toFixed(2)} USDC</p>
-              <p className="text-xs text-gray-400 mt-1">Pago único · No recurrente</p>
+              <p className="text-xs text-gray-400 mt-1">{t('listingFee.feeHint')}</p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={onCancel}
                 className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
               >
-                Cancelar
+                {t('listingFee.cancel')}
               </button>
               <button
                 onClick={handleSign}
                 className="flex-1 rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-400 transition"
               >
-                Firmar y publicar
+                {t('listingFee.signAndPublish')}
               </button>
             </div>
           </>
@@ -151,16 +151,16 @@ export default function ListingFeeModal({
         {step === 'signing' && (
           <div className="text-center py-8">
             <div className="text-4xl mb-3">✍️</div>
-            <p className="font-semibold text-gray-900">Esperando firma...</p>
-            <p className="text-sm text-gray-500 mt-1">Confirma la transacción en tu wallet</p>
+            <p className="font-semibold text-gray-900">{t('listingFee.waitingSignature')}</p>
+            <p className="text-sm text-gray-500 mt-1">{t('listingFee.confirmWallet')}</p>
           </div>
         )}
 
         {step === 'paying' && (
           <div className="text-center py-8">
             <div className="text-4xl mb-3 animate-spin inline-block">⏳</div>
-            <p className="font-semibold text-gray-900">Procesando pago...</p>
-            <p className="text-sm text-gray-500 mt-1">Confirmando en Avalanche</p>
+            <p className="font-semibold text-gray-900">{t('listingFee.processing')}</p>
+            <p className="text-sm text-gray-500 mt-1">{t('listingFee.confirming')}</p>
           </div>
         )}
 
@@ -168,7 +168,7 @@ export default function ListingFeeModal({
           <div className="text-center py-8">
             <div className="text-4xl mb-3">✅</div>
             <p className="font-semibold text-gray-900">¡Agente publicado!</p>
-            <p className="text-sm text-gray-500 mt-1">Redirigiendo al dashboard...</p>
+            <p className="text-sm text-gray-500 mt-1">{t('listingFee.redirecting')}</p>
           </div>
         )}
 

@@ -61,7 +61,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
             <p className="text-3xl font-bold text-gray-900">
               ${pendingOnChain.toFixed(2)}
             </p>
-            <p className="text-xs text-gray-500">USDC available</p>
+            <p className="text-xs text-gray-500">{t('onchainEarnings')}</p>
           </div>
           <WithdrawButton
             pending={pendingOnChain}
