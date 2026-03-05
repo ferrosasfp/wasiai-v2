@@ -121,7 +121,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
             onChange('name', e.target.value)
             if (localErrors.name) setLocalErrors(prev => { const e = { ...prev }; delete e.name; return e })
           }}
-          placeholder="Ej: Traductor Español GPT"
+          placeholder={t('step1NamePlaceholder')}
           className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100 ${allErrors.name ? 'border-red-400' : 'border-gray-200'}`}
         />
         {allErrors.name && <p className="mt-1 text-xs text-red-500">{allErrors.name}</p>}
@@ -140,7 +140,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
             onChange('description', e.target.value)
             if (localErrors.description) setLocalErrors(prev => { const e = { ...prev }; delete e.description; return e })
           }}
-          placeholder="Describe qué hace tu agente…"
+          placeholder={t('step1DescPlaceholder')}
           rows={4}
           className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100 ${allErrors.description ? 'border-red-400' : 'border-gray-200'}`}
         />

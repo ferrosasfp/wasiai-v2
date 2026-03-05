@@ -155,7 +155,7 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
           {/* CTA principal — depositar en Agent Key */}
           <div className="rounded-xl bg-avax-50 border border-avax-100 p-4">
             <p className="text-sm font-semibold text-gray-900 mb-1">
-              ¿Tu agente necesita pagar otros servicios?
+              {t('agentPayTitle')}
             </p>
             <p className="text-xs text-gray-500 mb-3">
               {t('agentKeyNote')}

@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useTranslations } from 'next-intl'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ export interface PipelineHistoryProps {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('es', {
+  return new Date(iso).toLocaleString(undefined, {
     day:    '2-digit',
     month:  '2-digit',
     year:   'numeric',
@@ -42,6 +43,7 @@ function statusBadge(status: string): string {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export function PipelineHistory({ userId }: PipelineHistoryProps) {
+  const t = useTranslations('pipelines')
   const [items, setItems] = useState<PipelineHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -50,8 +52,6 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
     if (!userId) return
 
     const supabase = createClient()
-    // pipeline_executions usa RLS via key_id → key_owner_read policy
-    // filtra automáticamente por las keys del usuario autenticado
     supabase
       .from('pipeline_executions')
       .select('id, status, steps_completed, total_cost_usdc, created_at, completed_at')
@@ -69,15 +69,15 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold text-gray-800">Historial de ejecuciones</h2>
+      <h2 className="text-lg font-semibold text-gray-800">{t('history')}</h2>
 
       {loading && (
-        <div className="text-sm text-gray-500">Cargando historial...</div>
+        <div className="text-sm text-gray-500">{t('loading')}</div>
       )}
 
       {!loading && items.length === 0 && (
         <div className="text-sm text-gray-400 border border-dashed border-gray-300 rounded-lg p-6 text-center">
-          No hay ejecuciones previas.
+          {t('historyEmpty')}
         </div>
       )}
 
@@ -86,10 +86,10 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
-                <th className="px-4 py-3 text-left">Fecha</th>
-                <th className="px-4 py-3 text-center">Steps</th>
-                <th className="px-4 py-3 text-right">Costo USDC</th>
-                <th className="px-4 py-3 text-center">Estado</th>
+                <th className="px-4 py-3 text-left">{t('colStart')}</th>
+                <th className="px-4 py-3 text-center">{t('colSteps')}</th>
+                <th className="px-4 py-3 text-right">Cost USDC</th>
+                <th className="px-4 py-3 text-center">{t('colStatus')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -120,7 +120,7 @@ export function PipelineHistory({ userId }: PipelineHistoryProps) {
                           </div>
                           {item.completed_at && (
                             <div>
-                              <span className="font-medium">Completado: </span>
+                              <span className="font-medium">{t('colDuration')}: </span>
                               {formatDate(item.completed_at)}
                             </div>
                           )}

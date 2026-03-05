@@ -181,7 +181,8 @@ export async function GET(req: NextRequest) {
           type: 'high_error_rate',
           agentId: agent.id,
           agentName: agent.name,
-          message: `Tu agente "${agent.name}" tiene alta tasa de error. Revisa tu endpoint.`,
+          // i18n key resolved client-side: analytics.alertHighError
+          message: `analytics.alertHighError:${agent.name}`,
         })
       }
 
@@ -190,7 +191,8 @@ export async function GET(req: NextRequest) {
           type: 'no_activity',
           agentId: agent.id,
           agentName: agent.name,
-          message: `"${agent.name}" sin actividad en 7 días. ¿Tu agente está activo?`,
+          // i18n key resolved client-side: analytics.alertNoActivity
+          message: `analytics.alertNoActivity:${agent.name}`,
         })
       }
     }
