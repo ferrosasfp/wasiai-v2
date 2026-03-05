@@ -234,7 +234,10 @@
     "walletRequired": "Set up your wallet before publishing this agent.",
     "step1NamePlaceholder": "e.g. DeFi Sentiment Analyzer",
     "step1DescPlaceholder": "Describe what your agent does\u2026",
-    "step3AuthNote": "Sent as Authorization header on every call to your API"
+    "step3AuthNote": "Sent as Authorization header on every call to your API",
+    "step3TestBtn": "Test endpoint",
+    "step3Testing": "Testing...",
+    "step3EarningsNote": "You earn 90% of each call \u00b7 WasiAI takes 10% \u00b7 Paid in USDC"
   },
   "dashboard": {
     "title": "Creator Dashboard",

@@ -114,9 +114,9 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                 </svg>
-                Probando...
+                {t('step3Testing')}
               </span>
-            ) : 'Probar endpoint'}
+            ) : t('step3TestBtn')}
           </button>
         </div>
 
@@ -176,7 +176,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
 
       {/* Info box */}
       <div className="rounded-xl bg-avax-50 p-4 text-sm text-avax-700">
-        <span className="inline-flex items-center gap-1"><DollarSign size={12} />Ganas el <strong>90%</strong> de cada llamada · WasiAI toma el 10% · Pagado en USDC</span>
+        <span className="inline-flex items-center gap-1"><DollarSign size={12} />{t('step3EarningsNote')}</span>
       </div>
 
       {/* General error */}
