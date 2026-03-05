@@ -16,6 +16,8 @@ const SECTION_KEYS = [
   { id: 'agent-keys',    key: 'agentKeys'    },
   { id: 'creator-guide', key: 'creatorGuide' },
   { id: 'agentkit',      key: 'agentkit'     },
+  { id: 'collections',   key: 'collections'   },
+  { id: 'creator-cli',   key: 'creatorCli'   },
   { id: 'pricing',       key: 'pricing'      },
 ] as const
 

@@ -12,6 +12,8 @@ import { CreatorGuideSection } from '@/features/docs/content/creator-guide'
 import { AgentKitSection }    from '@/features/docs/content/agentkit'
 import { PricingSection }     from '@/features/docs/content/pricing'
 import { DiscoverySection }  from '@/features/docs/content/discovery'
+import { CollectionsDocsSection } from '@/features/docs/content/collections-docs'
+import { CreatorCliSection } from '@/features/docs/content/creator-cli'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -67,6 +69,12 @@ export default function DocsPage() {
       </div>
       <div className="border-t border-gray-100 pt-8">
         <AgentKitSection />
+      </div>
+      <div className="border-t border-gray-100 pt-8">
+        <CollectionsDocsSection />
+      </div>
+      <div className="border-t border-gray-100 pt-8">
+        <CreatorCliSection />
       </div>
       <div className="border-t border-gray-100 pt-8">
         <PricingSection />
