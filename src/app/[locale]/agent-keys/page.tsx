@@ -377,7 +377,11 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
       setStatus('success')
       setTimeout(onSuccess, 1500)
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : String(err))
+      const msg =
+        err instanceof Error ? err.message
+        : (err && typeof err === 'object' && 'message' in err) ? String((err as { message: unknown }).message)
+        : String(err)
+      setErrorMsg(msg)
       setStatus('error')
     }
   }
