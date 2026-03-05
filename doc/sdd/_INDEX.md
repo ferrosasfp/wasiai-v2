@@ -46,3 +46,4 @@
 | 041 | 2026-03-04 | WAS-139 | Perfiles públicos — excluir /creator/[username] del auth guard en middleware | hotfix | hotfix | DONE | master |
 | 042 | 2026-03-04 | WAS-140 | Pagos autónomos agente→agente — agentPay.ts + invoke-agent route | feature | QUALITY | DONE | master |
 | 043 | 2026-03-04 | WAS-141 | Retiro parcial/total Agent Key — withdrawKey contrato + UI + backend sync | feature | QUALITY | DONE | master |
+| 044 | 2026-03-05 | WAS-153 | Curated Collections — tables, pages, featured landing, navbar | feature | QUALITY | DONE | master |
