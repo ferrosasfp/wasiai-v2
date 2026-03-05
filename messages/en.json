@@ -312,7 +312,15 @@
   "analytics": {
     "callsChartTitle": "Calls per day (last 30 days)",
     "alertHighError": "Your agent \"{name}\" has a high error rate. Check your endpoint.",
-    "alertNoActivity": "\"{name}\" has had no activity in 7 days. Is your agent active?"
+    "alertNoActivity": "\"{name}\" has had no activity in 7 days. Is your agent active?",
+    "title": "Analytics",
+    "all_agents": "All agents",
+    "empty_state": "No calls yet. Share your agent link to start receiving invocations.",
+    "calls_24h": "Calls (24h)",
+    "total_calls": "Total calls",
+    "avg_latency": "Avg latency",
+    "uptime": "Uptime (24h)",
+    "earnings": "Earnings"
   },
   "creator_profile": {
     "agents_count": "{count} agents",
