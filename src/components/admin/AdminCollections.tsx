@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Image from 'next/image'
 import { useTranslations } from 'next-intl'
-import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, X, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, X, Search, Upload, Loader2 } from 'lucide-react'
 
 interface Collection {
   id: string
@@ -52,6 +53,7 @@ export function AdminCollections() {
   const [allAgents, setAllAgents] = useState<AgentOption[]>([])
   const [agentSearch, setAgentSearch] = useState('')
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   const loadCollections = useCallback(async () => {
     setLoading(true)
@@ -247,8 +249,37 @@ export function AdminCollections() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs text-gray-400 mb-1">{t('collectionCover')}</label>
-              <input value={form.cover_image} onChange={e => setForm(f => ({ ...f, cover_image: e.target.value }))} placeholder="https://..."
-                className="w-full rounded-lg bg-gray-700 px-3 py-2 text-sm text-white border border-gray-600 focus:border-avax-500 focus:outline-none" />
+              <div className="flex items-center gap-3">
+                {form.cover_image && (
+                  <Image src={form.cover_image} alt="cover" width={80} height={48} className="h-12 w-20 rounded object-cover border border-gray-600" />
+                )}
+                <label className={`inline-flex items-center gap-1.5 cursor-pointer rounded-lg px-3 py-2 text-sm font-medium transition ${uploading ? 'bg-gray-600 text-gray-400' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+                  {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {uploading ? 'Uploading...' : 'Upload image'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" disabled={uploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      setUploading(true)
+                      try {
+                        const fd = new FormData()
+                        fd.append('file', file)
+                        fd.append('bucket', 'collections')
+                        const res = await fetch('/api/admin/upload', { method: 'POST', body: fd })
+                        if (res.ok) {
+                          const data = await res.json() as { url: string }
+                          setForm(f => ({ ...f, cover_image: data.url }))
+                        } else {
+                          const err = await res.json().catch(() => ({})) as { error?: string }
+                          setMsg(`❌ Upload: ${err.error ?? 'Failed'}`)
+                        }
+                      } finally { setUploading(false) }
+                    }} />
+                </label>
+                {form.cover_image && (
+                  <button onClick={() => setForm(f => ({ ...f, cover_image: '' }))} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 pt-5">
               <input type="checkbox" checked={form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))}

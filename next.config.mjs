@@ -27,6 +27,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.mypinata.cloud' },
       { protocol: 'https', hostname: 'gateway.pinata.cloud' },
       { protocol: 'https', hostname: '*.ipfs.dweb.link' },
+      { protocol: 'https', hostname: 'bdwvrwzvsldephfibmuu.supabase.co' },
     ],
   },
   async headers() {
