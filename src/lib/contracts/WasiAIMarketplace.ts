@@ -17,6 +17,18 @@ export const WASIAI_MARKETPLACE_ABI = [
     ],
     outputs: [],
   },
+  // WAS-160g: Self-registration — creator signs and pays gas directly
+  {
+    name: 'selfRegisterAgent',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'slug',         type: 'string'  },
+      { name: 'pricePerCall', type: 'uint256' },
+      { name: 'erc8004Id',    type: 'uint64'  },
+    ],
+    outputs: [],
+  },
   {
     name: 'updateAgent',
     type: 'function',
@@ -24,7 +36,6 @@ export const WASIAI_MARKETPLACE_ABI = [
     inputs: [
       { name: 'slug',     type: 'string'  },
       { name: 'newPrice', type: 'uint256' },
-      { name: 'active',   type: 'bool'    },
     ],
     outputs: [],
   },
@@ -41,7 +52,7 @@ export const WASIAI_MARKETPLACE_ABI = [
           { name: 'pricePerCall',  type: 'uint256' },
           { name: 'erc8004Id',     type: 'uint64'  },
           // NA-207: creatorFeeBps removido del contrato (dead storage)
-          { name: 'active',        type: 'bool'    },
+          // WAS-161: active removido — status se controla en Supabase
         ],
       },
     ],

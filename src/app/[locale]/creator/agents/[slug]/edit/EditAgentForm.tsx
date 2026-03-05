@@ -10,6 +10,11 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { CapabilitiesEditor } from '@/features/publish/CapabilitiesEditor'
 import type { CapabilitiesEditorRef } from '@/features/publish/CapabilitiesEditor'
 import type { CapabilityPayload } from '@/features/publish/types'
+import { useAccount } from 'wagmi'
+import { createPublicClient, http, encodeFunctionData } from 'viem'
+import { avalanche, avalancheFuji } from 'viem/chains'
+import { WASIAI_MARKETPLACE_ABI, toUSDCAtomics } from '@/lib/contracts/WasiAIMarketplace'
+
 
 // Agent row shape returned from Supabase select('*')
 interface AgentRow {
@@ -28,6 +33,7 @@ interface AgentRow {
   free_trial_limit?: number
   max_rpm?: number
   max_rpd?: number
+  registration_type?: string
   [key: string]: unknown
 }
 
@@ -66,6 +72,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const { address: walletAddress, isConnected: walletConnected } = useAccount()
 
   function handleChange(field: keyof typeof form, value: unknown) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -105,6 +112,42 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
         const data = await res.json().catch(() => ({ error: 'Unknown error' }))
         setErrors({ form: data.error ?? t('errorUpdate') })
         return
+      }
+
+      // WAS-161: If agent is on-chain and price changed, sync with contract (creator signs)
+      const priceChanged = result.data.price_per_call !== agent.price_per_call
+      if (agent.registration_type === 'on_chain' && priceChanged && walletConnected && walletAddress) {
+        try {
+          const win = window as Window & { ethereum?: { request: (args: { method: string; params: unknown[] }) => Promise<string> } }
+          if (win.ethereum) {
+            const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+            const contractAddress = chainId === 43114
+              ? (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET ?? '')
+              : (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI ?? '')
+
+            const data = encodeFunctionData({
+              abi: WASIAI_MARKETPLACE_ABI,
+              functionName: 'updateAgent',
+              args: [agent.slug, toUSDCAtomics(result.data.price_per_call!)],
+            })
+
+            const txHash = await win.ethereum.request({
+              method: 'eth_sendTransaction',
+              params: [{ from: walletAddress, to: contractAddress, data }],
+            })
+
+            // Wait for confirmation
+            const chain = chainId === 43114 ? avalanche : avalancheFuji
+            const publicClient = createPublicClient({ chain, transport: http() })
+            await publicClient.waitForTransactionReceipt({
+              hash: txHash as `0x${string}`,
+              timeout: 60_000,
+            })
+          }
+        } catch (err) {
+          // Non-fatal: DB already updated. Log but don't block.
+          console.warn('[WAS-161] On-chain price sync failed:', err)
+        }
       }
 
       setSuccess(true)

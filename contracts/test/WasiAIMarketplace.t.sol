@@ -98,7 +98,6 @@ contract WasiAIMarketplaceTest is Test {
         WasiAIMarketplace.Agent memory agent = marketplace.getAgent(SLUG);
         assertEq(agent.creator,      creator);
         assertEq(agent.pricePerCall, PRICE);
-        assertTrue(agent.active);
     }
 
     function test_RegisterAgent_SlugTaken() public {
@@ -122,6 +121,49 @@ contract WasiAIMarketplaceTest is Test {
         vm.prank(operator);
         marketplace.registerAgent(SLUG, PRICE, creator, 0);
         assertGt(marketplace.lastOperatorActivity(), before);
+    }
+
+    // ── Self-Registration (WAS-160g) ────────────────────────────────────────────
+
+    function test_SelfRegisterAgent() public {
+        vm.prank(creator);
+        marketplace.selfRegisterAgent(SLUG, PRICE, 0);
+
+        WasiAIMarketplace.Agent memory agent = marketplace.getAgent(SLUG);
+        assertEq(agent.creator,      creator);
+        assertEq(agent.pricePerCall, PRICE);
+        assertEq(agent.erc8004Id,    0);
+    }
+
+    function test_SelfRegisterAgent_SlugTaken() public {
+        vm.prank(creator);
+        marketplace.selfRegisterAgent(SLUG, PRICE, 0);
+
+        vm.prank(stranger);
+        vm.expectRevert("WasiAI: slug taken");
+        marketplace.selfRegisterAgent(SLUG, PRICE, 0);
+    }
+
+    function test_SelfRegisterAgent_EmptySlug() public {
+        vm.prank(creator);
+        vm.expectRevert("WasiAI: empty slug");
+        marketplace.selfRegisterAgent("", PRICE, 0);
+    }
+
+    function test_SelfRegisterAgent_WhenPaused() public {
+        vm.prank(owner);
+        marketplace.pause();
+
+        vm.prank(creator);
+        vm.expectRevert();
+        marketplace.selfRegisterAgent(SLUG, PRICE, 0);
+    }
+
+    function test_SelfRegisterAgent_EmitsEvent() public {
+        vm.prank(creator);
+        vm.expectEmit(true, true, true, true);
+        emit WasiAIMarketplace.AgentRegistered(SLUG, creator, PRICE, 0);
+        marketplace.selfRegisterAgent(SLUG, PRICE, 0);
     }
 
     // ── Invocation & Split ────────────────────────────────────────────────────
@@ -149,16 +191,8 @@ contract WasiAIMarketplaceTest is Test {
         assertEq(marketplace.totalInvocations(), 1);
     }
 
-    function test_RecordInvocation_InactiveAgent() public {
-        vm.startPrank(operator);
-        marketplace.registerAgent(SLUG, PRICE, creator, 0);
-        marketplace.updateAgent(SLUG, PRICE, false); // pause agent
-
-        usdc.mint(address(marketplace), PRICE);
-        vm.expectRevert("WasiAI: agent inactive");
-        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256(abi.encodePacked(block.number, msg.sender)));
-        vm.stopPrank();
-    }
+    // WAS-161: test_RecordInvocation_InactiveAgent removed — active field removed from contract
+    // Status is now controlled off-chain in Supabase
 
     // ── Withdrawal ────────────────────────────────────────────────────────────
 
@@ -403,22 +437,7 @@ contract WasiAIMarketplaceTest is Test {
         marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
     }
 
-    function test_SettleKeyBatch_InactiveAgent() public {
-        _registerAgent(SLUG, creator);
-        vm.prank(operator);
-        marketplace.updateAgent(SLUG, PRICE, false); // pause
-
-        _fundKey(KEY_ID, payer, 100_000);
-
-        string[] memory slugs   = new string[](1);
-        uint256[] memory amounts = new uint256[](1);
-        slugs[0]   = SLUG;
-        amounts[0] = 20_000;
-
-        vm.prank(operator);
-        vm.expectRevert("WasiAI: agent inactive");
-        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
-    }
+    // WAS-161: test_SettleKeyBatch_InactiveAgent removed — active field removed from contract
 
     function test_SettleKeyBatch_OnlyOperator() public {
         _registerAgent(SLUG, creator);
@@ -928,7 +947,7 @@ contract WasiAIMarketplaceTest is Test {
     function test_EdgeCase_RecordInvocation_UnknownAgent_Reverts() public {
         usdc.mint(address(marketplace), PRICE);
         vm.prank(operator);
-        vm.expectRevert("WasiAI: agent inactive");
+        vm.expectRevert("WasiAI: agent not found");
         marketplace.recordInvocation("nonexistent-agent", payer, PRICE, keccak256("pid-unknown"));
     }
 

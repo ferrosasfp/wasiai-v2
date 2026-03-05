@@ -6,6 +6,7 @@ import { memo, useState } from 'react'
 import type { Model } from '../types/models.types'
 import { MessageSquare, Eye, Music, Code2, Bot, BarChart2, Flame, BadgeCheck } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { OnChainBadge } from '@/components/badges/OnChainBadge'
 
 const CATEGORY_COLORS: Record<string, string> = {
   nlp:        'bg-blue-100 text-blue-700',
@@ -90,11 +91,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
             {model.agent_type}
           </span>
         )}
-        {model.on_chain_registered && (
-          <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-600">
-            ✓ On-chain
-          </span>
-        )}
+        {model.registration_type === 'on_chain' && <OnChainBadge />}
         {model.erc8004_id && (
           <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600">
             ERC-8004

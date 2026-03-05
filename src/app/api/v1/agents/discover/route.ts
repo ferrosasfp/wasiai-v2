@@ -28,17 +28,12 @@ export async function GET(request: NextRequest) {
   const { category, max_price, capability, limit } = parsed.data
   const supabase = await createClient()
 
-  let query = supabase
-    .from('agents')
-    .select('id, slug, name, description, price_per_call, category, capabilities, total_calls, reputation_score, free_trial_enabled, free_trial_limit')
-    .eq('status', 'active')
-    .order('total_calls', { ascending: false })
-    .limit(limit)
-
-  if (category)  query = query.eq('category', category)
-  if (max_price) query = query.lte('price_per_call', max_price)
-
-  const { data: agents, error } = await query
+  // WAS-160e: Use RPC function with on-chain boost ordering
+  const { data: agents, error } = await supabase.rpc('discover_agents_v2', {
+    p_category:  category ?? null,
+    p_max_price: max_price ?? null,
+    p_limit:     limit,
+  })
 
   if (error) {
     return NextResponse.json({ error: 'Discovery failed' }, { status: 500 })

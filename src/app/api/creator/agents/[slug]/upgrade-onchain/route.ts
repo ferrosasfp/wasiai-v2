@@ -1,0 +1,115 @@
+/**
+ * POST /api/creator/agents/[slug]/upgrade-onchain — WAS-160c
+ *
+ * Upgrade an off-chain agent to on-chain after creator signs selfRegisterAgent() client-side.
+ * Backend verifies the tx receipt on-chain before updating DB (HAL-025 pattern).
+ */
+import { type NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { validateCsrf } from '@/lib/security/csrf'
+import { createPublicClient, http } from 'viem'
+import { avalanche, avalancheFuji } from 'viem/chains'
+import { logger } from '@/lib/logger'
+
+const upgradeSchema = z.object({
+  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid transaction hash'),
+})
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> },
+) {
+  const csrfError = validateCsrf(req)
+  if (csrfError) return csrfError
+
+  const { slug } = await params
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json().catch(() => ({}))
+  const result = upgradeSchema.safeParse(body)
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'Invalid request', details: result.error.flatten() },
+      { status: 400 },
+    )
+  }
+
+  const serviceClient = createServiceClient()
+
+  // Ownership check
+  const { data: existing } = await serviceClient
+    .from('agents')
+    .select('id, creator_id, registration_type, slug, price_per_call')
+    .eq('slug', slug)
+    .single()
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+  }
+  if (existing.creator_id !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  if (existing.registration_type === 'on_chain') {
+    return NextResponse.json({ error: 'Agent is already registered on-chain' }, { status: 409 })
+  }
+
+  // HAL-025: Verify receipt on-chain before updating DB
+  try {
+    const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+    const chain = chainId === 43114 ? avalanche : avalancheFuji
+    const rpcUrl = (chainId === 43114
+      ? process.env.NEXT_PUBLIC_RPC_MAINNET
+      : process.env.NEXT_PUBLIC_RPC_TESTNET
+    )?.trim() || undefined
+
+    const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
+
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: result.data.txHash as `0x${string}`,
+      timeout: 30_000,
+    })
+
+    if (receipt.status === 'reverted') {
+      return NextResponse.json(
+        { error: 'Transaction was reverted on-chain' },
+        { status: 422 },
+      )
+    }
+
+    logger.info('[upgrade-onchain] Receipt verified', {
+      slug,
+      txHash: result.data.txHash,
+      blockNumber: receipt.blockNumber.toString(),
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.error('[upgrade-onchain] Receipt verification failed', { slug, err: msg })
+    return NextResponse.json(
+      { error: `Could not verify transaction: ${msg}` },
+      { status: 422 },
+    )
+  }
+
+  // Update DB
+  const { error } = await serviceClient
+    .from('agents')
+    .update({
+      registration_type: 'on_chain',
+      on_chain_registered: true,
+      chain_registered_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', existing.id)
+
+  if (error) {
+    logger.error('[upgrade-onchain] DB update failed', { slug, error: error.message })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  logger.info('[upgrade-onchain] Agent upgraded', { slug })
+  return NextResponse.json({ status: 'on_chain', slug })
+}
