@@ -611,19 +611,19 @@
     "approx": "(approx)"
   },
   "transparency": {
-    "title": "Protocol Transparency",
-    "subtitle": "Real-time on-chain metrics from the WasiAI marketplace contract on Avalanche",
-    "totalVolume": "Total Volume",
-    "totalInvocations": "Total Invocations",
-    "platformFee": "Platform Fee",
-    "topAgents": "Top Agents",
-    "rank": "Rank",
+    "title": "Transparency",
+    "subtitle": "All data read directly from the smart contract. Verifiable on-chain.",
+    "marketplaceStats": "Marketplace Stats",
+    "onChainAgents": "On-Chain Agents",
     "agent": "Agent",
-    "calls": "Calls",
-    "estimatedRevenue": "Est. Revenue",
-    "footerLink": "Transparency",
-    "contractAddress": "Contract",
-    "dataSource": "Data sourced directly from the WasiAI Marketplace smart contract on Avalanche Fuji testnet."
+    "priceDb": "Price (DB)",
+    "priceChain": "Price (Chain)",
+    "noAgents": "No on-chain agents yet.",
+    "volume": "Volume",
+    "invocations": "Invocations",
+    "fee": "Platform Fee",
+    "refresh": "Refresh",
+    "footerLink": "View Transparency Dashboard"
   },
   "examples": {
     "title": "Usage examples",

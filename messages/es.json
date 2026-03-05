@@ -611,19 +611,19 @@
     "approx": "(aprox)"
   },
   "transparency": {
-    "title": "Transparencia del Protocolo",
-    "subtitle": "Métricas en tiempo real del contrato WasiAI en Avalanche",
-    "totalVolume": "Volumen Total",
-    "totalInvocations": "Invocaciones Totales",
-    "platformFee": "Comisión del Protocolo",
-    "topAgents": "Top Agentes",
-    "rank": "Posición",
+    "title": "Transparencia",
+    "subtitle": "Todos los datos se leen directamente del contrato inteligente. Verificable on-chain.",
+    "marketplaceStats": "Estadísticas del Marketplace",
+    "onChainAgents": "Agentes On-Chain",
     "agent": "Agente",
-    "calls": "Llamadas",
-    "estimatedRevenue": "Ingresos estimados",
-    "footerLink": "Transparencia",
-    "contractAddress": "Contrato",
-    "dataSource": "Datos obtenidos directamente del contrato WasiAI Marketplace en Avalanche Fuji testnet."
+    "priceDb": "Precio (DB)",
+    "priceChain": "Precio (Chain)",
+    "noAgents": "Aún no hay agentes on-chain.",
+    "volume": "Volumen",
+    "invocations": "Invocaciones",
+    "fee": "Comisión",
+    "refresh": "Actualizar",
+    "footerLink": "Ver Panel de Transparencia"
   },
   "examples": {
     "title": "Ejemplos de uso",
