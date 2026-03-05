@@ -5,6 +5,7 @@ import { useAccount } from 'wagmi'
 import { useWalletClient } from 'wagmi'
 import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
+import { AdminCollections } from '@/components/admin/AdminCollections'
 import { useTranslations } from 'next-intl'
 
 interface TreasuryData {
@@ -543,6 +544,11 @@ export default function AdminPage() {
             ) : (
               <p className="text-gray-500 text-sm">{treasuryLoading ? 'Cargando datos on-chain…' : 'No disponible'}</p>
             )}
+          </section>
+
+          {/* ── Collections Manager ──────────────────────────────────── */}
+          <section className="rounded-2xl bg-gray-900 p-6">
+            <AdminCollections />
           </section>
         </>
       )}
