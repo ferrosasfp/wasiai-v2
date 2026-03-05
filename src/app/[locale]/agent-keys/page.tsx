@@ -505,14 +505,16 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
     setStatus('loading')
     setErrorMsg('')
     try {
-      const res = await fetch(`/api/agent-keys/${keyId}/refund`, {
-        method:  'POST',
+      // Desactivar la clave — los fondos se retiran por separado con WithdrawModal
+      const res = await fetch(`/api/agent-keys/${keyId}`, {
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ is_active: false }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`)
 
-      setResult({ txHash: data.txHash, refundedUsdc: data.refundedUsdc ?? 0 })
+      setResult({ txHash: null, refundedUsdc: 0 })
       setStatus('success')
       onSuccess(data.txHash)
     } catch (err: unknown) {

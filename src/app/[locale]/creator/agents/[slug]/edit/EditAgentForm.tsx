@@ -55,7 +55,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
     description: agent.description ?? '',
     category: agent.category as (typeof MODEL_CATEGORIES)[number],
     price_per_call: agent.price_per_call,
-    endpoint_url: agent.endpoint_url,
+    endpoint_url: agent.endpoint_url ?? '',
     cover_image: agent.cover_image ?? null,
     capabilities: (agent.capabilities ?? []) as CapabilityPayload[],
     free_trial_enabled: agent.free_trial_enabled ?? false,
