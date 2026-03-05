@@ -244,16 +244,35 @@ export default function AdminPage() {
       // keccak256("withdrawFor(address)").slice(0,4)
       const withdrawForSelector = '0x9eca672c'
 
-      let step = 1
-      for (const { keyId, owner } of KEYS_WITH_BALANCE) {
-        setDrainMsg(`Paso ${step}/${KEYS_WITH_BALANCE.length * 2}: refundKeyToEarnings…`)
-        const refundData = refundSelector + keyId.slice(2).padStart(64, '0')
-        await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: refundData }] })
+      const waitReceipt = async (txHash: string) => {
+        for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, 2000))
+          const receipt = await win.ethereum!.request({ method: 'eth_getTransactionReceipt', params: [txHash] })
+          if (receipt) return
+        }
+      }
 
-        setDrainMsg(`Paso ${step + 1}/${KEYS_WITH_BALANCE.length * 2}: withdrawFor…`)
+      for (const { keyId, owner } of KEYS_WITH_BALANCE) {
+        // Verificar si la key ya fue procesada (balance = 0)
+        const balData   = '0x70a5967f' + keyId.slice(2).padStart(64, '0') // No es así — usar keyBalances
+        const refundData   = refundSelector    + keyId.slice(2).padStart(64, '0')
         const withdrawData = withdrawForSelector + owner.slice(2).padStart(64, '0')
-        await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: withdrawData }] })
-        step += 2
+
+        // Intentar refund — si ya está en 0 lo saltamos
+        setDrainMsg(`Procesando refundKeyToEarnings…`)
+        try {
+          const txRefund = await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: refundData }] }) as string
+          setDrainMsg(`Refund enviado, esperando confirmación…`)
+          await waitReceipt(txRefund)
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : (e && typeof e === 'object' && 'message' in e) ? String((e as {message:unknown}).message) : String(e)
+          if (!msg.includes('nothing to refund') && !msg.includes('User rejected')) throw e
+        }
+
+        setDrainMsg(`Retirando earnings a owner…`)
+        const txWithdraw = await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: withdrawData }] }) as string
+        setDrainMsg(`WithdrawFor enviado, esperando confirmación…`)
+        await waitReceipt(txWithdraw)
       }
 
       setDrainMsg('✅ Contrato limpio — recarga el dashboard')
