@@ -24,6 +24,8 @@ const ES_IN_EN = [
   'buscando', 'disponible para', 'ejecutar', 'tu wallet',
   'Wallet del Agente', 'Panel Admin', 'Agentes publicados',
   'Fondos para', 'Depositar', 'Limpiar balances',
+  'Lista tu agente', 'gana USDC', 'Tienes un borrador', 'Continuar borrador',
+  'Configura tu wallet', 'agente de IA', 'por cada llamada',
 ]
 
 // Palabras que NO deben aparecer en /es/ (texto claramente en EN)

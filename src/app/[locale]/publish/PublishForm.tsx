@@ -150,7 +150,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
         setGateData(gate)
         if (gate.requiresFee) {
           if (!gate.hasWallet) {
-            setErrors({ endpoint_url: 'Configura tu wallet antes de publicar este agente.' })
+            setErrors({ endpoint_url: t('walletRequired') })
             setPublishing(false)
             return
           }
@@ -216,20 +216,20 @@ export default function PublishForm({ initialDraft, from }: Props) {
       {showDraftModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl">
-            <h2 className="mb-2 text-lg font-bold text-gray-900">Tienes un borrador sin publicar</h2>
-            <p className="mb-6 text-sm text-gray-500">¿Quieres continuar donde lo dejaste?</p>
+            <h2 className="mb-2 text-lg font-bold text-gray-900">{t('draftTitle')}</h2>
+            <p className="mb-6 text-sm text-gray-500">{t('draftQuestion')}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDraftModal(false)}
                 className="flex-1 rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition"
               >
-                Continuar borrador
+                {t('draftContinue')}
               </button>
               <button
                 onClick={handleDiscardDraft}
                 className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
               >
-                Descartar
+                {t('draftDiscard')}
               </button>
             </div>
           </div>
@@ -238,8 +238,8 @@ export default function PublishForm({ initialDraft, from }: Props) {
 
       <div className="mx-auto max-w-5xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Publicar agente</h1>
-          <p className="mt-2 text-gray-500">Lista tu agente de IA en WasiAI y gana USDC por cada llamada.</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('pageTitle')}</h1>
+          <p className="mt-2 text-gray-500">{t('pageSubtitle')}</p>
         </div>
 
         <StepIndicator currentStep={step} />
