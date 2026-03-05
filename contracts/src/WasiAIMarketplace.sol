@@ -61,7 +61,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         address creator;          // wallet that receives earnings
         uint256 pricePerCall;     // USDC in atomic units (6 decimals). e.g. 20000 = $0.02
         uint64  erc8004Id;        // ERC-8004 identity token ID (0 = not registered)
-        uint16  creatorFeeBps;    // creator's share in bps (default: 9000 = 90%)
+        // NA-207: creatorFeeBps removido — dead storage. Fee calculado dinámicamente como (10_000 - platformFeeBps)
         bool    active;
     }
 
@@ -209,7 +209,6 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
             creator:       creator,
             pricePerCall:  pricePerCall,
             erc8004Id:     erc8004Id,
-            creatorFeeBps: uint16(10_000 - platformFeeBps), // e.g. 9000
             active:        true
         });
 
@@ -293,7 +292,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         address          payer,
         uint256          amount,
         bytes32          paymentId
-    ) external onlyOperator nonReentrant {
+    ) external onlyOperator nonReentrant whenNotPaused {
+        // NA-210: whenNotPaused — no registrar invocaciones cuando el contrato está pausado
         lastOperatorActivity = block.timestamp;
         require(!usedPaymentIds[paymentId], "WasiAI: payment already recorded");
         usedPaymentIds[paymentId] = true;
@@ -395,6 +395,11 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
             validAfter, validBefore, nonce, v, r, s
         );
 
+        // NA-205: si la key ya tiene owner, solo ese owner puede depositar más
+        if (keyOwners[keyId] != address(0)) {
+            require(owner == keyOwners[keyId], "WasiAI: not key owner");
+        }
+
         keyBalances[keyId]  += amount;
         totalKeyBalances    += amount;
         if (keyOwners[keyId] == address(0)) {
@@ -455,6 +460,9 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
             require(amounts[i] > 0,          "WasiAI: zero amount");
             Agent storage agent = agents[slugs[i]];
             require(agent.active,            "WasiAI: agent inactive");
+            // NA-206: DEFERRED — settleKeyBatch permite amounts flexibles (descuentos, bundles).
+            // El operador es el único que puede llamar esta función (onlyOperator).
+            // La validación de amount == pricePerCall no aplica por diseño del batch settlement.
 
             uint256 platformShare = (amounts[i] * platformFeeBps) / 10_000;
             uint256 creatorShare  = amounts[i] - platformShare;
@@ -548,8 +556,11 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     // ── Daily Cap Admin (WAS-94) ──────────────────────────────────────────────
 
-    /// @notice Update the daily settlement cap. Set to 0 to disable cap.
+    /// @notice Update the daily settlement cap.
+    /// @dev NA-212: Cap no puede ser 0 (deja el sistema sin límite) ni exceder 100k USDC.
     function setDailySettlementCap(uint256 newCap) external onlyOwner {
+        require(newCap >= 100 * 1e6,          "WasiAI: cap too low");   // mínimo 100 USDC
+        require(newCap <= 100_000 * 1e6,      "WasiAI: cap too high");  // máximo 100k USDC
         uint256 old = dailySettlementCap;
         dailySettlementCap = newCap;
         emit DailyCapUpdated(old, newCap);
@@ -688,6 +699,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         uint256          amount,
         bytes32          nonce
     ) external view returns (bytes32) {
-        return keccak256(abi.encodePacked(slug, payer, amount, nonce, block.chainid));
+        // NA-209: abi.encode evita colisiones de hash (pad a 32 bytes, sin ambigüedad)
+        return keccak256(abi.encode(slug, payer, amount, nonce, block.chainid));
     }
 }

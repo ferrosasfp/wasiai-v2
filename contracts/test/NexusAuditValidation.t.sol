@@ -506,43 +506,36 @@ contract NexusAuditValidationTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
     // NA-I02 [INFO] -- agent.creatorFeeBps almacenado pero NUNCA usado en calculos
     // ─────────────────────────────────────────────────────────────────────────
-    function test_NA_I02_CreatorFeeBps_DeadCode() public {
-        // creatorFeeBps se asigna al registrar el agente
+    function test_NA_I02_CreatorFeeBps_Removed() public {
+        // NA-207 FIX: creatorFeeBps eliminado del struct Agent — ya no es dead storage
+        // El fee del creator se calcula dinámicamente como (10_000 - platformFeeBps)
         WasiAIMarketplace.Agent memory agent = marketplace.getAgent(SLUG);
-        uint16 storedCreatorBps = agent.creatorFeeBps;
-
-        emit log_named_uint("creatorFeeBps almacenado    ", storedCreatorBps);
         emit log_named_uint("platformFeeBps global       ", marketplace.platformFeeBps());
 
-        // Ahora cambiamos el platformFeeBps global via timelock
+        // Cambiar platformFeeBps via timelock
         vm.prank(owner);
         marketplace.proposeFee(2000);
         vm.warp(block.timestamp + 48 hours + 1);
         vm.prank(owner);
         marketplace.executeFee(); // 20%
 
-        // El agente todavia tiene el creatorFeeBps viejo
-        WasiAIMarketplace.Agent memory agentAfter = marketplace.getAgent(SLUG);
-        emit log_named_uint("creatorFeeBps despues       ", agentAfter.creatorFeeBps);
-        emit log_named_uint("platformFeeBps global ahora ", marketplace.platformFeeBps());
-
-        // Ejecutamos una invocacion y vemos que se usa platformFeeBps global, no creatorFeeBps
+        // Ejecutar invocacion — earnings deben usar platformFeeBps global dinámico
         usdc.mint(address(marketplace), PRICE);
         vm.prank(operator);
         marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-i02"));
 
         uint256 actualCreatorEarnings = marketplace.getPendingEarnings(creator);
         uint256 expectedWithGlobalFee = PRICE * (10000 - 2000) / 10000; // 80%
-        uint256 expectedWithStoredBps = PRICE * agentAfter.creatorFeeBps / 10000; // 80% (coincide)
 
         emit log_named_uint("earnings con fee global (20%)", expectedWithGlobalFee);
         emit log_named_uint("earnings reales             ", actualCreatorEarnings);
 
         assertEq(actualCreatorEarnings, expectedWithGlobalFee,
-            "NA-I02 CONFIRMED: recordInvocation uses platformFeeBps global, NOT agent.creatorFeeBps");
+            "NA-207 FIX: recordInvocation uses platformFeeBps global dynamically");
 
-        // El campo creatorFeeBps existe pero nunca se lee en los calculos de pago
-        emit log_string("NA-I02 CONFIRMED: creatorFeeBps is stored but dead code in payment logic");
+        // Verificar que el struct ya no tiene el campo creatorFeeBps
+        emit log_string("NA-207 FIXED: creatorFeeBps removed from Agent struct - no more dead storage");
+        assertEq(agent.creator, creator, "Agent struct still valid after field removal");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
