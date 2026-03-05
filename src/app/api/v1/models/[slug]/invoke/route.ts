@@ -28,7 +28,7 @@ import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdc
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitBreaker'
 import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
-import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits } from '@/lib/ratelimit'
+import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits, getSharedRedis } from '@/lib/ratelimit'
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
 import { logger } from '@/lib/logger'
 
@@ -231,6 +231,25 @@ export async function POST(
       )
     }
 
+    // NA-203: Redis mutex per-key — prevents concurrent double-spend from same key
+    // (on-chain nonce is the stronger fix, but this prevents backend races without re-deploy)
+    let keyMutexAcquired = false
+    const mutexKey = `invoke:mutex:${keyRow.id}`
+    try {
+      const redis = getSharedRedis()
+      const acquired = await redis.set(mutexKey, '1', { nx: true, ex: 15 }) // 15s TTL
+      if (!acquired) {
+        return NextResponse.json(
+          { error: 'Concurrent invocation in progress for this key', code: 'concurrent_invocation' },
+          { status: 429, headers: { 'Retry-After': '5' } }
+        )
+      }
+      keyMutexAcquired = true
+    } catch {
+      // Redis unavailable — fail-open (rate limiting still applies)
+      logger.warn('[invoke] Redis mutex unavailable — proceeding without mutex', { keyId: keyRow.id })
+    }
+
     // NG-008: Pre-flight soft check for user-friendly error (non-atomic, for UX only)
     const remaining = Number(keyRow.budget_usdc) - Number(keyRow.spent_usdc)
     if (remaining < totalPrice) {
@@ -318,6 +337,11 @@ export async function POST(
           latency_ms: result.latencyMs,
         }
       ).catch(() => { /* non-fatal */ })
+    }
+
+    // NA-203: Liberar mutex antes de retornar
+    if (keyMutexAcquired) {
+      try { await getSharedRedis().del(mutexKey) } catch { /* non-fatal */ }
     }
 
     return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown })
