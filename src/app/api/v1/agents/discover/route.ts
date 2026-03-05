@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from('agents')
-    .select('slug, name, description, price_per_call, category, capabilities, total_calls, reputation_score, free_trial_enabled, free_trial_limit')
+    .select('id, slug, name, description, price_per_call, category, capabilities, total_calls, reputation_score, free_trial_enabled, free_trial_limit')
     .eq('status', 'active')
     .order('total_calls', { ascending: false })
     .limit(limit)
