@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { memo, useState } from 'react'
 import type { Model } from '../types/models.types'
 import { MessageSquare, Eye, Music, Code2, Bot, BarChart2, Zap } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 const CATEGORY_COLORS: Record<string, string> = {
   nlp:        'bg-blue-100 text-blue-700',
@@ -35,6 +36,7 @@ interface ModelCardProps {
 
 // P-03: Memoized to avoid unnecessary re-renders in grid lists
 export const ModelCard = memo(function ModelCard({ model, locale, index = 0, reputationBadge }: ModelCardProps) {
+  const t = useTranslations('marketplace')
   const remaining = Math.max(0, model.total_calls ?? 0)
   const [imgError, setImgError] = useState(false)
 
@@ -105,7 +107,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
         <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
           <span className="shrink-0 flex items-center gap-1"><Zap size={11} className="text-avax-500" />{remaining.toLocaleString('en-US')} calls</span>
           {model.is_featured && (
-            <span className="rounded-full bg-avax-50 px-2 py-0.5 text-avax-600 font-medium shrink-0">Featured</span>
+            <span className="rounded-full bg-avax-50 px-2 py-0.5 text-avax-600 font-medium shrink-0">{t('featured')}</span>
           )}
           {model.reputation_score !== null && model.reputation_count > 0 && (
             <span className="inline-flex items-center gap-1 shrink-0 text-green-600 font-medium">

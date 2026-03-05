@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useReducer } from 'react'
+import { useTranslations } from 'next-intl'
 import type { PaymentFlowState } from '../types/payment-flow.types'
 
 interface WalletStatusBarProps {
@@ -27,6 +28,8 @@ export function WalletStatusBar({
   const [mounted, markMounted] = useReducer(() => true, false)
   useEffect(markMounted, [markMounted])
 
+  const t = useTranslations('wallet')
+
   const handleDisconnect = () => {
     onDisconnect()
   }
@@ -35,7 +38,7 @@ export function WalletStatusBar({
   if (!mounted) {
     return (
       <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm">
-        <span className="text-gray-400">Cargando wallet…</span>
+        <span className="text-gray-400">{t('connectToContinue')}</span>
       </div>
     )
   }
@@ -43,12 +46,12 @@ export function WalletStatusBar({
   if (flowState === 'no_wallet') {
     return (
       <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm">
-        <span className="text-gray-500">Conecta tu wallet para continuar</span>
+        <span className="text-gray-500">{t('connectToContinue')}</span>
         <button
           onClick={onConnect}
           className="rounded-lg bg-avax-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-avax-600 transition"
         >
-          Conectar wallet
+          {t('connect')}
         </button>
       </div>
     )
@@ -59,13 +62,13 @@ export function WalletStatusBar({
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <p className="text-sm text-amber-800">
-            Tu wallet está en <strong>{chainName}</strong>. WasiAI requiere Avalanche Fuji Testnet.
+            {t('yourWalletIsOn')} <strong>{chainName}</strong>. WasiAI requiere Avalanche Fuji Testnet.
           </p>
           <button
             onClick={onSwitchChain}
             className="shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 transition"
           >
-            Cambiar a Fuji
+            {t('switchToFuji')}
           </button>
         </div>
         {address && (
@@ -74,7 +77,7 @@ export function WalletStatusBar({
               onClick={handleDisconnect}
               className="text-xs text-amber-600 hover:text-amber-800 transition"
             >
-              Desconectar
+              {t('disconnect')}
             </button>
           </div>
         )}
@@ -89,7 +92,7 @@ export function WalletStatusBar({
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <span>Cambiando a Fuji...</span>
+        <span>{t('switching')}</span>
       </div>
     )
   }
@@ -108,7 +111,7 @@ export function WalletStatusBar({
               onClick={handleDisconnect}
               className="text-xs text-red-500 hover:text-red-700 transition"
             >
-              Desconectar
+              {t('disconnect')}
             </button>
           </div>
         )}
@@ -138,7 +141,7 @@ export function WalletStatusBar({
         onClick={handleDisconnect}
         className="rounded px-2 py-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition text-xs"
       >
-        Desconectar
+        {t('disconnect')}
       </button>
     </div>
   )

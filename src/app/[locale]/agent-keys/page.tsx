@@ -279,6 +279,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
   keyId: string; keyName: string; balance: number; keyHash: string
   onClose: () => void; onSuccess: () => void
 }) {
+  const t = useTranslations('agentKeys')
   const [amount,   setAmount]   = useState(balance)
   const [status,   setStatus]   = useState<'idle' | 'signing' | 'submitted' | 'polling' | 'success' | 'error'>('idle')
   const [txHash,   setTxHash]   = useState('')
@@ -294,15 +295,15 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
     setErrorMsg('')
 
     if (!keyHash) {
-      setErrorMsg('No se encontró el identificador de la key. Recarga la página.')
+      setErrorMsg(t('withdraw.noHash'))
       return
     }
     if (amount <= 0 || amount > balance) {
-      setErrorMsg(`El monto debe ser entre $0.01 y $${balance.toFixed(4)} USDC`)
+      setErrorMsg(t('withdraw.invalidAmount').replace('${max}', balance.toFixed(4)))
       return
     }
     if (!MARKETPLACE_ADDRESS) {
-      setErrorMsg('Contrato no configurado. Contacta soporte.')
+      setErrorMsg(t('withdraw.noContract'))
       return
     }
 
@@ -310,7 +311,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
       ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }
     }
     if (!win.ethereum) {
-      setErrorMsg('No se detectó wallet. Instala Core o MetaMask.')
+      setErrorMsg(t('withdraw.noWallet'))
       return
     }
 
@@ -324,7 +325,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
       // 2. Verificar chain
       const chainIdHex = await win.ethereum.request({ method: 'eth_chainId' }) as string
       if (parseInt(chainIdHex, 16) !== CHAIN_ID) {
-        throw new Error(`Cambia a la red correcta (Chain ID: ${CHAIN_ID})`)
+        throw new Error(t('withdraw.wrongChain').replace('{chainId}', String(CHAIN_ID)))
       }
 
       // 3. CD-4: USDC atomics (6 decimals)
@@ -362,7 +363,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
         if (receipt) break
       }
 
-      if (!receipt) throw new Error('Timeout esperando confirmación. Verifica la tx en el explorador.')
+      if (!receipt) throw new Error(t('withdraw.timeout'))
 
       // 7. Sync DB
       setStatus('submitted')
@@ -389,17 +390,17 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
   const isLoading = ['signing', 'submitted', 'polling'].includes(status)
 
   const statusLabel = {
-    signing:   'Esperando firma…',
-    submitted: 'Sincronizando…',
-    polling:   'Confirmando tx…',
-  }[status as string] ?? `Retirar $${amount.toFixed(4)}`
+    signing:   t('withdraw.signing'),
+    submitted: t('withdraw.submitting'),
+    polling:   t('withdraw.polling'),
+  }[status as string] ?? t('withdraw.withdrawBtn').replace('${amount}', amount.toFixed(4))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Retirar fondos</h2>
+            <h2 className="text-lg font-bold text-gray-900">{t('withdraw.title')}</h2>
             <p className="text-sm text-gray-500">{keyName}</p>
           </div>
           <button onClick={onClose} disabled={isLoading} className="text-gray-400 hover:text-gray-600 text-xl leading-none disabled:opacity-30">✕</button>
@@ -408,9 +409,9 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
         {status === 'success' ? (
           <div className="text-center space-y-3">
             <div className="text-4xl">✅</div>
-            <p className="font-semibold text-green-700">Retiro exitoso</p>
+            <p className="font-semibold text-green-700">{t('withdraw.success')}</p>
             <p className="text-sm text-gray-500">
-              ${amount.toFixed(4)} USDC enviados a tu wallet.
+              {t('withdraw.sentToWallet').replace('{amount}', `$${amount.toFixed(4)}`)}
             </p>
             {txHash && (
               <a
@@ -419,14 +420,14 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
                 rel="noopener noreferrer"
                 className="text-xs text-avax-500 underline"
               >
-                Ver tx en explorer →
+                {t('withdraw.viewTx')} →
               </a>
             )}
           </div>
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-4 text-center">
-              <p className="text-xs text-gray-500 mb-1">Fondos disponibles</p>
+              <p className="text-xs text-gray-500 mb-1">{t('withdraw.availableLabel')}</p>
               <p className="text-3xl font-extrabold text-green-700">
                 ${balance.toFixed(4)} <span className="text-base font-medium text-green-500">USDC</span>
               </p>
@@ -435,7 +436,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
             {/* Monto a retirar */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Monto a retirar (USDC)
+                {t('withdraw.amountLabel')}
               </label>
               <div className="flex items-center overflow-hidden rounded-xl border border-gray-200 focus-within:border-avax-400">
                 <span className="border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-400">$</span>
@@ -454,7 +455,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
                   onClick={() => setAmount(balance)}
                   className="px-3 py-2.5 text-xs text-avax-500 hover:text-avax-600 font-medium"
                 >
-                  Max
+                  {t('withdraw.max')}
                 </button>
               </div>
               {amount >= balance && (
@@ -463,7 +464,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
             </div>
 
             <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-800">
-              <Info size={13} className="shrink-0" /> Los USDC irán directo a tu wallet. Necesitas AVAX para el gas.
+              <Info size={13} className="shrink-0" /> {t('withdraw.gasNote')}
             </div>
 
             {errorMsg && (

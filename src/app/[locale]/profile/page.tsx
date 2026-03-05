@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/server'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
 import { ProfileSignOut } from './_components/ProfileSignOut'
+import { getTranslations } from 'next-intl/server'
 
 export default async function ProfilePage({
   params,
@@ -22,6 +23,7 @@ export default async function ProfilePage({
   params: Promise<{ locale: string }>
 }) {
   const { locale } = await params
+  const t = await getTranslations('profile')
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -69,14 +71,14 @@ export default async function ProfilePage({
                 <p className="truncate text-sm text-gray-500">{user.email}</p>
               </>
             ) : (
-              <p className="font-semibold text-gray-900">Invitado</p>
+              <p className="font-semibold text-gray-900">{t('guest')}</p>
             )}
           </div>
         </div>
 
         {/* ── Wallet (WAS-61) ─────────────────────────────────────── */}
         <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Wallet</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t('wallet')}</h2>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <WalletConnectButton locale={locale} />
             {creatorProfile?.wallet_address && (
@@ -156,7 +158,7 @@ export default async function ProfilePage({
 
         {/* ── Auth (WAS-62) ───────────────────────────────────────── */}
         <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Cuenta</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t('account')}</h2>
           {user ? (
             <ProfileSignOut locale={locale} />
           ) : (
@@ -165,13 +167,13 @@ export default async function ProfilePage({
                 href={`/${locale}/login`}
                 className="flex items-center justify-center rounded-xl bg-[#E84142] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#c73535] transition"
               >
-                Iniciar sesión
+                {t('signIn')}
               </Link>
               <Link
                 href={`/${locale}/signup`}
                 className="flex items-center justify-center rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
               >
-                Crear cuenta
+                {t('createAccount')}
               </Link>
             </div>
           )}

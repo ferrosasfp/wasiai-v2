@@ -5,6 +5,7 @@ import { useAccount } from 'wagmi'
 import { useWalletClient } from 'wagmi'
 import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
+import { useTranslations } from 'next-intl'
 
 interface TreasuryData {
   total_usdc:            number
@@ -45,6 +46,7 @@ interface AdminStatus {
 }
 
 export default function AdminPage() {
+  const t = useTranslations('admin')
   const [mounted, markMounted] = useReducer(() => true, false)
   useEffect(markMounted, [markMounted])
   const { address, isConnected } = useAccount()
@@ -297,7 +299,7 @@ export default function AdminPage() {
     <div className="mx-auto max-w-3xl p-8 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">WasiAI Admin Panel</h1>
+        <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
         <div className="text-sm text-gray-400">
           {mounted && isConnected ? (
             <span className="flex items-center gap-2">
@@ -305,12 +307,12 @@ export default function AdminPage() {
               {isOwner ? (
                 <span className="rounded bg-avax-500 px-2 py-0.5 text-xs text-white">Owner</span>
               ) : (
-                <span className="rounded bg-red-700 px-2 py-0.5 text-xs text-white">Not authorized</span>
+                <span className="rounded bg-red-700 px-2 py-0.5 text-xs text-white">{t('notAuthorized')}</span>
               )}
             </span>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <p className="text-gray-400 text-sm">Connect your wallet to access the admin panel</p>
+              <p className="text-gray-400 text-sm">{t('connectWallet')}</p>
               <WalletConnectButton locale="en" />
             </div>
           )}
@@ -329,9 +331,9 @@ export default function AdminPage() {
         <>
           {/* Platform Fee */}
           <section className="rounded-lg border border-gray-700 bg-gray-900 p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-avax-400">Platform Fee</h2>
+            <h2 className="text-lg font-semibold text-avax-400">{t('platformFee')}</h2>
             <p className="text-gray-300">
-              Current: <span className="font-bold text-white">{status.platformFeeBps} bps ({(status.platformFeeBps / 100).toFixed(2)}%)</span>
+              {t('current')} <span className="font-bold text-white">{status.platformFeeBps} bps ({(status.platformFeeBps / 100).toFixed(2)}%)</span>
             </p>
             {isOwner && (
               <div className="flex items-center gap-3">
@@ -348,7 +350,7 @@ export default function AdminPage() {
                   onClick={handleUpdateFee}
                   className="rounded bg-avax-500 px-4 py-1.5 text-sm text-white hover:bg-avax-600 disabled:opacity-50"
                 >
-                  Update Fee
+                  {t('updateFee')}
                 </button>
               </div>
             )}
@@ -478,14 +480,14 @@ export default function AdminPage() {
                     onClick={() => { void handleRunSettlement(); void loadTreasury() }}
                     className="rounded-lg bg-avax-500 px-4 py-2 text-sm font-medium text-white hover:bg-avax-600 transition whitespace-nowrap"
                   >
-                    Run Settlement
+                    {t('settlement')}
                   </button>
                 </div>
 
                 {/* Limpiar balances */}
                 <div className="flex items-center gap-3 rounded-lg bg-red-950/40 border border-red-800 p-4">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-red-300">Limpiar balances del contrato</p>
+                    <p className="text-sm font-medium text-red-300">{t('cleanBalances')}</p>
                     <p className="text-xs text-red-400 mt-0.5">Devuelve USDC de keys huérfanas a sus owners — deja el contrato en cero. Requiere wallet del operador.</p>
                     {drainMsg && <p className="text-xs text-gray-300 mt-1">{drainMsg}</p>}
                   </div>

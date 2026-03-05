@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount }                        from 'wagmi'
+import { useTranslations }                   from 'next-intl'
 
 interface Props {
   slug:             string
@@ -21,6 +22,7 @@ export function AgentRating({ slug, initialScore, initialCount, compact = false 
   const { address } = useAccount()
 
   const [score, setScore]     = useState<number | null>(initialScore)
+  const t = useTranslations('rating')
   const [count, setCount]     = useState(initialCount)
   const [yourVote, setYourVote] = useState<'up' | 'down' | null>(null)
   const [loading, setLoading] = useState(false)
@@ -75,7 +77,7 @@ export function AgentRating({ slug, initialScore, initialCount, compact = false 
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-sm font-semibold text-gray-700">Rate this agent</p>
+          <p className="text-sm font-semibold text-gray-700">{t('rateThis')}</p>
           <p className="text-xs text-gray-400 mt-0.5">ERC-8004 · On-chain reputation</p>
         </div>
         {score !== null && count > 0 && (
@@ -100,7 +102,7 @@ export function AgentRating({ slug, initialScore, initialCount, compact = false 
       {voted ? (
         <div className="flex items-center justify-center gap-2 py-2 text-sm text-gray-500">
           <span>{yourVote === 'up' ? '👍' : '👎'}</span>
-          <span>Thanks for your feedback!</span>
+          <span>{t('thanks')}</span>
         </div>
       ) : (
         <div className="flex gap-3">
@@ -130,7 +132,7 @@ export function AgentRating({ slug, initialScore, initialCount, compact = false 
       )}
 
       {count === 0 && !voted && (
-        <p className="mt-2 text-center text-xs text-gray-400">Be the first to rate this agent</p>
+        <p className="mt-2 text-center text-xs text-gray-400">{t('beFirst')}</p>
       )}
     </div>
   )
