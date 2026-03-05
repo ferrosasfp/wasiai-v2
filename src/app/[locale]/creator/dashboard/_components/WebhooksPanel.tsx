@@ -213,7 +213,7 @@ export function WebhooksPanel() {
 
       {/* Webhook list */}
       {webhooks.length === 0 ? (
-        <p className="text-sm text-gray-400 py-4 text-center">No tienes webhooks configurados aún.</p>
+        <p className="text-sm text-gray-400 py-4 text-center">{t('noWebhooks')}</p>
       ) : (
         <div className="divide-y divide-gray-100">
           {webhooks.map(wh => (

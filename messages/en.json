@@ -468,7 +468,9 @@
       "wrongChain": "Switch to the correct network (Chain ID: {chainId})",
       "timeout": "Timeout waiting for confirmation. Check the tx in the explorer.",
       "max": "Max"
-    }
+    },
+    "withdrawBtn": "Withdraw ${amount}",
+    "withdrawBtnShort": "Withdraw"
   },
   "editAgent": {
     "backToDashboard": "\u2190 Back to Dashboard",
@@ -638,7 +640,8 @@
     "title": "Agent Key",
     "subtitle": "Funds for agentic services",
     "noKey": "You don't have an active Agent Key. Create one so your agents can invoke other agents' services.",
-    "available": "Available to pay for services"
+    "available": "Available to pay for services",
+    "manage": "Manage / Deposit more \u2192"
   },
   "webhooks": {
     "title": "Webhooks",
@@ -647,7 +650,7 @@
     "events": "Events",
     "copy": "Copy",
     "saved": "I saved it, close",
-    "noWebhooks": "No webhooks configured",
+    "noWebhooks": "You have no webhooks configured yet.",
     "addWebhook": "Add Webhook",
     "secret": "Secret",
     "secretHint": "Use this to verify webhook signatures",
@@ -714,7 +717,8 @@
     "createAccount": "Create account",
     "signOut": "Sign out",
     "settings": "Settings",
-    "myProfile": "My profile"
+    "myProfile": "My profile",
+    "publishAgent": "Publish Agent"
   },
   "pipelines": {
     "title": "Pipeline Builder",
@@ -755,9 +759,9 @@
     "network": "Fuji Testnet",
     "noWallet": "This agent doesn't have its own wallet. Initialize one to enable autonomous payments in the future.",
     "earningsAddress": "Earnings address",
-    "viewExplorer": "View on explorer",
+    "viewExplorer": "View on explorer \u2197",
     "agentKeyNote": "To let your agent invoke other WasiAI agents, deposit USDC into your Agent Key. Without funds, your agent can't pay for other agents' services.",
-    "depositCta": "Deposit into Agent Key"
+    "depositCta": "Deposit to Agent Key \u2192"
   },
   "earnings": {
     "available": "USDC available",

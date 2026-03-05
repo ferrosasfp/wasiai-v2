@@ -114,7 +114,7 @@ export function AgentKeyWidget({ locale }: Props) {
             href={`/${locale}/agent-keys`}
             className="self-start text-sm font-semibold text-avax-600 hover:text-avax-800 transition"
           >
-            Administrar / Depositar más →
+            {t('manage')}
           </Link>
         </div>
       )}
