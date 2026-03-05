@@ -144,7 +144,8 @@ export async function checkCreatorRateLimits(
     if (!rpmResult.success) {
       return NextResponse.json(
         { error: 'Rate limit exceeded', code: 'rate_limited' },
-        { status: 429, headers: { 'Retry-After': String(Math.ceil((rpmResult.reset - Date.now()) / 1000)), 'X-RateLimit-Limit': String(rpmResult.limit), 'X-RateLimit-Remaining': '0' } },
+        // NG-011: No exponer headers internos de Upstash — solo Retry-After estándar
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((rpmResult.reset - Date.now()) / 1000)) } },
       )
     }
     const rpdResult = await getCreatorRpdLimit(slug, maxRpd).limit(identifier)

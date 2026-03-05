@@ -1,6 +1,6 @@
 import { setRequestLocale, getTranslations } from 'next-intl/server'
 import { getPublicClient }    from '@/shared/lib/web3/client'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { WASIAI_MARKETPLACE_ABI, getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 
 export const revalidate = 60
@@ -18,7 +18,8 @@ export default async function TransparencyPage({ params }: Props) {
     process.env.NEXT_PUBLIC_CHAIN_ID ? Number(process.env.NEXT_PUBLIC_CHAIN_ID) : 43113
   )
   const client  = getPublicClient()
-  const supabase = createServiceClient()
+  // NG-013: createClient() respeta RLS — página pública no necesita bypass
+  const supabase = await createClient()
 
   // ── On-chain stats ────────────────────────────────────────────────────────
   // getStats() returns (volume: uint256, invocations: uint256, feeBps: uint16)

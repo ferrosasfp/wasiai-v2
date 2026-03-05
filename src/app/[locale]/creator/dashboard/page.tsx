@@ -2,7 +2,7 @@ import React, { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { Package, CheckCircle2, Zap, DollarSign, Inbox, Activity } from 'lucide-react'
 import type { ReactNode } from 'react'
 // WithdrawButton and WalletSetup are used inside EarningsSection sub-component
@@ -86,9 +86,10 @@ export default async function CreatorDashboardPage({
   // Recent calls — fetched in parallel with above (independent query)
   const callsPage = Math.max(1, parseInt(callsPageParam ?? '1', 10))
   const callsOffset = (callsPage - 1) * CALLS_PER_PAGE
-  const serviceClient = createServiceClient()
+  // NG-013: usar createClient() (respeta RLS) en vez de createServiceClient()
+  const userClient = await createClient()
   const recentCallsData = modelIds.length > 0
-    ? await serviceClient
+    ? await userClient
         .from('agent_calls')
         .select(
           'id, agent_id, caller_type, amount_paid, status, latency_ms, called_at, agent:agents(name, slug)',
