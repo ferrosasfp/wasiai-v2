@@ -5,7 +5,7 @@
  */
 
 import { createClient }        from '@/lib/supabase/server'
-import { createServiceClient } from '@/lib/supabase/server'
+// createServiceClient removido — NG-013
 import { PipelinePageClient }  from './_components/PipelinePageClient'
 
 interface Props {
@@ -21,14 +21,13 @@ interface AgentRow {
 export default async function PipelinesPage({ params }: Props) {
   await params // consume params (locale not needed for data fetch)
 
-  // Auth-aware client — RLS applies
-  const supabase        = await createClient()
-  const serviceSupabase = createServiceClient()
+  // NG-013: createClient() respeta RLS — no usar createServiceClient en Server Components
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
 
   // Cargar agentes activos
-  const { data: agentsData } = await serviceSupabase
+  const { data: agentsData } = await supabase
     .from('agents')
     .select('slug, name, price_per_call')
     .eq('status', 'active')

@@ -30,11 +30,30 @@ const ALLOWED_ORIGINS = new Set([
  * Note: Only checks browser-initiated requests (those with an Origin header).
  * Server-to-server calls (no Origin) pass through — they are CORS-safe by nature.
  */
-export function validateCsrf(request: NextRequest): NextResponse | null {
+/**
+ * NG-012: Extrae el origin del request con fallback a Referer header.
+ * Prioridad: Origin > Referer > null
+ */
+function getRequestOrigin(request: NextRequest): string | null {
   const origin = request.headers.get('origin')
+  if (origin) return origin
 
-  // No origin header = non-browser request (server-to-server, curl, etc.)
-  // These are safe to pass through — CORS prevents cross-origin browser attacks
+  // Fallback a Referer (algunos browsers omiten Origin en navegación directa)
+  const referer = request.headers.get('referer')
+  if (referer) {
+    try {
+      return new URL(referer).origin
+    } catch { /* referer inválido */ }
+  }
+
+  return null
+}
+
+export function validateCsrf(request: NextRequest): NextResponse | null {
+  // NG-012: Usar Origin con fallback a Referer
+  const origin = getRequestOrigin(request)
+
+  // No origin ni referer = request server-to-server (curl, etc.) — safe por naturaleza
   if (!origin) return null
 
   if (!ALLOWED_ORIGINS.has(origin)) {
