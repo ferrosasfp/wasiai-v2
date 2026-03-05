@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { memo, useState } from 'react'
 import type { Model } from '../types/models.types'
-import { MessageSquare, Eye, Music, Code2, Bot, BarChart2, Zap } from 'lucide-react'
+import { MessageSquare, Eye, Music, Code2, Bot, BarChart2, Flame, BadgeCheck } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -100,18 +100,35 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
             ERC-8004
           </span>
         )}
+        {model.free_trial_enabled && model.free_trial_limit > 0 && (
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            {t('freeTrial', { count: model.free_trial_limit })}
+          </span>
+        )}
       </div>
 
       {/* Footer */}
       <div className="mt-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
-          <span className="shrink-0 flex items-center gap-1"><Zap size={11} className="text-avax-500" />{remaining.toLocaleString('en-US')} calls</span>
+          {remaining > 0 && (
+            <span className="shrink-0 flex items-center gap-1">
+              <Flame size={11} className="text-orange-500" />
+              {remaining >= 1000
+                ? `${(remaining / 1000).toFixed(1)}k`
+                : remaining} {t('calls')}
+            </span>
+          )}
           {model.is_featured && (
             <span className="rounded-full bg-avax-50 px-2 py-0.5 text-avax-600 font-medium shrink-0">{t('featured')}</span>
           )}
           {model.reputation_score !== null && model.reputation_count > 0 && (
             <span className="inline-flex items-center gap-1 shrink-0 text-green-600 font-medium">
               👍 {model.reputation_score}%
+            </span>
+          )}
+          {model.creator?.verified && (
+            <span className="shrink-0" title={t('verifiedCreator')}>
+              <BadgeCheck size={13} className="text-blue-500" />
             </span>
           )}
         </div>

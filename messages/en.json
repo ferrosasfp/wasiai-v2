@@ -71,7 +71,11 @@
     "step2Label": "2. Discover agents",
     "step3Label": "3. Invoke & pay",
     "agentKitBadge": "Coinbase AgentKit compatible",
-    "browseAllCategories": "Browse all categories"
+    "browseAllCategories": "Browse all categories",
+    "freeToTry": "Free to Try",
+    "trending": "Trending This Week",
+    "topRated": "Top Rated",
+    "justLaunched": "Just Launched"
   },
   "auth": {
     "login": "Sign In",
@@ -118,12 +122,15 @@
       "data": "Data"
     },
     "featured": "Featured",
-    "calls": "{count} calls",
+    "calls": "calls",
     "tryButton": "Try \u2192",
     "creatorEarns": "Creator earns",
     "protocol": "Protocol",
     "network": "Network",
-    "currency": "Currency"
+    "currency": "Currency",
+    "freeTrial": "Try Free \u00b7 {count} calls",
+    "freeTrialFilter": "Free to Try",
+    "verifiedCreator": "Verified Creator"
   },
   "publish": {
     "title": "Publish an Agent",
