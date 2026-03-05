@@ -17,9 +17,12 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')
 // Build list of allowed origins (add staging/preview URLs here if needed)
 const ALLOWED_ORIGINS = new Set([
   SITE_URL,
-  // Allow localhost during development
+  // Allow localhost during development (any port 3000–3009)
   ...(process.env.NODE_ENV === 'development'
-    ? ['http://localhost:3000', 'http://127.0.0.1:3000']
+    ? [
+        'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002',
+        'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002',
+      ]
     : []),
 ].filter(Boolean))
 
