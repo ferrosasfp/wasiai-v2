@@ -362,7 +362,9 @@
     "agentkit": "AgentKit",
     "pricing": "Precios y Tarifas",
     "subtitle": "Todo lo que necesitas para construir con WasiAI.",
-    "discovery": "Agent Discovery"
+    "discovery": "Agent Discovery",
+    "collections": "Colecciones",
+    "creatorCli": "Creator CLI"
   },
   "codeExamples": {
     "title": "Cómo usar",
