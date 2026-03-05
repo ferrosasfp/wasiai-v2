@@ -1,9 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { useWalletClient } from 'wagmi'
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
+
+interface TreasuryData {
+  total_usdc:            number
+  key_balances_usdc:     number
+  settled_earnings_usdc: number
+  platform_fee_bps:      number
+  treasury_address:      string
+  treasury_balance_usdc: number
+}
+interface CreatorRow {
+  creator_id:   string
+  username:     string
+  wallet:       string | null
+  total_calls:  number
+  pending_usdc: number
+  settled_usdc: number
+  total_usdc:   number
+}
 
 const OPERATOR_ADDRESS = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? ''
 const OWNER_ADDRESS    = process.env.NEXT_PUBLIC_WASIAI_OWNER ?? ''
@@ -29,6 +48,10 @@ export default function AdminPage() {
   const { address, isConnected } = useAccount()
   const { data: walletClient }    = useWalletClient()
   const [status, setStatus]       = useState<AdminStatus | null>(null)
+  const [treasury, setTreasury]   = useState<TreasuryData | null>(null)
+  const [creators, setCreators]   = useState<CreatorRow[]>([])
+  const [showCreators, setShowCreators] = useState(false)
+  const [treasuryLoading, setTreasuryLoading] = useState(false)
   const [loading, setLoading]     = useState(true)
   const [newBps, setNewBps]       = useState<string>('')
   const [feeMsg, setFeeMsg]       = useState<string>('')
@@ -46,7 +69,20 @@ export default function AdminPage() {
     }
   }
 
-  useEffect(() => { void loadStatus() }, [])
+  const loadTreasury = useCallback(async () => {
+    setTreasuryLoading(true)
+    try {
+      const [t, c] = await Promise.all([
+        fetch('/api/admin/treasury').then(r => r.json()) as Promise<TreasuryData>,
+        fetch('/api/admin/treasury/creators').then(r => r.json()) as Promise<CreatorRow[]>,
+      ])
+      setTreasury(t)
+      setCreators(Array.isArray(c) ? c : [])
+    } catch { /* best-effort */ }
+    finally { setTreasuryLoading(false) }
+  }, [])
+
+  useEffect(() => { void loadStatus(); void loadTreasury() }, [loadTreasury])
 
   async function signAdminAction(action: string): Promise<{
     signature: string
@@ -296,6 +332,104 @@ export default function AdminPage() {
               </div>
             )}
             {settleMsg && <p className="text-sm text-gray-300">{settleMsg}</p>}
+          </section>
+
+          {/* ── Treasury Dashboard ────────────────────────────────────── */}
+          <section className="rounded-xl bg-gray-800 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">💰 Treasury Dashboard</h2>
+              <button
+                onClick={() => void loadTreasury()}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${treasuryLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+
+            {treasury ? (
+              <>
+                {/* Cards principales */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="rounded-lg bg-gray-700 p-4 text-center">
+                    <p className="text-xs text-gray-400 mb-1">Total en contrato</p>
+                    <p className="text-2xl font-bold text-white">${treasury.total_usdc.toFixed(2)}</p>
+                    <p className="text-xs text-gray-500 mt-1">USDC</p>
+                  </div>
+                  <div className="rounded-lg bg-blue-900/40 border border-blue-700 p-4 text-center">
+                    <p className="text-xs text-blue-300 mb-1">
+                      WasiAI ({(treasury.platform_fee_bps / 100).toFixed(0)}%)
+                    </p>
+                    <p className="text-2xl font-bold text-blue-200">
+                      ${(treasury.total_usdc * treasury.platform_fee_bps / 10000).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-blue-400 mt-1">
+                      Treasury: ${treasury.treasury_balance_usdc.toFixed(2)} disponible
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-green-900/40 border border-green-700 p-4 text-center">
+                    <p className="text-xs text-green-300 mb-1">
+                      Creators ({(100 - treasury.platform_fee_bps / 100).toFixed(0)}%)
+                    </p>
+                    <p className="text-2xl font-bold text-green-200">
+                      ${(treasury.total_usdc * (10000 - treasury.platform_fee_bps) / 10000).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-green-400 mt-1">
+                      Settled: ${treasury.settled_earnings_usdc.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Key balances info */}
+                <p className="text-xs text-gray-500">
+                  Key balances depositados: <span className="text-gray-300">${treasury.key_balances_usdc.toFixed(2)} USDC</span>
+                  {' · '}Treasury address: <code className="text-gray-400 text-xs">{treasury.treasury_address.slice(0, 10)}…</code>
+                </p>
+
+                {/* Toggle detalle creators */}
+                <button
+                  onClick={() => setShowCreators(v => !v)}
+                  className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors"
+                >
+                  {showCreators ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  Ver detalle por creator ({creators.length})
+                </button>
+
+                {showCreators && (
+                  <div className="overflow-x-auto rounded-lg border border-gray-700">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-700 text-gray-300">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Creator</th>
+                          <th className="px-4 py-2 text-right">Calls</th>
+                          <th className="px-4 py-2 text-right">Pendiente (DB)</th>
+                          <th className="px-4 py-2 text-right">Settled (on-chain)</th>
+                          <th className="px-4 py-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-700">
+                        {creators.length === 0 ? (
+                          <tr><td colSpan={5} className="px-4 py-4 text-center text-gray-500">Sin datos</td></tr>
+                        ) : creators.map(c => (
+                          <tr key={c.creator_id} className="hover:bg-gray-750 text-gray-200">
+                            <td className="px-4 py-2">
+                              <div className="font-medium">{c.username ?? 'Unknown'}</div>
+                              {c.wallet && <div className="text-xs text-gray-500">{c.wallet.slice(0, 10)}…</div>}
+                            </td>
+                            <td className="px-4 py-2 text-right">{c.total_calls}</td>
+                            <td className="px-4 py-2 text-right text-yellow-400">${c.pending_usdc.toFixed(4)}</td>
+                            <td className="px-4 py-2 text-right text-green-400">${c.settled_usdc.toFixed(4)}</td>
+                            <td className="px-4 py-2 text-right font-semibold">${c.total_usdc.toFixed(4)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-gray-500 text-sm">{treasuryLoading ? 'Cargando datos on-chain…' : 'No disponible'}</p>
+            )}
           </section>
         </>
       )}
