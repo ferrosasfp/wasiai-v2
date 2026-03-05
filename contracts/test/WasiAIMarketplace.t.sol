@@ -1148,10 +1148,15 @@ contract WasiAIMarketplaceTest is Test {
         marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
 
         // 5. withdraw() still works — pull pattern preserved
-        // Give creator some earnings first (recordInvocation has no whenNotPaused)
+        // NA-210 FIX: recordInvocation ahora tiene whenNotPaused — unpause primero para cargar earnings
+        vm.prank(owner);
+        marketplace.unpause();
         usdc.mint(address(marketplace), PRICE);
         vm.prank(operator);
         marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("prc1"));
+        // Re-pause para verificar que withdraw() sigue funcionando paused
+        vm.prank(owner);
+        marketplace.pause();
         uint256 pending = marketplace.getPendingEarnings(creator);
         assertGt(pending, 0);
         vm.prank(creator);
@@ -1354,13 +1359,14 @@ contract WasiAIMarketplaceTest is Test {
     }
 
     function test_DailyCap_ZeroDisablesCap() public {
+        // NA-212 FIX: cap=0 ya no es permitido (min 100 USDC). Cap bajo muy alto permite settlements grandes.
         vm.prank(owner);
+        vm.expectRevert("WasiAI: cap too low");
         marketplace.setDailySettlementCap(0);
-        _registerAgent(SLUG, creator);
-        _fundKey(KEY_ID, payer, 999_999 * 1e6);
-        _settleKey(KEY_ID, 999_999 * 1e6); // no cap, passes
-        (, uint256 settled,) = marketplace.getDailySettlementStatus();
-        assertEq(settled, 999_999 * 1e6);
+
+        // Verificar que el cap por defecto (10k USDC) sigue activo
+        (uint256 cap,,) = marketplace.getDailySettlementStatus();
+        assertEq(cap, 10_000 * 1e6);
     }
 
     function test_DailyCap_EmitsDailyCapUpdated() public {
@@ -1418,8 +1424,9 @@ contract WasiAIMarketplaceTest is Test {
     }
 
     function test_ComputePaymentId_MatchesExpected() public view {
+        // NA-209 FIX: computePaymentId ahora usa abi.encode (sin colisiones) en vez de encodePacked
         bytes32 nonce = bytes32(uint256(1));
-        bytes32 expected = keccak256(abi.encodePacked(SLUG, payer, PRICE, nonce, block.chainid));
+        bytes32 expected = keccak256(abi.encode(SLUG, payer, PRICE, nonce, block.chainid));
         bytes32 result = marketplace.computePaymentId(SLUG, payer, PRICE, nonce);
         assertEq(result, expected);
     }
