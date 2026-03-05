@@ -236,7 +236,7 @@ export default function AdminPage() {
 
       // Keys con balance conocido — obtenidos del contrato
       const KEYS_WITH_BALANCE: Array<{ keyId: `0x${string}`; owner: `0x${string}` }> = [
-        { keyId: '0x08bdf88cf88c4bc3f4fdfb73451851d9c6ef858896a01b86d489fd763c51c2330', owner: '0xfb652f4506731aC58E51b39DCa4F5ECDcb2C1543' },
+        { keyId: '0x08bdf88cf88c4bc3f4fdfb73451851d9c6ef858896a01b86d489fd763c51c233', owner: '0xfb652f4506731aC58E51b39DCa4F5ECDcb2C1543' },
       ]
 
       // Selectors verificados: keccak256("refundKeyToEarnings(bytes32)").slice(0,4)
