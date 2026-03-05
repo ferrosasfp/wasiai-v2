@@ -11,6 +11,7 @@ import { AgentKeysSection }   from '@/features/docs/content/agent-keys'
 import { CreatorGuideSection } from '@/features/docs/content/creator-guide'
 import { AgentKitSection }    from '@/features/docs/content/agentkit'
 import { PricingSection }     from '@/features/docs/content/pricing'
+import { DiscoverySection }  from '@/features/docs/content/discovery'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -54,6 +55,9 @@ export default function DocsPage() {
       </div>
       <div className="border-t border-gray-100 pt-8">
         <ComposeSection />
+      </div>
+      <div className="border-t border-gray-100 pt-8">
+        <DiscoverySection />
       </div>
       <div className="border-t border-gray-100 pt-8">
         <AgentKeysSection />

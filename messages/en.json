@@ -23,22 +23,22 @@
     "goHome": "Go to marketplace",
     "tryAgain": "Try again",
     "somethingWentWrong": "Something went wrong",
-    "saving": "Saving\u2026"
+    "saving": "Saving…"
   },
   "home": {
-    "title": "WasiAI \u2014 The Agentic Economy Marketplace",
+    "title": "WasiAI — The Agentic Economy Marketplace",
     "subtitle": "AI agents discover, pay, and call agents autonomously. x402 native payments on Avalanche.",
     "badge": "The marketplace for the agentic economy",
     "heroTitle": "Publish your AI agent.",
     "heroSubtitle": "Get paid automatically in USDC.",
     "heroDescription": "WasiAI is the marketplace where creators publish AI agents and earn per call. Developers find the right agent and integrate it in minutes.",
-    "ctaCreator": "Publish my agent \u2192",
+    "ctaCreator": "Publish my agent →",
     "ctaConsumer": "Explore agents",
     "hero": {
       "headline": "The Home of AI Agents",
       "subtitle": {
-        "creator": "Publish your AI agent and get paid automatically \u2014 no invoicing, no friction.",
-        "consumer": "Find the right AI agent and integrate it in minutes \u2014 with one API key."
+        "creator": "Publish your AI agent and get paid automatically — no invoicing, no friction.",
+        "consumer": "Find the right AI agent and integrate it in minutes — with one API key."
       },
       "cta": {
         "creator": "Publish your agent",
@@ -52,21 +52,21 @@
       }
     },
     "browseModels": "Browse Agents",
-    "publishModel": "Publish an Agent \u2192",
+    "publishModel": "Publish an Agent →",
     "statPayments": "Native payments",
     "statMinCall": "Min. per call",
     "statToCreators": "To creators",
     "statIdentity": "Agent identity",
     "availableModels": "Available Agents",
-    "modelsCount": "{total} agents \u00b7 page {page} of {total_pages}",
+    "modelsCount": "{total} agents · page {page} of {total_pages}",
     "noModels": "No agents yet.",
     "noModelsFiltered": "No agents match your filters.",
     "clearFilters": "Clear filters",
-    "beFirst": "Be the first to publish \u2192",
+    "beFirst": "Be the first to publish →",
     "builtForAgents": "Built for the Agentic Economy",
     "builtSubtitle": "Any AI agent can discover, pay, and call agents on WasiAI autonomously. x402 native. ERC-8004 identity. Gasless payments on Avalanche.",
-    "getAgentKey": "Get Agent Key \u2192",
-    "agentKitDocs": "AgentKit Docs \u2197",
+    "getAgentKey": "Get Agent Key →",
+    "agentKitDocs": "AgentKit Docs ↗",
     "step1Label": "1. Check budget",
     "step2Label": "2. Discover agents",
     "step3Label": "3. Invoke & pay",
@@ -123,12 +123,12 @@
     },
     "featured": "Featured",
     "calls": "calls",
-    "tryButton": "Try \u2192",
+    "tryButton": "Try →",
     "creatorEarns": "Creator earns",
     "protocol": "Protocol",
     "network": "Network",
     "currency": "Currency",
-    "freeTrial": "Try Free \u00b7 {count} calls",
+    "freeTrial": "Try Free · {count} calls",
     "freeTrialFilter": "Free to Try",
     "verifiedCreator": "Verified Creator"
   },
@@ -136,14 +136,14 @@
     "title": "Publish an Agent",
     "subtitle": "List your AI agent on WasiAI and earn USDC per call.",
     "coverImage": "Cover Image",
-    "coverImageHint": "optional \u00b7 max 5MB",
+    "coverImageHint": "optional · max 5MB",
     "slug": "Slug (URL)",
     "category": "Category",
     "pricePerCall": "Price per call (USDC)",
     "endpoint": "API Endpoint",
     "description": "Description",
-    "revenueInfo": "You earn 90% of every call \u00b7 WasiAI takes 10% \u00b7 Paid instantly in USDC",
-    "publishButton": "Publish Agent \u2192",
+    "revenueInfo": "You earn 90% of every call · WasiAI takes 10% · Paid instantly in USDC",
+    "publishButton": "Publish Agent →",
     "publishing": "Publishing...",
     "successTitle": "Agent Published!",
     "successSubtitle": "Redirecting to dashboard...",
@@ -160,7 +160,7 @@
     },
     "preview": {
       "label": "Preview",
-      "pricePlaceholder": "\u2014 USDC/call",
+      "pricePlaceholder": "— USDC/call",
       "show": "Show preview",
       "hide": "Hide preview"
     },
@@ -190,16 +190,16 @@
       "errorNameMin": "Name must be at least 3 characters",
       "errorDescriptionMin": "Description must be at least 10 characters",
       "selectCategory": "Select a category",
-      "uploadingIPFS": "Uploading to IPFS\u2026",
+      "uploadingIPFS": "Uploading to IPFS…",
       "dropHint": "Click or drag here"
     },
     "step2": {
       "title": "Product",
       "subtitle": "Price, base model and capabilities",
-      "revenueHint": "You earn 90% per call \u00b7 WasiAI takes 10%",
+      "revenueHint": "You earn 90% per call · WasiAI takes 10%",
       "baseModel": "Base model",
       "capabilitiesLabel": "Capabilities",
-      "capabilitiesHint": "JSON array \u00b7 optional",
+      "capabilitiesHint": "JSON array · optional",
       "errorCapabilitiesArray": "Must be a JSON array",
       "errorCapabilitiesJson": "Invalid JSON",
       "errorPriceMin": "Price must be greater than 0",
@@ -215,7 +215,7 @@
     },
     "form": {
       "errorSaving": "Error saving",
-      "errorPublishing": "Error publishing \u2014 please try again"
+      "errorPublishing": "Error publishing — please try again"
     },
     "agentName": "Agent Name",
     "loading": "Loading editor...",
@@ -223,7 +223,7 @@
       "title": "Listing fee required",
       "description": "Your second agent (and beyond) requires a listing fee to publish on WasiAI.",
       "feeLabel": "Publication fee",
-      "feeHint": "One-time payment \u00b7 Not recurring",
+      "feeHint": "One-time payment · Not recurring",
       "cancel": "Cancel",
       "signAndPublish": "Sign and publish",
       "waitingSignature": "Waiting for signature...",
@@ -240,11 +240,11 @@
     "draftQuestion": "Do you want to continue where you left off?",
     "walletRequired": "Set up your wallet before publishing this agent.",
     "step1NamePlaceholder": "e.g. DeFi Sentiment Analyzer",
-    "step1DescPlaceholder": "Describe what your agent does\u2026",
+    "step1DescPlaceholder": "Describe what your agent does…",
     "step3AuthNote": "Sent as Authorization header on every call to your API",
     "step3TestBtn": "Test endpoint",
     "step3Testing": "Testing...",
-    "step3EarningsNote": "You earn 90% of each call \u00b7 WasiAI takes 10% \u00b7 Paid in USDC"
+    "step3EarningsNote": "You earn 90% of each call · WasiAI takes 10% · Paid in USDC"
   },
   "dashboard": {
     "title": "Creator Dashboard",
@@ -253,8 +253,8 @@
     "revenue": "Revenue",
     "recentCalls": "Recent Calls",
     "onchainEarnings": "On-chain Earnings",
-    "withdrawUsdc": "Withdraw USDC \u2192",
-    "withdrawing": "Withdrawing\u2026",
+    "withdrawUsdc": "Withdraw USDC →",
+    "withdrawing": "Withdrawing…",
     "noWallet": "No wallet",
     "noCalls": "No calls yet",
     "noCallsSubtitle": "Calls to your agents will appear here in real time.",
@@ -277,10 +277,10 @@
     "colAmount": "Amount",
     "colLatency": "Latency",
     "colTime": "Time",
-    "callerAgent": "\ud83e\udd16 agent",
-    "callerHuman": "\ud83d\udc64 human",
-    "apiQuickStartLabel": "\ud83e\udd16 Other agents discover and pay your agents automatically:",
-    "manageAgentKeys": "Manage Agent Keys \u2192"
+    "callerAgent": "🤖 agent",
+    "callerHuman": "👤 human",
+    "apiQuickStartLabel": "🤖 Other agents discover and pay your agents automatically:",
+    "manageAgentKeys": "Manage Agent Keys →"
   },
   "onboarding": {
     "step1": {
@@ -310,7 +310,7 @@
     "button": "Try for free",
     "loading": "Invoking agent...",
     "used": "You already tried this agent",
-    "cta": "Get API key \u2192",
+    "cta": "Get API key →",
     "error_timeout": "The agent took too long. Try again later.",
     "error_generic": "The agent encountered an error. It may be temporary.",
     "error_ratelimit": "Too many attempts. Wait a moment.",
@@ -336,7 +336,7 @@
     "member_since": "Since {year}",
     "no_agents": "This creator hasn't published any agents yet.",
     "not_found": "Creator not found.",
-    "back_to_marketplace": "\u2190 Back to marketplace"
+    "back_to_marketplace": "← Back to marketplace"
   },
   "docs": {
     "title": "Documentation",
@@ -360,7 +360,8 @@
     "creatorGuide": "Creator Guide",
     "agentkit": "AgentKit",
     "pricing": "Pricing & Fees",
-    "subtitle": "Everything you need to build with WasiAI."
+    "subtitle": "Everything you need to build with WasiAI.",
+    "discovery": "Agent Discovery"
   },
   "codeExamples": {
     "title": "How to use",
@@ -375,8 +376,8 @@
       "noKey": "Create API key",
       "noKeyTooltip": "Create your API key to invoke agents",
       "ok": "Balance: {amount}",
-      "warning": "Low balance \u2014 top up soon",
-      "exhausted": "Balance exhausted \u2014 cannot invoke agents",
+      "warning": "Low balance — top up soon",
+      "exhausted": "Balance exhausted — cannot invoke agents",
       "inactive": "Key inactive",
       "inactiveTooltip": "Your API key is deactivated",
       "error": "Balance unavailable",
@@ -390,7 +391,7 @@
     "publish": "Publish",
     "agentKeys": "Agent Keys",
     "mainNavLabel": "Main navigation",
-    "homeLabel": "WasiAI \u2014 go to homepage",
+    "homeLabel": "WasiAI — go to homepage",
     "loadingUser": "Loading user...",
     "signOutLabel": "Sign out of your account",
     "sandbox": "Sandbox",
@@ -410,7 +411,7 @@
     "title": "Agent Keys",
     "subtitle": "API keys for your AI agents to call WasiAI agents autonomously.",
     "newKey": "+ New Key",
-    "keyCreated": "Key created \u2014 save it now!",
+    "keyCreated": "Key created — save it now!",
     "keyOnce": "This key won't be shown again.",
     "acknowledged": "Got it, close",
     "newKeyTitle": "New Agent Key",
@@ -440,12 +441,12 @@
       "success": "USDC deposited successfully!",
       "done": "Done",
       "amountLabel": "Amount to deposit (USDC)",
-      "amountHint": "Min $1 \u00b7 Max $1,000",
+      "amountHint": "Min $1 · Max $1,000",
       "info1": "Signs a gasless ERC-3009 authorization (no ETH needed)",
       "info2": "USDC transferred directly from your wallet to the contract",
       "info3": "Each API call deducts the agent price from your on-chain balance",
-      "signing": "\u23f3 Waiting for signature...",
-      "submitting": "\u23f3 Submitting on-chain...",
+      "signing": "⏳ Waiting for signature...",
+      "submitting": "⏳ Submitting on-chain...",
       "fundKey": "Fund Key"
     },
     "close": {
@@ -459,7 +460,7 @@
       "warn1": "All pending calls will be settled to creators",
       "warn2": "Remaining {amount} USDC will move to your Earnings",
       "warn3": "Your agent will stop working immediately",
-      "closing": "\u23f3 Closing...",
+      "closing": "⏳ Closing...",
       "confirmBtn": "Close Key"
     },
     "withdraw": {
@@ -486,31 +487,31 @@
     "withdrawBtnShort": "Withdraw"
   },
   "editAgent": {
-    "backToDashboard": "\u2190 Back to Dashboard",
+    "backToDashboard": "← Back to Dashboard",
     "title": "Edit Agent",
     "agentName": "Agent Name",
     "category": "Category",
     "pricePerCall": "Price per call (USDC)",
     "apiEndpoint": "API Endpoint",
     "description": "Description",
-    "saveChanges": "Save Changes \u2192",
-    "saving": "Saving\u2026",
+    "saveChanges": "Save Changes →",
+    "saving": "Saving…",
     "updated": "Agent Updated!",
-    "redirecting": "Redirecting to dashboard\u2026",
+    "redirecting": "Redirecting to dashboard…",
     "cancel": "Cancel",
     "errorUpdate": "Failed to update agent",
-    "errorNetwork": "Network error \u2014 please try again"
+    "errorNetwork": "Network error — please try again"
   },
   "payToCall": {
     "connectWallet": "Connect Wallet to Call",
     "connecting": "Connecting wallet...",
     "signing": "Sign payment (no gas)...",
     "calling": "Calling agent...",
-    "done": "\u2713 Done \u2014 call again",
+    "done": "✓ Done — call again",
     "retry": "Retry",
     "inputPlaceholder": "Enter your input for the agent...",
     "result": "Result",
-    "gaslessNote": "Signs an EIP-712 message \u2014 no AVAX needed for gas \u26a1",
+    "gaslessNote": "Signs an EIP-712 message — no AVAX needed for gas ⚡",
     "errorInsufficientBalance": "Not enough USDC on Avalanche. Add funds and try again.",
     "errorCancelled": "Payment cancelled.",
     "errorChain": "Switch your wallet to Avalanche C-Chain.",
@@ -525,22 +526,22 @@
     "description": "Let users try your agent for free before requiring funds.",
     "limitLabel": "Free invocations per user",
     "limitHint": "Users can try your agent up to {limit} {times} without a funded API key. (min 1, max 10)",
-    "activated": "Free trial activated \u2713",
+    "activated": "Free trial activated ✓",
     "deactivated": "Free trial deactivated",
     "errorSaving": "Error saving. Try again.",
     "timeSingular": "time",
     "timePlural": "times"
   },
   "modelDetail": {
-    "backToMarketplace": "\u2190 Back to marketplace",
+    "backToMarketplace": "← Back to marketplace",
     "capabilitiesSchema": "Capabilities & Schema",
     "noCapabilities": "No capabilities defined.",
     "featured": "Featured",
     "creator": "Creator",
-    "getAgentKey": "Get Agent Key \u2192",
-    "modelSpecJson": "Model Spec (JSON) \u2197",
-    "optionA": "Option A \u2014 Agent Key (budget-based)",
-    "optionB": "Option B \u2014 x402 Direct Payment (Avalanche USDC)"
+    "getAgentKey": "Get Agent Key →",
+    "modelSpecJson": "Model Spec (JSON) ↗",
+    "optionA": "Option A — Agent Key (budget-based)",
+    "optionB": "Option B — x402 Direct Payment (Avalanche USDC)"
   },
   "wallet": {
     "connectWallet": "Connect Wallet",
@@ -592,7 +593,7 @@
     "latencyP95": "Latency p95",
     "latencyAvg": "Avg latency",
     "errorRate": "Error rate",
-    "noData": "\u2014",
+    "noData": "—",
     "insufficientData": "Insufficient data",
     "basedOn": "Based on {n} calls",
     "approx": "(approx)"
@@ -654,7 +655,7 @@
     "subtitle": "Funds for agentic services",
     "noKey": "You don't have an active Agent Key. Create one so your agents can invoke other agents' services.",
     "available": "Available to pay for services",
-    "manage": "Manage / Deposit more \u2192"
+    "manage": "Manage / Deposit more →"
   },
   "webhooks": {
     "title": "Webhooks",
@@ -686,7 +687,7 @@
     "member_since": "Since {year}",
     "no_agents": "This creator hasn't published any agents yet.",
     "not_found": "Creator not found.",
-    "back_to_marketplace": "\u2190 Back to marketplace",
+    "back_to_marketplace": "← Back to marketplace",
     "publishedAgents": "Published agents",
     "noAgents": "This creator hasn't published any agents yet."
   },
@@ -759,7 +760,7 @@
     "colSteps": "Steps",
     "loading": "Loading history...",
     "stepAgent": "Agent",
-    "stepInputPlaceholder": "Input text for this step\u2026",
+    "stepInputPlaceholder": "Input text for this step…",
     "stepInputRequired": "This step needs an input, or enable \"Use output from previous step\".",
     "stepValidation": "Step {n}: write an input or enable \"Use output from previous step\".",
     "stepChained": "chained",
@@ -768,8 +769,8 @@
     "stepUseOutput": "Use output from previous step",
     "stepUseParallel": "Run in parallel with previous step",
     "runBtn": "Run pipeline",
-    "chainedNote": "Chained \u2014 the output of the previous step is passed as input automatically.",
-    "parallelNote": "Parallel \u2014 consecutive steps marked this way run at the same time."
+    "chainedNote": "Chained — the output of the previous step is passed as input automatically.",
+    "parallelNote": "Parallel — consecutive steps marked this way run at the same time."
   },
   "sandbox": {
     "title": "Sandbox",
@@ -794,14 +795,14 @@
     "network": "Fuji Testnet",
     "noWallet": "This agent doesn't have its own wallet. Initialize one to enable autonomous payments in the future.",
     "earningsAddress": "Earnings address",
-    "viewExplorer": "View on explorer \u2197",
+    "viewExplorer": "View on explorer ↗",
     "agentKeyNote": "To let your agent invoke other WasiAI agents, deposit USDC into your Agent Key. Without funds, your agent can't pay for other agents' services.",
-    "depositCta": "Deposit to Agent Key \u2192",
+    "depositCta": "Deposit to Agent Key →",
     "agentPayTitle": "Does your agent need to pay for other services?",
     "initWallet": "Initialize wallet",
-    "initializing": "Initializing\u2026",
+    "initializing": "Initializing…",
     "copyAddress": "Copy address",
-    "copied": "\u2713 Copied"
+    "copied": "✓ Copied"
   },
   "earnings": {
     "available": "USDC available",
