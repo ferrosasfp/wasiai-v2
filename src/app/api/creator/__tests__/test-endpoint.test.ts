@@ -26,7 +26,8 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/security/validateEndpointUrl', () => ({
-  validateEndpointUrl: mocks.validateEndpointUrl,
+  validateEndpointUrl:      mocks.validateEndpointUrl,
+  validateEndpointUrlAsync: mocks.validateEndpointUrl, // mismo mock — test solo verifica sincrónico
 }))
 
 vi.mock('@/lib/ratelimit', () => ({

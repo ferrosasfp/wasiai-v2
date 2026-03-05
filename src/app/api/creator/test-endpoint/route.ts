@@ -8,7 +8,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { checkRateLimit, getIdentifier } from '@/lib/ratelimit'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
@@ -51,9 +51,9 @@ export async function POST(req: NextRequest) {
 
   const { endpoint_url, auth_header } = result.data
 
-  // SSRF protection
+  // SSRF protection + NG-005 DNS probe
   try {
-    validateEndpointUrl(endpoint_url)
+    await validateEndpointUrlAsync(endpoint_url)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 400 })
   }

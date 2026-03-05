@@ -62,6 +62,35 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
   }
 
+  // NG-007: Sybil protection — require at least 1 successful invocation before voting
+  // Check via x-agent-key header (most reliable: key had to spend budget to invoke)
+  const agentKeyHeader = request.headers.get('x-agent-key')
+  if (agentKeyHeader) {
+    const keyHash = createHash('sha256').update(agentKeyHeader).digest('hex')
+    const { data: keyRow } = await supabase
+      .from('agent_keys')
+      .select('id')
+      .eq('key_hash', keyHash)
+      .eq('is_active', true)
+      .single()
+
+    if (keyRow) {
+      const { count } = await supabase
+        .from('agent_calls')
+        .select('id', { count: 'exact', head: true })
+        .eq('agent_id', agent.id)
+        .eq('key_id', keyRow.id)
+        .eq('status', 'success')
+
+      if (!count || count === 0) {
+        return NextResponse.json(
+          { error: 'You must invoke this agent at least once before rating it', code: 'no_invocation' },
+          { status: 403 }
+        )
+      }
+    }
+  }
+
   // Determine voter_id — wallet address if provided, else hashed IP
   const rawId = wallet?.toLowerCase().trim() ?? getIdentifier(request)
   const voterId = createHash('sha256').update(rawId).digest('hex').slice(0, 32)

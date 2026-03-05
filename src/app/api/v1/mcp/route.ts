@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { mcpRequestSchema } from '@/lib/schemas/api.schemas'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { logger } from '@/lib/logger'
 import { getInvokeLimit, checkRateLimit } from '@/lib/ratelimit'
 
@@ -41,9 +41,9 @@ async function callUpstreamMcp(
   input: string,
   options?: Record<string, unknown>,
 ): Promise<{ data: unknown; status: 'success' | 'error'; latencyMs: number }> {
-  // SEC-01: validate endpoint to prevent SSRF
+  // SEC-01 + NG-005: validate endpoint to prevent SSRF (async version includes DNS probe)
   try {
-    validateEndpointUrl(endpointUrl)
+    await validateEndpointUrlAsync(endpointUrl)
   } catch (err) {
     return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error', latencyMs: 0 }
   }
@@ -240,7 +240,8 @@ export async function POST(request: NextRequest) {
     // 6. Deduct budget + log call (fire-and-forget safe — non-critical path)
     if (result.status === 'success') {
       await Promise.all([
-        supabase.rpc('increment_agent_key_spend', {
+        // NG-008: Atomic check+deduct — reemplaza increment_agent_key_spend
+        supabase.rpc('check_and_deduct_budget', {
           p_key_id: keyRow.id,
           p_amount: model.price_per_call,
         }),

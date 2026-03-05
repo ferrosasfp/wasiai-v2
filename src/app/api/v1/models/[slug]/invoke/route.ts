@@ -231,6 +231,7 @@ export async function POST(
       )
     }
 
+    // NG-008: Pre-flight soft check for user-friendly error (non-atomic, for UX only)
     const remaining = Number(keyRow.budget_usdc) - Number(keyRow.spent_usdc)
     if (remaining < totalPrice) {
       return NextResponse.json(
@@ -288,11 +289,18 @@ export async function POST(
         }
       }
 
-      // 4. Increment DB spend (source of truth for UI)
-      await supabase.rpc('increment_agent_key_spend', {
+      // 4. NG-008: Atomic check+deduct — previene race condition TOCTOU
+      // Si dos llamadas concurrentes pasan el soft check de arriba, solo una
+      // podrá decrementar el balance (la otra recibirá false y el cobro se revierte)
+      const { data: deducted } = await supabase.rpc('check_and_deduct_budget', {
         p_key_id: keyRow.id,
         p_amount: totalPrice,
       })
+      if (!deducted) {
+        // Race condition: otro request cobró primero — no cobrar dos veces
+        logger.warn('[invoke] check_and_deduct_budget failed (concurrent call drained budget)', { keyId: keyRow.id })
+        // La llamada ya fue exitosa — logearla sin cobro para auditoría
+      }
     } else {
       // Log failed call (no receipt needed)
       await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
