@@ -13,12 +13,6 @@ export async function GET(_req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'operator' && profile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  // Leer de creator_pending_earnings (view DB)
   const { data: creators } = await supabase
     .from('creator_pending_earnings')
     .select('creator_id, username, wallet_address, total_calls, total_earned, creator_share')
@@ -26,7 +20,6 @@ export async function GET(_req: NextRequest) {
 
   if (!creators?.length) return NextResponse.json([])
 
-  // Leer earnings on-chain para cada creator con wallet
   const rpcUrl = process.env.FUJI_RPC_URL ?? 'https://api.avax-test.network/ext/bc/C/rpc'
   const client = createPublicClient({ chain: avalancheFuji, transport: http(rpcUrl) })
 
