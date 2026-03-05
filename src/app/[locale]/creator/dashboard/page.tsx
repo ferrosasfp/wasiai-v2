@@ -185,7 +185,7 @@ export default async function CreatorDashboardPage({
                     <tr className="hover:bg-gray-50/50 transition">
                       <td className="px-6 py-4">
                         <Link
-                          href={`/models/${model.slug}`}
+                          href={`/${locale}/models/${model.slug}`}
                           className="font-medium text-gray-900 hover:text-avax-600"
                         >
                           {model.name}
