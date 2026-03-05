@@ -49,3 +49,6 @@
 | 044 | 2026-03-05 | WAS-153 | Curated Collections — tables, pages, featured landing, navbar | feature | QUALITY | DONE | master |
 | 045 | 2026-03-05 | WAS-154 | Creator CLI — wasiai discover + publish + stats | feature | QUALITY | DONE | master |
 | 046 | 2026-03-05 | WAS-157 | Admin Collections CRUD — API + UI + agent manager | feature | QUALITY | DONE | master |
+| 047 | 2026-03-05 | WAS-160 | EPIC: Dual Registration Off-chain + On-chain (ERC-8004) con Upgrade Path | EPIC | QUALITY | DONE | master |
+| 048 | 2026-03-05 | WAS-161 | Sync precio on-chain al editar agente (creator paga gas, active removido) | feature | QUALITY | DONE | master |
+| 049 | 2026-03-05 | WAS-162 | Transparency Dashboard — on-chain economics en footer + /transparency | feature | QUALITY | DONE | master |
