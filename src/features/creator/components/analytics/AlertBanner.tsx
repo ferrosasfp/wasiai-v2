@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface Alert {
   type: string
@@ -13,7 +14,19 @@ interface Props {
   alerts: Alert[]
 }
 
+function resolveAlertMessage(message: string, t: ReturnType<typeof useTranslations<'analytics'>>) {
+  // Backend encodes as "i18n.key:agentName"
+  if (message.startsWith('analytics.alertHighError:')) {
+    return t('alertHighError', { name: message.split(':')[1] })
+  }
+  if (message.startsWith('analytics.alertNoActivity:')) {
+    return t('alertNoActivity', { name: message.split(':')[1] })
+  }
+  return message
+}
+
 export function AlertBanner({ alerts }: Props) {
+  const t = useTranslations('analytics')
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
 
   const visible = alerts.filter(a => !dismissed.has(`${a.type}:${a.agentId}`))
@@ -38,7 +51,7 @@ export function AlertBanner({ alerts }: Props) {
             <span className="shrink-0 text-base">
               {alert.type === 'high_error_rate' ? '⚠️' : '💤'}
             </span>
-            <p>{alert.message}</p>
+            <p>{resolveAlertMessage(alert.message, t)}</p>
           </div>
           <button
             onClick={() => dismiss(alert)}

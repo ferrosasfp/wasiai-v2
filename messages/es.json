@@ -231,7 +231,10 @@
     "draftContinue": "Continuar borrador",
     "draftDiscard": "Descartar",
     "draftQuestion": "\u00bfQuieres continuar donde lo dejaste?",
-    "walletRequired": "Configura tu wallet antes de publicar este agente."
+    "walletRequired": "Configura tu wallet antes de publicar este agente.",
+    "step1NamePlaceholder": "Ej: Traductor Espa\u00f1ol GPT",
+    "step1DescPlaceholder": "Describe qu\u00e9 hace tu agente\u2026",
+    "step3AuthNote": "Se env\u00eda como cabecera Authorization en cada llamada a tu API"
   },
   "dashboard": {
     "title": "Panel del Creator",
@@ -304,18 +307,9 @@
     "success_cta": "\u00bfTe gust\u00f3? \u00dasalo sin l\u00edmites con una API key."
   },
   "analytics": {
-    "title": "Anal\u00edtica",
-    "calls_24h": "Llamadas (24h)",
-    "total_calls": "Total de llamadas",
-    "avg_latency": "Latencia promedio",
-    "uptime": "Uptime (24h)",
-    "earnings": "Ganancias",
-    "chart_title": "Llamadas por d\u00eda",
-    "alert_error_rate": "Alta tasa de error en {agent}. Revisa tu endpoint.",
-    "alert_no_activity": "{agent} sin actividad en 7 d\u00edas. \u00bfEst\u00e1 activo?",
-    "empty_state": "A\u00fan no hay llamadas. Comparte tu agente o int\u00e9gralo via API.",
-    "all_agents": "Todos los agentes",
-    "errorLoading": "Error cargando analytics. Intenta recargar la p\u00e1gina."
+    "callsChartTitle": "Llamadas por d\u00eda (\u00faltimos 30 d\u00edas)",
+    "alertHighError": "Tu agente \"{name}\" tiene alta tasa de error. Revisa tu endpoint.",
+    "alertNoActivity": "\"{name}\" sin actividad en 7 d\u00edas. \u00bfTu agente est\u00e1 activo?"
   },
   "creator_profile": {
     "agents_count": "{count} agentes",
@@ -734,11 +728,19 @@
     "configure": "Configurar pipeline",
     "noActiveAgents": "No hay agentes activos disponibles. Publica un agente primero.",
     "enterApiKey": "Ingresa tu API key para ejecutar el pipeline.",
-    "maxSteps": "Maximo {n} steps"
+    "maxSteps": "Maximo {n} steps",
+    "history": "Historial de ejecuciones",
+    "historyLogin": "Inicia sesi\u00f3n para ver el historial de ejecuciones.",
+    "historyEmpty": "No hay ejecuciones previas.",
+    "colStatus": "Estado",
+    "colStart": "Inicio",
+    "colDuration": "Duraci\u00f3n",
+    "colSteps": "Pasos",
+    "loading": "Cargando historial..."
   },
   "sandbox": {
     "title": "Sandbox",
-    "subtitle": "Prueba agentes con tus propios inputs antes de integrarlos.",
+    "subtitle": "Prueba agentes gratis con tus cr\u00e9ditos iniciales. Sin tarjeta.",
     "inputLabel": "Entrada",
     "inputPlaceholder": "Escribe tu mensaje...",
     "run": "Ejecutar",
@@ -761,7 +763,8 @@
     "earningsAddress": "Direccion de earnings",
     "viewExplorer": "Ver en explorer \u2197",
     "agentKeyNote": "Para que tu agente pueda invocar otros agentes en WasiAI, deposita USDC en tu Agent Key. Sin fondos, tu agente no puede comprar servicios de otros agentes.",
-    "depositCta": "Depositar en Agent Key \u2192"
+    "depositCta": "Depositar en Agent Key \u2192",
+    "agentPayTitle": "\u00bfTu agente necesita pagar otros servicios?"
   },
   "earnings": {
     "available": "USDC disponible",

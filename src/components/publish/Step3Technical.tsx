@@ -170,7 +170,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
           className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
         />
         <p className="mt-1 text-xs text-gray-400">
-          Se envía como cabecera <code>Authorization</code> en cada llamada a tu API
+          {t('step3AuthNote')} <code>Authorization</code>
         </p>
       </div>
 

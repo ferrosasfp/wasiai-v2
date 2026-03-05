@@ -231,7 +231,10 @@
     "draftContinue": "Continue draft",
     "draftDiscard": "Discard",
     "draftQuestion": "Do you want to continue where you left off?",
-    "walletRequired": "Set up your wallet before publishing this agent."
+    "walletRequired": "Set up your wallet before publishing this agent.",
+    "step1NamePlaceholder": "e.g. DeFi Sentiment Analyzer",
+    "step1DescPlaceholder": "Describe what your agent does\u2026",
+    "step3AuthNote": "Sent as Authorization header on every call to your API"
   },
   "dashboard": {
     "title": "Creator Dashboard",
@@ -304,18 +307,9 @@
     "success_cta": "Liked it? Use it without limits with an API key."
   },
   "analytics": {
-    "title": "Analytics",
-    "calls_24h": "Calls (24h)",
-    "total_calls": "Total calls",
-    "avg_latency": "Avg latency",
-    "uptime": "Uptime (24h)",
-    "earnings": "Earnings",
-    "chart_title": "Calls per day",
-    "alert_error_rate": "High error rate on {agent}. Check your endpoint.",
-    "alert_no_activity": "{agent} with no activity in 7 days. Is it active?",
-    "empty_state": "No calls yet. Share your agent or integrate it via API.",
-    "all_agents": "All agents",
-    "errorLoading": "Error loading analytics. Try reloading the page."
+    "callsChartTitle": "Calls per day (last 30 days)",
+    "alertHighError": "Your agent \"{name}\" has a high error rate. Check your endpoint.",
+    "alertNoActivity": "\"{name}\" has had no activity in 7 days. Is your agent active?"
   },
   "creator_profile": {
     "agents_count": "{count} agents",
@@ -734,11 +728,19 @@
     "configure": "Configure pipeline",
     "noActiveAgents": "No active agents available. Publish an agent first.",
     "enterApiKey": "Enter your API key to run the pipeline.",
-    "maxSteps": "Maximum {n} steps"
+    "maxSteps": "Maximum {n} steps",
+    "history": "Execution history",
+    "historyLogin": "Sign in to view execution history.",
+    "historyEmpty": "No previous executions.",
+    "colStatus": "Status",
+    "colStart": "Start",
+    "colDuration": "Duration",
+    "colSteps": "Steps",
+    "loading": "Loading history..."
   },
   "sandbox": {
     "title": "Sandbox",
-    "subtitle": "Test agents with your own inputs before integrating.",
+    "subtitle": "Test agents for free with your initial credits. No card required.",
     "inputLabel": "Input",
     "inputPlaceholder": "Enter your message...",
     "run": "Run",
@@ -761,7 +763,8 @@
     "earningsAddress": "Earnings address",
     "viewExplorer": "View on explorer \u2197",
     "agentKeyNote": "To let your agent invoke other WasiAI agents, deposit USDC into your Agent Key. Without funds, your agent can't pay for other agents' services.",
-    "depositCta": "Deposit to Agent Key \u2192"
+    "depositCta": "Deposit to Agent Key \u2192",
+    "agentPayTitle": "Does your agent need to pay for other services?"
   },
   "earnings": {
     "available": "USDC available",

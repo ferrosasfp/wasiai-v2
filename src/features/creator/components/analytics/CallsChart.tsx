@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface DayData {
   date: string
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function CallsChart({ series }: Props) {
+  const t = useTranslations('analytics')
   const [tooltip, setTooltip] = useState<{ date: string; calls: number } | null>(null)
   const maxCalls = Math.max(...series.map(d => d.calls), 1)
   const allZero = series.every(d => d.calls === 0)
@@ -19,7 +21,7 @@ export function CallsChart({ series }: Props) {
   if (allZero) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="mb-3 text-sm font-semibold text-gray-700">Llamadas por día (últimos 30 días)</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-700">{t('callsChartTitle')}</h3>
         <div className="flex h-24 items-center justify-center text-sm text-gray-400">
           Sin llamadas todavía. Comparte tu agente para empezar.
         </div>
@@ -29,7 +31,7 @@ export function CallsChart({ series }: Props) {
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">Llamadas por día (últimos 30 días)</h3>
+      <h3 className="mb-4 text-sm font-semibold text-gray-700">{t('callsChartTitle')}</h3>
       <div className="relative">
         {/* Tooltip */}
         {tooltip && (
