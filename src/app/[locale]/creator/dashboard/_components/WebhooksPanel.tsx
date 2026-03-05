@@ -137,7 +137,7 @@ export function WebhooksPanel() {
           onClick={() => { setShowForm(s => !s); setError(null) }}
           className="rounded-xl bg-avax-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-avax-600 transition"
         >
-          {showForm ? 'Cancelar' : '+ Nuevo webhook'}
+          {showForm ? t('cancelWebhook') : t('newWebhook')}
         </button>
       </div>
 

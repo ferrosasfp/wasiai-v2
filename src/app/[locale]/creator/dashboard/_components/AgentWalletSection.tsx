@@ -104,7 +104,7 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
             disabled={initializing}
             className="self-start rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
-            {initializing ? 'Inicializando…' : 'Inicializar wallet'}
+            {initializing ? t('initializing') : t('initWallet')}
           </button>
         </div>
       ) : (
@@ -129,7 +129,7 @@ export function AgentWalletSection({ agentSlug, agentName, locale = 'es' }: Agen
                 onClick={copyAddress}
                 className="text-xs text-avax-600 hover:text-avax-800 font-medium"
               >
-                {copied ? '✓ Copiado' : 'Copiar dirección'}
+                {copied ? t('copied') : t('copyAddress')}
               </button>
               {fujiExplorer && (
                 <a

@@ -320,7 +320,8 @@
     "total_calls": "Total llamadas",
     "avg_latency": "Latencia promedio",
     "uptime": "Uptime (24h)",
-    "earnings": "Ganancias"
+    "earnings": "Ganancias",
+    "noCallsYet": "Sin llamadas todav\u00eda. Comparte tu agente para empezar."
   },
   "creator_profile": {
     "agents_count": "{count} agentes",
@@ -668,7 +669,9 @@
     "saveBtn": "Guardar",
     "editBtn": "Editar",
     "deleteBtn": "Eliminar",
-    "endpoint": "Endpoint"
+    "endpoint": "Endpoint",
+    "newWebhook": "+ Nuevo webhook",
+    "cancelWebhook": "Cancelar"
   },
   "creatorProfile": {
     "agents_count": "{count} agentes",
@@ -787,7 +790,11 @@
     "viewExplorer": "Ver en explorer \u2197",
     "agentKeyNote": "Para que tu agente pueda invocar otros agentes en WasiAI, deposita USDC en tu Agent Key. Sin fondos, tu agente no puede comprar servicios de otros agentes.",
     "depositCta": "Depositar en Agent Key \u2192",
-    "agentPayTitle": "\u00bfTu agente necesita pagar otros servicios?"
+    "agentPayTitle": "\u00bfTu agente necesita pagar otros servicios?",
+    "initWallet": "Inicializar wallet",
+    "initializing": "Inicializando\u2026",
+    "copyAddress": "Copiar direcci\u00f3n",
+    "copied": "\u2713 Copiado"
   },
   "earnings": {
     "available": "USDC disponible",

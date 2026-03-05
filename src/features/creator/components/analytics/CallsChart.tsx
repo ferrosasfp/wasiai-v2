@@ -23,7 +23,7 @@ export function CallsChart({ series }: Props) {
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <h3 className="mb-3 text-sm font-semibold text-gray-700">{t('callsChartTitle')}</h3>
         <div className="flex h-24 items-center justify-center text-sm text-gray-400">
-          Sin llamadas todavía. Comparte tu agente para empezar.
+          {t('noCallsYet')}
         </div>
       </div>
     )
