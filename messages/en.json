@@ -75,7 +75,8 @@
     "freeToTry": "Free to Try",
     "trending": "Trending This Week",
     "topRated": "Top Rated",
-    "justLaunched": "Just Launched"
+    "justLaunched": "Just Launched",
+    "featuredCollections": "Featured Collections"
   },
   "auth": {
     "login": "Sign In",
@@ -405,7 +406,8 @@
     "storage": "Storage",
     "login": "Sign In",
     "signup": "Create Account",
-    "signout": "Sign Out"
+    "signout": "Sign Out",
+    "collections": "Collections"
   },
   "agentKeys": {
     "title": "Agent Keys",
@@ -821,5 +823,14 @@
     "type": "Type",
     "description": "Description",
     "exampleResponse": "Example Response"
+  },
+  "collections": {
+    "title": "Collections",
+    "subtitle": "Curated groups of agents for every use case",
+    "viewAll": "View All",
+    "agents": "{count} agents",
+    "featured": "Featured",
+    "empty": "No collections yet",
+    "backToCollections": "Back to Collections"
   }
 }

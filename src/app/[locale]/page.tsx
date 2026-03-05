@@ -9,6 +9,7 @@ export const revalidate = 300
 import { getModels } from '@/features/models/services/models.service'
 import { createClient } from '@/lib/supabase/server'
 import { ModelCard } from '@/features/models/components/ModelCard'
+import { CollectionCard } from '@/features/collections/components/CollectionCard'
 import { ReputationBadge } from '@/features/models/components/ReputationBadge'
 import { FilterPanel } from '@/features/models/components/FilterPanel'
 import { EmptySearchState } from '@/features/models/components/EmptySearchState'
@@ -36,6 +37,7 @@ export default async function HomePage({ params, searchParams }: Props) {
   const t  = await getTranslations('home')
   const tc = await getTranslations('common')
   const tEmptySearch = await getTranslations('emptySearch')
+  const tCollections = await getTranslations('collections')
 
   const page   = Math.max(1, parseInt(pageStr ?? '1', 10))
   const offset = (page - 1) * PAGE_SIZE
@@ -83,6 +85,13 @@ export default async function HomePage({ params, searchParams }: Props) {
           .then(r => r.data ?? []),
       ])
     : [[], [], [], []]
+
+  // CM-03: Featured collections
+  const featuredCollections = isFirstPage && supabase
+    ? await supabase.from('collections').select('*, collection_agents(agent_id)')
+        .eq('featured', true).order('sort_order').limit(4)
+        .then(r => r.data ?? [])
+    : []
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const hasNext    = page < totalPages
@@ -262,6 +271,32 @@ export default async function HomePage({ params, searchParams }: Props) {
           )}
         </div>
       </section>
+
+      {/* ── Featured Collections (CM-03) ──────────────────────────────── */}
+      {isFirstPage && featuredCollections.length > 0 && (
+        <section className="px-6 py-8 bg-gray-50 border-t border-gray-100">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-gray-900">{t('featuredCollections')}</h3>
+              <a href={`/${locale}/collections`} className="text-sm text-avax-600 hover:underline">
+                {tCollections('viewAll')} →
+              </a>
+            </div>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {featuredCollections.map((c: Record<string, unknown>) => (
+                <CollectionCard
+                  key={c.id as string}
+                  collection={{
+                    ...(c as { id: string; slug: string; name: string; description: string | null; cover_image: string | null; featured: boolean }),
+                    agent_count: Array.isArray(c.collection_agents) ? (c.collection_agents as unknown[]).length : 0,
+                  }}
+                  locale={locale}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Curated sections (CM-01/02) ────────────────────────────────── */}
       {isFirstPage && (freeTrialAgents.length > 0 || trendingAgents.length > 0 || topRatedAgents.length > 0 || newAgents.length > 0) && (

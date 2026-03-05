@@ -75,7 +75,8 @@
     "freeToTry": "Prueba gratis",
     "trending": "Tendencia esta semana",
     "topRated": "Mejor valorados",
-    "justLaunched": "Recién lanzados"
+    "justLaunched": "Recién lanzados",
+    "featuredCollections": "Colecciones Destacadas"
   },
   "auth": {
     "login": "Iniciar Sesión",
@@ -405,7 +406,8 @@
     "storage": "Almacenamiento",
     "login": "Iniciar Sesión",
     "signup": "Crear Cuenta",
-    "signout": "Cerrar Sesión"
+    "signout": "Cerrar Sesión",
+    "collections": "Colecciones"
   },
   "agentKeys": {
     "title": "Claves de Agente",
@@ -821,5 +823,14 @@
     "type": "Tipo",
     "description": "Descripcion",
     "exampleResponse": "Ejemplo de respuesta"
+  },
+  "collections": {
+    "title": "Colecciones",
+    "subtitle": "Grupos curados de agentes para cada caso de uso",
+    "viewAll": "Ver Todas",
+    "agents": "{count} agentes",
+    "featured": "Destacada",
+    "empty": "Aún no hay colecciones",
+    "backToCollections": "Volver a Colecciones"
   }
 }

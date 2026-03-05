@@ -89,7 +89,8 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   const isLoggedIn = !!userEmail
 
   const primaryLinks = [
-    { path: '',         label: tNav('marketplace') },
+    { path: '',              label: tNav('marketplace') },
+    { path: '/collections',  label: tNav('collections') },
   ]
 
   const secondaryLinks = [
