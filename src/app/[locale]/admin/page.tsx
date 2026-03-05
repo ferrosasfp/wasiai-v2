@@ -258,21 +258,31 @@ export default function AdminPage() {
         const refundData   = refundSelector    + keyId.slice(2).padStart(64, '0')
         const withdrawData = withdrawForSelector + owner.slice(2).padStart(64, '0')
 
-        // Intentar refund — si ya está en 0 lo saltamos
-        setDrainMsg(`Procesando refundKeyToEarnings…`)
-        try {
+        // Solo refund si la key aún tiene balance on-chain
+        const keyBalSelector  = '0xdad1df98' // keyBalances(bytes32)
+        const keyBalCalldata  = keyBalSelector + keyId.slice(2).padStart(64, '0')
+        const keyBalHex = await win.ethereum.request({ method: 'eth_call', params: [{ to: MARKETPLACE, data: keyBalCalldata }, 'latest'] }) as string
+        const keyBal = BigInt(keyBalHex)
+
+        if (keyBal > 0n) {
+          setDrainMsg(`Procesando refundKeyToEarnings (${Number(keyBal)/1e6} USDC)…`)
           const txRefund = await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: refundData }] }) as string
           setDrainMsg(`Refund enviado, esperando confirmación…`)
           await waitReceipt(txRefund)
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : (e && typeof e === 'object' && 'message' in e) ? String((e as {message:unknown}).message) : String(e)
-          if (!msg.includes('nothing to refund') && !msg.includes('User rejected')) throw e
         }
 
-        setDrainMsg(`Retirando earnings a owner…`)
-        const txWithdraw = await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: withdrawData }] }) as string
-        setDrainMsg(`WithdrawFor enviado, esperando confirmación…`)
-        await waitReceipt(txWithdraw)
+        // Solo withdrawFor si el owner tiene earnings
+        const earningsSelector = '0x543fd313' // earnings(address)
+        const earningsCalldata = earningsSelector + owner.slice(2).padStart(64, '0')
+        const earningsHex = await win.ethereum.request({ method: 'eth_call', params: [{ to: MARKETPLACE, data: earningsCalldata }, 'latest'] }) as string
+        const earnings = BigInt(earningsHex)
+
+        if (earnings > 0n) {
+          setDrainMsg(`Retirando ${Number(earnings)/1e6} USDC a owner…`)
+          const txWithdraw = await win.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: MARKETPLACE, data: withdrawData }] }) as string
+          setDrainMsg(`WithdrawFor enviado, esperando confirmación…`)
+          await waitReceipt(txWithdraw)
+        }
       }
 
       setDrainMsg('✅ Contrato limpio — recarga el dashboard')
