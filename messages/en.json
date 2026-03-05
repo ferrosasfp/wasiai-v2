@@ -739,7 +739,19 @@
     "colStart": "Start",
     "colDuration": "Duration",
     "colSteps": "Steps",
-    "loading": "Loading history..."
+    "loading": "Loading history...",
+    "stepAgent": "Agent",
+    "stepInputPlaceholder": "Input text for this step\u2026",
+    "stepInputRequired": "This step needs an input, or enable \"Use output from previous step\".",
+    "stepValidation": "Step {n}: write an input or enable \"Use output from previous step\".",
+    "stepChained": "chained",
+    "stepParallel": "parallel",
+    "stepRemove": "Remove step",
+    "stepUseOutput": "Use output from previous step",
+    "stepUseParallel": "Run in parallel with previous step",
+    "runBtn": "Run pipeline",
+    "chainedNote": "Chained \u2014 the output of the previous step is passed as input automatically.",
+    "parallelNote": "Parallel \u2014 consecutive steps marked this way run at the same time."
   },
   "sandbox": {
     "title": "Sandbox",

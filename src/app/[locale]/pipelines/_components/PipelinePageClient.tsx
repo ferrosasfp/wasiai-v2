@@ -157,7 +157,7 @@ export function PipelinePageClient({ availableAgents, userId }: PipelinePageClie
       )}
       {!userId && (
         <p className="text-sm text-gray-400 text-center">
-          Inicia sesión para ver el historial de ejecuciones.
+          {t('historyLogin')}
         </p>
       )}
     </div>

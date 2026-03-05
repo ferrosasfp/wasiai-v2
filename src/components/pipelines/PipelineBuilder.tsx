@@ -39,12 +39,11 @@ const API_KEY_STORAGE_KEY = 'wasi_pipeline_api_key'
 const MAX_STEPS = 5
 
 // ── Validación client-side ────────────────────────────────────────────────────
-function validateStepsClient(steps: LocalStep[]): string | null {
+function validateStepsClient(steps: LocalStep[], tFn: (k: string, v?: Record<string, string | number | Date>) => string): string | null {
   for (let i = 0; i < steps.length; i++) {
-    if (!steps[i].agent_slug) return `Step ${i + 1}: selecciona un agente.`
-    // Step sin pass_output debe tener input no vacío
+    if (!steps[i].agent_slug) return `Step ${i + 1}: select an agent.`
     if (!steps[i].pass_output && !steps[i].input?.trim()) {
-      return `Step ${i + 1}: escribe un input o activa "Usar output del step anterior".`
+      return tFn('stepValidation', { n: i + 1 })
     }
   }
   return null
@@ -118,7 +117,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
   }
 
   function handleRun() {
-    const err = validateStepsClient(steps)
+    const err = validateStepsClient(steps, t)
     if (err) {
       setValidationError(err)
       return
@@ -184,12 +183,12 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
                   <span className="text-sm font-semibold text-gray-700">Step {index + 1}</span>
                   {step.pass_output && index > 0 && (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 font-medium">
-                      encadenado
+                      {t('stepChained')}
                     </span>
                   )}
                   {step.parallel && (
                     <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700 font-medium">
-                      paralelo
+                      {t('stepParallel')}
                     </span>
                   )}
                 </div>
@@ -197,7 +196,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
                   <button
                     onClick={() => removeStep(index)}
                     className="text-gray-400 hover:text-red-500 transition"
-                    title="Eliminar step"
+                    title={t('stepRemove')}
                   >
                     <Trash2 size={15} />
                   </button>
@@ -206,7 +205,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
 
               {/* Selector de agente */}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Agente</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('stepAgent')}</label>
                 <select
                   value={step.agent_slug}
                   onChange={e => updateStep(index, { agent_slug: e.target.value })}
@@ -230,7 +229,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
                       onChange={e => updateStep(index, { pass_output: e.target.checked, input: '' })}
                       className="rounded accent-avax-500"
                     />
-                    Usar output del step anterior
+                    {t('stepUseOutput')}
                   </label>
                   <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
                     <input
@@ -239,7 +238,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
                       onChange={e => updateStep(index, { parallel: e.target.checked })}
                       className="rounded accent-avax-500"
                     />
-                    Ejecutar en paralelo
+                    {t('stepUseParallel')}
                   </label>
                 </div>
               )}
@@ -257,11 +256,11 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
                     className={`w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-avax-400 ${
                       !step.input?.trim() ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
                     }`}
-                    placeholder="Texto de entrada para este step…"
+                    placeholder={t('stepInputPlaceholder')}
                   />
                   {!step.input?.trim() && (
                     <p className="mt-1 text-xs text-amber-600">
-                      Este step necesita un input, o activa &quot;Usar output del step anterior&quot;.
+                      {t('stepInputRequired')}
                     </p>
                   )}
                 </div>
@@ -314,7 +313,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
             {isRunning ? (
               <><Loader2 size={14} className="animate-spin" /> Ejecutando…</>
             ) : (
-              <><Play size={14} /> Ejecutar pipeline</>
+              <><Play size={14} /> {t('runBtn')}</>
             )}
           </button>
         </div>
@@ -323,8 +322,8 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
       {/* Leyenda rápida si hay más de 1 step */}
       {steps.length > 1 && (
         <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-700 space-y-1">
-          <p><strong>Encadenado</strong> — el output del step anterior se pasa como input automáticamente.</p>
-          <p><strong>Paralelo</strong> — steps consecutivos marcados así se ejecutan al mismo tiempo.</p>
+          <p>{t('chainedNote')}</p>
+          <p>{t('parallelNote')}</p>
         </div>
       )}
     </div>
