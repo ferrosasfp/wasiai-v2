@@ -934,17 +934,48 @@ contract WasiAIMarketplaceTest is Test {
 
     // Admin edge cases
 
-    function test_EdgeCase_SetTreasury_ZeroAddress_Reverts() public {
+    // NA-202: setTreasury reemplazado por proposeTreasury/executeTreasury (48h timelock)
+    function test_EdgeCase_ProposeTreasury_ZeroAddress_Reverts() public {
         vm.prank(owner);
-        vm.expectRevert("WasiAI: zero treasury");
-        marketplace.setTreasury(address(0));
+        vm.expectRevert("WasiAI: zero address");
+        marketplace.proposeTreasury(address(0));
     }
 
-    function test_EdgeCase_SetTreasury_Success() public {
+    function test_EdgeCase_ProposeTreasury_SameAddress_Reverts() public {
+        // treasury inicial = address(0x2) (definido en setUp)
+        address currentTreasury = marketplace.treasury();
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: same treasury");
+        marketplace.proposeTreasury(currentTreasury);
+    }
+
+    function test_EdgeCase_ExecuteTreasury_BeforeTimelock_Reverts() public {
         address newTreasury = address(0xBB);
         vm.prank(owner);
-        marketplace.setTreasury(newTreasury);
+        marketplace.proposeTreasury(newTreasury);
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: timelock active");
+        marketplace.executeTreasury();
+    }
+
+    function test_EdgeCase_ExecuteTreasury_AfterTimelock_Success() public {
+        address newTreasury = address(0xBB);
+        vm.prank(owner);
+        marketplace.proposeTreasury(newTreasury);
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(owner);
+        marketplace.executeTreasury();
         assertEq(marketplace.treasury(), newTreasury);
+        assertEq(marketplace.pendingTreasury(), address(0));
+    }
+
+    function test_EdgeCase_CancelTreasury_Success() public {
+        address newTreasury = address(0xBB);
+        vm.prank(owner);
+        marketplace.proposeTreasury(newTreasury);
+        vm.prank(owner);
+        marketplace.cancelTreasury();
+        assertEq(marketplace.pendingTreasury(), address(0));
     }
 
     function test_EdgeCase_SetOperator_ZeroAddress_Reverts() public {

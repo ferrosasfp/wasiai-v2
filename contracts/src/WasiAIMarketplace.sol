@@ -76,6 +76,11 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     uint256 public pendingFeeTimestamp;
     uint256 public constant FEE_TIMELOCK = 48 hours;
 
+    // NA-202: Treasury timelock — mismo patrón que fee
+    address public pendingTreasury;
+    uint256 public pendingTreasuryTimestamp;
+    uint256 public constant TREASURY_TIMELOCK = 48 hours;
+
     /// slug → Agent
     mapping(string  => Agent)   public agents;
     /// creator wallet → claimable USDC (atomic units)
@@ -142,6 +147,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     event FeeProposed(uint16 indexed newBps, uint256 executeAfter);
     event FeeCanceled(uint16 indexed canceledBps);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event TreasuryProposed(address indexed proposed, uint256 executeAfter);
+    event TreasuryCanceled(address indexed canceledProposal);
     event OperatorSet(address indexed operator, bool active);
     event AgentTransferred(string indexed agentId, address indexed oldCreator, address indexed newCreator);
 
@@ -615,11 +622,33 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         _unpause();
     }
 
-    function setTreasury(address _treasury) external onlyOwner {
-        require(_treasury != address(0), "WasiAI: zero treasury");
+    /// @notice NA-202: Propose treasury address change (48h timelock).
+    function proposeTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "WasiAI: zero address");
+        require(_treasury != treasury,   "WasiAI: same treasury");
+        pendingTreasury          = _treasury;
+        pendingTreasuryTimestamp = block.timestamp + TREASURY_TIMELOCK;
+        emit TreasuryProposed(_treasury, pendingTreasuryTimestamp);
+    }
+
+    /// @notice NA-202: Execute treasury change after timelock expires.
+    function executeTreasury() external onlyOwner {
+        require(pendingTreasury != address(0),            "WasiAI: no pending treasury");
+        require(block.timestamp >= pendingTreasuryTimestamp, "WasiAI: timelock active");
         address oldTreasury = treasury;
-        treasury = _treasury;
-        emit TreasuryUpdated(oldTreasury, _treasury);
+        treasury = pendingTreasury;
+        pendingTreasury          = address(0);
+        pendingTreasuryTimestamp = 0;
+        emit TreasuryUpdated(oldTreasury, treasury);
+    }
+
+    /// @notice NA-202: Cancel pending treasury proposal.
+    function cancelTreasury() external onlyOwner {
+        require(pendingTreasury != address(0), "WasiAI: no pending treasury");
+        address canceled = pendingTreasury;
+        pendingTreasury          = address(0);
+        pendingTreasuryTimestamp = 0;
+        emit TreasuryCanceled(canceled);
     }
 
     function setOperator(address operator, bool active) external onlyOwner {
