@@ -210,7 +210,21 @@
       "errorSaving": "Error al guardar",
       "errorPublishing": "Error al publicar \u2014 intenta de nuevo"
     },
-    "agentName": "Nombre del Agente"
+    "agentName": "Nombre del Agente",
+    "loading": "Cargando editor...",
+    "listingFee": {
+      "title": "Listing fee requerido",
+      "description": "Tu segundo agente (y siguientes) requieren un listing fee para publicarse en WasiAI.",
+      "feeLabel": "Fee de publicacion",
+      "feeHint": "Pago unico \u00b7 No recurrente",
+      "cancel": "Cancelar",
+      "signAndPublish": "Firmar y publicar",
+      "waitingSignature": "Esperando firma...",
+      "confirmWallet": "Confirma la transaccion en tu wallet",
+      "processing": "Procesando pago...",
+      "confirming": "Confirmando en Avalanche",
+      "redirecting": "Redirigiendo al dashboard..."
+    }
   },
   "dashboard": {
     "title": "Panel del Creator",
@@ -305,7 +319,7 @@
     "back_to_marketplace": "\u2190 Volver al marketplace"
   },
   "docs": {
-    "title": "Documentaci\u00f3n",
+    "title": "Documentacion",
     "quickstart": "Inicio r\u00e1pido",
     "sdkNode": "SDK Node.js",
     "sdkPython": "SDK Python",
@@ -325,7 +339,8 @@
     "agentKeys": "Agent Keys",
     "creatorGuide": "Gu\u00eda del Creator",
     "agentkit": "AgentKit",
-    "pricing": "Precios y Tarifas"
+    "pricing": "Precios y Tarifas",
+    "subtitle": "Todo lo que necesitas para construir con WasiAI."
   },
   "codeExamples": {
     "title": "C\u00f3mo usar",
@@ -696,7 +711,7 @@
   },
   "pipelines": {
     "title": "Constructor de Pipelines",
-    "subtitle": "Encadena agentes de IA para construir flujos de trabajo multi-paso.",
+    "subtitle": "Encadena agentes en pasos para crear flujos multi-paso sin codigo.",
     "noAgents": "No hay agentes disponibles",
     "addStep": "Agregar paso",
     "run": "Ejecutar pipeline",
@@ -705,5 +720,49 @@
     "clear": "Limpiar",
     "inputLabel": "Entrada",
     "inputPlaceholder": "Escribe tu entrada..."
+  },
+  "sandbox": {
+    "title": "Sandbox",
+    "subtitle": "Prueba agentes con tus propios inputs antes de integrarlos.",
+    "inputLabel": "Entrada",
+    "inputPlaceholder": "Escribe tu mensaje...",
+    "run": "Ejecutar",
+    "running": "Ejecutando...",
+    "output": "Salida",
+    "selectAgent": "Selecciona un agente",
+    "noAgents": "No hay agentes disponibles",
+    "error": "Error",
+    "clear": "Limpiar",
+    "history": "Historial",
+    "noHistory": "Sin ejecuciones aun",
+    "latency": "Latencia",
+    "status": "Estado"
+  },
+  "agentWallet": {
+    "title": "Wallet del Agente",
+    "network": "Fuji Testnet",
+    "noWallet": "Este agente no tiene wallet propia. Inicializa una para habilitar pagos autonomos en el futuro.",
+    "earningsAddress": "Direccion de earnings",
+    "viewExplorer": "Ver en explorer",
+    "agentKeyNote": "Para que tu agente pueda invocar otros agentes en WasiAI, deposita USDC en tu Agent Key. Sin fondos, tu agente no puede comprar servicios de otros agentes.",
+    "depositCta": "Depositar en Agent Key"
+  },
+  "earnings": {
+    "available": "USDC disponible",
+    "pendingNote": "Pendiente on-chain"
+  },
+  "search": {
+    "searching": "Buscando...",
+    "placeholder": "Buscar agentes...",
+    "noResults": "Sin resultados"
+  },
+  "endpointCard": {
+    "authRequired": "Autenticacion requerida",
+    "pathParams": "Parametros de ruta",
+    "bodyParams": "Parametros del cuerpo",
+    "name": "Nombre",
+    "type": "Tipo",
+    "description": "Descripcion",
+    "exampleResponse": "Ejemplo de respuesta"
   }
 }

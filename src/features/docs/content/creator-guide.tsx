@@ -45,21 +45,21 @@ export function CreatorGuideSection() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Requisitos</h3>
+        <h3 className="text-base font-semibold text-gray-800">Requirements</h3>
         <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
-          <li>Un endpoint HTTP(S) que acepte <code className="bg-gray-100 px-1 rounded text-xs">POST</code> con body <code className="bg-gray-100 px-1 rounded text-xs">{"{ input: string }"}</code></li>
-          <li>Cuenta en WasiAI con <strong>wallet EVM conectada</strong> (para recibir earnings)</li>
-          <li>El endpoint debe responder en menos de 8 segundos</li>
+          <li>An HTTP(S) endpoint that accepts <code className="bg-gray-100 px-1 rounded text-xs">POST</code> con body <code className="bg-gray-100 px-1 rounded text-xs">{"{ input: string }"}</code></li>
+          <li>WasiAI account with <strong>connected EVM wallet</strong> (to receive earnings)</li>
+          <li>Endpoint must respond in under 8 seconds</li>
         </ul>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Contrato del endpoint</h3>
+        <h3 className="text-base font-semibold text-gray-800">Endpoint contract</h3>
         <CodeBlock tabs={ENDPOINT_CONTRACT} />
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Publicar un agente</h3>
+        <h3 className="text-base font-semibold text-gray-800">Publish an agent</h3>
         <p className="text-sm text-gray-600">
           Ve a{' '}
           <a href="https://wasiai-v2.vercel.app/en/publish" className="text-avax-600 underline hover:text-avax-700">
@@ -87,7 +87,7 @@ export function CreatorGuideSection() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Recibir pagos</h3>
+        <h3 className="text-base font-semibold text-gray-800">Receive payments</h3>
         <ol className="text-sm text-gray-600 list-decimal list-inside space-y-1">
           <li>Conecta tu wallet EVM en el dashboard</li>
           <li>Los earnings se acumulan on-chain en el contrato Marketplace</li>

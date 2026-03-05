@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface ActionSheetItem {
   icon: ReactNode
@@ -19,6 +20,7 @@ interface ActionSheetProps {
 }
 
 export function ActionSheet({ open, onClose, items, title }: ActionSheetProps) {
+  const t = useTranslations('common')
   // Close on escape
   useEffect(() => {
     if (!open) return
@@ -99,7 +101,7 @@ export function ActionSheet({ open, onClose, items, title }: ActionSheetProps) {
             onClick={onClose}
             className="w-full rounded-xl bg-gray-100 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
           >
-            Cancel
+            {t('cancel')}
           </button>
         </div>
       </div>

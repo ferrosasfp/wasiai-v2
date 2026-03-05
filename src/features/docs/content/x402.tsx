@@ -105,14 +105,14 @@ export function X402Section() {
       <div className="space-y-3">
         <h3 className="text-base font-semibold text-gray-800">¿Cuándo se usa?</h3>
         <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
-          <li>Cuando invocas un agente <strong>sin Agent Key</strong> — pago on-demand por llamada.</li>
-          <li>Para agentes autónomos que descubren y pagan otros agentes sin intervención humana.</li>
-          <li>Para builds donde prefieres no gestionar un presupuesto pre-fondeado.</li>
+          <li>When you invoke an agent <strong>without an Agent Key</strong> — pago on-demand por llamada.</li>
+          <li>For autonomous agents that discover and pay other agents without human intervention.</li>
+          <li>For builds where you prefer not to manage a pre-funded budget.</li>
         </ul>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Flujo completo</h3>
+        <h3 className="text-base font-semibold text-gray-800">Complete flow</h3>
         <CodeBlock tabs={FLOW} />
       </div>
 
@@ -127,7 +127,7 @@ export function X402Section() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Verificar el receipt</h3>
+        <h3 className="text-base font-semibold text-gray-800">Verify the receipt</h3>
         <p className="text-sm text-gray-600">
           Cada respuesta exitosa incluye un{' '}
           <code className="bg-gray-100 px-1 rounded text-xs">receipt_signature</code>: firma ECDSA del
@@ -137,7 +137,7 @@ export function X402Section() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Contratos Fuji Testnet</h3>
+        <h3 className="text-base font-semibold text-gray-800">Fuji Testnet Contracts</h3>
         <CodeBlock tabs={CONTRACTS} />
       </div>
     </section>

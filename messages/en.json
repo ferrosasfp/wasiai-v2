@@ -210,7 +210,21 @@
       "errorSaving": "Error saving",
       "errorPublishing": "Error publishing \u2014 please try again"
     },
-    "agentName": "Agent Name"
+    "agentName": "Agent Name",
+    "loading": "Loading editor...",
+    "listingFee": {
+      "title": "Listing fee required",
+      "description": "Your second agent (and beyond) requires a listing fee to publish on WasiAI.",
+      "feeLabel": "Publication fee",
+      "feeHint": "One-time payment \u00b7 Not recurring",
+      "cancel": "Cancel",
+      "signAndPublish": "Sign and publish",
+      "waitingSignature": "Waiting for signature...",
+      "confirmWallet": "Confirm the transaction in your wallet",
+      "processing": "Processing payment...",
+      "confirming": "Confirming on Avalanche",
+      "redirecting": "Redirecting to dashboard..."
+    }
   },
   "dashboard": {
     "title": "Creator Dashboard",
@@ -325,7 +339,8 @@
     "agentKeys": "Agent Keys",
     "creatorGuide": "Creator Guide",
     "agentkit": "AgentKit",
-    "pricing": "Pricing & Fees"
+    "pricing": "Pricing & Fees",
+    "subtitle": "Everything you need to build with WasiAI."
   },
   "codeExamples": {
     "title": "How to use",
@@ -696,7 +711,7 @@
   },
   "pipelines": {
     "title": "Pipeline Builder",
-    "subtitle": "Chain AI agents to build powerful multi-step workflows.",
+    "subtitle": "Chain agents into steps to create multi-step workflows with no code.",
     "noAgents": "No agents available",
     "addStep": "Add step",
     "run": "Run pipeline",
@@ -705,5 +720,49 @@
     "clear": "Clear",
     "inputLabel": "Input",
     "inputPlaceholder": "Enter your input..."
+  },
+  "sandbox": {
+    "title": "Sandbox",
+    "subtitle": "Test agents with your own inputs before integrating.",
+    "inputLabel": "Input",
+    "inputPlaceholder": "Enter your message...",
+    "run": "Run",
+    "running": "Running...",
+    "output": "Output",
+    "selectAgent": "Select an agent",
+    "noAgents": "No agents available",
+    "error": "Error",
+    "clear": "Clear",
+    "history": "History",
+    "noHistory": "No runs yet",
+    "latency": "Latency",
+    "status": "Status"
+  },
+  "agentWallet": {
+    "title": "Agent Wallet",
+    "network": "Fuji Testnet",
+    "noWallet": "This agent doesn't have its own wallet. Initialize one to enable autonomous payments in the future.",
+    "earningsAddress": "Earnings address",
+    "viewExplorer": "View on explorer",
+    "agentKeyNote": "To let your agent invoke other WasiAI agents, deposit USDC into your Agent Key. Without funds, your agent can't pay for other agents' services.",
+    "depositCta": "Deposit into Agent Key"
+  },
+  "earnings": {
+    "available": "USDC available",
+    "pendingNote": "Pending on-chain"
+  },
+  "search": {
+    "searching": "Searching...",
+    "placeholder": "Search agents...",
+    "noResults": "No results found"
+  },
+  "endpointCard": {
+    "authRequired": "Auth required",
+    "pathParams": "Path Parameters",
+    "bodyParams": "Body Parameters",
+    "name": "Name",
+    "type": "Type",
+    "description": "Description",
+    "exampleResponse": "Example Response"
   }
 }

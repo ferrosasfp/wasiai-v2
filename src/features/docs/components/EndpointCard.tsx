@@ -1,3 +1,5 @@
+import { useTranslations } from 'next-intl'
+
 interface Param {
   name: string
   type: string
@@ -32,6 +34,7 @@ export function EndpointCard({
   bodyParams = [],
   responseExample,
 }: EndpointCardProps) {
+  const t = useTranslations('endpointCard')
   return (
     <div className="rounded-xl border border-gray-200 overflow-hidden mb-6">
       {/* Header */}
@@ -53,13 +56,13 @@ export function EndpointCard({
         {/* Path params */}
         {params.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Path Parameters</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t('pathParams')}</p>
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-gray-400">
-                  <th className="pb-1 pr-4">Name</th>
-                  <th className="pb-1 pr-4">Type</th>
-                  <th className="pb-1">Description</th>
+                  <th className="pb-1 pr-4">{t('name')}</th>
+                  <th className="pb-1 pr-4">{t('type')}</th>
+                  <th className="pb-1">{t('description')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -81,13 +84,13 @@ export function EndpointCard({
         {/* Body params */}
         {bodyParams.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Body Parameters</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t('bodyParams')}</p>
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-gray-400">
-                  <th className="pb-1 pr-4">Name</th>
-                  <th className="pb-1 pr-4">Type</th>
-                  <th className="pb-1">Description</th>
+                  <th className="pb-1 pr-4">{t('name')}</th>
+                  <th className="pb-1 pr-4">{t('type')}</th>
+                  <th className="pb-1">{t('description')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -109,7 +112,7 @@ export function EndpointCard({
         {/* Response example */}
         {responseExample && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Example Response</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t('exampleResponse')}</p>
             <pre className="rounded-lg bg-[#0d1117] p-3 text-xs text-green-400 font-mono overflow-x-auto">
               {responseExample}
             </pre>

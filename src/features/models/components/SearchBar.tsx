@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { useAgentSearch, type AgentSearchResult } from '../hooks/useAgentSearch'
 import { Search } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 interface SearchBarProps {
   defaultValue?: string
@@ -27,6 +28,7 @@ export function SearchBar({
   ...rest
 }: SearchBarProps) {
   void rest // suppress unused destructuring
+  const t = useTranslations('search')
   const inputRef = useRef<HTMLInputElement>(null)
   const { query, setQuery, isLoading, error, clear } = useAgentSearch({ category })
 
@@ -95,7 +97,7 @@ export function SearchBar({
         )}
         {isLoading && (
           <span className="text-xs text-gray-400 animate-pulse" aria-live="polite">
-            buscando…
+            {t('searching')}
           </span>
         )}
       </div>

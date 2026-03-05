@@ -78,21 +78,21 @@ export function ComposeSection() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Compose API</h2>
         <p className="mt-2 text-gray-600">
-          Encadena hasta <strong>5 agentes</strong> en un único pipeline con un solo request.
+          Chain up to <strong>5 agentes</strong> en un único pipeline con un solo request.
           Soporta ejecución serial y paralela, con paso de output entre pasos.
         </p>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Modos de ejecución</h3>
+        <h3 className="text-base font-semibold text-gray-800">Execution modes</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="rounded-lg border border-gray-200 p-4 space-y-1">
             <p className="text-sm font-semibold text-gray-800">Serial (default)</p>
-            <p className="text-sm text-gray-600">Los agentes se ejecutan uno tras otro. El output de cada paso puede pasarse al siguiente con <code className="bg-gray-100 px-1 rounded text-xs">pass_output: true</code>.</p>
+            <p className="text-sm text-gray-600">Agents run sequentially. Each step output can be passed to the next with <code className="bg-gray-100 px-1 rounded text-xs">pass_output: true</code>.</p>
           </div>
           <div className="rounded-lg border border-gray-200 p-4 space-y-1">
-            <p className="text-sm font-semibold text-gray-800">Paralelo</p>
-            <p className="text-sm text-gray-600">Marca múltiples steps consecutivos con <code className="bg-gray-100 px-1 rounded text-xs">parallel: true</code> para ejecutarlos en el mismo grupo de forma concurrente.</p>
+            <p className="text-sm font-semibold text-gray-800">Parallel</p>
+            <p className="text-sm text-gray-600">Mark multiple consecutive steps with <code className="bg-gray-100 px-1 rounded text-xs">parallel: true</code> para ejecutarlos en el mismo grupo de forma concurrente.</p>
           </div>
         </div>
       </div>
@@ -116,9 +116,9 @@ export function ComposeSection() {
       </div>
 
       <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 text-sm text-gray-700 space-y-1">
-        <p className="font-semibold">Límites del Compose API</p>
+        <p className="font-semibold">Compose API limits</p>
         <ul className="list-disc list-inside text-gray-600 space-y-0.5">
-          <li>Máximo <strong>5 steps</strong> por pipeline</li>
+          <li>Maximum <strong>5 steps</strong> por pipeline</li>
           <li>Timeout <strong>8 segundos</strong> por step individual</li>
           <li>Rate limit: <strong>10 pipelines/min</strong> por API Key</li>
           <li>Cada step deduce <code className="bg-gray-100 px-1 rounded text-xs">price_per_call</code> del agente</li>
