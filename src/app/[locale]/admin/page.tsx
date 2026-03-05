@@ -228,6 +228,12 @@ export default function AdminPage() {
       const chainHex = await win.ethereum.request({ method: 'eth_chainId' }) as string
       if (parseInt(chainHex, 16) !== 43113) { setDrainMsg('❌ Cambia a Fuji (chain 43113)'); return }
 
+      const OPERATOR = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '').toLowerCase()
+      if (from.toLowerCase() !== OPERATOR) {
+        setDrainMsg(`❌ Wallet incorrecta. Conectado: ${from.slice(0,10)}… — necesitas la del operador: ${OPERATOR.slice(0,10)}…`)
+        return
+      }
+
       // Keys con balance conocido — obtenidos del contrato
       const KEYS_WITH_BALANCE: Array<{ keyId: `0x${string}`; owner: `0x${string}` }> = [
         { keyId: '0x08bdf88cf88c4bc3f4fdfb73451851d9c6ef858896a01b86d489fd763c51c2330', owner: '0xfb652f4506731aC58E51b39DCa4F5ECDcb2C1543' },
