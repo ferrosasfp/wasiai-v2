@@ -92,7 +92,7 @@ export function ComposeSection() {
           </div>
           <div className="rounded-lg border border-gray-200 p-4 space-y-1">
             <p className="text-sm font-semibold text-gray-800">Parallel</p>
-            <p className="text-sm text-gray-600">Mark multiple consecutive steps with <code className="bg-gray-100 px-1 rounded text-xs">parallel: true</code> para ejecutarlos en el mismo grupo de forma concurrente.</p>
+            <p className="text-sm text-gray-600">Mark multiple consecutive steps with <code className="bg-gray-100 px-1 rounded text-xs">parallel: true</code> to run them in the same group concurrently.</p>
           </div>
         </div>
       </div>

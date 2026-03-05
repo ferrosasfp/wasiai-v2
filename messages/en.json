@@ -719,7 +719,11 @@
     "result": "Result",
     "clear": "Clear",
     "inputLabel": "Input",
-    "inputPlaceholder": "Enter your input..."
+    "inputPlaceholder": "Enter your input...",
+    "configure": "Configure pipeline",
+    "noActiveAgents": "No active agents available. Publish an agent first.",
+    "enterApiKey": "Enter your API key to run the pipeline.",
+    "maxSteps": "Maximum {n} steps"
   },
   "sandbox": {
     "title": "Sandbox",
@@ -736,7 +740,8 @@
     "history": "History",
     "noHistory": "No runs yet",
     "latency": "Latency",
-    "status": "Status"
+    "status": "Status",
+    "noActiveAgents": "No active agents available."
   },
   "agentWallet": {
     "title": "Agent Wallet",

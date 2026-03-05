@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { PipelineBuilder }                   from '@/components/pipelines/PipelineBuilder'
 import { PipelineStatus, PipelineRunState }  from '@/components/pipelines/PipelineStatus'
 import { PipelineHistory }                   from '@/components/pipelines/PipelineHistory'
+import { useTranslations }                   from 'next-intl'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ const INITIAL_RUN_STATE: PipelineRunState = {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export function PipelinePageClient({ availableAgents, userId }: PipelinePageClientProps) {
+  const t = useTranslations('pipelines')
   const [runState, setRunState] = useState<PipelineRunState>(INITIAL_RUN_STATE)
   const [historyKey, setHistoryKey] = useState(0)
 
@@ -130,11 +132,9 @@ export function PipelinePageClient({ availableAgents, userId }: PipelinePageClie
       {/* Builder — siempre visible excepto cuando hay status activo */}
       {runState.status === 'idle' || runState.status === 'running' ? (
         <section className="border rounded-lg p-6 space-y-4 bg-white shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-800">Configurar pipeline</h2>
+          <h2 className="text-lg font-semibold text-gray-800">{t('configure')}</h2>
           {availableAgents.length === 0 ? (
-            <p className="text-sm text-amber-600">
-              No hay agentes activos disponibles. Publica un agente primero.
-            </p>
+            <p className="text-sm text-amber-600">{t('noActiveAgents')}</p>
           ) : (
             <PipelineBuilder
               onRun={handleRun}

@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface AgentOption {
@@ -41,6 +42,7 @@ function formatUsdc(value: number | string): string {
 // userId recibido del Server Component (auth ya verificada allá)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function SandboxClient({ userId }: { userId: string }) {
+  const t = useTranslations('sandbox')
   const [agents, setAgents]               = useState<AgentOption[]>([])
   const [selectedSlug, setSelectedSlug]   = useState<string>('')
   const [inputText, setInputText]         = useState<string>('')
@@ -184,7 +186,7 @@ export function SandboxClient({ userId }: { userId: string }) {
               Agente
             </label>
             {agents.length === 0 ? (
-              <p className="text-sm text-gray-400">No hay agentes activos disponibles.</p>
+              <p className="text-sm text-gray-400">{t('noActiveAgents')}</p>
             ) : (
               <select
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142]"
