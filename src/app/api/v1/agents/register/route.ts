@@ -27,7 +27,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { CHAIN_NAME } from '@/lib/chain'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
@@ -149,9 +149,9 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data
 
-  // SEC-01: Block SSRF via endpoint_url
+  // SEC-01 + NG-005: Block SSRF via endpoint_url (async version includes DNS probe)
   try {
-    validateEndpointUrl(data.endpoint_url)
+    await validateEndpointUrlAsync(data.endpoint_url)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 422 })
   }
