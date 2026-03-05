@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useReducer } from 'react'
 import { useAccount, useDisconnect } from 'wagmi'
 import { useTranslations } from 'next-intl'
 import { WalletConnectModal } from './WalletConnectModal'
@@ -22,11 +22,22 @@ function truncateAddress(addr: `0x${string}` | undefined): string {
 export function WalletConnectButton({ locale: _locale }: WalletConnectButtonProps) {
   const [showModal, setShowModal] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [mounted, markMounted] = useReducer(() => true, false)
+  useEffect(markMounted, [markMounted])
   const { address, isConnected, chain } = useAccount()
   const { disconnect } = useDisconnect()
   const t = useTranslations('wallet')
 
   const isWrongNetwork = isConnected && chain?.id !== FUJI_CHAIN_ID
+
+  // SSR: render neutral button until client mounts
+  if (!mounted) {
+    return (
+      <button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600">
+        {t('connectWallet')}
+      </button>
+    )
+  }
 
   // Caso A: No conectado
   if (!isConnected) {
