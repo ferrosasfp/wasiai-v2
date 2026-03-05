@@ -17,6 +17,7 @@ const MARKETPLACE_ABI = [
   { name: 'earnings',         type: 'function' as const, stateMutability: 'view' as const, inputs: [{ name: '', type: 'address' }], outputs: [{ type: 'uint256' }] },
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

@@ -253,8 +253,6 @@ export default function AdminPage() {
       }
 
       for (const { keyId, owner } of KEYS_WITH_BALANCE) {
-        // Verificar si la key ya fue procesada (balance = 0)
-        const balData   = '0x70a5967f' + keyId.slice(2).padStart(64, '0') // No es así — usar keyBalances
         const refundData   = refundSelector    + keyId.slice(2).padStart(64, '0')
         const withdrawData = withdrawForSelector + owner.slice(2).padStart(64, '0')
 
