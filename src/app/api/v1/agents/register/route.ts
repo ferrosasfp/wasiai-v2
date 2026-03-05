@@ -65,6 +65,9 @@ const RegisterAgentSchema = z.object({
   // Registration metadata
   framework:       z.string().optional(), // 'agentkit', 'langchain', 'custom'
   version:         z.string().optional(),
+
+  // WAS-160b: Optional on-chain registration preference (default: true if creator_wallet present)
+  register_on_chain: z.boolean().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -170,6 +173,9 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // WAS-160b: Determine on-chain registration preference
+  const registerOnChain = data.register_on_chain ?? !!data.creator_wallet
+
   // ── Create agent in DB ────────────────────────────────────────────────────
   const agentPayload = {
     name:           data.name,
@@ -184,6 +190,8 @@ export async function POST(request: NextRequest) {
     capabilities:   data.capabilities,
     dependencies:   data.dependencies,
     creator_wallet: data.creator_wallet ?? null,
+    // WAS-160b: Set registration_type based on preference
+    registration_type: (registerOnChain && data.creator_wallet) ? 'on_chain' : 'off_chain',
     mcp_tool_name:  data.mcp_tool_name  ?? data.slug.replace(/-/g, '_'),
     mcp_description: data.mcp_description ?? data.description,
     // JWT-authenticated devs go active immediately; open/agent-key registrations go to review
@@ -239,8 +247,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Register on-chain (non-blocking) ─────────────────────────────────────
-  if (data.creator_wallet) {
+  // ── Register on-chain (non-blocking) — WAS-160b: only if registerOnChain ──
+  if (registerOnChain && data.creator_wallet) {
     registerAgentOnChain({
       slug:             data.slug,
       pricePerCallUSDC: data.price_per_call,
@@ -261,7 +269,8 @@ export async function POST(request: NextRequest) {
       invoke_url:     `${SITE_URL}/api/v1/models/${agent.slug}/invoke`,
       marketplace_url: `${SITE_URL}/en/models/${agent.slug}`,
       status:         agent.status,
-      on_chain_registered: !!data.creator_wallet,
+      on_chain_registered: registerOnChain && !!data.creator_wallet,
+      registration_type: (registerOnChain && data.creator_wallet) ? 'on_chain' : 'off_chain',
     },
     management_key: managementKey,
     management_key_warning: managementKey ? null : 'Management key could not be issued. Contact support@wasiai.io',

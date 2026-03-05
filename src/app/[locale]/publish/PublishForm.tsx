@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import ListingFeeModal from './ListingFeeModal'
+import RegistrationChoiceModal from './RegistrationChoiceModal'
 import { useRouter, useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useAccount } from 'wagmi'
 import type { CreateModelDraft, ModelCapability } from '@/lib/schemas/model.schema'
 import { StepIndicator } from '@/components/publish/StepIndicator'
 import { PublishPreview } from '@/features/publish/components/PublishPreview'
@@ -67,6 +69,10 @@ export default function PublishForm({ initialDraft, from }: Props) {
     treasuryAddress: string
   } | null>(null)
   const [showFeeModal, setShowFeeModal] = useState(false)
+
+  // WAS-160b: Wallet detection for registration choice
+  const { address: walletAddress, isConnected: walletConnected } = useAccount()
+  const [showRegChoiceModal, setShowRegChoiceModal] = useState(false)
 
   function handleChange(field: string, value: unknown) {
     setData(prev => ({ ...prev, [field]: value }))
@@ -160,8 +166,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
         }
       }
 
-      // Sin fee requerido → flujo actual
-      // Guardar campos técnicos
+      // WAS-160b: Save technical fields first
       const patchRes = await fetch(`/api/creator/agents/${draftSlug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -172,21 +177,51 @@ export default function PublishForm({ initialDraft, from }: Props) {
         setErrors((json.fields as Record<string, string>) ?? { endpoint_url: (json.error as string) ?? t('form.errorSaving') })
         return
       }
-      // Activar
-      const statusRes = await fetch(`/api/creator/agents/${draftSlug}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active' }),
-      })
-      if (!statusRes.ok) {
-        setErrors({ endpoint_url: t('form.errorPublishing') })
+
+      // WAS-160b: If wallet connected → show registration choice modal
+      if (walletConnected && walletAddress) {
+        setPublishing(false)
+        setShowRegChoiceModal(true)
         return
       }
-      // Redirect
-      const redirectPath = from === 'onboarding'
-        ? `/${locale}/onboarding?published=true`
-        : `/${locale}/creator/dashboard`
-      router.push(redirectPath)
+
+      // No wallet → off-chain by default (AC1)
+      await activateAgent('off_chain')
+      
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  // WAS-160b: Activate agent with registration type
+  async function activateAgent(registrationType: 'off_chain' | 'on_chain', txHash?: string) {
+    const body: Record<string, unknown> = {
+      status: 'active',
+      registration_type: registrationType,
+    }
+    if (txHash) body.tx_hash = txHash
+
+    const statusRes = await fetch(`/api/creator/agents/${draftSlug}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!statusRes.ok) {
+      setErrors({ endpoint_url: t('form.errorPublishing') })
+      return
+    }
+    const redirectPath = from === 'onboarding'
+      ? `/${locale}/onboarding?published=true`
+      : `/${locale}/creator/dashboard`
+    router.push(redirectPath)
+  }
+
+  // WAS-160b: Handle registration choice from modal
+  async function handleRegistrationChoice(choice: 'on_chain' | 'off_chain', txHash?: string) {
+    setShowRegChoiceModal(false)
+    setPublishing(true)
+    try {
+      await activateAgent(choice, txHash)
     } finally {
       setPublishing(false)
     }
@@ -296,6 +331,22 @@ export default function PublishForm({ initialDraft, from }: Props) {
           creatorWallet={''}
           locale={locale}
           onCancel={() => setShowFeeModal(false)}
+        />
+      )}
+      {/* WAS-160b: Registration choice modal */}
+      {showRegChoiceModal && draftSlug && walletAddress && (
+        <RegistrationChoiceModal
+          slug={draftSlug}
+          pricePerCall={data.price_per_call as number ?? 0.02}
+          creatorAddress={walletAddress}
+          contractAddress={
+            Number(process.env.NEXT_PUBLIC_CHAIN_ID) === 43114
+              ? (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET ?? '')
+              : (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI ?? '')
+          }
+          chainId={Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)}
+          onChoose={handleRegistrationChoice}
+          onCancel={() => setShowRegChoiceModal(false)}
         />
       )}
     </main>

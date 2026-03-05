@@ -443,7 +443,7 @@ contract NexusAuditValidationTest is Test {
     function test_NA_L02_FIXED_UpdateAgent_RejectsNonExistentSlug() public {
         vm.prank(owner);
         vm.expectRevert("WasiAI: agent not found");
-        marketplace.updateAgent("does-not-exist", 999, true);
+        marketplace.updateAgent("does-not-exist", 999);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

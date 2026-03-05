@@ -153,6 +153,43 @@ export async function registerAgentOnChain({
 }
 
 /**
+ * WAS-161: Sync agent price/status on-chain after edit.
+ * Called by operator (fire-and-forget) when creator edits an on-chain agent.
+ */
+export async function updateAgentOnChain({
+  slug,
+  pricePerCallUSDC,
+}: {
+  slug: string
+  pricePerCallUSDC: number
+}): Promise<string | null> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) {
+    logger.warn('[marketplace] Contract not configured — skipping updateAgent')
+    return null
+  }
+
+  try {
+    const { wallet, public: pub, account } = getOperatorClient()
+
+    const { request } = await pub.simulateContract({
+      address: contractAddress,
+      abi: WASIAI_MARKETPLACE_ABI,
+      functionName: 'updateAgent',
+      args: [slug, toUSDCAtomics(pricePerCallUSDC)],
+      account,
+    })
+
+    const txHash = await wallet.writeContract(request)
+    logger.info('[marketplace] updateAgent tx', { txHash, slug })
+    return txHash
+  } catch (err) {
+    logger.error('[marketplace] updateAgent failed', { err: String(err).slice(0, 300) })
+    return null
+  }
+}
+
+/**
  * Operator-triggered withdrawal on behalf of a creator.
  * Returns tx hash or null if contract not configured / no earnings.
  */

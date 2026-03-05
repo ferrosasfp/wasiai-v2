@@ -16,6 +16,10 @@ import { logger } from '@/lib/logger'
 // HU-1.2: 'draft' added to support multi-step publish flow
 const statusSchema = z.object({
   status: z.enum(['active', 'paused', 'draft']),
+  // WAS-160b: Optional registration type — set when publishing with wallet choice
+  registration_type: z.enum(['off_chain', 'on_chain']).optional(),
+  // WAS-160b: txHash from client-side selfRegisterAgent — used to verify on-chain registration
+  tx_hash: z.string().regex(/^0x[a-fA-F0-9]{64}$/).optional(),
 })
 
 export async function PATCH(
@@ -45,7 +49,7 @@ export async function PATCH(
   // Ownership check
   const { data: existing } = await serviceClient
     .from('agents')
-    .select('id, creator_id, status')
+    .select('id, creator_id, status, registration_type')
     .eq('slug', slug)
     .single()
 
@@ -56,15 +60,31 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // WAS-160b: Build update payload with optional registration fields
+  const updatePayload: Record<string, unknown> = {
+    status: result.data.status,
+    updated_at: new Date().toISOString(),
+  }
+
+  // WAS-160b: If client already registered on-chain (tx_hash present), mark as on_chain
+  if (result.data.registration_type === 'on_chain' && result.data.tx_hash) {
+    updatePayload.registration_type = 'on_chain'
+    updatePayload.on_chain_registered = true
+    updatePayload.chain_registered_at = new Date().toISOString()
+  } else if (result.data.registration_type === 'off_chain') {
+    updatePayload.registration_type = 'off_chain'
+  }
+
   const { error } = await serviceClient
     .from('agents')
-    .update({ status: result.data.status, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq('id', existing.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // HU-1.2: registerAgentOnChain — fire-and-forget when status → 'active'
-  if (result.data.status === 'active') {
+  // WAS-160b: Only fire-and-forget registerAgentOnChain for legacy flow (no client-side tx)
+  // If registration_type was explicitly set, the client already handled on-chain registration
+  if (result.data.status === 'active' && !result.data.registration_type) {
     const { data: profile } = await supabase
       .from('creator_profiles')
       .select('wallet_address')
@@ -72,7 +92,6 @@ export async function PATCH(
       .single()
 
     if (profile?.wallet_address) {
-      // Get agent price for on-chain registration
       const { data: agent } = await serviceClient
         .from('agents')
         .select('price_per_call')

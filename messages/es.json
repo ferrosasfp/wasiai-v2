@@ -245,7 +245,15 @@
     "step3AuthNote": "Se envía como cabecera Authorization en cada llamada a tu API",
     "step3TestBtn": "Probar endpoint",
     "step3Testing": "Probando...",
-    "step3EarningsNote": "Ganas el 90% de cada llamada · WasiAI toma el 10% · Pagado en USDC"
+    "step3EarningsNote": "Ganas el 90% de cada llamada · WasiAI toma el 10% · Pagado en USDC",
+    "registrationChoice": {
+      "title": "Elige tipo de registro",
+      "onChainOption": "Registrar on-chain",
+      "onChainDesc": "Propiedad verificable via token ERC-8004. Aplica gas fee.",
+      "offChainOption": "Registrar gratis",
+      "offChainDesc": "Funcionalidad completa. Escala a on-chain cuando quieras.",
+      "gasEstimate": "Gas estimado: {amount} AVAX"
+    }
   },
   "dashboard": {
     "title": "Panel del Creator",
@@ -850,5 +858,27 @@
     "featured": "Destacada",
     "empty": "Aún no hay colecciones",
     "backToCollections": "Volver a Colecciones"
+  },
+  "agent": {
+    "badge": {
+      "onChain": "On-chain"
+    },
+    "upgrade": {
+      "button": "Escalar a On-chain",
+      "title": "Escalar a registro On-chain",
+      "benefits": {
+        "ownership": "Propiedad criptográfica verificable",
+        "composability": "Composabilidad cross-protocol (DeFi, DAOs)",
+        "reputation": "Historial de reputación inmutable",
+        "censorship": "Resistencia a censura",
+        "badge": "Badge On-chain Verified + boost en discovery"
+      },
+      "gasEstimate": "Gas estimado: {amount} AVAX",
+      "balance": "Tu balance: {amount} AVAX",
+      "confirm": "Confirmar y firmar",
+      "upgrading": "Escalando...",
+      "success": "¡Agente escalado a on-chain!",
+      "error": "Error al escalar: {message}"
+    }
   }
 }

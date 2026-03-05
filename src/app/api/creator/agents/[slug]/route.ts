@@ -10,6 +10,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
 import { createModelSchema } from '@/lib/schemas/model.schema'
 
+
 // ── PATCH — update agent fields ──────────────────────────────────────────────
 
 export async function PATCH(
@@ -62,6 +63,7 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // WAS-161: Return registration_type so client knows if on-chain sync is needed
   return NextResponse.json({ agent })
 }
 

@@ -62,7 +62,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         uint256 pricePerCall;     // USDC in atomic units (6 decimals). e.g. 20000 = $0.02
         uint64  erc8004Id;        // ERC-8004 identity token ID (0 = not registered)
         // NA-207: creatorFeeBps removido — dead storage. Fee calculado dinámicamente como (10_000 - platformFeeBps)
-        bool    active;
+        // WAS-161: active removido — status se controla en Supabase (backend filtra antes de llegar al contrato)
     }
 
     // ─── State ────────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         uint256 pricePerCall,
         uint64  erc8004Id
     );
-    event AgentUpdated(string indexed slug, uint256 newPrice, bool active);
+    event AgentUpdated(string indexed slug, uint256 newPrice);
     event AgentInvoked(
         string  indexed slug,
         address indexed payer,
@@ -215,21 +215,45 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         agents[slug] = Agent({
             creator:       creator,
             pricePerCall:  pricePerCall,
-            erc8004Id:     erc8004Id,
-            active:        true
+            erc8004Id:     erc8004Id
         });
 
         emit AgentRegistered(slug, creator, pricePerCall, erc8004Id);
     }
 
     /**
-     * @notice Update agent price or status.
+     * @notice Self-registration: creator registers their own agent and pays gas.
+     * @dev msg.sender becomes the creator. No operator needed.
+     *      WAS-160g: Dual Registration — allows creators to register on-chain directly.
+     */
+    function selfRegisterAgent(
+        string  calldata slug,
+        uint256 pricePerCall,
+        uint64  erc8004Id
+    ) external whenNotPaused {
+        require(bytes(slug).length > 0, "WasiAI: empty slug");
+        require(
+            agents[slug].creator == address(0),
+            "WasiAI: slug taken"
+        );
+
+        agents[slug] = Agent({
+            creator:       msg.sender,
+            pricePerCall:  pricePerCall,
+            erc8004Id:     erc8004Id
+        });
+
+        emit AgentRegistered(slug, msg.sender, pricePerCall, erc8004Id);
+    }
+
+    /**
+     * @notice Update agent price.
      * @dev Callable by the creator themselves or by an operator.
+     *      WAS-161: active removed — status controlled off-chain in Supabase.
      */
     function updateAgent(
         string  calldata slug,
-        uint256 newPrice,
-        bool    active
+        uint256 newPrice
     ) external {
         Agent storage agent = agents[slug];
         require(agent.creator != address(0), "WasiAI: agent not found");
@@ -240,8 +264,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
             "WasiAI: not authorized"
         );
         agent.pricePerCall = newPrice;
-        agent.active       = active;
-        emit AgentUpdated(slug, newPrice, active);
+        emit AgentUpdated(slug, newPrice);
     }
 
     /// @notice Transfer agent ownership to a new creator.
@@ -306,7 +329,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         usedPaymentIds[paymentId] = true;
 
         Agent storage agent = agents[slug];
-        require(agent.active,  "WasiAI: agent inactive");
+        // WAS-161: active check removed — status controlled in Supabase (backend filters before contract call)
+        require(agent.creator != address(0), "WasiAI: agent not found");
         require(amount > 0,    "WasiAI: zero amount");
         require(amount == agent.pricePerCall, "WasiAI: amount mismatch");
 
@@ -466,7 +490,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         for (uint256 i = 0; i < slugs.length; i++) {
             require(amounts[i] > 0,          "WasiAI: zero amount");
             Agent storage agent = agents[slugs[i]];
-            require(agent.active,            "WasiAI: agent inactive");
+            require(agent.creator != address(0), "WasiAI: agent not found");
             // NA-206: DEFERRED — settleKeyBatch permite amounts flexibles (descuentos, bundles).
             // El operador es el único que puede llamar esta función (onlyOperator).
             // La validación de amount == pricePerCall no aplica por diseño del batch settlement.

@@ -13,6 +13,7 @@ import { PricingBadge }    from '@/features/agents/components/PricingBadge'
 import { WasiKeyBanner }   from '@/features/agents/components/WasiKeyBanner'
 import Link from 'next/link'
 import { Bot } from 'lucide-react'
+import { UpgradeOnChainButton } from '@/features/agents/components/UpgradeOnChainButton'
 
 // PERF-04: ISR — revalidate detail pages every 5 minutes
 export const revalidate = 300
@@ -76,6 +77,12 @@ export default async function ModelDetailPage({ params }: Props) {
                         🎁 Free Trial
                       </span>
                     )}
+                    {model.registration_type === 'on_chain' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                        On-chain
+                      </span>
+                    )}
                     <span className="rounded-full bg-gray-100 px-3 py-0.5 text-xs font-medium text-gray-600 capitalize">
                       {model.category}
                     </span>
@@ -91,6 +98,13 @@ export default async function ModelDetailPage({ params }: Props) {
               {model.description && (
                 <p className="mt-4 text-gray-600 leading-relaxed">{model.description}</p>
               )}
+              {/* WAS-160c: Upgrade to on-chain button — only for off-chain agents owned by current user */}
+              <UpgradeOnChainButton
+                slug={model.slug}
+                pricePerCall={model.price_per_call}
+                registrationType={model.registration_type ?? 'off_chain'}
+                isOwner={user?.id === model.creator_id}
+              />
             </div>
 
             {/* Capabilities */}

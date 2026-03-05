@@ -2,6 +2,8 @@ export type ModelCategory = 'nlp' | 'vision' | 'audio' | 'code' | 'multimodal' |
 
 export type ModelStatus = 'active' | 'paused' | 'reviewing'
 
+export type RegistrationType = 'off_chain' | 'on_chain'
+
 export type AgentType = 'model' | 'agent' | 'workflow'
 
 export interface ModelCapability {
@@ -39,7 +41,10 @@ export interface Model {
   agent_type: AgentType          // 'model' | 'agent' | 'workflow'
   dependencies: string[]         // slugs of other agents this agent calls
   creator_wallet: string | null  // creator's wallet for on-chain payouts
-  on_chain_registered: boolean   // registered in WasiAIMarketplace.sol
+  on_chain_registered: boolean   // registered in WasiAIMarketplace.sol (legacy — use registration_type)
+  registration_type: RegistrationType // WAS-160: 'off_chain' | 'on_chain'
+  token_id: number | null        // WAS-160: ERC-8004 token ID from selfRegisterAgent/registerAgent
+  chain_registered_at: string | null // WAS-160: timestamp of on-chain registration
   erc8004_id: number | null      // ERC-8004 identity token ID
   reputation_score: number | null
   reputation_count: number
