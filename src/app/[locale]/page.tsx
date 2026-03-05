@@ -7,6 +7,7 @@ import { Search, Bot } from 'lucide-react'
 export const revalidate = 300
 
 import { getModels } from '@/features/models/services/models.service'
+import { createClient } from '@/lib/supabase/server'
 import { ModelCard } from '@/features/models/components/ModelCard'
 import { ReputationBadge } from '@/features/models/components/ReputationBadge'
 import { FilterPanel } from '@/features/models/components/FilterPanel'
@@ -16,6 +17,12 @@ import { SearchBar } from '@/features/models/components/SearchBar'
 import type { ModelCategory } from '@/features/models/types/models.types'
 
 const PAGE_SIZE = 12
+
+/** Pre-computed interval for "just launched" query (14 days) */
+function getFourteenDaysAgo(): string {
+  'use no memo'
+  return new Date(Date.now() - 14 * 86_400_000).toISOString()
+}
 
 interface Props {
   params: Promise<{ locale: string }>
@@ -51,6 +58,29 @@ export default async function HomePage({ params, searchParams }: Props) {
   const suggestedModels = (models.length === 0 && search)
     ? (await getModels({ limit: 4, offset: 0 })).models
     : []
+
+  // CM-01/02: Curated sections — only on first page without filters
+  const isFirstPage = page === 1 && !category && !search && !agent_type && !max_price
+  const supabase = isFirstPage ? await createClient() : null
+  const fourteenDaysAgo = getFourteenDaysAgo()
+
+  const [freeTrialAgents, topRatedAgents, newAgents] = isFirstPage && supabase
+    ? await Promise.all([
+        supabase.from('agents').select('*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)')
+          .eq('status', 'active').eq('free_trial_enabled', true)
+          .order('total_calls', { ascending: false }).limit(6)
+          .then(r => r.data ?? []),
+        supabase.from('agents').select('*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)')
+          .eq('status', 'active').not('reputation_score', 'is', null)
+          .order('reputation_score', { ascending: false }).limit(6)
+          .then(r => r.data ?? []),
+        supabase.from('agents').select('*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)')
+          .eq('status', 'active')
+          .gte('created_at', fourteenDaysAgo)
+          .order('created_at', { ascending: false }).limit(6)
+          .then(r => r.data ?? []),
+      ])
+    : [[], [], []]
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const hasNext    = page < totalPages
@@ -230,6 +260,44 @@ export default async function HomePage({ params, searchParams }: Props) {
           )}
         </div>
       </section>
+
+      {/* ── Curated sections (CM-01/02) ────────────────────────────────── */}
+      {isFirstPage && (freeTrialAgents.length > 0 || topRatedAgents.length > 0 || newAgents.length > 0) && (
+        <section className="px-6 py-8 bg-white border-t border-gray-100">
+          <div className="mx-auto max-w-6xl space-y-10">
+            {freeTrialAgents.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">{t('freeToTry')}</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {freeTrialAgents.map((agent: Record<string, unknown>, i: number) => (
+                    <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {topRatedAgents.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">{t('topRated')}</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {topRatedAgents.map((agent: Record<string, unknown>, i: number) => (
+                    <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {newAgents.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">{t('justLaunched')}</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {newAgents.map((agent: Record<string, unknown>, i: number) => (
+                    <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ── Agent API ────────────────────────────────────────────────────── */}
       <section className="bg-gray-900 px-6 py-16 text-white">

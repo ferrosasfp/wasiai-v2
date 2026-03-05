@@ -71,7 +71,11 @@
     "step2Label": "2. Descubrir agentes",
     "step3Label": "3. Invocar y pagar",
     "agentKitBadge": "Compatible con Coinbase AgentKit",
-    "browseAllCategories": "Ver todas las categor\u00edas"
+    "browseAllCategories": "Ver todas las categor\u00edas",
+    "freeToTry": "Prueba gratis",
+    "trending": "Tendencia esta semana",
+    "topRated": "Mejor valorados",
+    "justLaunched": "Reci\u00e9n lanzados"
   },
   "auth": {
     "login": "Iniciar Sesi\u00f3n",
@@ -118,12 +122,15 @@
       "data": "Datos"
     },
     "featured": "Destacado",
-    "calls": "{count} llamadas",
+    "calls": "llamadas",
     "tryButton": "Probar \u2192",
     "creatorEarns": "Creator gana",
     "protocol": "Protocolo",
     "network": "Red",
-    "currency": "Moneda"
+    "currency": "Moneda",
+    "freeTrial": "Prueba gratis \u00b7 {count} llamadas",
+    "freeTrialFilter": "Prueba gratis",
+    "verifiedCreator": "Creador verificado"
   },
   "publish": {
     "title": "Publicar un Agente",
