@@ -585,7 +585,7 @@
     "rank": "Posici\u00f3n",
     "agent": "Agente",
     "calls": "Llamadas",
-    "estimatedRevenue": "Revenue Estimado",
+    "estimatedRevenue": "Ingresos estimados",
     "footerLink": "Transparencia",
     "contractAddress": "Contrato",
     "dataSource": "Datos obtenidos directamente del contrato WasiAI Marketplace en Avalanche Fuji testnet."
@@ -713,13 +713,17 @@
     "title": "Constructor de Pipelines",
     "subtitle": "Encadena agentes en pasos para crear flujos multi-paso sin codigo.",
     "noAgents": "No hay agentes disponibles",
-    "addStep": "Agregar paso",
+    "addStep": "Agregar step",
     "run": "Ejecutar pipeline",
     "running": "Ejecutando...",
     "result": "Resultado",
     "clear": "Limpiar",
     "inputLabel": "Entrada",
-    "inputPlaceholder": "Escribe tu entrada..."
+    "inputPlaceholder": "Escribe tu entrada...",
+    "configure": "Configurar pipeline",
+    "noActiveAgents": "No hay agentes activos disponibles. Publica un agente primero.",
+    "enterApiKey": "Ingresa tu API key para ejecutar el pipeline.",
+    "maxSteps": "Maximo {n} steps"
   },
   "sandbox": {
     "title": "Sandbox",
@@ -736,7 +740,8 @@
     "history": "Historial",
     "noHistory": "Sin ejecuciones aun",
     "latency": "Latencia",
-    "status": "Estado"
+    "status": "Estado",
+    "noActiveAgents": "No hay agentes activos disponibles."
   },
   "agentWallet": {
     "title": "Wallet del Agente",

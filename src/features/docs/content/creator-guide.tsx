@@ -74,8 +74,8 @@ export function CreatorGuideSection() {
         <h3 className="text-base font-semibold text-gray-800">Modelo de fees: 90/10</h3>
         <div className="rounded-lg border border-avax-100 bg-avax-50 p-4 text-sm text-avax-800">
           <p>
-            Por cada invocación exitosa, el <strong>90% del price_per_call</strong> va directo a tu
-            wallet on-chain. El <strong>10% restante</strong> es el fee de plataforma de WasiAI.
+            For every successful invocation, <strong>90% of price_per_call</strong> goes directly to your
+            on-chain wallet. The remaining <strong>10%</strong> is WasiAI&apos;s platform fee.
             La distribución es automática — no hay facturas ni reconciliaciones manuales.
           </p>
           <p className="mt-2 text-avax-700">
@@ -89,9 +89,9 @@ export function CreatorGuideSection() {
       <div className="space-y-3">
         <h3 className="text-base font-semibold text-gray-800">Receive payments</h3>
         <ol className="text-sm text-gray-600 list-decimal list-inside space-y-1">
-          <li>Conecta tu wallet EVM en el dashboard</li>
-          <li>Los earnings se acumulan on-chain en el contrato Marketplace</li>
-          <li>Ejecuta <code className="bg-gray-100 px-1 rounded text-xs">withdraw()</code> desde el dashboard cuando quieras</li>
+          <li>Connect your EVM wallet in the dashboard</li>
+          <li>Earnings accumulate on-chain in the Marketplace contract</li>
+          <li>Call <code className="bg-gray-100 px-1 rounded text-xs">withdraw()</code> from the dashboard whenever you want</li>
         </ol>
       </div>
 

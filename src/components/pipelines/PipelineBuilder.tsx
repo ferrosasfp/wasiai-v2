@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useReducer, useRef } from 'react'
 import { Trash2, Plus, ArrowDown, Play, Loader2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ function validateStepsClient(steps: LocalStep[]): string | null {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineBuilderProps) {
+  const t = useTranslations('pipelines')
   const [steps, setSteps] = useState<LocalStep[]>([
     { _id: newStepId(), agent_slug: availableAgents[0]?.slug ?? '', input: '', pass_output: false, parallel: false },
   ])
@@ -163,7 +165,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
         />
         {mounted && !apiKey.trim() && (
           <p className="text-xs text-amber-600 mt-1" suppressHydrationWarning>
-            Ingresa tu API key para ejecutar el pipeline.
+            {t('enterApiKey')}
           </p>
         )}
       </div>
@@ -291,10 +293,10 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
             disabled={atMaxSteps || isRunning}
             className="flex items-center gap-1.5 text-sm px-4 py-2 border border-avax-300 text-avax-600 rounded-xl hover:bg-avax-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            <Plus size={14} /> Agregar step
+            <Plus size={14} /> {t('addStep')}
           </button>
           {atMaxSteps && (
-            <span className="text-xs text-amber-600">Máximo 5 steps</span>
+            <span className="text-xs text-amber-600">{t('maxSteps', { n: 5 })}</span>
           )}
         </div>
 
