@@ -187,7 +187,9 @@ export async function signInWithGoogle(locale: string) {
 
     const supabase = await createClient()
     const headersList = await headers()
-    const origin = headersList.get('origin') ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+    // NG-004: Validar origin contra allowlist antes de usar en redirectTo
+    const { getSafeOriginFromHeaders } = await import('@/lib/security/allowed-origins')
+    const origin = getSafeOriginFromHeaders(headersList)
 
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
