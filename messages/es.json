@@ -312,7 +312,15 @@
   "analytics": {
     "callsChartTitle": "Llamadas por d\u00eda (\u00faltimos 30 d\u00edas)",
     "alertHighError": "Tu agente \"{name}\" tiene alta tasa de error. Revisa tu endpoint.",
-    "alertNoActivity": "\"{name}\" sin actividad en 7 d\u00edas. \u00bfTu agente est\u00e1 activo?"
+    "alertNoActivity": "\"{name}\" sin actividad en 7 d\u00edas. \u00bfTu agente est\u00e1 activo?",
+    "title": "Anal\u00edticas",
+    "all_agents": "Todos los agentes",
+    "empty_state": "Sin llamadas a\u00fan. Comparte el link de tu agente para empezar a recibir invocaciones.",
+    "calls_24h": "Llamadas (24h)",
+    "total_calls": "Total llamadas",
+    "avg_latency": "Latencia promedio",
+    "uptime": "Uptime (24h)",
+    "earnings": "Ganancias"
   },
   "creator_profile": {
     "agents_count": "{count} agentes",
