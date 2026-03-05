@@ -224,7 +224,14 @@
       "processing": "Procesando pago...",
       "confirming": "Confirmando en Avalanche",
       "redirecting": "Redirigiendo al dashboard..."
-    }
+    },
+    "pageTitle": "Publicar agente",
+    "pageSubtitle": "Lista tu agente de IA en WasiAI y gana USDC por cada llamada.",
+    "draftTitle": "Tienes un borrador sin publicar",
+    "draftContinue": "Continuar borrador",
+    "draftDiscard": "Descartar",
+    "draftQuestion": "\u00bfQuieres continuar donde lo dejaste?",
+    "walletRequired": "Configura tu wallet antes de publicar este agente."
   },
   "dashboard": {
     "title": "Panel del Creator",

@@ -224,7 +224,14 @@
       "processing": "Processing payment...",
       "confirming": "Confirming on Avalanche",
       "redirecting": "Redirecting to dashboard..."
-    }
+    },
+    "pageTitle": "Publish Agent",
+    "pageSubtitle": "List your AI agent on WasiAI and earn USDC per call.",
+    "draftTitle": "You have an unpublished draft",
+    "draftContinue": "Continue draft",
+    "draftDiscard": "Discard",
+    "draftQuestion": "Do you want to continue where you left off?",
+    "walletRequired": "Set up your wallet before publishing this agent."
   },
   "dashboard": {
     "title": "Creator Dashboard",
