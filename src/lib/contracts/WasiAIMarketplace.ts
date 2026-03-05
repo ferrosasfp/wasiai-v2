@@ -40,7 +40,7 @@ export const WASIAI_MARKETPLACE_ABI = [
           { name: 'creator',       type: 'address' },
           { name: 'pricePerCall',  type: 'uint256' },
           { name: 'erc8004Id',     type: 'uint64'  },
-          { name: 'creatorFeeBps', type: 'uint16'  },
+          // NA-207: creatorFeeBps removido del contrato (dead storage)
           { name: 'active',        type: 'bool'    },
         ],
       },
@@ -291,6 +291,57 @@ export const WASIAI_MARKETPLACE_ABI = [
       { name: 'keyId',  type: 'bytes32', indexed: true  },
       { name: 'owner',  type: 'address', indexed: true  },
       { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
+  // NA-202: Treasury timelock — proposeTreasury / executeTreasury / cancelTreasury
+  {
+    name: 'proposeTreasury',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_treasury', type: 'address' }],
+    outputs: [],
+  },
+  {
+    name: 'executeTreasury',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'cancelTreasury',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'pendingTreasury',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    name: 'pendingTreasuryTimestamp',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'TreasuryProposed',
+    type: 'event',
+    inputs: [
+      { name: 'proposed',     type: 'address', indexed: true  },
+      { name: 'executeAfter', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    name: 'TreasuryCanceled',
+    type: 'event',
+    inputs: [
+      { name: 'canceledProposal', type: 'address', indexed: true },
     ],
   },
   // WAS-141: Creator withdraws USDC directly from key balance
