@@ -234,7 +234,10 @@
     "walletRequired": "Configura tu wallet antes de publicar este agente.",
     "step1NamePlaceholder": "Ej: Traductor Espa\u00f1ol GPT",
     "step1DescPlaceholder": "Describe qu\u00e9 hace tu agente\u2026",
-    "step3AuthNote": "Se env\u00eda como cabecera Authorization en cada llamada a tu API"
+    "step3AuthNote": "Se env\u00eda como cabecera Authorization en cada llamada a tu API",
+    "step3TestBtn": "Probar endpoint",
+    "step3Testing": "Probando...",
+    "step3EarningsNote": "Ganas el 90% de cada llamada \u00b7 WasiAI toma el 10% \u00b7 Pagado en USDC"
   },
   "dashboard": {
     "title": "Panel del Creator",
