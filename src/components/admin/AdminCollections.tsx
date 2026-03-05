@@ -300,7 +300,7 @@ export function AdminCollections() {
                         <p className="p-2 text-xs text-gray-500">No agents available</p>
                       ) : (
                         filteredAgents.slice(0, 15).map(a => (
-                          <button key={a.id} onClick={() => addAgent(a.id)}
+                          <button key={a.id ?? a.slug} onClick={() => addAgent(a.id)}
                             className="w-full text-left rounded px-2 py-1.5 text-sm hover:bg-gray-600 transition">
                             <span className="text-white">{a.name}</span>
                             <span className="ml-2 text-xs text-gray-400">{a.category}</span>
