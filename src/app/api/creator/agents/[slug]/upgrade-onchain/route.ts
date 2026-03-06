@@ -11,6 +11,7 @@ import { validateCsrf } from '@/lib/security/csrf'
 import { createPublicClient, http } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { logger } from '@/lib/logger'
+import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 const upgradeSchema = z.object({
   txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid transaction hash'),
@@ -22,6 +23,10 @@ export async function POST(
 ) {
   const csrfError = validateCsrf(req)
   if (csrfError) return csrfError
+
+  // NG-102: Rate limiting — reutiliza register limit (5/h por IP)
+  const rlHit = await checkRateLimit(getRegisterLimit(), getIdentifier(req))
+  if (rlHit) return rlHit
 
   const { slug } = await params
 
@@ -87,14 +92,15 @@ export async function POST(
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    // NG-106: No exponer mensaje interno de RPC al usuario
     logger.error('[upgrade-onchain] Receipt verification failed', { slug, err: msg })
     return NextResponse.json(
-      { error: `Could not verify transaction: ${msg}` },
+      { error: 'Could not verify transaction on-chain. Please try again or contact support.' },
       { status: 422 },
     )
   }
 
-  // Update DB
+  // Update DB — NG-107: incluir token_id (erc8004Id del evento, 0 = no NFT)
   const { error } = await serviceClient
     .from('agents')
     .update({
@@ -102,6 +108,7 @@ export async function POST(
       on_chain_registered: true,
       chain_registered_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      token_id: 0, // erc8004Id — siempre 0 en selfRegisterAgent (no NFT minted yet)
     })
     .eq('id', existing.id)
 
