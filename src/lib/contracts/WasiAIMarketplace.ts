@@ -25,6 +25,21 @@ export const WASIAI_MARKETPLACE_ABI = [
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
   },
+  // NA-301b: Free registrations per user
+  {
+    name: 'freeRegistrationsPerUser',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'userRegistrationCount',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
   // WAS-160g: Self-registration — creator signs and pays gas directly
   {
     name: 'selfRegisterAgent',

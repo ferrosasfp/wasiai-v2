@@ -48,6 +48,7 @@ export default function RegistrationChoiceModal({
   const [gasEstimate, setGasEstimate] = useState<string | null>(null)
   const [balance, setBalance]     = useState<string | null>(null)
   const [registrationFee, setRegistrationFee] = useState<bigint>(0n)
+  const [feeApplies, setFeeApplies] = useState(false)
 
   const chain = chainId === 43114 ? avalanche : avalancheFuji
   const rpcUrl = chainId === 43114
@@ -60,13 +61,28 @@ export default function RegistrationChoiceModal({
   useEffect(() => {
     async function estimate() {
       try {
-        // NA-301: Fetch registration fee
-        const fee = await publicClient.readContract({
-          address: contractAddress as Address,
-          abi: WASIAI_MARKETPLACE_ABI,
-          functionName: 'registrationFee',
-        }) as bigint
+        // NA-301b: Fetch registration fee + free tier info
+        const [fee, freeLimit, userCount] = await Promise.all([
+          publicClient.readContract({
+            address: contractAddress as Address,
+            abi: WASIAI_MARKETPLACE_ABI,
+            functionName: 'registrationFee',
+          }) as Promise<bigint>,
+          publicClient.readContract({
+            address: contractAddress as Address,
+            abi: WASIAI_MARKETPLACE_ABI,
+            functionName: 'freeRegistrationsPerUser',
+          }) as Promise<bigint>,
+          publicClient.readContract({
+            address: contractAddress as Address,
+            abi: WASIAI_MARKETPLACE_ABI,
+            functionName: 'userRegistrationCount',
+            args: [creatorAddress as Address],
+          }) as Promise<bigint>,
+        ])
         setRegistrationFee(fee)
+        const needsFee = fee > 0n && userCount >= freeLimit
+        setFeeApplies(needsFee)
 
         const [gas, gasPrice, bal] = await Promise.all([
           publicClient.estimateContractGas({
@@ -103,8 +119,8 @@ export default function RegistrationChoiceModal({
     try {
       const priceAtomics = toUSDCAtomics(pricePerCall)
 
-      // NA-301: Approve USDC for registration fee before selfRegisterAgent
-      if (registrationFee > 0n) {
+      // NA-301b: Approve USDC only if user exceeded free registrations
+      if (feeApplies) {
         const approveData = encodeFunctionData({
           abi: ERC20_APPROVE_ABI,
           functionName: 'approve',
@@ -189,9 +205,15 @@ export default function RegistrationChoiceModal({
               </div>
               <p className="text-sm text-gray-600">{t('registrationChoice.onChainDesc')}</p>
               {registrationFee > 0n && (
-                <p className="text-xs text-amber-600 mt-2">
-                  📋 Registration fee: {formatUnits(registrationFee, 6)} USDC
-                </p>
+                feeApplies ? (
+                  <p className="text-xs text-amber-600 mt-2">
+                    📋 Registration fee: {formatUnits(registrationFee, 6)} USDC
+                  </p>
+                ) : (
+                  <p className="text-xs text-green-600 mt-2">
+                    🎉 Free registration — no fee for your first agents!
+                  </p>
+                )
               )}
               {gasEstimate && (
                 <p className="text-xs text-gray-400 mt-1">
