@@ -8,7 +8,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
-import { createPublicClient, http, decodeEventLog } from 'viem'
+import { createPublicClient, http, decodeEventLog, keccak256, toHex } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { logger } from '@/lib/logger'
 import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
@@ -108,6 +108,8 @@ export async function POST(
     }
 
     // NG-101: Verify AgentRegistered event with correct slug
+    // Note: slug is an indexed string, so it appears as keccak256 hash in topics
+    const slugHash = keccak256(toHex(slug))
     const agentRegisteredEvent = receipt.logs
       .map(log => {
         try {
@@ -123,7 +125,7 @@ export async function POST(
       .find(
         decoded =>
           decoded?.eventName === 'AgentRegistered' &&
-          (decoded.args as { slug?: string })?.slug === slug,
+          (decoded.args as { slug?: string })?.slug === slugHash,
       )
 
     if (!agentRegisteredEvent) {
