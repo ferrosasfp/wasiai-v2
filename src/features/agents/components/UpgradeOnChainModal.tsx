@@ -236,7 +236,7 @@ export function UpgradeOnChainModal({
                       📋 Registration fee: {formatUnits(registrationFee, 6)} USDC
                     </p>
                     <p className="text-xs text-amber-600 mt-1">
-                      You've used your free registrations. A fee is required for additional agents.
+                      You&apos;ve used your free registrations. A fee is required for additional agents.
                     </p>
                   </>
                 ) : (
