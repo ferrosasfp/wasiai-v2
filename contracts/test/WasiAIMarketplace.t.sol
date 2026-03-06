@@ -146,7 +146,7 @@ contract WasiAIMarketplaceTest is Test {
 
     function test_SelfRegisterAgent_EmptySlug() public {
         vm.prank(creator);
-        vm.expectRevert("WasiAI: empty slug");
+        vm.expectRevert("Invalid slug length");
         marketplace.selfRegisterAgent("", PRICE, 0);
     }
 
@@ -164,6 +164,67 @@ contract WasiAIMarketplaceTest is Test {
         vm.expectEmit(true, true, true, true);
         emit WasiAIMarketplace.AgentRegistered(SLUG, creator, PRICE, 0);
         marketplace.selfRegisterAgent(SLUG, PRICE, 0);
+    }
+
+    // ── Self-Registration Validations (WAS-165 / SDD #054) ─────────────────────
+
+    function test_selfRegister_noFee_reverts() public {
+        // Set a registration fee of 1 USDC
+        vm.prank(owner);
+        marketplace.setRegistrationFee(1_000_000);
+
+        // Creator tries to register without approving USDC — transferFrom will fail
+        vm.prank(creator);
+        vm.expectRevert(); // transferFrom reverts (no balance/allowance)
+        marketplace.selfRegisterAgent("my-agent", PRICE, 0);
+    }
+
+    function test_selfRegister_slugTooLong_reverts() public {
+        // Build a slug of 81 chars
+        bytes memory longSlug = new bytes(81);
+        for (uint256 i = 0; i < 81; i++) longSlug[i] = "a";
+
+        vm.prank(creator);
+        vm.expectRevert("Invalid slug length");
+        marketplace.selfRegisterAgent(string(longSlug), PRICE, 0);
+    }
+
+    function test_selfRegister_priceTooLow_reverts() public {
+        vm.prank(creator);
+        vm.expectRevert("Price out of range");
+        marketplace.selfRegisterAgent("low-price", 999, 0);
+    }
+
+    function test_selfRegister_priceTooHigh_reverts() public {
+        vm.prank(creator);
+        vm.expectRevert("Price out of range");
+        marketplace.selfRegisterAgent("high-price", 100_000_001, 0);
+    }
+
+    function test_selfRegister_withFee_succeeds() public {
+        uint256 fee = 1_000_000; // 1 USDC
+        vm.prank(owner);
+        marketplace.setRegistrationFee(fee);
+
+        // Give creator USDC and approve marketplace
+        usdc.mint(creator, fee);
+        vm.startPrank(creator);
+        usdc.approve(address(marketplace), fee);
+        marketplace.selfRegisterAgent("paid-agent", PRICE, 0);
+        vm.stopPrank();
+
+        WasiAIMarketplace.Agent memory agent = marketplace.getAgent("paid-agent");
+        assertEq(agent.creator, creator);
+        assertEq(agent.pricePerCall, PRICE);
+        // Fee transferred to contract
+        assertEq(usdc.balanceOf(address(marketplace)), fee);
+        assertEq(usdc.balanceOf(creator), 0);
+    }
+
+    function test_setRegistrationFee_onlyOwner() public {
+        vm.prank(stranger);
+        vm.expectRevert();
+        marketplace.setRegistrationFee(1_000_000);
     }
 
     // ── Invocation & Split ────────────────────────────────────────────────────

@@ -8,10 +8,24 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { createPublicClient, http, formatEther } from 'viem'
+import { createPublicClient, http, formatEther, formatUnits, encodeFunctionData } from 'viem'
 import { avalancheFuji, avalanche } from 'viem/chains'
 import { WASIAI_MARKETPLACE_ABI, toUSDCAtomics } from '@/lib/contracts/WasiAIMarketplace'
 import type { Address } from 'viem'
+import { USDC_ADDRESS } from '@/lib/chain'
+
+const ERC20_APPROVE_ABI = [
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const
 
 interface Props {
   slug: string
@@ -33,6 +47,7 @@ export default function RegistrationChoiceModal({
   const [error, setError]         = useState<string | null>(null)
   const [gasEstimate, setGasEstimate] = useState<string | null>(null)
   const [balance, setBalance]     = useState<string | null>(null)
+  const [registrationFee, setRegistrationFee] = useState<bigint>(0n)
 
   const chain = chainId === 43114 ? avalanche : avalancheFuji
   const rpcUrl = chainId === 43114
@@ -45,6 +60,14 @@ export default function RegistrationChoiceModal({
   useEffect(() => {
     async function estimate() {
       try {
+        // NA-301: Fetch registration fee
+        const fee = await publicClient.readContract({
+          address: contractAddress as Address,
+          abi: WASIAI_MARKETPLACE_ABI,
+          functionName: 'registrationFee',
+        }) as bigint
+        setRegistrationFee(fee)
+
         const [gas, gasPrice, bal] = await Promise.all([
           publicClient.estimateContractGas({
             address: contractAddress as Address,
@@ -80,8 +103,30 @@ export default function RegistrationChoiceModal({
     try {
       const priceAtomics = toUSDCAtomics(pricePerCall)
 
+      // NA-301: Approve USDC for registration fee before selfRegisterAgent
+      if (registrationFee > 0n) {
+        const approveData = encodeFunctionData({
+          abi: ERC20_APPROVE_ABI,
+          functionName: 'approve',
+          args: [contractAddress as Address, registrationFee],
+        })
+
+        const approveTx = await win.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: creatorAddress,
+            to: USDC_ADDRESS,
+            data: approveData,
+          }],
+        })
+
+        await publicClient.waitForTransactionReceipt({
+          hash: approveTx as `0x${string}`,
+          timeout: 60_000,
+        })
+      }
+
       // Encode selfRegisterAgent call
-      const { encodeFunctionData } = await import('viem')
       const data = encodeFunctionData({
         abi: WASIAI_MARKETPLACE_ABI,
         functionName: 'selfRegisterAgent',
@@ -143,8 +188,13 @@ export default function RegistrationChoiceModal({
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">ERC-8004</span>
               </div>
               <p className="text-sm text-gray-600">{t('registrationChoice.onChainDesc')}</p>
+              {registrationFee > 0n && (
+                <p className="text-xs text-amber-600 mt-2">
+                  📋 Registration fee: {formatUnits(registrationFee, 6)} USDC
+                </p>
+              )}
               {gasEstimate && (
-                <p className="text-xs text-gray-400 mt-2">
+                <p className="text-xs text-gray-400 mt-1">
                   {t('registrationChoice.gasEstimate', { amount: Number(gasEstimate).toFixed(6) })}
                   {balance && ` · Balance: ${Number(balance).toFixed(4)} AVAX`}
                 </p>

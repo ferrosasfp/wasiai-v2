@@ -9,11 +9,25 @@
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { createPublicClient, http, formatEther, encodeFunctionData } from 'viem'
+import { createPublicClient, http, formatEther, formatUnits, encodeFunctionData } from 'viem'
 import { avalancheFuji, avalanche } from 'viem/chains'
 import { WASIAI_MARKETPLACE_ABI, toUSDCAtomics } from '@/lib/contracts/WasiAIMarketplace'
 import { ShieldCheck } from 'lucide-react'
 import type { Address } from 'viem'
+import { USDC_ADDRESS } from '@/lib/chain'
+
+const ERC20_APPROVE_ABI = [
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const
 
 interface Props {
   slug: string
@@ -35,6 +49,7 @@ export function UpgradeOnChainModal({
   const [error, setError] = useState<string | null>(null)
   const [gasEstimate, setGasEstimate] = useState<string | null>(null)
   const [balance, setBalance] = useState<string | null>(null)
+  const [registrationFee, setRegistrationFee] = useState<bigint>(0n)
 
   const chain = chainId === 43114 ? avalanche : avalancheFuji
   const rpcUrl = chainId === 43114
@@ -46,6 +61,14 @@ export function UpgradeOnChainModal({
   useEffect(() => {
     async function estimate() {
       try {
+        // Fetch registration fee from contract
+        const fee = await publicClient.readContract({
+          address: contractAddress as Address,
+          abi: WASIAI_MARKETPLACE_ABI,
+          functionName: 'registrationFee',
+        }) as bigint
+        setRegistrationFee(fee)
+
         const [gas, gasPrice, bal] = await Promise.all([
           publicClient.estimateContractGas({
             address: contractAddress as Address,
@@ -86,6 +109,29 @@ export function UpgradeOnChainModal({
     setStep('signing')
 
     try {
+      // NA-301: Approve USDC for registration fee before selfRegisterAgent
+      if (registrationFee > 0n) {
+        const approveData = encodeFunctionData({
+          abi: ERC20_APPROVE_ABI,
+          functionName: 'approve',
+          args: [contractAddress as Address, registrationFee],
+        })
+
+        const approveTx = await win.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: creatorAddress,
+            to: USDC_ADDRESS,
+            data: approveData,
+          }],
+        })
+
+        await publicClient.waitForTransactionReceipt({
+          hash: approveTx as `0x${string}`,
+          timeout: 60_000,
+        })
+      }
+
       const data = encodeFunctionData({
         abi: WASIAI_MARKETPLACE_ABI,
         functionName: 'selfRegisterAgent',
@@ -165,6 +211,17 @@ export function UpgradeOnChainModal({
                 </div>
               ))}
             </div>
+
+            {registrationFee > 0n && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 mb-4">
+                <p className="text-sm text-amber-800 font-medium">
+                  📋 Registration fee: {formatUnits(registrationFee, 6)} USDC
+                </p>
+                <p className="text-xs text-amber-600 mt-1">
+                  This fee is required to register your agent on-chain. You will be asked to approve USDC first.
+                </p>
+              </div>
+            )}
 
             {gasEstimate && (
               <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 mb-4">
