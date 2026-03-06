@@ -30,10 +30,12 @@ Marketplace on-chain de agentes IA en Avalanche. Cualquier developer publica un 
 
 | Red | Dirección | Estado |
 |-----|-----------|--------|
-| Fuji (43113) | `0x71CddCdF8a40951a1d8C22C8774448FbcA089b53` | ✅ activo, verificado |
+| Fuji (43113) | `0x3583fb96bAB5DbBDd85CCeA1C4fCE3EfF3249F08` | ✅ activo, v1.3 con registration fee + free tier |
 | Mainnet | pendiente | 🔒 no deployado |
 
 **NUNCA usar estas direcciones deprecadas:**
+- `0x71CddCdF8a40951a1d8C22C8774448FbcA089b53` (v1.2 sin fee/validaciones)
+- `0x2aC90D148563CFe325220bbCB0Dec394B9292C2e` (v1.1)
 - `0xB25688c47B441964d8d30b1157161Fde3e0334AA`
 - `0x02e8A1c86E4D246ED281E8Cd45B2a8480B15Db71`
 
@@ -74,8 +76,8 @@ Marketplace on-chain de agentes IA en Avalanche. Cualquier developer publica un 
 6. **SSRF protection** en cualquier endpoint que haga fetch a URLs del usuario
 7. **trim()** en todas las env vars leídas al arrancar
 8. **RLS activo** antes de cualquier commit con tablas nuevas
-9. **Push siempre:** `git push origin master master:main`
-10. **Migrations numeradas:** `0XX_descripcion.sql` — próxima disponible: 017
+9. **Push siempre:** `git push origin main` (rama única, master eliminado)
+10. **Migrations numeradas:** `0XX_descripcion.sql` — próxima disponible: 041
 11. **Contrato de integración condicional** — si la HU involucra comunicación entre componentes (compose ↔ agente, frontend ↔ API, SDK ↔ endpoint): la sección "Contrato de Integración" es BLOQUEANTE en el story file — Dev no empieza sin ella completa. Si NO hay comunicación entre componentes: la sección se elimina del story file, no se deja vacía.
 
 ---
@@ -150,9 +152,8 @@ contracts/
 ├── test/
 └── script/DeployMarketplace.s.sol
 
-supabase/migrations/       ← 000–014 aplicadas
-.nexus/                    ← metodología Nexus
-.nexus/                    ← artefactos y sprints NexusAgil
+supabase/migrations/       ← 000–040 aplicadas
+.nexus/                    ← artefactos, sprints y metodología NexusAgil
 ```
 
 ---
@@ -177,26 +178,14 @@ supabase/migrations/       ← 000–014 aplicadas
 
 ## Estado de sprints y épicas
 
-### Sprints cerrados
-| Sprint | HUs | Commits | Tests |
-|--------|-----|---------|-------|
-| Sprint 1 | HU-1.1, HU-1.2, HU-1.3 | `a036cbe` | 144/144 |
-| Sprint 2 | HU-1.4, HU-1.5, HU-3.1 | `4ff5ddc` | 182/182 |
+### Estado general
+- **Sprints completados:** 1–15+ (49 issues documentados en `.nexus/_INDEX.md`)
+- **Metodología:** NexusAgil v1.3 con 6 sub-agentes especializados
+- **Contrato:** v1.3 con registration fee (1 USDC) + free tier (2 agentes gratis)
+- **Migrations:** 000–040 aplicadas
 
-### Épicas activas
-
-| Épica | Estado | Prioridad |
-|-------|--------|-----------|
-| E1 — Creators Reales | ✅ COMPLETA | — |
-| E2 — SDK @wasiai/sdk | 🔜 Sprint 3 | P0 |
-| E3 — Free Trial | ✅ HU-3.1 done | P0 |
-| E4 — Discovery | pendiente | P1 |
-| E5 — Compose API | pendiente | P2 |
-| E6 — Mainnet | 🔒 diferida (producto más robusto primero) | P3 |
-| E7 — Integraciones | pendiente | P3 |
-| E8 — Transparencia | pendiente | P4 |
-
-Ver detalle completo: `BACKLOG.md`
+Ver historial completo: `.nexus/_INDEX.md`
+Ver artefactos legacy: `.nexus/legacy/`
 
 ### Columnas DB críticas (no confundir)
 - `agent_calls.status` → `'success' | 'error'` (NO `status_code`)
@@ -210,7 +199,7 @@ Ver detalle completo: `BACKLOG.md`
 
 ## Decisiones de arquitectura tomadas (ADRs)
 
-Archivos completos en `.nexus/docs/architecture/`
+Decisiones registradas en este archivo. Detalle en los SDDs de cada sprint (`.nexus/sprints/`).
 
 | ID | Decisión | Razón | Sprint |
 |----|----------|-------|--------|
@@ -250,4 +239,4 @@ Archivos completos en `.nexus/docs/architecture/`
 
 ---
 
-*Última actualización: 2026-02-28 | Migrations aplicadas: 000–025 | Próxima: 026*
+*Última actualización: 2026-03-06 | Migrations aplicadas: 000–040 | Próxima: 041 | Contrato: 0x3583fb96 (Fuji)*
