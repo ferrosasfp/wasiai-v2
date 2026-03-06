@@ -245,9 +245,19 @@ export async function POST(
         )
       }
       keyMutexAcquired = true
-    } catch {
-      // Redis unavailable — fail-open (rate limiting still applies)
-      logger.warn('[invoke] Redis mutex unavailable — proceeding without mutex', { keyId: keyRow.id })
+    } catch (err) {
+      // NG-105: Redis unavailable — fail-closed to prevent double-spend
+      logger.error('[invoke] Redis mutex unavailable — rejecting request', {
+        keyId: keyRow.id,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable. Please retry.' },
+        {
+          status: 503,
+          headers: { 'Retry-After': '5' },
+        },
+      )
     }
 
     // NG-008: Pre-flight soft check for user-friendly error (non-atomic, for UX only)

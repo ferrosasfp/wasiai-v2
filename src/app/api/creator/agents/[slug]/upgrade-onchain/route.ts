@@ -8,9 +8,10 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, decodeEventLog } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { logger } from '@/lib/logger'
+import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 const upgradeSchema = z.object({
@@ -81,6 +82,58 @@ export async function POST(
     if (receipt.status === 'reverted') {
       return NextResponse.json(
         { error: 'Transaction was reverted on-chain' },
+        { status: 422 },
+      )
+    }
+
+    // NG-101: Verify tx target is the correct marketplace contract
+    const contractAddress = process.env.MARKETPLACE_CONTRACT_ADDRESS
+    if (!contractAddress) {
+      return NextResponse.json(
+        { error: 'Marketplace contract not configured' },
+        { status: 500 },
+      )
+    }
+
+    if (receipt.to?.toLowerCase() !== contractAddress.toLowerCase()) {
+      logger.warn('[upgrade-onchain] TX target mismatch', {
+        slug,
+        expected: contractAddress,
+        actual: receipt.to,
+      })
+      return NextResponse.json(
+        { error: 'Transaction is not directed to the WasiAI Marketplace contract' },
+        { status: 422 },
+      )
+    }
+
+    // NG-101: Verify AgentRegistered event with correct slug
+    const agentRegisteredEvent = receipt.logs
+      .map(log => {
+        try {
+          return decodeEventLog({
+            abi: WASIAI_MARKETPLACE_ABI,
+            data: log.data,
+            topics: log.topics,
+          })
+        } catch {
+          return null
+        }
+      })
+      .find(
+        decoded =>
+          decoded?.eventName === 'AgentRegistered' &&
+          (decoded.args as { slug?: string })?.slug === slug,
+      )
+
+    if (!agentRegisteredEvent) {
+      logger.warn('[upgrade-onchain] AgentRegistered event not found for slug', {
+        slug,
+        txHash: result.data.txHash,
+        logCount: receipt.logs.length,
+      })
+      return NextResponse.json(
+        { error: 'Transaction does not contain a valid AgentRegistered event for this agent' },
         { status: 422 },
       )
     }
