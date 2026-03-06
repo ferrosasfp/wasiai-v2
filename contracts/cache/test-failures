@@ -1,1 +1,1 @@
-test_SelfRegisterAgent_EmptySlug
+test_selfRegister_noFee_reverts|test_selfRegister_withFee_succeeds

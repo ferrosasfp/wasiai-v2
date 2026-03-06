@@ -168,15 +168,36 @@ contract WasiAIMarketplaceTest is Test {
 
     // ── Self-Registration Validations (WAS-165 / SDD #054) ─────────────────────
 
-    function test_selfRegister_noFee_reverts() public {
+    function test_selfRegister_noFee_reverts_afterFreeTier() public {
         // Set a registration fee of 1 USDC
         vm.prank(owner);
         marketplace.setRegistrationFee(1_000_000);
 
-        // Creator tries to register without approving USDC — transferFrom will fail
-        vm.prank(creator);
+        // Use up the 2 free registrations
+        vm.startPrank(creator);
+        marketplace.selfRegisterAgent("free-agent-1", PRICE, 0);
+        marketplace.selfRegisterAgent("free-agent-2", PRICE, 0);
+
+        // 3rd registration without approving USDC — should revert
         vm.expectRevert(); // transferFrom reverts (no balance/allowance)
         marketplace.selfRegisterAgent("my-agent", PRICE, 0);
+        vm.stopPrank();
+    }
+
+    function test_selfRegister_freeTier_noFeeCharged() public {
+        uint256 fee = 1_000_000;
+        vm.prank(owner);
+        marketplace.setRegistrationFee(fee);
+
+        // First 2 registrations should be free (no USDC needed)
+        vm.startPrank(creator);
+        marketplace.selfRegisterAgent("free-1", PRICE, 0);
+        marketplace.selfRegisterAgent("free-2", PRICE, 0);
+        vm.stopPrank();
+
+        // No USDC was transferred
+        assertEq(usdc.balanceOf(address(marketplace)), 0);
+        assertEq(marketplace.userRegistrationCount(creator), 2);
     }
 
     function test_selfRegister_slugTooLong_reverts() public {
@@ -201,12 +222,18 @@ contract WasiAIMarketplaceTest is Test {
         marketplace.selfRegisterAgent("high-price", 100_000_001, 0);
     }
 
-    function test_selfRegister_withFee_succeeds() public {
+    function test_selfRegister_withFee_succeeds_afterFreeTier() public {
         uint256 fee = 1_000_000; // 1 USDC
         vm.prank(owner);
         marketplace.setRegistrationFee(fee);
 
-        // Give creator USDC and approve marketplace
+        // Use up free tier
+        vm.startPrank(creator);
+        marketplace.selfRegisterAgent("free-a", PRICE, 0);
+        marketplace.selfRegisterAgent("free-b", PRICE, 0);
+        vm.stopPrank();
+
+        // 3rd registration — needs fee
         usdc.mint(creator, fee);
         vm.startPrank(creator);
         usdc.approve(address(marketplace), fee);
@@ -219,6 +246,7 @@ contract WasiAIMarketplaceTest is Test {
         // Fee transferred to contract
         assertEq(usdc.balanceOf(address(marketplace)), fee);
         assertEq(usdc.balanceOf(creator), 0);
+        assertEq(marketplace.userRegistrationCount(creator), 3);
     }
 
     function test_setRegistrationFee_onlyOwner() public {
