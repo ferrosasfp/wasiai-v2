@@ -1,16 +1,55 @@
 ---
 name: nexus-agil
 description: >
-  Metodología NexusAgil v1.2 para procesar trabajo con agentes de IA.
+  Metodología NexusAgil v1.3 para procesar trabajo con agentes de IA.
   Activar cuando el usuario mencione "NexusAgil", "procesa HU", "sprint planning",
   "adversarial review", "story file", "quality pipeline", o cualquier gate formal.
 ---
 
-# NexusAgil v1.2 — Instrucciones de Ejecución
+# NexusAgil v1.3 — Instrucciones de Ejecución
 
 > **REGLA #1: Este archivo es un CHECKLIST, no documentación. Cada paso numerado es una INSTRUCCIÓN que DEBO ejecutar. No saltar pasos.**
 > **REGLA #2: Si no estoy seguro de qué paso sigue, releer este archivo desde el inicio.**
-> **REGLA #3: Las references/ contienen templates y detalles. Este archivo contiene el flujo obligatorio.**
+> **REGLA #3: Yo soy el ORQUESTADOR. No me auto-evalúo. Cada artefacto que produzco pasa por un sub-agente especializado antes de llegar al PO.**
+> **REGLA #4: Las references/ contienen templates, roles/ contienen instrucciones de sub-agentes.**
+
+---
+
+## Arquitectura de Agentes
+
+Yo (SM/Orquestador) escribo artefactos. Sub-agentes especializados los validan. El PO aprueba.
+
+```
+Yo escribo → Sub-agente valida → PO aprueba
+```
+
+### Los 6 Sub-agentes
+
+| # | Nombre | Skill | Cuándo se invoca | Misión |
+|---|--------|-------|-----------------|--------|
+| 1 | **Requirements Reviewer** | `roles/requirements-reviewer.md` | Pre HU_APPROVED | Encontrar lo que FALTA en el Work Item |
+| 2 | **Spec Reviewer** | `roles/spec-reviewer.md` | Pre SPEC_APPROVED | Encontrar errores técnicos en el SDD |
+| 3 | **Builder** | `roles/builder.md` | Post SPRINT_APPROVED | Implementar exactamente el SDD |
+| 4 | **Logic Auditor** | `roles/logic-auditor.md` | Post Builder | ¿El código hace lo correcto? |
+| 5 | **Security Reviewer** | `roles/security-reviewer.md` | Post Builder (solo QUALITY) | ¿El código es seguro? |
+| 6 | **QA Verifier** | `roles/qa-verifier.md` | Post Auditor/Security | ¿Los ACs se cumplen con evidencia? |
+
+### Cuántos sub-agentes por clasificación
+
+| Clasificación | Sub-agentes activos |
+|--------------|-------------------|
+| FAST-FIX | Solo Builder |
+| HU-MINOR | Builder + QA |
+| HU-MAJOR | Req Reviewer + Spec Reviewer + Builder + Logic Auditor + QA |
+| QUALITY | Los 6 completos |
+
+### Cómo invocar un sub-agente
+
+Al hacer `sessions_spawn`, incluir en el task:
+1. La misión del rol (primera línea del role skill)
+2. El contenido del role skill (`roles/[nombre].md`)
+3. El artefacto a procesar (Work Item, SDD, diff, etc.)
+4. Acceso al repo
 
 ---
 
@@ -39,30 +78,27 @@ Cuando el PO trae múltiples issues para un sprint:
 HACER:
 1. Leer todos los issues (Linear, descripción del PO, etc.)
 2. Presentar backlog priorizado con: número, título, prioridad, dependencias
-3. Dar mi validación adversarial del backlog
-4. Esperar: HU_APPROVED
+3. Lanzar sub-agente [1] Requirements Reviewer con el backlog + código actual
+4. Presentar al PO: backlog + findings del Requirements Reviewer
+5. Esperar: HU_APPROVED
 ```
 
 ### S2 — Escribir SDDs
 ```
 HACER (por cada issue aprobado):
 1. Leer el código actual relacionado con el issue
-2. *** WAVE 0 — PRE-FLIGHT (OBLIGATORIO) ***
-   0.1 — ¿El fix ya existe? (grep/búsqueda) → si existe: ALREADY_IMPLEMENTED
-   0.2 — ¿Los archivos referenciados existen? → si no: corregir rutas
-   0.3a — ¿El código de referencia compila contra tipos/ABI reales? → si no: corregir
-   0.3b — ¿El encoding es correcto? (indexed events = keccak256, structs) → si no: corregir
-   0.3c — Para contratos: ¿overflow, reentrancy, front-running? → documentar
-   0.4 — ¿Dependencias entre SDDs resueltas? → si no: marcar orden
-   0.5 — ¿Hay TODOs o ambigüedades? → completar
-3. Escribir SDD con estas secciones OBLIGATORIAS:
+2. Escribir SDD con estas secciones OBLIGATORIAS:
    - Context
    - Acceptance Criteria (EARS format)
-   - Wave 0 — Pre-flight (instrucciones para sub-agente)
+   - Wave 0 — Pre-flight (instrucciones para Builder)
    - Waves 1..N (con build gate al final de cada wave)
    - Rollback (cómo revertir)
    - Critical Constraints
-4. Guardar en doc/sdd/NNN-titulo.md
+3. Guardar en doc/sdd/NNN-titulo.md
+4. Lanzar sub-agente [2] Spec Reviewer con el SDD + acceso al repo
+   → El Spec Reviewer ejecuta Wave 0 completo + validación de coherencia
+5. Si Spec Reviewer reporta BLOQUEANTES → corregir SDD y re-lanzar
+6. Presentar al PO: SDD + reporte del Spec Reviewer
 ```
 
 ### S3 — Sprint Plan
@@ -81,25 +117,25 @@ HACER:
 ### S4 — Ejecutar
 ```
 HACER:
-1. Lanzar sub-agentes según plan (paralelo o secuencial)
-2. En el task de cada sub-agente, INCLUIR ESTA INSTRUCCIÓN:
-   "Antes de ejecutar Wave 1, ejecuta Wave 0:
-    Lee el SDD completo. Luego verifica:
-    1. ¿Los archivos mencionados existen? Lee cada uno.
-    2. ¿El código de referencia es compatible con los tipos reales?
-    3. ¿El fix ya está implementado?
-    4. Ejecuta build gate al final de cada wave (tsc --noEmit o equivalente).
-    Si encuentras discrepancias, STOP y reporta. No ejecutes."
-3. Esperar resultados
-4. Para QUALITY/contratos: ejecutar Security Gate (ver abajo)
+1. Lanzar sub-agentes [3] Builder según plan (paralelo o secuencial)
+   → Cada Builder recibe: SDD + roles/builder.md como instrucciones
+   → El Builder ejecuta Wave 0 independientemente (doble validación)
+2. Esperar resultados de Builders
+3. Por cada commit exitoso, lanzar en secuencia:
+   a. Sub-agente [4] Logic Auditor → recibe: diff + ACs + roles/logic-auditor.md
+   b. Si QUALITY: Sub-agente [5] Security Reviewer → recibe: diff + roles/security-reviewer.md
+   c. Sub-agente [6] QA Verifier → recibe: código + ACs + roles/qa-verifier.md
+4. Si Auditor o Security reportan BLOQUEANTE → Builder corrige → re-auditar
+5. Si QA reporta NO CUMPLE → Builder corrige → re-QA
 ```
 
 ### S5 — Review
 ```
 HACER:
 1. Presentar tabla de resultados: issue, fix, commit, evidencia
-2. Incluir hallazgos durante ejecución
-3. Esperar: REVIEW_APPROVED
+2. Incluir reportes de: Logic Auditor, Security Reviewer (si aplica), QA Verifier
+3. Incluir hallazgos durante ejecución
+4. Esperar: REVIEW_APPROVED
 ```
 
 ### S6 — Retro
@@ -128,19 +164,23 @@ HACER:
 ### Q2 — Work Item
 ```
 HACER:
-1. Presentar Work Item normalizado con ACs EARS
-2. Esperar: HU_APPROVED
+1. Escribir Work Item normalizado con ACs EARS
+2. Lanzar sub-agente [1] Requirements Reviewer con Work Item + código
+3. Presentar al PO: Work Item + findings del Requirements Reviewer
+4. Esperar: HU_APPROVED
 ```
 
 ### Q3 — SDD
 ```
 HACER:
-1. *** EJECUTAR WAVE 0 COMPLETO (ver S2 arriba) ***
-2. Escribir SDD con todas las secciones obligatorias
-3. Incluir Constraint Directives (OBLIGATORIO/PROHIBIDO)
-4. Incluir Rollback plan
-5. Readiness Check (cada AC tiene archivo, cada archivo tiene exemplar)
-6. Esperar: SPEC_APPROVED
+1. Escribir SDD con todas las secciones obligatorias
+2. Incluir Constraint Directives (OBLIGATORIO/PROHIBIDO)
+3. Incluir Rollback plan
+4. Lanzar sub-agente [2] Spec Reviewer con SDD + repo
+   → Ejecuta Wave 0 + validación de coherencia
+5. Si BLOQUEANTES → corregir y re-lanzar Spec Reviewer
+6. Presentar al PO: SDD + reporte del Spec Reviewer
+7. Esperar: SPEC_APPROVED
 ```
 
 ### Q4 — Story File
@@ -153,38 +193,30 @@ HACER:
 ### Q5 — Implementación
 ```
 HACER:
-1. Lanzar sub-agente con Story File + instrucción de Wave 0 + build gates
-2. Esperar resultado
+1. Lanzar sub-agente [3] Builder con SDD + roles/builder.md
+2. Esperar commit hash
 ```
 
-### Q6 — Adversarial Review
+### Q6 — Logic Audit
 ```
 HACER:
-1. Revisar el diff real (no el SDD, el código commiteado)
-2. Ejecutar checklist AR (references/adversarial_review_checklist.md)
-3. Clasificar: BLOQUEANTE / MENOR / OK
-4. Si BLOQUEANTE: sub-agente corrige, re-review
+1. Lanzar sub-agente [4] Logic Auditor con diff + ACs + roles/logic-auditor.md
+2. Si BLOQUEANTE → Builder corrige → re-auditar
 ```
 
-### Q7 — Security Gate (si QUALITY o contratos)
+### Q7 — Security Review (solo QUALITY o auth/pagos/contratos)
 ```
 HACER:
-1. ¿El diff introduce nueva superficie de ataque?
-2. ¿Se mantiene menor privilegio?
-3. ¿Inputs validados?
-4. ¿Secrets hardcodeados?
-5. ¿Error handling seguro?
-Si concern → revert o hotfix SDD
+1. Lanzar sub-agente [5] Security Reviewer con diff + roles/security-reviewer.md
+2. Si CRITICAL/HIGH → Builder corrige → re-review
 ```
 
-### Q8 — QA + Push
+### Q8 — QA Verification
 ```
 HACER:
-1. Drift detection (esperado vs real)
-2. Verificar ACs con evidencia archivo:línea
-3. Build + tests pasan
-4. Commit + push
-5. Actualizar _INDEX.md
+1. Lanzar sub-agente [6] QA Verifier con código + ACs + roles/qa-verifier.md
+2. Si NO CUMPLE → Builder corrige → re-QA
+3. Presentar reporte de QA como parte del Review
 ```
 
 ---
@@ -209,16 +241,18 @@ HACER:
 
 ## Reglas que NO puedo saltarme
 
-1. **Wave 0 es OBLIGATORIO** — doble ejecución (yo + sub-agente)
-2. **Build gate al final de CADA wave** — no solo al final
-3. **Rollback en cada SDD** — sin rollback = SDD incompleto
-4. **Gates requieren texto EXACTO** — "sí", "ok", "dale" NO activan gates
-5. **No preguntar "¿continúo?" entre fases** — el pipeline avanza solo entre gates
-6. **Leer código real antes de generar** — SIEMPRE
-7. **Para contratos: verificar encoding** — indexed = keccak256, no string directo
-8. **Paralelismo solo con archivos disjuntos** — verificar ANTES
-9. **Security Gate para QUALITY** — revisar diff real post-commit
+1. **Nunca me auto-evalúo** — todo artefacto que escribo pasa por un sub-agente antes del PO
+2. **Wave 0 lo ejecuta el Spec Reviewer, no yo** — él tiene ojos frescos sobre mi SDD
+3. **Build gate al final de CADA wave** — el Builder lo ejecuta, no opcional
+4. **Rollback en cada SDD** — sin rollback = SDD incompleto
+5. **Gates requieren texto EXACTO** — "sí", "ok", "dale" NO activan gates
+6. **No preguntar "¿continúo?" entre fases** — el pipeline avanza solo entre gates
+7. **Leer código real antes de generar** — SIEMPRE
+8. **Para contratos: los 6 sub-agentes** — sin excepción
+9. **Paralelismo solo con archivos disjuntos** — verificar ANTES de lanzar Builders
 10. **Amendments formales** — no cambios ad-hoc post-SPEC_APPROVED
+11. **Cada sub-agente recibe su role skill** — no instrucciones genéricas
+12. **Si un sub-agente reporta BLOQUEANTE → Builder corrige antes de continuar**
 
 ---
 
@@ -238,19 +272,31 @@ Cuando el PO menciona NexusAgil o trae trabajo:
 
 ## References (leer según necesidad)
 
+### Role Skills (instrucciones para sub-agentes)
+| Archivo | Sub-agente | Cuándo se usa |
+|---------|-----------|---------------|
+| `roles/requirements-reviewer.md` | Requirements Reviewer | Pre HU_APPROVED |
+| `roles/spec-reviewer.md` | Spec Reviewer | Pre SPEC_APPROVED |
+| `roles/builder.md` | Builder | Post SPRINT_APPROVED |
+| `roles/logic-auditor.md` | Logic Auditor | Post Builder commit |
+| `roles/security-reviewer.md` | Security Reviewer | Post Builder (QUALITY) |
+| `roles/qa-verifier.md` | QA Verifier | Post Auditor/Security |
+
+### Templates y checklists
 | Archivo | Cuándo leer |
 |---------|-------------|
 | `references/quality_pipeline.md` | Pipeline QUALITY detallado |
 | `references/quick_flow.md` | Pipeline FAST |
 | `references/sdd_template.md` | Al escribir un SDD |
 | `references/story_file_template.md` | Al generar Story File |
-| `references/adversarial_review_checklist.md` | Al hacer AR |
-| `references/validation_report_template.md` | Al hacer QA |
+| `references/adversarial_review_checklist.md` | Referencia para Logic Auditor |
+| `references/validation_report_template.md` | Referencia para QA Verifier |
 | `references/sprint_cadence.md` | Para ceremonias de sprint |
-| `references/agents_roster.md` | Roles de cada agente |
+| `references/agents_roster.md` | Descripción de roles (legacy, ver roles/) |
 | `references/project_context_template.md` | Bootstrap de proyecto nuevo |
 
 ---
 
-> **Versión:** 1.2 (marzo 2026)
-> **Changelog:** Wave 0 ampliado, doble validación, build gates por wave, rollback obligatorio, amendments, reglas de paralelismo, security gate
+> **Versión:** 1.3 (marzo 2026)
+> **Changelog v1.3:** 6 sub-agentes especializados con role skills, orquestador nunca se auto-evalúa, cada artefacto validado por sub-agente independiente antes del PO
+> **Changelog v1.2:** Wave 0 ampliado, doble validación, build gates por wave, rollback obligatorio, amendments, reglas de paralelismo, security gate
