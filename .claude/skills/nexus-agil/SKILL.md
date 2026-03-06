@@ -270,6 +270,59 @@ Cuando el PO menciona NexusAgil o trae trabajo:
 
 ---
 
+## Persistencia de Artefactos
+
+Todos los artefactos van en una carpeta dedicada dentro del proyecto. **NUNCA en la raíz.**
+
+### Estructura obligatoria
+
+```
+<proyecto>/
+└── .nexus/                              ← Carpeta raíz de NexusAgil (fuera del código)
+    ├── _INDEX.md                        ← Registro histórico de todas las HUs
+    ├── project-context.md               ← Context del proyecto (F0 Bootstrap)
+    └── sprints/
+        └── NNN-titulo-corto/            ← Carpeta por HU/issue
+            ├── work-item.md             ← F1: Work Item + ACs
+            ├── requirements-review.md   ← Reporte del Requirements Reviewer
+            ├── sdd.md                   ← F2: SDD aprobado
+            ├── spec-review.md           ← Reporte del Spec Reviewer
+            ├── story-file.md            ← F2.5: Story File para Builder
+            ├── build-report.md          ← Reporte del Builder
+            ├── logic-audit.md           ← Reporte del Logic Auditor
+            ├── security-review.md       ← Reporte del Security Reviewer (solo QUALITY)
+            ├── qa-report.md             ← Reporte del QA Verifier
+            └── report.md               ← DONE: Resumen final consolidado
+```
+
+### Reglas de persistencia
+
+1. **Crear `.nexus/` al inicio** si no existe (F0)
+2. **Cada sub-agente escribe su reporte** en la carpeta del issue
+3. **_INDEX.md se actualiza** al completar cada pipeline (o al abortar)
+4. **Artefactos aprobados son inmutables** — si hay cambios post-gate, crear `sdd-v2.md`
+5. **`.nexus/` se commitea al repo** — es parte del historial del proyecto
+6. **Para sprints con múltiples issues**, cada issue tiene su carpeta
+
+### Instrucción para sub-agentes
+
+Al invocar un sub-agente, incluir:
+```
+Persiste tu reporte en: .nexus/sprints/NNN-titulo/[tu-reporte].md
+```
+
+### Formato _INDEX.md
+
+```markdown
+# NexusAgil — Index
+
+| # | Fecha | Issue | Tipo | Clasificación | Status | Commit |
+|---|-------|-------|------|---------------|--------|--------|
+| 050 | 2026-03-06 | WAS-161 | quality | QUALITY | DONE | 82ed992 |
+```
+
+---
+
 ## References (leer según necesidad)
 
 ### Role Skills (instrucciones para sub-agentes)
