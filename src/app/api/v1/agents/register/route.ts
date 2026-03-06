@@ -190,8 +190,8 @@ export async function POST(request: NextRequest) {
     capabilities:   data.capabilities,
     dependencies:   data.dependencies,
     creator_wallet: data.creator_wallet ?? null,
-    // WAS-160b: Set registration_type based on preference
-    registration_type: (registerOnChain && data.creator_wallet) ? 'on_chain' : 'off_chain',
+    // WAS-162: Always insert as off_chain; upgrade after tx confirms
+    registration_type: 'off_chain',
     mcp_tool_name:  data.mcp_tool_name  ?? data.slug.replace(/-/g, '_'),
     mcp_description: data.mcp_description ?? data.description,
     // JWT-authenticated devs go active immediately; open/agent-key registrations go to review
@@ -247,13 +247,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Register on-chain (non-blocking) — WAS-160b: only if registerOnChain ──
+  // ── Register on-chain (non-blocking) — WAS-162: update DB only after tx confirms ──
   if (registerOnChain && data.creator_wallet) {
     registerAgentOnChain({
       slug:             data.slug,
       pricePerCallUSDC: data.price_per_call,
       creatorWallet:    data.creator_wallet,
-    }).catch(err => logger.error('[register] on-chain failed', { err }))
+    })
+      .then(async (txHash) => {
+        if (txHash) {
+          await serviceClient
+            .from('agents')
+            .update({
+              registration_type: 'on_chain',
+              on_chain_registered: true,
+              chain_registered_at: new Date().toISOString(),
+            })
+            .eq('id', agent.id)
+          logger.info('[register] on-chain confirmed, DB updated', { slug: data.slug, txHash })
+        }
+      })
+      .catch(err => logger.error('[register] on-chain failed, agent stays off_chain', { err }))
   }
 
   return NextResponse.json({
@@ -269,8 +283,8 @@ export async function POST(request: NextRequest) {
       invoke_url:     `${SITE_URL}/api/v1/models/${agent.slug}/invoke`,
       marketplace_url: `${SITE_URL}/en/models/${agent.slug}`,
       status:         agent.status,
-      on_chain_registered: registerOnChain && !!data.creator_wallet,
-      registration_type: (registerOnChain && data.creator_wallet) ? 'on_chain' : 'off_chain',
+      on_chain_registered: false,
+      registration_type: (registerOnChain && data.creator_wallet) ? 'pending_onchain' : 'off_chain',
     },
     management_key: managementKey,
     management_key_warning: managementKey ? null : 'Management key could not be issued. Contact support@wasiai.io',
