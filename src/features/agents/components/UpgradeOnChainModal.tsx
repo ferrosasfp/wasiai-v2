@@ -50,6 +50,7 @@ export function UpgradeOnChainModal({
   const [gasEstimate, setGasEstimate] = useState<string | null>(null)
   const [balance, setBalance] = useState<string | null>(null)
   const [registrationFee, setRegistrationFee] = useState<bigint>(0n)
+  const [feeApplies, setFeeApplies] = useState(false)
 
   const chain = chainId === 43114 ? avalanche : avalancheFuji
   const rpcUrl = chainId === 43114
@@ -62,12 +63,27 @@ export function UpgradeOnChainModal({
     async function estimate() {
       try {
         // Fetch registration fee from contract
-        const fee = await publicClient.readContract({
-          address: contractAddress as Address,
-          abi: WASIAI_MARKETPLACE_ABI,
-          functionName: 'registrationFee',
-        }) as bigint
+        const [fee, freeLimit, userCount] = await Promise.all([
+          publicClient.readContract({
+            address: contractAddress as Address,
+            abi: WASIAI_MARKETPLACE_ABI,
+            functionName: 'registrationFee',
+          }) as Promise<bigint>,
+          publicClient.readContract({
+            address: contractAddress as Address,
+            abi: WASIAI_MARKETPLACE_ABI,
+            functionName: 'freeRegistrationsPerUser',
+          }) as Promise<bigint>,
+          publicClient.readContract({
+            address: contractAddress as Address,
+            abi: WASIAI_MARKETPLACE_ABI,
+            functionName: 'userRegistrationCount',
+            args: [creatorAddress as Address],
+          }) as Promise<bigint>,
+        ])
         setRegistrationFee(fee)
+        const needsFee = fee > 0n && userCount >= freeLimit
+        setFeeApplies(needsFee)
 
         const [gas, gasPrice, bal] = await Promise.all([
           publicClient.estimateContractGas({
@@ -109,8 +125,8 @@ export function UpgradeOnChainModal({
     setStep('signing')
 
     try {
-      // NA-301: Approve USDC for registration fee before selfRegisterAgent
-      if (registrationFee > 0n) {
+      // NA-301b: Approve USDC only if user exceeded free registrations
+      if (feeApplies) {
         const approveData = encodeFunctionData({
           abi: ERC20_APPROVE_ABI,
           functionName: 'approve',
@@ -214,12 +230,20 @@ export function UpgradeOnChainModal({
 
             {registrationFee > 0n && (
               <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 mb-4">
-                <p className="text-sm text-amber-800 font-medium">
-                  📋 Registration fee: {formatUnits(registrationFee, 6)} USDC
-                </p>
-                <p className="text-xs text-amber-600 mt-1">
-                  This fee is required to register your agent on-chain. You will be asked to approve USDC first.
-                </p>
+                {feeApplies ? (
+                  <>
+                    <p className="text-sm text-amber-800 font-medium">
+                      📋 Registration fee: {formatUnits(registrationFee, 6)} USDC
+                    </p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      You've used your free registrations. A fee is required for additional agents.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-green-700 font-medium">
+                    🎉 Free registration — no fee for your first agents!
+                  </p>
+                )}
               </div>
             )}
 

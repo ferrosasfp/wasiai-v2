@@ -74,6 +74,10 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     // NA-301: Registration fee in USDC atomics (6 decimals)
     uint256 public registrationFee;
 
+    // NA-301b: Free registrations per user (default 2), then fee applies
+    uint256 public freeRegistrationsPerUser = 2;
+    mapping(address => uint256) public userRegistrationCount;
+
     // ── Fee Timelock (NA-M03) ─────────────────────────────────────────────────
     uint16  public pendingFeeBps;
     uint256 public pendingFeeTimestamp;
@@ -234,6 +238,11 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         emit RegistrationFeeUpdated(_fee);
     }
 
+    /// @notice Set how many free registrations each user gets before fee kicks in.
+    function setFreeRegistrationsPerUser(uint256 _count) external onlyOwner {
+        freeRegistrationsPerUser = _count;
+    }
+
     /**
      * @notice Self-registration: creator registers their own agent and pays gas.
      * @dev msg.sender becomes the creator. No operator needed.
@@ -247,13 +256,15 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         uint256 pricePerCall,
         uint64  erc8004Id
     ) external whenNotPaused {
-        // NA-301: Registration fee
-        if (registrationFee > 0) {
+        // NA-301b: Charge fee only after free registrations exhausted
+        uint256 userCount = userRegistrationCount[msg.sender];
+        if (registrationFee > 0 && userCount >= freeRegistrationsPerUser) {
             require(
                 usdc.transferFrom(msg.sender, address(this), registrationFee),
                 "Fee transfer failed"
             );
         }
+        userRegistrationCount[msg.sender] = userCount + 1;
 
         // NA-303: Slug length validation
         require(bytes(slug).length > 0 && bytes(slug).length <= 80, "Invalid slug length");
