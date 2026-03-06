@@ -1,346 +1,256 @@
 ---
 name: nexus-agil
 description: >
-  Metodologia stack-agnostic para procesar Historias de Usuario (HU) a traves de un pipeline
-  con agentes especializados, gates estrictos, adversarial review y anti-alucinacion.
-  Funciona con cualquier stack: Next.js, Rails, Django, Laravel o cualquier otro.
+  Metodología NexusAgil v1.2 para procesar trabajo con agentes de IA.
   Activar cuando el usuario mencione "NexusAgil", "procesa HU", "sprint planning",
-  "inicia fase 0", "adversarial review", o "story file".
+  "adversarial review", "story file", "quality pipeline", o cualquier gate formal.
 ---
 
-# NexusAgil
+# NexusAgil v1.2 — Instrucciones de Ejecución
 
-> **Unidad de trabajo**: 1 HU por ejecucion.
-> **Principio**: El humano decide QUE. Los agentes ejecutan COMO.
-> **Anti-alucinacion**: Leer codigo real antes de generar. Nunca inventar.
-> **Stack-agnostic**: NexusAgil no asume ningun stack. F0 descubre el proyecto real y genera `project-context.md`.
-
----
-
-## Principios Fundacionales
-
-1. **Stack-Agnostic** — No asumimos tecnologias. Cada proyecto define su stack en `project-context.md` (ver `references/project_context_template.md`).
-2. **1 HU = 1 ejecucion** — No mezclar historias. Una historia, un pipeline completo.
-3. **Anti-Alucinacion** — Codebase Grounding obligatorio. Leer codigo real, extraer patrones reales, referenciar archivos existentes. Nunca inventar.
-4. **Agentes Especializados** — Cada fase tiene agentes asignados con roles claros. Los roles NO se mezclan (ver `references/agents_roster.md`).
-5. **Gates Estrictos** — No se avanza sin aprobacion humana explicita en los gates.
-   **Entre gates, el pipeline corre solo.** El agente NO pide permiso para pasar de F0→F1, F2→F2.5, F3→AR, AR→CR, CR→QA, QA→Docs. Solo se detiene en los gates formales. Preguntar "¿continuo?" entre fases es un error de proceso.
-6. **Adversarial Review** — Despues de implementar, un agente adversario ataca la solucion antes de aprobarla.
-7. **Auto-Blindaje** — Cada error refuerza el proceso. Se documenta cuando ocurre, no al final.
+> **REGLA #1: Este archivo es un CHECKLIST, no documentación. Cada paso numerado es una INSTRUCCIÓN que DEBO ejecutar. No saltar pasos.**
+> **REGLA #2: Si no estoy seguro de qué paso sigue, releer este archivo desde el inicio.**
+> **REGLA #3: Las references/ contienen templates y detalles. Este archivo contiene el flujo obligatorio.**
 
 ---
 
-## Tabla de Gates
+## PASO 0 — Clasificar el trabajo (SIEMPRE PRIMERO)
 
-| Gate | Texto exacto | Contexto | Efecto |
-|------|-------------|----------|--------|
-| `HU_APPROVED` | `HU_APPROVED` | Despues de F1 Work Items + propuesta de paralelismo | Architect arranca F2 SDD |
-| `SPEC_APPROVED` | `SPEC_APPROVED` | Despues de F2 SDD | Architect genera Story File (F2.5) |
-| `LAUNCH_APPROVED` | `LAUNCH_APPROVED` | Despues de lista de HUs en modo LAUNCH | Architect genera Story Files simplificados |
-| `SPRINT_APPROVED` | `SPRINT_APPROVED` | Despues de Sprint Planning | SM commitea artefactos, Architect arranca F0 |
-| `REVIEW_APPROVED` | `REVIEW_APPROVED` | Despues de Status Meeting | SM commitea status, pipeline continua |
-| `RETRO_APPROVED` | `RETRO_APPROVED` | Despues de Retrospectiva | SM ejecuta Checklist de Cierre, sprint CERRADO |
+Antes de hacer CUALQUIER cosa, clasificar:
 
-> **Regla universal:** Solo el texto exacto activa el gate. "si", "ok", "dale", "go", "avanza" → NO activan ningun gate.
-> **Regla de flujo:** Entre gates, el pipeline avanza automaticamente. El agente nunca pregunta "¿continuo?" ni "¿arrancamos?" entre fases. Si el humano responde "si" a algo que no era un gate, es senal de que el agente pregunto innecesariamente — error de proceso.
+| Tipo | Señales | Qué hacer |
+|------|---------|-----------|
+| **FAST-FIX** | 1-2 archivos, <30 líneas, sin DB, sin auth | Pipeline FAST (ver `references/quick_flow.md`) |
+| **HU-MINOR** | Feature pequeña, bien entendida | Pipeline FAST con SDD ligero |
+| **HU-MAJOR** | Feature significativa, múltiples archivos | Pipeline QUALITY completo |
+| **QUALITY** | Seguridad, contratos, pagos, arquitectura | Pipeline QUALITY completo con Security Gate |
+| **Sprint** | Múltiples issues a procesar | Pipeline SPRINT (abajo) |
 
----
-
-## Los 3 Modos
-
-> Al inicio de cada sesion, si no hay contexto claro, Claude pregunta:
->
-> **"¿Que estas construyendo?"**
-> ```
-> 1. FAST    — Un cambio pequeno (fix, estilo, texto, 1-2 archivos)
-> 2. LAUNCH  — Algo nuevo desde cero (MVP, prototipo, nueva app)
-> 3. QUALITY — Feature para produccion (DB, auth, pagos, o usuarios reales)
-> ```
-
-### Tabla de decision rapida
-
-| Senal | Modo |
-|-------|------|
-| Fix de 1-2 archivos, sin DB | FAST |
-| Cambio de texto o estilo | FAST |
-| MVP nuevo, primera version | LAUNCH |
-| Prototipo para demo/pitch | LAUNCH |
-| Feature que va a usuarios reales | QUALITY |
-| Tiene pagos o auth | QUALITY siempre |
-| Bug critico en produccion | QUALITY (Hotfix) |
-| Equipo de 2+ personas | QUALITY siempre |
-| **Duda** | **QUALITY** |
-
-### FAST — Cambio trivial
-
-Califica si cumple TODO: max 2 archivos, <30 lineas, sin DB, sin logica nueva, sin auth/pagos.
-Si no cumple alguno → sube automaticamente a LAUNCH o QUALITY.
-
-> **Proceso completo:** `references/quick_flow.md`
-
-### LAUNCH — MVP / Prototipo
-
-Para construir algo nuevo desde cero con velocidad + estructura basica.
-Tiene: Codebase Grounding, Story Files, gate humano (LAUNCH_APPROVED), anti-alucinacion.
-No tiene: SDD completo, AR, CR formal, QA con evidencia archivo:linea.
-
-> **Proceso completo:** `references/launch_flow.md`
-
-### QUALITY — Produccion
-
-Para features que van a usuarios reales, con DB, auth, pagos, o en equipo.
-Pipeline completo con todos los gates, AR, CR, y QA con evidencia.
-
-> **Proceso completo:** `references/quality_pipeline.md`
+Si hay duda → **QUALITY**.
 
 ---
 
-## Activacion
+## Pipeline SPRINT (múltiples issues)
 
-| Trigger | Modo |
-|---------|------|
-| "NexusAgil" / "procesa HU" / "procesa esta HU" | QUALITY |
-| "Quick flow" / "cambio trivial" / "FAST" | FAST → `references/quick_flow.md` |
-| "Modo LAUNCH" / "MVP" / "prototipo" / "construye [algo]" | LAUNCH → `references/launch_flow.md` |
-| "Hotfix" / "bug en produccion" / "fix urgente" | QUALITY (Hotfix) → `references/quick_flow.md` (seccion Hotfix) |
-| "Sprint planning" / "status" / "retro" | Sprint Cadence → `references/sprint_cadence.md` |
-| "Adversarial review" | AR → `references/adversarial_review_checklist.md` |
-| "Story file" | F2.5 → `references/story_file_template.md` |
-| "Clarify" / "check consistencia" | `/nexus.clarify` (ver seccion abajo) |
+Cuando el PO trae múltiples issues para un sprint:
 
-Si el usuario no especifica modo → Claude pregunta cual de los 3 modos.
-
----
-
-## Agent Roster (resumen)
-
-> Detalle completo en `references/agents_roster.md`.
-
-| Agente | Rol | Fases |
-|--------|-----|-------|
-| **Analyst** | Business Analyst — Extrae requisitos, normaliza HU, define ACs EARS | F0, F1 |
-| **Architect** | Software Architect — Codebase Grounding, SDD, Story File, Code Review | F0, F1, F2, F2.5, CR |
-| **UX** | UX Designer — Microcopy, flujos de usuario, accesibilidad | F1 |
-| **Adversary** | Security & Quality Adversary — AR, CR, seguridad | AR, CR |
-| **Dev** | Senior Developer — Implementa SOLO desde Story File, waves, test-first | F3 |
-| **SM** | Scrum Master — Sprint ceremonies (Planning, Status, Retro) | Cadencia |
-| **QA** | QA Engineer — Validacion de ACs, drift detection, quality gates | F4 |
-| **Triage** | Quick Flow Specialist — Triage y pipeline abreviado | Quick Flow |
-| **Docs** | Documentation Specialist — Documenta artefactos, actualiza _INDEX.md | DONE |
-
-### Regla de Separacion
-- Quien **especifica** (Architect) NO implementa (Dev).
-- Quien **implementa** (Dev) NO valida (QA).
-- Quien **revisa adversarialmente** (Adversary) NO implemento.
-
----
-
-## Pipeline Overview (modo QUALITY)
-
+### S1 — Backlog priorizado
 ```
-HU (cualquier formato)
-    |
-    v
-[ F0: Contexto ] -------------- Analyst+Architect: project-context + codebase grounding + sizing
-    |
-    v
-[ F1: Discovery ] ------------- Analyst+Architect+UX: Work Item + ACs EARS + scope
-                               + analisis de dependencias + propuesta de paralelismo
-    |
-    v
-[ GATE 1: HU_APPROVED ] ------- Humano escribe texto exacto HU_APPROVED
-    |
-    v
-[ F2: Spec/SDD ] -------------- Architect+Adversary: Context Map + SDD + Constraint Directives
-    |
-    v
-[ Readiness Check ] ----------- Architect verifica: SDD listo para implementar?
-    |
-    v
-[ GATE 2: SPEC_APPROVED ] ----- Humano escribe texto exacto SPEC_APPROVED
-    |
-    v
-[ F2.5: Story File ] ---------- Architect genera contrato autocontenido para Dev
-    |
-    v
-[ F3: Implementacion ] -------- Dev SOLO desde Story File, waves, anti-hallucination
-    |                              ↓ AUTOMATICO
-    v
-[ Adversarial Review ] -------- Adversary ataca la solucion (BLOQUEANTE/MENOR/OK)
-    |                              ↓ AUTOMATICO
-    v
-[ Code Review ] --------------- Adversary+QA: calidad de codigo
-    |                              ↓ AUTOMATICO
-    v
-[ F4: QA/Validacion ] --------- QA: drift detection + ACs con evidencia + quality gates
-    |                              ↓ AUTOMATICO
-    v
-[ Build + Push ] --------------- Docs documenta + actualiza _INDEX.md
-    |
-    v
-DONE -> Persistir en doc/sdd/NNN-titulo/
+HACER:
+1. Leer todos los issues (Linear, descripción del PO, etc.)
+2. Presentar backlog priorizado con: número, título, prioridad, dependencias
+3. Dar mi validación adversarial del backlog
+4. Esperar: HU_APPROVED
 ```
 
-> **Proceso detallado de cada fase:** `references/quality_pipeline.md`
-
----
-
-## Dispatcher de Fases (QUALITY)
-
-Cuando ejecutas una HU en modo QUALITY, lee `references/quality_pipeline.md` para el proceso detallado. Tabla rapida de que leer en cada fase:
-
-| Fase | Referencia | Que contiene |
-|------|-----------|--------------|
-| F0: Contexto | `references/quality_pipeline.md` | Bootstrap, Smart Sizing, Codebase Grounding |
-| F1: Discovery | `references/quality_pipeline.md` | Work Item, EARS ACs, DoR, Branch, Paralelismo |
-| F2: SDD | `references/quality_pipeline.md` + `references/sdd_template.md` | Context Map, SDD, Constraint Directives, Readiness Check |
-| F2.5: Story File | `references/quality_pipeline.md` + `references/story_file_template.md` | Contrato autocontenido Architect→Dev |
-| F3: Implementacion | `references/quality_pipeline.md` | Waves, Anti-Hallucination Protocol, Re-mapeo, Auto-Blindaje |
-| AR | `references/quality_pipeline.md` + `references/adversarial_review_checklist.md` | 8 categorias de ataque, BLOQUEANTE/MENOR/OK |
-| CR | `references/quality_pipeline.md` | 6 checks de calidad de codigo |
-| F4: QA | `references/quality_pipeline.md` + `references/validation_report_template.md` | Drift Detection, AC Verification, Quality Gates |
-| DONE | `references/quality_pipeline.md` | Reporte final, _INDEX.md, cierre issue tracker |
-
----
-
-## Persistencia de Artefactos
-
+### S2 — Escribir SDDs
 ```
-doc/sdd/
-+-- _INDEX.md                          # Registro historico de HUs procesadas
-+-- NNN-titulo-corto/                  # Ej: 001-filtro-categorias/
-    +-- work-item.md                   # F1: Work Item normalizado
-    +-- sdd.md                         # F2: SDD aprobado
-    +-- story-file.md                  # F2.5: Story File para Dev
-    +-- plan.md                        # F2: Plan de waves (dentro del SDD o separado)
-    +-- validation.md                  # F4: Reporte de validacion
-    +-- report.md                      # DONE: Reporte final
+HACER (por cada issue aprobado):
+1. Leer el código actual relacionado con el issue
+2. *** WAVE 0 — PRE-FLIGHT (OBLIGATORIO) ***
+   0.1 — ¿El fix ya existe? (grep/búsqueda) → si existe: ALREADY_IMPLEMENTED
+   0.2 — ¿Los archivos referenciados existen? → si no: corregir rutas
+   0.3a — ¿El código de referencia compila contra tipos/ABI reales? → si no: corregir
+   0.3b — ¿El encoding es correcto? (indexed events = keccak256, structs) → si no: corregir
+   0.3c — Para contratos: ¿overflow, reentrancy, front-running? → documentar
+   0.4 — ¿Dependencias entre SDDs resueltas? → si no: marcar orden
+   0.5 — ¿Hay TODOs o ambigüedades? → completar
+3. Escribir SDD con estas secciones OBLIGATORIAS:
+   - Context
+   - Acceptance Criteria (EARS format)
+   - Wave 0 — Pre-flight (instrucciones para sub-agente)
+   - Waves 1..N (con build gate al final de cada wave)
+   - Rollback (cómo revertir)
+   - Critical Constraints
+4. Guardar en doc/sdd/NNN-titulo.md
 ```
 
-### Reglas de persistencia
-1. **F0**: Leer `doc/sdd/_INDEX.md` para siguiente NNN. Si no existe, crear directorio y archivo.
-2. **Cada fase**: Escribir artefacto en `doc/sdd/NNN-titulo/`.
-3. **_INDEX.md**: Actualizar al completar pipeline (o abortar).
-4. **Inmutabilidad**: Artefactos aprobados no se modifican. Si hay cambios post-gate, crear version (`sdd-v2.md`).
+### S3 — Sprint Plan
+```
+HACER:
+1. Presentar orden de ejecución
+2. Verificar paralelismo:
+   - ¿Archivos disjuntos? → paralelo OK
+   - ¿Dependencias de import? → secuencial
+   - ¿Dependencias de orden? → secuencial
+3. Esperar: SPEC_APPROVED
+4. Presentar sprint plan
+5. Esperar: SPRINT_APPROVED
+```
 
-### Formato _INDEX.md
+### S4 — Ejecutar
+```
+HACER:
+1. Lanzar sub-agentes según plan (paralelo o secuencial)
+2. En el task de cada sub-agente, INCLUIR ESTA INSTRUCCIÓN:
+   "Antes de ejecutar Wave 1, ejecuta Wave 0:
+    Lee el SDD completo. Luego verifica:
+    1. ¿Los archivos mencionados existen? Lee cada uno.
+    2. ¿El código de referencia es compatible con los tipos reales?
+    3. ¿El fix ya está implementado?
+    4. Ejecuta build gate al final de cada wave (tsc --noEmit o equivalente).
+    Si encuentras discrepancias, STOP y reporta. No ejecutes."
+3. Esperar resultados
+4. Para QUALITY/contratos: ejecutar Security Gate (ver abajo)
+```
 
-```markdown
-# SDD Index
+### S5 — Review
+```
+HACER:
+1. Presentar tabla de resultados: issue, fix, commit, evidencia
+2. Incluir hallazgos durante ejecución
+3. Esperar: REVIEW_APPROVED
+```
 
-| # | Fecha | HU | Tipo | Mode | Status | Branch |
-|---|-------|----|------|------|--------|--------|
-| 001 | YYYY-MM-DD | Titulo | feature | full | DONE | feat/001-titulo |
+### S6 — Retro
+```
+HACER:
+1. Qué salió bien
+2. Qué salió mal (con autocrítica honesta)
+3. Acciones concretas para siguiente sprint
+4. Esperar: RETRO_APPROVED
+5. Actualizar Linear (mover issues a Done)
 ```
 
 ---
 
-## Anti-Alucinacion: Codebase Grounding
+## Pipeline QUALITY (1 issue)
 
-> *"El AI no imagina codigo. Lee codigo real, extrae patrones reales, y genera codigo que sigue esos patrones."*
-
-Antes de generar cualquier cosa, el agente DEBE:
-
-1. **Leer archivos reales** del proyecto relacionados con la HU
-2. **Extraer patrones** (estructura, naming, imports, exports)
-3. **Documentar lo leido** en un Context Map
-4. **Referenciar archivos como exemplars**
-5. **Verificar que el exemplar existe** (Glob). Si no existe, buscar el reemplazo mas cercano
-
-### Regla de Exemplar Vivo
-
-Antes de usar cualquier archivo como exemplar:
-1. Verificar que existe (`Glob` o `Read`)
-2. Si **no existe**: buscar en la misma carpeta y elegir el mas similar
-3. Si **la carpeta tampoco existe**: buscar por patron en el proyecto (`Grep`)
-4. **Nunca referenciar un archivo que no se haya confirmado que existe**
-
----
-
-## /nexus.clarify — Consistency Check
-
-Invocable en cualquier momento: "clarify", "check consistencia", "valida artefactos".
-
-| Check | Status |
-|-------|--------|
-| **AC Coverage** | Cada AC tiene al menos 1 tarea |
-| **Scope Drift** | Ninguna tarea toca archivos fuera de Scope IN |
-| **Traceability** | Cada archivo del plan aparece en SDD |
-| **Contradictions** | No hay conflictos entre AC y reglas de negocio |
-| **Markers** | No hay [NEEDS CLARIFICATION] pendientes |
-| **Missing Inputs** | Missing Inputs bloqueantes resueltos |
-| **Exemplars Valid** | Archivos referenciados como exemplar existen |
-
-El clarify es informativo, no bloqueante. El humano decide.
-
----
-
-## Reglas Globales
-
-1. **1 HU = 1 ejecucion**. No mezclar HUs.
-2. **Gates bloqueantes**. No avanzar sin el texto exacto del gate.
-3. **Abort**: Si el humano aborta, Docs actualiza _INDEX.md con ABORTED.
-4. **Auto-Blindaje**: Documentar errores cuando ocurren, no al final.
-5. **Stack del proyecto**: Respetar `project-context.md`, sin excepciones.
-6. **Cambios minimos**: No tocar lo que no esta en scope.
-7. **Max 3 preguntas** en F1 para completar DoR.
-8. **Conservador**: Si hay duda, NO expandir alcance.
-9. **Persistencia**: Cada fase escribe su artefacto en `doc/sdd/NNN-titulo/`.
-10. **Test-first**: Para logica de negocio en F3.
-11. **Uncertainty markers**: `[NEEDS CLARIFICATION]` bloquea; `[TBD]` se resuelve en F2.
-12. **Waves**: Paralelizacion con W0/W1/W2+ en F3.
-13. **Branch semantico**: Sugerir en F1.
-14. **Codebase Grounding**: Leer codigo real antes de generar. SIEMPRE.
-15. **Exemplar Pattern**: Referenciar archivos existentes como patron.
-16. **Constraint Directives**: Incluir prohibiciones explicitas en SDD.
-17. **Verificacion incremental**: Verificar al completar cada wave.
-18. **EARS ACs**: Acceptance Criteria en formato WHEN/WHILE/IF.
-19. **Drift Detection**: En F4, comparar implementacion vs plan.
-20. **Smart Sizing**: Usar Quick Flow para cambios triviales, no inflar con ceremonia.
-21. **Re-mapeo ligero**: Antes de Wave N, re-leer archivos tocados en Wave N-1.
-22. **Separacion de roles**: Quien especifica no implementa, quien implementa no valida.
-23. **Story File como contrato**: Dev SOLO lee el Story File, nada mas.
-24. **Adversarial Review bloqueante**: Hallazgos BLOQUEANTE se corrigen antes de avanzar.
-25. **Modelo capaz para fases criticas**: Usar el modelo mas capaz disponible para analisis, implementacion y AR.
-
----
-
-## Modelo Recomendado por Fase
-
-| Fase | Modelo | Razon |
-|------|--------------------|-------|
-| F0-F2 (analisis, SDD) | Opus | Razonamiento profundo |
-| F2.5 (Story File) | Opus | Contrato critico |
-| F3 (implementacion) | Opus | Anti-alucinacion |
-| AR | Opus | Seguridad requiere el modelo mas capaz |
-| CR | Opus/Sonnet | Menos critico que AR |
-| F4 (QA) | Opus/Sonnet | Parcialmente mecanico |
-| Quick Flow | Sonnet | Cambios triviales |
-| Hotfix | Opus | Investigacion de causa raiz |
-| Sprint Cadence | Sonnet | Ceremonias estructuradas |
-
----
-
-## Auto-Blindaje
-
-> *"Los errores refuerzan el proceso. Blindamos para que la falla nunca se repita."*
-
-### Formato
-```markdown
-### [YYYY-MM-DD]: [Titulo corto]
-- **Error**: [Que fallo]
-- **Fix**: [Como se arreglo]
-- **Aplicar en**: [Donde mas aplica]
+### Q1 — Context
+```
+HACER:
+1. Leer project-context.md (si existe)
+2. Leer archivos relacionados con el issue (mínimo 2-3)
+3. Identificar exemplars (archivos similares a lo que se va a crear)
+4. Documentar en Context Map
 ```
 
-### Donde documentar
+### Q2 — Work Item
+```
+HACER:
+1. Presentar Work Item normalizado con ACs EARS
+2. Esperar: HU_APPROVED
+```
 
-| Alcance | Donde |
-|---------|-------|
-| Solo esta HU | `doc/sdd/NNN-titulo/report.md` seccion Auto-Blindaje |
-| Multiples features | Archivo de reglas del proyecto |
-| Todo el proyecto | `project-context.md` o equivalente |
+### Q3 — SDD
+```
+HACER:
+1. *** EJECUTAR WAVE 0 COMPLETO (ver S2 arriba) ***
+2. Escribir SDD con todas las secciones obligatorias
+3. Incluir Constraint Directives (OBLIGATORIO/PROHIBIDO)
+4. Incluir Rollback plan
+5. Readiness Check (cada AC tiene archivo, cada archivo tiene exemplar)
+6. Esperar: SPEC_APPROVED
+```
 
-### Cuando
-- **INMEDIATAMENTE** cuando el error ocurre, no al final del pipeline.
-- El reporte final (DONE) copia la tabla acumulada — no se reconstruye de memoria.
+### Q4 — Story File
+```
+HACER:
+1. Generar Story File autocontenido (template: references/story_file_template.md)
+2. El Story File es lo ÚNICO que el sub-agente lee
+```
+
+### Q5 — Implementación
+```
+HACER:
+1. Lanzar sub-agente con Story File + instrucción de Wave 0 + build gates
+2. Esperar resultado
+```
+
+### Q6 — Adversarial Review
+```
+HACER:
+1. Revisar el diff real (no el SDD, el código commiteado)
+2. Ejecutar checklist AR (references/adversarial_review_checklist.md)
+3. Clasificar: BLOQUEANTE / MENOR / OK
+4. Si BLOQUEANTE: sub-agente corrige, re-review
+```
+
+### Q7 — Security Gate (si QUALITY o contratos)
+```
+HACER:
+1. ¿El diff introduce nueva superficie de ataque?
+2. ¿Se mantiene menor privilegio?
+3. ¿Inputs validados?
+4. ¿Secrets hardcodeados?
+5. ¿Error handling seguro?
+Si concern → revert o hotfix SDD
+```
+
+### Q8 — QA + Push
+```
+HACER:
+1. Drift detection (esperado vs real)
+2. Verificar ACs con evidencia archivo:línea
+3. Build + tests pasan
+4. Commit + push
+5. Actualizar _INDEX.md
+```
+
+---
+
+## SDD Amendments
+
+Si el PO pide un cambio DESPUÉS de SPEC_APPROVED:
+
+```
+HACER:
+1. NO modificar el SDD silenciosamente
+2. Escribir amendment formal:
+   - Qué cambia
+   - Waves afectadas
+   - Impacto (bajo/medio/alto)
+3. Para contratos: re-ejecutar Wave 0.3c
+4. Esperar: AMENDMENT_APPROVED del PO
+5. Ejecutar
+```
+
+---
+
+## Reglas que NO puedo saltarme
+
+1. **Wave 0 es OBLIGATORIO** — doble ejecución (yo + sub-agente)
+2. **Build gate al final de CADA wave** — no solo al final
+3. **Rollback en cada SDD** — sin rollback = SDD incompleto
+4. **Gates requieren texto EXACTO** — "sí", "ok", "dale" NO activan gates
+5. **No preguntar "¿continúo?" entre fases** — el pipeline avanza solo entre gates
+6. **Leer código real antes de generar** — SIEMPRE
+7. **Para contratos: verificar encoding** — indexed = keccak256, no string directo
+8. **Paralelismo solo con archivos disjuntos** — verificar ANTES
+9. **Security Gate para QUALITY** — revisar diff real post-commit
+10. **Amendments formales** — no cambios ad-hoc post-SPEC_APPROVED
+
+---
+
+## Checklist de inicio de sesión
+
+Cuando el PO menciona NexusAgil o trae trabajo:
+
+```
+[ ] ¿Qué tipo de trabajo es? (FAST/MINOR/MAJOR/QUALITY/SPRINT)
+[ ] ¿Hay issues en Linear? → leerlos
+[ ] ¿Hay código existente? → leerlo ANTES de proponer solución
+[ ] ¿Es smart contract o seguridad? → QUALITY obligatorio
+[ ] ¿Son múltiples issues? → Pipeline SPRINT
+```
+
+---
+
+## References (leer según necesidad)
+
+| Archivo | Cuándo leer |
+|---------|-------------|
+| `references/quality_pipeline.md` | Pipeline QUALITY detallado |
+| `references/quick_flow.md` | Pipeline FAST |
+| `references/sdd_template.md` | Al escribir un SDD |
+| `references/story_file_template.md` | Al generar Story File |
+| `references/adversarial_review_checklist.md` | Al hacer AR |
+| `references/validation_report_template.md` | Al hacer QA |
+| `references/sprint_cadence.md` | Para ceremonias de sprint |
+| `references/agents_roster.md` | Roles de cada agente |
+| `references/project_context_template.md` | Bootstrap de proyecto nuevo |
+
+---
+
+> **Versión:** 1.2 (marzo 2026)
+> **Changelog:** Wave 0 ampliado, doble validación, build gates por wave, rollback obligatorio, amendments, reglas de paralelismo, security gate
