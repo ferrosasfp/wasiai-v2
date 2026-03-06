@@ -1,1 +1,1 @@
-test_EdgeCase_RecordInvocation_UnknownAgent_Reverts
+test_SelfRegisterAgent_EmptySlug

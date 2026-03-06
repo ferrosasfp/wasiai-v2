@@ -71,6 +71,9 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     address public           treasury;
     uint16  public           platformFeeBps = 1000; // 10% default
 
+    // NA-301: Registration fee in USDC atomics (6 decimals)
+    uint256 public registrationFee;
+
     // ── Fee Timelock (NA-M03) ─────────────────────────────────────────────────
     uint16  public pendingFeeBps;
     uint256 public pendingFeeTimestamp;
@@ -156,6 +159,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     event UpkeepPerformed(uint256 indexed timestamp, address indexed performer);
 
     event DailyCapUpdated(uint256 oldCap, uint256 newCap);
+    event RegistrationFeeUpdated(uint256 newFee);
 
     // ── Pre-funded Key Events ────────────────────────────────────────────────
     event KeyFunded(bytes32 indexed keyId, address indexed owner, uint256 amount);
@@ -222,16 +226,41 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     }
 
     /**
+     * @notice Set the registration fee for selfRegisterAgent.
+     * @dev NA-301: Fee goes to contract treasury. 0 = free registration.
+     */
+    function setRegistrationFee(uint256 _fee) external onlyOwner {
+        registrationFee = _fee;
+        emit RegistrationFeeUpdated(_fee);
+    }
+
+    /**
      * @notice Self-registration: creator registers their own agent and pays gas.
      * @dev msg.sender becomes the creator. No operator needed.
      *      WAS-160g: Dual Registration — allows creators to register on-chain directly.
+     *      NA-301: Registration fee required (if > 0).
+     *      NA-303: Slug length <= 80 enforced.
+     *      NA-304: pricePerCall range [1000, 100_000_000] enforced.
      */
     function selfRegisterAgent(
         string  calldata slug,
         uint256 pricePerCall,
         uint64  erc8004Id
     ) external whenNotPaused {
-        require(bytes(slug).length > 0, "WasiAI: empty slug");
+        // NA-301: Registration fee
+        if (registrationFee > 0) {
+            require(
+                usdc.transferFrom(msg.sender, address(this), registrationFee),
+                "Fee transfer failed"
+            );
+        }
+
+        // NA-303: Slug length validation
+        require(bytes(slug).length > 0 && bytes(slug).length <= 80, "Invalid slug length");
+
+        // NA-304: Price range validation
+        require(pricePerCall >= 1000 && pricePerCall <= 100_000_000, "Price out of range");
+
         require(
             agents[slug].creator == address(0),
             "WasiAI: slug taken"

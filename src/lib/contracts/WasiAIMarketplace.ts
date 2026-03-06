@@ -17,6 +17,14 @@ export const WASIAI_MARKETPLACE_ABI = [
     ],
     outputs: [],
   },
+  // NA-301: Registration fee getter
+  {
+    name: 'registrationFee',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
   // WAS-160g: Self-registration — creator signs and pays gas directly
   {
     name: 'selfRegisterAgent',
