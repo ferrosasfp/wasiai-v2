@@ -1,5 +1,5 @@
 # WasiAI — Project Context
-> Este archivo es cargado por TODOS los agentes BMAD antes de operar.
+> Este archivo es cargado por los agentes NexusAgil antes de operar.
 > Contiene las reglas críticas, patrones y contexto que cualquier IA necesita para trabajar correctamente en este proyecto.
 
 ---
@@ -152,7 +152,7 @@ contracts/
 
 supabase/migrations/       ← 000–014 aplicadas
 .nexus/                    ← metodología Nexus
-_bmad/                     ← agentes y workflows BMAD
+.nexus/                    ← artefactos y sprints NexusAgil
 ```
 
 ---
