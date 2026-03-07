@@ -75,20 +75,26 @@ export function useUnifiedWalletClient() {
   )
 
   /**
-   * Sign EIP-712 typed data. Only works with wagmi wallets (external).
-   * Thirdweb embedded wallets should use the thirdweb transaction path instead.
+   * Sign EIP-712 typed data. Works with both wagmi and thirdweb wallets.
+   * Thirdweb embedded wallets support signTypedData via smart account (ERC-1271).
    */
   const signTypedData = useCallback(
     async (params: Parameters<NonNullable<typeof wagmiWalletClient>['signTypedData']>[0]) => {
-      if (isThirdweb) {
-        throw new Error('EIP-712_NOT_SUPPORTED_THIRDWEB')
+      if (isThirdweb && thirdwebAccount) {
+        // thirdweb v5 smart accounts support signTypedData
+        // Use the account's signTypedData method directly
+        if (!thirdwebAccount.signTypedData) {
+          throw new Error('signTypedData not available on this account')
+        }
+        const sig = await thirdwebAccount.signTypedData(params as Parameters<NonNullable<typeof thirdwebAccount.signTypedData>>[0])
+        return sig as `0x${string}`
       }
       if (!wagmiWalletClient) {
         throw new Error('Wallet not connected')
       }
       return wagmiWalletClient.signTypedData(params)
     },
-    [isThirdweb, wagmiWalletClient],
+    [isThirdweb, thirdwebAccount, wagmiWalletClient],
   )
 
   /**
