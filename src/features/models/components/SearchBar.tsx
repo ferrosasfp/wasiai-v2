@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Search, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useAgentSearch, type AgentSearchResult } from '../hooks/useAgentSearch'
 
 interface SearchBarProps {
   defaultValue?: string
@@ -71,7 +72,7 @@ export function SearchBar({
   // Client mode uses the existing useAgentSearch hook
   if (mode === 'client') {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { query, setQuery, isLoading, error, clear } = require('../hooks/useAgentSearch').useAgentSearch()
+    const { query, setQuery, isLoading, error, clear } = useAgentSearch()
     return (
       <div className="relative">
         <div className="flex items-center gap-2">
