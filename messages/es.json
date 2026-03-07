@@ -316,6 +316,7 @@
   },
   "trial": {
     "badge": "Prueba gratuita",
+    "remaining": "restantes",
     "placeholder": "Escribe tu input para el agente...",
     "button": "Probar gratis",
     "loading": "Invocando agente...",
