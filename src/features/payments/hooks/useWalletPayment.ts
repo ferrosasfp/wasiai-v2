@@ -32,6 +32,19 @@ const USDC_ABI_APPROVE = [
   },
 ] as const
 
+const USDC_ABI_TRANSFER = [
+  {
+    name: 'transfer',
+    type: 'function' as const,
+    inputs: [
+      { name: 'to',    type: 'address' },
+      { name: 'value', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
 interface UseWalletPaymentOptions {
   slug:        string
   input:       string
@@ -59,6 +72,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     // Estados en vuelo tienen prioridad — nunca los interrumpas con condiciones externas
     if (
       flowState === 'signing_eip3009' ||
+      flowState === 'transferring'    ||
       flowState === 'calling'         ||
       flowState === 'approving'
     ) {
@@ -106,11 +120,51 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     requirementsRef.current = requirements
     const amountWei = BigInt(requirements.maxAmountRequired)
 
-    // ── Intento EIP-3009 / EIP-712 (wagmi wallets only) ────────────
-    // thirdweb embedded wallets don't support signTypedData reliably,
-    // so we go directly to the approve fallback for them.
+    // ── Embedded wallet: direct USDC transfer (1 firma, gasless) ──
     if (isThirdweb) {
-      setFlowState('eip3009_failed') // triggers FallbackApproveFlow
+      setFlowState('transferring')
+      try {
+        // 1. Direct USDC transfer — 1 signature, gasless via sponsorGas
+        const transferHash = await unifiedWriteContract({
+          address:      USDC_FUJI_ADDRESS,
+          abi:          USDC_ABI_TRANSFER as unknown as import('viem').Abi,
+          functionName: 'transfer',
+          args:         [WASIAI_OPERATOR_ADDRESS, amountWei],
+          chainId:      FUJI_CHAIN_ID,
+        })
+
+        // 2. Invoke agent with txHash as proof of payment
+        setFlowState('calling')
+        const invokeRes = await fetch(`/api/v1/models/${slug}/invoke`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-PAYMENT-TX': transferHash,
+          },
+          body: JSON.stringify({ input }),
+        })
+
+        if (!invokeRes.ok) {
+          const errData = await invokeRes.json().catch(() => ({})) as { error?: string }
+          setErrorMsg(errData.error ?? `Agent returned ${invokeRes.status}`)
+          setFlowState('error')
+          return
+        }
+
+        const data = await invokeRes.json() as { result?: unknown }
+        setResult(typeof data.result === 'string' ? data.result : JSON.stringify(data.result))
+        setTxHash(transferHash)
+        setFlowState('success')
+      } catch (err: unknown) {
+        const code = (err as { code?: number })?.code
+        if (code === 4001) {
+          setErrorMsg('Cancelaste el pago.')
+          setFlowState('idle')
+        } else {
+          setErrorMsg('Error al transferir USDC.')
+          setFlowState('error')
+        }
+      }
       return
     }
 
@@ -208,7 +262,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
         setFlowState('error')
       }
     }
-  }, [isReady, isThirdweb, address, slug, input, signTypedData])
+  }, [isReady, isThirdweb, address, slug, input, signTypedData, unifiedWriteContract])
 
   /** Ejecutar fallback approve — works for both thirdweb and wagmi wallets */
   const executeApprove = useCallback(async (amountWei: bigint) => {

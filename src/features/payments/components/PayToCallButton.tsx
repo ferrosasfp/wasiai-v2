@@ -91,6 +91,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
     ctx.state === 'wrong_network'        ? t('switchNetwork')   :
     ctx.state === 'insufficient_balance' ? 'USDC insuficiente'  :
     ctx.state === 'signing_eip3009'      ? t('signing')         :
+    ctx.state === 'transferring'         ? 'Procesando pago...' :
     ctx.state === 'calling'              ? t('calling')         :
     ctx.state === 'approving'            ? 'Aprobando...'       :
     ctx.state === 'success'              ? t('done')            :
@@ -99,6 +100,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
 
   const isProcessing = (
     ctx.state === 'signing_eip3009' ||
+    ctx.state === 'transferring'    ||
     ctx.state === 'calling'         ||
     ctx.state === 'approving'       ||
     ctx.state === 'switching_network'

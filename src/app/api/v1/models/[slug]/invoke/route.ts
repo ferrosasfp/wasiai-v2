@@ -30,6 +30,7 @@ import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitB
 import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
 import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits, getSharedRedis } from '@/lib/ratelimit'
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
+import { verifyUsdcTransfer } from '@/lib/contracts/verifyUsdcTransfer'
 import { logger } from '@/lib/logger'
 
 import { calcPlatformOverhead } from '@/lib/pricing/overhead'
@@ -355,6 +356,45 @@ export async function POST(
     }
 
     return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown })
+  }
+
+  // ── 3b. Route C: Direct USDC transfer (embedded wallets) ──────────────
+  const paymentTxHash = request.headers.get('x-payment-tx')
+  if (paymentTxHash) {
+    // Anti-replay: reject if txHash already used
+    const { data: existing } = await supabase
+      .from('agent_calls')
+      .select('id')
+      .eq('tx_hash', paymentTxHash)
+      .limit(1)
+      .maybeSingle()
+    if (existing) {
+      return NextResponse.json(
+        { error: 'Payment already used', code: 'payment_replay' },
+        { status: 402 }
+      )
+    }
+
+    const verification = await verifyUsdcTransfer(paymentTxHash, totalPrice)
+    if (!verification.verified) {
+      return NextResponse.json(
+        { error: 'Payment verification failed', code: 'payment_invalid', reason: verification.error },
+        { status: 402 }
+      )
+    }
+
+    const result = await callUpstream(model, request, slug)
+    await logCall(supabase, model, 'human', null, paymentTxHash, result, null, slug)
+
+    if (model.creator_id) {
+      void triggerAgentEvent(
+        result.status === 'success' ? 'agent.invoked' : 'agent.error',
+        model.id as string, model.creator_id as string,
+        { slug, status: result.status, latency_ms: result.latencyMs }
+      ).catch(() => {})
+    }
+
+    return buildResponse(model, result, paymentTxHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
   }
 
   // ── 3. Route B: x402 Payment (Ultravioleta DAO / Avalanche) ──────────────

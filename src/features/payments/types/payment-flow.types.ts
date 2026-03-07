@@ -7,6 +7,7 @@ export type PaymentFlowState =
   | 'insufficient_balance' // USDC < price_per_call
   | 'signing_eip3009'      // signTypedData en progreso
   | 'eip3009_failed'       // EIP-3009 falló por incompatibilidad técnica → mostrar fallback
+  | 'transferring'         // USDC.transfer directo (embedded wallets)
   | 'approving'            // writeContract(approve) en progreso
   | 'calling'              // fetch /invoke en vuelo
   | 'success'
