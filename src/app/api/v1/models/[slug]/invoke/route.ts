@@ -8,7 +8,7 @@ const X402_CORS_HEADERS = {
 } as const
 import { keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
 import { signReceipt } from '@/lib/receipts/signReceipt'
-// settlePaymentDirectly removed — using thirdweb x402 facilitator
+import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitBreaker'
 import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
@@ -55,10 +55,26 @@ function buildRequirements(options: {
   }
 }
 
+// WAS-134: x402 utilities inlineadas — eliminada dependencia de uvd-x402-sdk
+function extractPaymentFromHeaders(headers: Headers | Record<string, string | string[] | undefined>): Record<string, string> | null {
+  const normalized: Record<string, string> = {}
+  const entries = headers instanceof Headers
+    ? Array.from(headers.entries())
+    : Object.entries(headers)
+  for (const [key, value] of entries) {
+    if (typeof value === 'string') normalized[key.toLowerCase()] = value
+    else if (Array.isArray(value) && value.length > 0) normalized[key.toLowerCase()] = value[0]
+  }
+  const payment = normalized['x-payment'] ?? normalized['payment-signature'] ?? null
+  if (!payment) return null
+  try { return JSON.parse(Buffer.from(payment, 'base64').toString('utf-8')) }
+  catch { return null }
+}
+
 // ── A-01: Extracted helpers (each < 50 lines, golden path logic unchanged) ───
 
 type SupabaseServiceClient = ReturnType<typeof createServiceClient>
-// SettlementResult removed — thirdweb facilitator handles settlement
+type SettlementResult = { verified: boolean; settled: boolean; transactionHash?: string; error?: string }
 
 /**
  * Returns 402 instructions response (probe / no payment path).
@@ -78,10 +94,35 @@ function build402Instructions(model: Record<string, unknown>, priceStr: string, 
 }
 
 /**
- * Verify + settle x402 payment. Handles both Fuji (native) and mainnet (facilitator).
+ * Verify + settle x402 payment via native settler (WAS-134).
+ * settlePaymentDirectly() covers Fuji (43113) and mainnet (43114) — no external facilitator.
  */
-/** Decoded x402 payment header — supports v1 (EVM payload) and opaque upstream formats */
-// x402 settlement now handled by thirdweb facilitator (settlePayment)
+interface X402PaymentHeader {
+  x402Version?: number
+  scheme?: string
+  network?: string
+  payload?: {
+    signature?: string
+    authorization?: {
+      from?: string
+      to?: string
+      value?: string
+      validAfter?: string | number
+      validBefore?: string | number
+      nonce?: string
+    }
+  }
+  [key: string]: unknown
+}
+
+async function settleX402(paymentHeader: X402PaymentHeader, _model: Record<string, unknown>, priceStr: string): Promise<SettlementResult | NextResponse> {
+  const evmPayload = paymentHeader?.payload as X402EVMPayload | undefined
+  if (!evmPayload?.authorization || !evmPayload?.signature) {
+    return NextResponse.json({ error: 'Invalid payment header', code: 'payment_invalid' }, { status: 402 })
+  }
+  const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
+  return settlePaymentDirectly(evmPayload, atomicRequired)
+}
 
 // WAS-132: recordOnChain() eliminado — Supabase agent_calls es la fuente de verdad.
 // recordInvocationOnChain() on-chain era auditoría duplicada con costo de gas por invocación.
@@ -315,72 +356,59 @@ export async function POST(
     return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown })
   }
 
-  // ── 3. Route B: x402 Payment (thirdweb facilitator) ───────────────────
-  // thirdweb handles: signature verification, on-chain settlement, gas payment
-  // Works with ALL wallet types: MetaMask, Core, thirdweb embedded wallets
-  const paymentData = request.headers.get('x-payment') ?? request.headers.get('payment-signature')
+  // ── 3. Route B: x402 Payment (WasiAI-native settlement) ────────────────
+  // WAS-134: settlePaymentDirectly() covers Fuji + mainnet — no external facilitator/bundler
+  const headers = Object.fromEntries(request.headers.entries())
+  const paymentHeader = extractPaymentFromHeaders(headers) as X402PaymentHeader | null
 
-  if (!paymentData) {
+  if (!paymentHeader) {
+    // No payment — return 402 with x402 payment instructions
     return build402Instructions(model, priceStr, resourceUrl)
   }
 
-  // Use thirdweb x402 facilitator for settlement
-  const { createThirdwebClient } = await import('thirdweb')
-  const { facilitator: createFacilitator, settlePayment } = await import('thirdweb/x402')
-  const { avalancheFuji: fujiNetwork, avalanche: avaxNetwork } = await import('thirdweb/chains')
+  // ── 4. Verify + Settle ─────────────────────────────────────────────────
+  const settlementOrError = await settleX402(paymentHeader, model, priceStr)
 
-  const twSecretKey = process.env.THIRDWEB_SECRET_KEY
-  if (!twSecretKey) {
-    logger.error('[invoke] THIRDWEB_SECRET_KEY not configured')
-    return NextResponse.json({ error: 'Payment service unavailable' }, { status: 503 })
-  }
+  // If helper returned a NextResponse (error), return it directly
+  if (settlementOrError instanceof NextResponse) return settlementOrError
 
-  const twClient = createThirdwebClient({ secretKey: twSecretKey })
-  const operatorAddress = process.env.NEXT_PUBLIC_WASIAI_OPERATOR ?? '0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba'
-  const network = CHAIN_ID_NUM === 43114 ? avaxNetwork : fujiNetwork
+  const settlement = settlementOrError as SettlementResult
 
-  const twFacilitator = createFacilitator({
-    client: twClient,
-    serverWalletAddress: operatorAddress,
-  })
-
-  const settlementResult = await settlePayment({
-    resourceUrl,
-    method: 'POST',
-    paymentData,
-    payTo: operatorAddress,
-    network,
-    price: `$${priceStr}`,
-    facilitator: twFacilitator,
-  })
-
-  if (settlementResult.status !== 200) {
-    logger.warn('[invoke] x402 settlement failed', { status: settlementResult.status })
+  if (!settlement.verified) {
+    logger.error('[invoke] payment verification failed', settlement)
     return NextResponse.json(
-      settlementResult.responseBody ?? { error: 'Payment settlement failed' },
       {
-        status: settlementResult.status,
-        headers: settlementResult.responseHeaders as HeadersInit ?? {},
+        error: 'Payment verification failed',
+        code: 'payment_invalid',
+        reason: settlement.error,
+        // S-10: Only expose debug info in development — never in production
+        ...(process.env.NODE_ENV === 'development'
+          ? { debug: { chain: CHAIN, usdc: USDC_ADDR, contract: CONTRACT_ADDRESS } }
+          : {}),
       },
+      { status: 402 },
     )
   }
 
-  // ── 4. Payment valid — call the upstream model ────────────────────────────
+  // ── 5. Payment valid — call the upstream model ────────────────────────────
   const result = await callUpstream(model, request, slug)
-  const txHash = (settlementResult as Record<string, unknown>).txHash as string ?? null
-  await logCall(supabase, model, 'human', null, txHash, result, null, slug)
+  await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
 
-  // WAS-74: Fire-and-forget webhook trigger
+  // WAS-74: Fire-and-forget webhook trigger — never await, never blocks TTFB
   if (model.creator_id) {
     void triggerAgentEvent(
       result.status === 'success' ? 'agent.invoked' : 'agent.error',
       model.id as string,
       model.creator_id as string,
-      { slug, status: result.status, latency_ms: result.latencyMs }
-    ).catch(() => {})
+      {
+        slug: slug as string,
+        status: result.status,
+        latency_ms: result.latencyMs,
+      }
+    ).catch(() => { /* non-fatal */ })
   }
 
-  return buildResponse(model, result, txHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
+  return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
   } catch (err) {
     logger.error('[invoke] unhandled error', { err })
     // S-10: Never expose raw error details in production
