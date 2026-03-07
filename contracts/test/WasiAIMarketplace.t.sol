@@ -1570,6 +1570,144 @@ contract WasiAIMarketplaceTest is Test {
         assertEq(result, expected);
     }
 
+    // ── Reputation Batch Tests ───────────────────────────────────────────────
+
+    function test_submitReputationBatch_single() public {
+        vm.prank(operator);
+        marketplace.registerAgent("test-agent", PRICE, creator, 0);
+
+        string[] memory slugs = new string[](1);
+        slugs[0] = "test-agent";
+        uint16[] memory ratings = new uint16[](1);
+        ratings[0] = 450;
+        uint32[] memory counts = new uint32[](1);
+        counts[0] = 42;
+
+        vm.prank(operator);
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+
+        (uint16 avg, uint32 cnt, uint64 ts) = marketplace.getReputation("test-agent");
+        assertEq(avg, 450);
+        assertEq(cnt, 42);
+        assertGt(ts, 0);
+    }
+
+    function test_submitReputationBatch_multi() public {
+        vm.startPrank(operator);
+        marketplace.registerAgent("agent-a", PRICE, creator, 0);
+        marketplace.registerAgent("agent-b", 30000, creator, 0);
+
+        string[] memory slugs = new string[](2);
+        slugs[0] = "agent-a";
+        slugs[1] = "agent-b";
+        uint16[] memory ratings = new uint16[](2);
+        ratings[0] = 500;
+        ratings[1] = 250;
+        uint32[] memory counts = new uint32[](2);
+        counts[0] = 100;
+        counts[1] = 5;
+
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+        vm.stopPrank();
+
+        (uint16 avg1,,) = marketplace.getReputation("agent-a");
+        (uint16 avg2,,) = marketplace.getReputation("agent-b");
+        assertEq(avg1, 500);
+        assertEq(avg2, 250);
+    }
+
+    function test_submitReputationBatch_overwrite() public {
+        vm.startPrank(operator);
+        marketplace.registerAgent("overwrite-test", PRICE, creator, 0);
+
+        string[] memory slugs = new string[](1);
+        slugs[0] = "overwrite-test";
+        uint16[] memory ratings = new uint16[](1);
+        ratings[0] = 300;
+        uint32[] memory counts = new uint32[](1);
+        counts[0] = 10;
+
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+
+        ratings[0] = 480;
+        counts[0] = 25;
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+        vm.stopPrank();
+
+        (uint16 avg, uint32 cnt,) = marketplace.getReputation("overwrite-test");
+        assertEq(avg, 480);
+        assertEq(cnt, 25);
+    }
+
+    function test_submitReputationBatch_notOperator_Reverts() public {
+        vm.prank(operator);
+        marketplace.registerAgent("no-op-test", PRICE, creator, 0);
+
+        string[] memory slugs = new string[](1);
+        slugs[0] = "no-op-test";
+        uint16[] memory ratings = new uint16[](1);
+        ratings[0] = 400;
+        uint32[] memory counts = new uint32[](1);
+        counts[0] = 1;
+
+        vm.prank(address(0xBEEF));
+        vm.expectRevert("WasiAI: not operator");
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+    }
+
+    function test_submitReputationBatch_ratingTooHigh_Reverts() public {
+        vm.prank(operator);
+        marketplace.registerAgent("high-rating", PRICE, creator, 0);
+
+        string[] memory slugs = new string[](1);
+        slugs[0] = "high-rating";
+        uint16[] memory ratings = new uint16[](1);
+        ratings[0] = 501;
+        uint32[] memory counts = new uint32[](1);
+        counts[0] = 1;
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: rating out of range");
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+    }
+
+    function test_submitReputationBatch_emptyBatch_Reverts() public {
+        string[] memory slugs = new string[](0);
+        uint16[] memory ratings = new uint16[](0);
+        uint32[] memory counts = new uint32[](0);
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: empty batch");
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+    }
+
+    function test_submitReputationBatch_agentNotFound_Reverts() public {
+        string[] memory slugs = new string[](1);
+        slugs[0] = "nonexistent-agent";
+        uint16[] memory ratings = new uint16[](1);
+        ratings[0] = 400;
+        uint32[] memory counts = new uint32[](1);
+        counts[0] = 1;
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: agent not found");
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+    }
+
+    function test_submitReputationBatch_lengthMismatch_Reverts() public {
+        string[] memory slugs = new string[](1);
+        slugs[0] = "mismatch-test";
+        uint16[] memory ratings = new uint16[](2);
+        ratings[0] = 400;
+        ratings[1] = 300;
+        uint32[] memory counts = new uint32[](1);
+        counts[0] = 1;
+
+        vm.prank(operator);
+        vm.expectRevert("WasiAI: length mismatch");
+        marketplace.submitReputationBatch(slugs, ratings, counts);
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
 
     function _setupAndInvoke() internal {
