@@ -441,3 +441,33 @@ export async function getPendingEarnings(creatorWallet: string): Promise<number>
     return 0
   }
 }
+
+/**
+ * Read the on-chain owner address for a key.
+ * Returns null if contract not configured or key not registered.
+ */
+export async function getKeyOwnerOnChain(keyHash: string): Promise<string | null> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) {
+    logger.warn('[marketplace] getKeyOwner: contract not configured')
+    return null
+  }
+
+  try {
+    const { public: pub } = getOperatorClient()
+    const bytes32KeyId = keyHashToBytes32(keyHash)
+
+    const owner = await pub.readContract({
+      address:      contractAddress,
+      abi:          WASIAI_MARKETPLACE_ABI,
+      functionName: 'keyOwners',
+      args:         [bytes32KeyId],
+    }) as string
+
+    if (!owner || owner === '0x0000000000000000000000000000000000000000') return null
+    return owner
+  } catch (err) {
+    logger.error('[marketplace] getKeyOwner failed', { err: String(err).slice(0, 200) })
+    return null
+  }
+}

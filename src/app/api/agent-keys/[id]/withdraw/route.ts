@@ -12,7 +12,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
-import { refundKeyToEarningsOnChain, withdrawForCreator, getKeyBalanceOnChain } from '@/lib/contracts/marketplaceClient'
+import { refundKeyToEarningsOnChain, withdrawForCreator, getKeyBalanceOnChain, getKeyOwnerOnChain } from '@/lib/contracts/marketplaceClient'
 
 const BodySchema = z.object({
   amount: z.number().positive(),
@@ -51,21 +51,14 @@ export async function POST(
   if (!keyRow.is_active) return NextResponse.json({ error: 'Key already revoked' }, { status: 400 })
   if (!keyRow.key_hash) return NextResponse.json({ error: 'Key has no hash' }, { status: 500 })
 
-  // 4. Fetch wallet address del usuario desde creator_profiles
-  const { data: creatorProfile } = await supabase
-    .from('creator_profiles')
-    .select('wallet_address')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!creatorProfile?.wallet_address) {
+  // 4. Obtener wallet address del owner desde el contrato on-chain (fuente autoritativa)
+  const ownerAddress = await getKeyOwnerOnChain(keyRow.key_hash)
+  if (!ownerAddress) {
     return NextResponse.json(
-      { error: 'No wallet address configured for this account. Deposit first.' },
+      { error: 'Key owner not found on-chain. Key may not have been deposited yet.' },
       { status: 400 },
     )
   }
-
-  const ownerAddress = creatorProfile.wallet_address
 
   // 5. Verificar balance on-chain antes de operar (AC-3)
   // getKeyBalanceOnChain returns USDC float (already divided by 1_000_000)
