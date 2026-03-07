@@ -21,14 +21,20 @@ export function AgentTrialPlayground({ slug, isAuthenticated }: Props) {
   )
   const [output, setOutput] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [trialsRemaining, setTrialsRemaining] = useState<number | null>(null)
+  const [trialsLimit, setTrialsLimit] = useState<number>(3)
 
   useEffect(() => {
-    if (!isAuthenticated) return
     fetch(`/api/v1/agents/${slug}/trial`)
       .then(r => r.json())
-      .then((data: { used: boolean }) => setState(data.used ? 'used' : 'idle'))
+      .then((data: { used: boolean; trialsRemaining?: number; limit?: number }) => {
+        if (data.used) { setState('used'); return }
+        setState('idle')
+        if (data.trialsRemaining !== undefined) setTrialsRemaining(data.trialsRemaining)
+        if (data.limit !== undefined) setTrialsLimit(data.limit)
+      })
       .catch(() => setState('idle'))
-  }, [slug, isAuthenticated])
+  }, [slug])
 
   async function handleTrial() {
     setState('loading')
@@ -56,6 +62,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated }: Props) {
 
       setState('success')
       setOutput(data.output ?? '')
+      setTrialsRemaining(prev => prev !== null ? Math.max(0, prev - 1) : null)
     } catch {
       setState('error')
       setErrorMsg(t('error_generic'))
@@ -66,10 +73,15 @@ export function AgentTrialPlayground({ slug, isAuthenticated }: Props) {
 
   return (
     <section className="border border-gray-200 rounded-xl p-5 space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
         <span className="text-xs font-semibold bg-[#E84142]/10 text-[#E84142] px-2 py-1 rounded-full">
           {t('badge')}
         </span>
+        {trialsRemaining !== null && state !== 'used' && !anonLimitHit && (
+          <span className="text-xs text-gray-400">
+            {trialsRemaining}/{trialsLimit} {t('remaining') ?? 'remaining'}
+          </span>
+        )}
       </div>
 
       {state === 'used' ? (

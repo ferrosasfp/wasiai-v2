@@ -316,6 +316,7 @@
   },
   "trial": {
     "badge": "Free trial",
+    "remaining": "remaining",
     "placeholder": "Write your input for the agent...",
     "button": "Try for free",
     "loading": "Invoking agent...",
