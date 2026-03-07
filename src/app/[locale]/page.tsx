@@ -137,10 +137,6 @@ export default async function HomePage({ params, searchParams }: Props) {
               {t('statPayments')}
             </div>
             <div>
-              <span className="block text-2xl font-extrabold text-gray-900">$0.02</span>
-              {t('statMinCall')}
-            </div>
-            <div>
               <span className="block text-2xl font-extrabold text-gray-900">90%</span>
               {t('statToCreators')}
             </div>
