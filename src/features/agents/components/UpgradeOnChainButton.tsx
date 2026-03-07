@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react'
-import { useAccount } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { useTranslations } from 'next-intl'
 import { ShieldCheck } from 'lucide-react'
 import { UpgradeOnChainModal } from './UpgradeOnChainModal'
@@ -20,7 +20,7 @@ interface Props {
 
 export function UpgradeOnChainButton({ slug, pricePerCall, registrationType, isOwner }: Props) {
   const t = useTranslations('agent')
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useWallet()
   const [showModal, setShowModal] = useState(false)
 
   // AC9: Only show if off-chain AND owner AND wallet connected

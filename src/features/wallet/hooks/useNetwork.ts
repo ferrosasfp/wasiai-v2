@@ -1,19 +1,22 @@
 'use client'
 
-import { useAccount, useSwitchChain } from 'wagmi'
+import { useSwitchChain } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { supportedChains, defaultChain, getChainById } from '@/shared/lib/web3/chains'
 
 export function useNetwork() {
-  const { chain } = useAccount()
+  const { chain, isThirdweb } = useWallet()
   const { switchChain } = useSwitchChain()
 
   const isCorrectNetwork = chain?.id === defaultChain.id
 
   function switchToDefault() {
+    if (isThirdweb) return // thirdweb handles chain at tx time
     switchChain({ chainId: defaultChain.id })
   }
 
   function switchToChain(chainId: number) {
+    if (isThirdweb) return // thirdweb handles chain at tx time
     switchChain({ chainId })
   }
 

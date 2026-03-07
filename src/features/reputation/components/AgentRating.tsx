@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAccount }                        from 'wagmi'
+import { useWallet }                         from '@/features/wallet/hooks/useWallet'
 import { useTranslations }                   from 'next-intl'
 
 interface Props {
@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function AgentRating({ slug, initialScore, initialCount, compact = false }: Props) {
-  const { address } = useAccount()
+  const { address } = useWallet()
 
   const [score, setScore]     = useState<number | null>(initialScore)
   const t = useTranslations('rating')

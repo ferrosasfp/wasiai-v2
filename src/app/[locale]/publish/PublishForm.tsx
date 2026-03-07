@@ -5,7 +5,7 @@ import ListingFeeModal from './ListingFeeModal'
 import RegistrationChoiceModal from './RegistrationChoiceModal'
 import { useRouter, useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useAccount } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
 import type { CreateModelDraft, ModelCapability } from '@/lib/schemas/model.schema'
 import { StepIndicator } from '@/components/publish/StepIndicator'
 import { PublishPreview } from '@/features/publish/components/PublishPreview'
@@ -71,7 +71,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
   const [showFeeModal, setShowFeeModal] = useState(false)
 
   // WAS-160b: Wallet detection for registration choice
-  const { address: walletAddress, isConnected: walletConnected } = useAccount()
+  const { address: walletAddress, isConnected: walletConnected } = useWallet()
   const [showRegChoiceModal, setShowRegChoiceModal] = useState(false)
 
   function handleChange(field: string, value: unknown) {

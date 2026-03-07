@@ -93,10 +93,13 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
     { path: '/collections',  label: tNav('collections') },
   ]
 
-  const secondaryLinks = [
-    { path: '/creator/dashboard', label: tNav('dashboard') },
+  const secondaryLinksPublic = [
     { path: '/sandbox',           label: tNav('sandbox')   },
     { path: '/docs',              label: tNav('docs')      },
+  ]
+
+  const secondaryLinksAuth = [
+    { path: '/creator/dashboard', label: tNav('dashboard') },
   ]
 
   const createItems = [
@@ -195,8 +198,23 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
               </div>
             )}
 
-            {/* Secondary links — Sandbox, Docs */}
-            {secondaryLinks.map(({ path, label }) => (
+            {/* Secondary links — public (Sandbox, Docs) */}
+            {secondaryLinksPublic.map(({ path, label }) => (
+              <Link
+                key={path}
+                href={`/${locale}${path}`}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isActive(path)
+                    ? 'bg-avax-50 text-avax-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+
+            {/* Secondary links — auth only (Dashboard) */}
+            {isLoggedIn && secondaryLinksAuth.map(({ path, label }) => (
               <Link
                 key={path}
                 href={`/${locale}${path}`}
@@ -221,10 +239,12 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             <ApiKeyBalance enabled={!!userEmail} locale={locale} />
           </div>
 
-          {/* Wallet connect */}
-          <div className="hidden sm:flex shrink-0">
-            <WalletConnectButton locale={locale} />
-          </div>
+          {/* Wallet connect — only when logged in */}
+          {isLoggedIn && (
+            <div className="hidden sm:flex shrink-0">
+              <WalletConnectButton locale={locale} />
+            </div>
+          )}
 
           {/* Auth section: Yo dropdown or login/signup */}
           <div className="hidden items-center gap-2 sm:flex shrink-0">
@@ -284,10 +304,12 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             )}
           </div>
 
-          {/* Mobile: WalletConnectButton only */}
-          <div className="flex items-center gap-2 sm:hidden">
-            <WalletConnectButton locale={locale} />
-          </div>
+          {/* Mobile: WalletConnectButton only — when logged in */}
+          {isLoggedIn && (
+            <div className="flex items-center gap-2 sm:hidden">
+              <WalletConnectButton locale={locale} />
+            </div>
+          )}
 
         </div>
       </div>

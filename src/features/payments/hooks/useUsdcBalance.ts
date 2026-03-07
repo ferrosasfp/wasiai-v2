@@ -1,4 +1,5 @@
-import { useReadContract, useAccount } from 'wagmi'
+import { useReadContract } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { USDC_FUJI_ADDRESS, FUJI_CHAIN_ID } from '@/shared/lib/web3/fuji'
 
 const ERC20_BALANCE_ABI = [
@@ -12,7 +13,7 @@ const ERC20_BALANCE_ABI = [
 ] as const
 
 export function useUsdcBalance(priceUsdc: number) {
-  const { address } = useAccount()
+  const { address } = useWallet()
 
   const { data, isLoading } = useReadContract({
     address: USDC_FUJI_ADDRESS,

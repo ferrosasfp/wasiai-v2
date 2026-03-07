@@ -1,5 +1,9 @@
+'use client'
+
 import { useState, useCallback, useRef } from 'react'
-import { useAccount, useWalletClient, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useWaitForTransactionReceipt } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
+import { useUnifiedWalletClient } from '@/features/wallet/hooks/useUnifiedWalletClient'
 import { useChainGuard } from './useChainGuard'
 import { useUsdcBalance } from './useUsdcBalance'
 import {
@@ -44,14 +48,13 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
   // Guardar requirements del probe para el flujo fallback
   const requirementsRef = useRef<X402Requirements | null>(null)
 
-  const { address }              = useAccount()
-  const { data: walletClient }   = useWalletClient()
+  const { address }              = useWallet()
+  const { isThirdweb, isReady, writeContract: unifiedWriteContract, signTypedData } = useUnifiedWalletClient()
   const { isConnected, isCorrectChain, currentChainName, switchToFuji } = useChainGuard()
   const { usdcBalance, hasEnoughBalance, isLoading: balanceLoading } = useUsdcBalance(priceUsdc)
-  const { writeContractAsync }   = useWriteContract()
   const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTx })
 
-  /** Deriva el estado del flujo a partir del contexto wagmi */
+  /** Deriva el estado del flujo a partir del contexto */
   function deriveState(): PaymentFlowState {
     // Estados en vuelo tienen prioridad — nunca los interrumpas con condiciones externas
     if (
@@ -64,13 +67,12 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     if (!isConnected)       return 'no_wallet'
     if (!isCorrectChain)    return 'wrong_network'
     // Solo evaluar balance cuando ya terminó de cargar — evita hydration mismatch
-    // (usdcBalance === undefined significa que aún está cargando o no hay wallet)
     if (!balanceLoading && usdcBalance !== undefined && !hasEnoughBalance) return 'insufficient_balance'
     return flowState  // 'idle', 'eip3009_failed', 'success', 'error', etc.
   }
 
   const pay = useCallback(async () => {
-    if (!walletClient || !address) return
+    if (!isReady || !address) return
     setErrorMsg(undefined)
 
     // ── Probe del endpoint ──────────────────────────────────────────
@@ -104,19 +106,26 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     requirementsRef.current = requirements
     const amountWei = BigInt(requirements.maxAmountRequired)
 
-    // ── Intento EIP-3009 / EIP-712 ─────────────────────────────────
+    // ── Intento EIP-3009 / EIP-712 (wagmi wallets only) ────────────
+    // thirdweb embedded wallets don't support signTypedData reliably,
+    // so we go directly to the approve fallback for them.
+    if (isThirdweb) {
+      setFlowState('eip3009_failed') // triggers FallbackApproveFlow
+      return
+    }
+
     setFlowState('signing_eip3009')
     try {
       const nonce       = crypto.getRandomValues(new Uint8Array(32))
       const nonceHex    = ('0x' + Array.from(nonce).map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`
       const validBefore = Math.floor(Date.now() / 1000) + 300  // 5 min
 
-      const signature = await walletClient.signTypedData({
+      const signature = await signTypedData({
         domain: {
           name:              USDC_EIP712_CONFIG.name,
           version:           USDC_EIP712_CONFIG.version,
           chainId:           FUJI_CHAIN_ID,
-          verifyingContract: requirements.asset,  // viene del server
+          verifyingContract: requirements.asset,
         },
         types: {
           TransferWithAuthorization: [
@@ -181,35 +190,34 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
       const message = (err as { message?: string })?.message ?? ''
 
       if (code === 4001) {
-        // Rechazo explícito del usuario → NO ofrecer fallback
         setErrorMsg('Cancelaste la operación. Puedes intentar de nuevo.')
         setFlowState('error')
         return
       }
 
-      // Incompatibilidad técnica (METHOD_NOT_FOUND, etc.) → ofrecer fallback
       const isTechnicalFailure =
         message.includes('METHOD_NOT_FOUND') ||
         message.includes('not supported') ||
+        message.includes('EIP-712_NOT_SUPPORTED_THIRDWEB') ||
         code === -32601
 
       if (isTechnicalFailure) {
-        setFlowState('eip3009_failed')  // FallbackApproveFlow aparece
+        setFlowState('eip3009_failed')
       } else {
         setErrorMsg('Error al firmar la autorización. Intenta de nuevo.')
         setFlowState('error')
       }
     }
-  }, [walletClient, address, slug, input])
+  }, [isReady, isThirdweb, address, slug, input, signTypedData])
 
-  /** Ejecutar fallback approve → lo llama FallbackApproveFlow al confirmar */
+  /** Ejecutar fallback approve — works for both thirdweb and wagmi wallets */
   const executeApprove = useCallback(async (amountWei: bigint) => {
     if (!address) return
     setFlowState('approving')
     try {
-      const hash = await writeContractAsync({
+      const hash = await unifiedWriteContract({
         address:      USDC_FUJI_ADDRESS,
-        abi:          USDC_ABI_APPROVE,
+        abi:          USDC_ABI_APPROVE as unknown as import('viem').Abi,
         functionName: 'approve',
         args:         [WASIAI_OPERATOR_ADDRESS, amountWei],
         chainId:      FUJI_CHAIN_ID,
@@ -223,9 +231,9 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
       } else {
         setErrorMsg('Error al ejecutar la aprobación on-chain.')
       }
-      setFlowState('eip3009_failed')  // vuelve a mostrar el fallback
+      setFlowState('eip3009_failed')
     }
-  }, [address, writeContractAsync])
+  }, [address, unifiedWriteContract])
 
   const currentFlowState = deriveState()
 

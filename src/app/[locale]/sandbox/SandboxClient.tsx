@@ -41,7 +41,7 @@ function formatUsdc(value: number | string): string {
 // ── Componente principal ──────────────────────────────────────────────────────
 // userId recibido del Server Component (auth ya verificada allá)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function SandboxClient({ userId }: { userId: string }) {
+export function SandboxClient({ userId }: { userId: string | null }) {
   const t = useTranslations('sandbox')
   const [agents, setAgents]               = useState<AgentOption[]>([])
   const [selectedSlug, setSelectedSlug]   = useState<string>('')

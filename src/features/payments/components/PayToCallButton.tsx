@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useAccount, useDisconnect } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { WalletConnectModal } from './WalletConnectModal'
 import { useTranslations } from 'next-intl'
 import type { Model } from '@/features/models/types/models.types'
@@ -16,8 +16,7 @@ interface PayToCallButtonProps {
 
 export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const t = useTranslations('payToCall')
-  const { disconnect } = useDisconnect()
-  const { address } = useAccount()
+  const { disconnect, address } = useWallet()
   const pendingPayRef = useRef(false)
   const [input, setInput] = useState('')
   const [showWalletModal, setShowWalletModal] = useState(false)
