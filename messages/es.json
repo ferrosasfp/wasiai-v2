@@ -128,6 +128,7 @@
     "creatorEarns": "Creator gana",
     "protocol": "Protocolo",
     "network": "Red",
+    "loginToCall": "Inicia sesión para usar este agente",
     "currency": "Moneda",
     "freeTrial": "Prueba gratis · {count} llamadas",
     "freeTrialFilter": "Prueba gratis",
