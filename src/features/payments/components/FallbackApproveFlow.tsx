@@ -20,13 +20,12 @@ export function FallbackApproveFlow({
       <div className="flex items-start gap-2">
         <span className="text-lg">⚠️</span>
         <p className="text-sm font-semibold text-amber-900">
-          Firma EIP-3009 no disponible en tu wallet
+          Aprobación requerida
         </p>
       </div>
 
       <p className="text-sm text-amber-800">
-        Este camino alternativo requiere aprobar una transacción on-chain. Necesitarás
-        una pequeña cantidad de <strong>AVAX</strong> para el gas.
+        Para completar el pago, necesitas aprobar el uso de USDC. No tiene costo adicional.
       </p>
 
       {approveState === 'idle' && (
