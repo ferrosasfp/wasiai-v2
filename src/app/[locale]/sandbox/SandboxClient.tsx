@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -40,9 +41,9 @@ function formatUsdc(value: number | string): string {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 // userId recibido del Server Component (auth ya verificada allá)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function SandboxClient({ userId }: { userId: string | null }) {
   const t = useTranslations('sandbox')
+  const isAnonymous = !userId
   const [agents, setAgents]               = useState<AgentOption[]>([])
   const [selectedSlug, setSelectedSlug]   = useState<string>('')
   const [inputText, setInputText]         = useState<string>('')
@@ -52,6 +53,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
   const [result, setResult]               = useState<SandboxInvokeResponse | null>(null)
   const [errorMsg, setErrorMsg]           = useState<string | null>(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
+  const [anonLimitHit, setAnonLimitHit]   = useState(false)
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -66,6 +68,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
   }, [selectedSlug])
 
   const fetchBalance = useCallback(async () => {
+    if (!userId) { setBalance(null); return }
     try {
       const res = await fetch('/api/v1/sandbox/balance')
       if (res.ok) {
@@ -76,7 +79,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
     } catch {
       setBalance(0.5)
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     Promise.all([fetchAgents(), fetchBalance()]).finally(() => setLoadingInitial(false))
@@ -108,7 +111,12 @@ export function SandboxClient({ userId }: { userId: string | null }) {
         if (res.status === 402) {
           setErrorMsg(`Créditos insuficientes. Balance: ${formatUsdc(errData.balance_usdc ?? 0)} | Requerido: ${formatUsdc(errData.required_usdc ?? 0)}`)
         } else if (res.status === 429) {
-          setErrorMsg(`Límite alcanzado (${errData.limit ?? 10} llamadas/hora). Reintentar en: ${errData.reset_at ?? 'pronto'}`)
+          if (errData.code === 'anon_rate_limited') {
+            setAnonLimitHit(true)
+            setErrorMsg(null)
+          } else {
+            setErrorMsg(`Límite alcanzado (${errData.limit ?? 10} llamadas/hora). Reintentar en: ${errData.reset_at ?? 'pronto'}`)
+          }
         } else if (res.status === 422) {
           setErrorMsg('El agente falló. Se reembolsó el costo. Intenta de nuevo.')
         } else if (res.status === 401) {
@@ -157,6 +165,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
         </div>
 
         {/* Balance card */}
+        {!isAnonymous && (
         <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -182,6 +191,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
             Inicial: $0.5000 USDC · Restante: {balancePct.toFixed(0)}%
           </p>
         </section>
+        )}
 
         {/* Formulario */}
         <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm space-y-4">
@@ -232,11 +242,26 @@ export function SandboxClient({ userId }: { userId: string | null }) {
           <button
             className="w-full bg-[#E84142] hover:bg-[#d03536] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
             onClick={handleInvoke}
-            disabled={loading || !selectedSlug || agents.length === 0}
+            disabled={loading || !selectedSlug || agents.length === 0 || anonLimitHit}
           >
             {loading ? 'Invocando…' : 'Invocar gratis →'}
           </button>
         </section>
+
+        {/* Anonymous limit banner */}
+        {anonLimitHit && (
+          <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5 text-center space-y-3">
+            <p className="text-sm text-blue-800 font-medium">
+              Has alcanzado el límite diario de pruebas gratuitas (5 llamadas)
+            </p>
+            <Link
+              href="/auth/login"
+              className="inline-block bg-[#E84142] text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-[#d03536] transition-colors"
+            >
+              Crear cuenta gratis →
+            </Link>
+          </section>
+        )}
 
         {/* Error */}
         {errorMsg && (

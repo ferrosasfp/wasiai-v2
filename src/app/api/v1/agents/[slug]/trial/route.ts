@@ -11,6 +11,7 @@ import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { z } from 'zod'
+import { checkIpLimit } from '@/lib/rate-limit-ip'
 
 const BodySchema = z.object({ input: z.string().min(1).max(2000) })
 
@@ -34,7 +35,17 @@ export async function GET(
   const { slug } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!user) {
+    // Anonymous: return generic trial info (no usage tracking)
+    return NextResponse.json({
+      used: false,
+      trialsUsed: 0,
+      trialsRemaining: 3,
+      limit: 3,
+      usedAt: null,
+      anonymous: true,
+    })
+  }
 
   const svc = createServiceClient()
   const { data: agent } = await svc
@@ -79,15 +90,29 @@ export async function POST(
 ) {
   const { slug } = await params
 
-  // 1. Auth
+  // 1. Auth (optional — anonymous allowed)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const isAnonymous = !user
 
   // 2. Rate limit por IP
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1'
-  const { success } = await getTrialLimit().limit(`ip:${ip}`)
-  if (!success) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+
+  if (isAnonymous) {
+    // Anonymous: 3 calls per agent per IP per day (reuses 058 infra)
+    const { success } = await checkIpLimit(ip, `trial-anon:${slug}`, 3)
+    if (!success) {
+      return NextResponse.json({
+        error: 'anon_rate_limited',
+        code: 'anon_trial_limited',
+        limit: 3,
+        message: 'Crea una cuenta gratuita para seguir probando',
+      }, { status: 429 })
+    }
+  } else {
+    const { success } = await getTrialLimit().limit(`ip:${ip}`)
+    if (!success) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  }
 
   // 3. Validate body
   const parsed = BodySchema.safeParse(await req.json().catch(() => ({})))
@@ -120,14 +145,16 @@ export async function POST(
     return NextResponse.json({ error: 'invalid_endpoint' }, { status: 400 })
   }
 
-  // 6-7. HU-3.3: Atómico — use_trial RPC (evita race condition TOCTOU)
-  const { data: result } = await svc.rpc('use_trial', {
-    p_user_id:  user.id,
-    p_agent_id: agent.id,
-    p_limit:    agent.free_trial_limit,
-  })
-  if (result === -1) {
-    return NextResponse.json({ error: 'trial_exhausted', limit: agent.free_trial_limit }, { status: 409 })
+  // 6-7. Trial usage tracking (authenticated only — anonymous tracked by IP rate limit)
+  if (!isAnonymous) {
+    const { data: result } = await svc.rpc('use_trial', {
+      p_user_id:  user!.id,
+      p_agent_id: agent.id,
+      p_limit:    agent.free_trial_limit,
+    })
+    if (result === -1) {
+      return NextResponse.json({ error: 'trial_exhausted', limit: agent.free_trial_limit }, { status: 409 })
+    }
   }
 
   // 8. Llamar al agente con timeout de 8s
