@@ -19,7 +19,7 @@ export function useWallet() {
   const { connect } = useConnect()
   const { disconnect: wagmiDisconnect } = useWagmiDisconnect()
 
-  const isThirdweb = !!thirdwebAccount
+  const isThirdweb = !!thirdwebAccount && thirdwebWallet?.id === 'inApp'
 
   // ── Dual-connection guard ───────────────────────────────────────
   // If both providers are connected, auto-disconnect the secondary one
