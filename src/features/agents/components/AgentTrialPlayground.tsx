@@ -14,6 +14,7 @@ type TrialState = 'checking' | 'idle' | 'loading' | 'success' | 'error' | 'timeo
 export function AgentTrialPlayground({ slug, isAuthenticated }: Props) {
   const t = useTranslations('trial')
   const [input, setInput] = useState('')
+  const [anonLimitHit, setAnonLimitHit] = useState(false)
   // Initialize directly from prop — avoids synchronous setState in effect
   const [state, setState] = useState<TrialState>(() =>
     isAuthenticated ? 'checking' : 'idle'
@@ -44,6 +45,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated }: Props) {
 
       if (!res.ok) {
         if (data.error === 'already_used') { setState('used'); return }
+        if (data.error === 'anon_rate_limited') { setAnonLimitHit(true); return }
         if (data.error === 'timeout') { setState('timeout'); return }
         setState('error')
         setErrorMsg(
@@ -82,11 +84,18 @@ export function AgentTrialPlayground({ slug, isAuthenticated }: Props) {
         </div>
       ) : (
         <>
-          {!isAuthenticated ? (
-            <p className="text-sm text-gray-500">
-              <Link href="/auth/login" className="text-[#E84142] underline">Inicia sesión</Link>{' '}
-              para probar gratis
-            </p>
+          {anonLimitHit ? (
+            <div className="space-y-3 text-center">
+              <p className="text-sm text-gray-600 font-medium">
+                Has alcanzado el límite de pruebas gratuitas
+              </p>
+              <Link
+                href="/auth/login"
+                className="inline-block bg-[#E84142] text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-[#c73535] transition-colors"
+              >
+                Crear cuenta gratis →
+              </Link>
+            </div>
           ) : (
             <>
               <textarea

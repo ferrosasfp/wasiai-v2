@@ -4,7 +4,10 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) {
+    // Anonymous: return null balance (UI hides balance section)
+    return NextResponse.json({ balance_usdc: null, total_calls: 0, anonymous: true })
+  }
 
   const service = createServiceClient()
 
