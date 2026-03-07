@@ -19,6 +19,7 @@ export async function verifyUsdcTransfer(
   txHash: string,
   expectedAmountUsdc: number
 ): Promise<{ verified: boolean; from?: string; error?: string }> {
+  console.log('[verifyUsdcTransfer]', { txHash, expectedAmountUsdc, OPERATOR_ADDRESS, USDC_ADDRESS, CHAIN_ID })
   try {
     const client = createPublicClient({ chain, transport: http(RPC_URL) })
 
