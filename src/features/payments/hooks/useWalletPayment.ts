@@ -49,7 +49,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
   const requirementsRef = useRef<X402Requirements | null>(null)
 
   const { address }              = useWallet()
-  const { isThirdweb, isReady, writeContract: unifiedWriteContract, signTypedData, signMessage } = useUnifiedWalletClient()
+  const { isReady, writeContract: unifiedWriteContract, signTypedData } = useUnifiedWalletClient()
   const { isConnected, isCorrectChain, currentChainName, switchToFuji } = useChainGuard()
   const { usdcBalance, hasEnoughBalance, isLoading: balanceLoading } = useUsdcBalance(priceUsdc)
   const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTx })
@@ -59,7 +59,6 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     // Estados en vuelo tienen prioridad — nunca los interrumpas con condiciones externas
     if (
       flowState === 'signing_eip3009' ||
-      flowState === 'transferring'    ||
       flowState === 'calling'         ||
       flowState === 'approving'
     ) {
@@ -107,79 +106,9 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     requirementsRef.current = requirements
     const amountWei = BigInt(requirements.maxAmountRequired)
 
-    // ── Embedded wallet: x402 facilitator settlement ──────────────
-    // User signs off-chain → server (facilitator) settles on-chain → facilitator pays gas
-    if (isThirdweb) {
-      setFlowState('transferring')
-      try {
-        // 1. Check if operator has allowance — if not, approve (one-time, gas sponsored by thirdweb paymaster)
-        const checkRes = await fetch(`/api/v1/payments/check-allowance?address=${address}&amount=${amountWei.toString()}`)
-        const { approved } = await checkRes.json() as { approved: boolean }
-
-        if (!approved) {
-          // One-time approve — gas sponsored via smart account
-          await unifiedWriteContract({
-            address:      USDC_FUJI_ADDRESS,
-            abi:          USDC_ABI_APPROVE as unknown as import('viem').Abi,
-            functionName: 'approve',
-            args:         [WASIAI_OPERATOR_ADDRESS, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')],
-            chainId:      FUJI_CHAIN_ID,
-          })
-        }
-
-        // 2. Sign payment authorization off-chain (personal_sign — works on all wallets)
-        const timestamp = Math.floor(Date.now() / 1000)
-        const message = `WasiAI x402 Payment Authorization\nAgent: ${slug}\nAmount: ${amountWei.toString()}\nTo: ${WASIAI_OPERATOR_ADDRESS}\nTimestamp: ${timestamp}`
-        const signature = await signMessage(message)
-
-        // 3. Send x402 payment header with scheme: facilitator
-        setFlowState('calling')
-        const x402Payload = {
-          x402Version: 1,
-          scheme: 'facilitator',
-          network: requirements.network,
-          payload: {
-            signature,
-            from: address,
-            to: WASIAI_OPERATOR_ADDRESS,
-            value: amountWei.toString(),
-            timestamp,
-            message,
-          },
-        }
-        const invokeRes = await fetch(`/api/v1/models/${slug}/invoke`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-PAYMENT': btoa(JSON.stringify(x402Payload)),
-          },
-          body: JSON.stringify({ input }),
-        })
-
-        if (!invokeRes.ok) {
-          const errData = await invokeRes.json().catch(() => ({})) as { error?: string }
-          setErrorMsg(errData.error ?? `Agent returned ${invokeRes.status}`)
-          setFlowState('error')
-          return
-        }
-
-        const data = await invokeRes.json() as { result?: unknown; meta?: { tx_hash?: `0x${string}` } }
-        setResult(typeof data.result === 'string' ? data.result : JSON.stringify(data.result))
-        setTxHash(data.meta?.tx_hash)
-        setFlowState('success')
-      } catch (err: unknown) {
-        const code = (err as { code?: number })?.code
-        if (code === 4001) {
-          setErrorMsg('Cancelaste el pago.')
-          setFlowState('idle')
-        } else {
-          setErrorMsg('Error al procesar el pago.')
-          setFlowState('error')
-        }
-      }
-      return
-    }
-
+    // ── x402 EIP-3009 payment — same flow for ALL wallet types ──────
+    // User signs off-chain (signTypedData) → server settles via thirdweb facilitator
+    // thirdweb embedded wallets support signTypedData via smart account
     setFlowState('signing_eip3009')
     try {
       const nonce       = crypto.getRandomValues(new Uint8Array(32))
@@ -274,7 +203,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
         setFlowState('error')
       }
     }
-  }, [isReady, isThirdweb, address, slug, input, signTypedData, signMessage, unifiedWriteContract])
+  }, [isReady, address, slug, input, signTypedData])
 
   /** Ejecutar fallback approve — works for both thirdweb and wagmi wallets */
   const executeApprove = useCallback(async (amountWei: bigint) => {
