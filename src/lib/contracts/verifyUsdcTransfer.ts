@@ -25,12 +25,14 @@ const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a
  */
 export async function verifyUsdcTransfer(
   txHash: string,
-  expectedAmountUsdc: number
+  expectedAmountUsdc: number,
+  expectedRecipient?: string,
 ): Promise<{ verified: boolean; from?: string; error?: string }> {
+  const recipientAddress = (expectedRecipient ?? OPERATOR_ADDRESS).toLowerCase()
   logger.info('[verifyUsdcTransfer] start', {
     txHash,
     expectedAmountUsdc,
-    OPERATOR_ADDRESS,
+    recipientAddress,
     USDC_ADDRESS,
     CHAIN_ID,
   })
@@ -82,12 +84,12 @@ export async function verifyUsdcTransfer(
         to: logTo,
         value: logValue,
         matchesUsdc: logAddress === USDC_ADDRESS,
-        matchesOperator: logTo === OPERATOR_ADDRESS,
+        matchesRecipient: logTo === recipientAddress,
       })
 
       if (logAddress !== USDC_ADDRESS) continue
       if (log.topics.length < 3) continue
-      if (logTo !== OPERATOR_ADDRESS) continue
+      if (logTo !== recipientAddress) continue
 
       const value = BigInt(log.data)
       if (value >= expectedAtomic) {
@@ -97,7 +99,7 @@ export async function verifyUsdcTransfer(
       }
     }
 
-    return { verified: false, error: `No USDC Transfer to ${OPERATOR_ADDRESS} found in ${receipt.logs.length} logs` }
+    return { verified: false, error: `No USDC Transfer to ${recipientAddress} found in ${receipt.logs.length} logs` }
   } catch (err) {
     logger.error('[verifyUsdcTransfer] error', { err: String(err).slice(0, 300) })
     return { verified: false, error: `Verification error: ${String(err).slice(0, 200)}` }

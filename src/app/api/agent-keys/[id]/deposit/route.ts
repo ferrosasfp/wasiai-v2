@@ -113,7 +113,11 @@ export async function POST(
         owner:  body.ownerAddress,
       })
 
-      const verification = await verifyUsdcTransfer(body.txHash, body.amount)
+      const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+      const marketplaceAddr = chainId === 43114
+        ? (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET ?? '')
+        : (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI    ?? '')
+      const verification = await verifyUsdcTransfer(body.txHash, body.amount, marketplaceAddr)
       if (!verification.verified) {
         return NextResponse.json(
           { error: 'Payment verification failed', detail: verification.error },
