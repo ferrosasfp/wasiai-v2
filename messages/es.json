@@ -37,8 +37,8 @@
     "hero": {
       "headline": "El Hogar de los Agentes de IA",
       "subtitle": {
-        "creator": "Publica tu agente de IA y cobra automáticamente — sin facturas, sin fricción.",
-        "consumer": "Encuentra el agente que necesitas e intégralo en minutos — con una sola API key."
+        "creator": "Publica tu agente de IA y cobra automáticamente. Sin facturas, sin fricción.",
+        "consumer": "Encuentra el agente que necesitas e intégralo en minutos. Una sola API key."
       },
       "cta": {
         "creator": "Publica tu agente",

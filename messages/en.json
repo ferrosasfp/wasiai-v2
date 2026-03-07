@@ -37,8 +37,8 @@
     "hero": {
       "headline": "The Home of AI Agents",
       "subtitle": {
-        "creator": "Publish your AI agent and get paid automatically — no invoicing, no friction.",
-        "consumer": "Find the right AI agent and integrate it in minutes — with one API key."
+        "creator": "Publish your AI agent and get paid automatically. No invoicing, no friction.",
+        "consumer": "Find the right AI agent and integrate it in minutes. One API key, that's it."
       },
       "cta": {
         "creator": "Publish your agent",
