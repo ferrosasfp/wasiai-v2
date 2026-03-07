@@ -1,6 +1,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { clearWalletState } from '@/lib/wallet-cleanup'
 import { useTranslations } from 'next-intl'
 
 interface Props {
@@ -13,6 +14,7 @@ export function ProfileSignOut({ locale }: Props) {
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
+    clearWalletState()
     window.location.href = `/${locale}/login`
   }
 

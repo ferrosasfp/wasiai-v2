@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Package, GitBranch, KeyRound, User, Globe } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
+import { clearWalletState } from '@/lib/wallet-cleanup'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { ApiKeyBalance } from '@/features/layout/components/ApiKeyBalance'
 import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
@@ -77,6 +78,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   async function handleSignout() {
     const supabase = createClient()
     await supabase.auth.signOut()
+    clearWalletState()
     window.location.href = `/${locale}/login`
   }
 

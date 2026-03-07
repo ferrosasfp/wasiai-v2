@@ -816,7 +816,8 @@
     "noHistory": "Sin ejecuciones aun",
     "latency": "Latencia",
     "status": "Estado",
-    "noActiveAgents": "No hay agentes activos disponibles."
+    "noActiveAgents": "No hay agentes activos disponibles.",
+    "testingBanner": "Modo sandbox. Este es un ambiente de prueba. Los resultados pueden no reflejar la precisión de producción."
   },
   "agentWallet": {
     "title": "Wallet del Agente",

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useState, useEffect, useRef, startTransition } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { clearWalletState } from '@/lib/wallet-cleanup'
 import { ActionSheet } from '@/features/auth/components/ActionSheet'
 import { Package, GitBranch, KeyRound, User, BookOpen, Globe, LogOut, Sparkles } from 'lucide-react'
 
@@ -43,6 +44,7 @@ export function BottomTabBar({ locale: _locale, initialEmail = null }: BottomTab
   async function handleSignout() {
     const supabase = createClient()
     await supabase.auth.signOut()
+    clearWalletState()
     window.location.href = `/${locale}/login`
   }
 

@@ -816,7 +816,8 @@
     "noHistory": "No runs yet",
     "latency": "Latency",
     "status": "Status",
-    "noActiveAgents": "No active agents available."
+    "noActiveAgents": "No active agents available.",
+    "testingBanner": "Sandbox mode. This is a testing environment. Results may not reflect production accuracy."
   },
   "agentWallet": {
     "title": "Agent Wallet",

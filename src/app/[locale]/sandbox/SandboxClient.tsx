@@ -143,6 +143,11 @@ export function SandboxClient({ userId }: { userId: string | null }) {
     <main className="min-h-screen bg-gray-50 pb-24">
       <div className="mx-auto max-w-2xl px-4 py-8 space-y-5">
 
+        {/* Testing banner */}
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          🧪 {t('testingBanner')}
+        </div>
+
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sandbox</h1>
