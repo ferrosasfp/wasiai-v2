@@ -10,7 +10,13 @@ interface WalletConnectButtonProps {
 }
 
 const wallets = [
-  inAppWallet({ auth: { options: ['google', 'email'] } }),
+  inAppWallet({
+    auth: { options: ['google', 'email'] },
+    smartAccount: {
+      chain: avalancheFuji,
+      sponsorGas: true,
+    },
+  }),
   createWallet('io.metamask'),
   createWallet('app.core.extension'),
   createWallet('com.coinbase.wallet'),
