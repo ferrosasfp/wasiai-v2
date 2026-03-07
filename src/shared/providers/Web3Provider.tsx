@@ -3,6 +3,7 @@
 import { Component, useState } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ThirdwebProvider } from 'thirdweb/react'
 import { wagmiConfig } from '@/shared/lib/web3/config'
 
 interface Props {
@@ -65,7 +66,9 @@ export function Web3Provider({ children }: Props) {
     <Web3ErrorBoundary>
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
-          {children}
+          <ThirdwebProvider>
+            {children}
+          </ThirdwebProvider>
         </QueryClientProvider>
       </WagmiProvider>
     </Web3ErrorBoundary>
