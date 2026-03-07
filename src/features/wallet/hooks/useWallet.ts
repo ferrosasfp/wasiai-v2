@@ -19,6 +19,8 @@ export function useWallet() {
   const { connect } = useConnect()
   const { disconnect: wagmiDisconnect } = useWagmiDisconnect()
 
+  // isThirdweb = true ONLY for embedded wallets (Google/email) — affects payment routing
+  // External wallets (Core, MetaMask) connected via thirdweb UI are NOT embedded
   const isThirdweb = !!thirdwebAccount && thirdwebWallet?.id === 'inApp'
 
   // ── Dual-connection guard ───────────────────────────────────────
@@ -31,8 +33,11 @@ export function useWallet() {
     }
   }, [thirdwebAccount, wagmiConnected, wagmiDisconnect])
 
-  const address = isThirdweb ? (thirdwebAccount.address as `0x${string}`) : wagmiAddress
-  const isConnected = isThirdweb || wagmiConnected
+  // Use thirdweb address for any wallet connected via thirdweb UI (embedded or external)
+  const address = thirdwebAccount
+    ? (thirdwebAccount.address as `0x${string}`)
+    : wagmiAddress
+  const isConnected = !!thirdwebAccount || wagmiConnected
   const isConnecting = wagmiConnecting
 
   // ── Wave 6c: Normalize chain to wagmi-compatible Chain object ───
