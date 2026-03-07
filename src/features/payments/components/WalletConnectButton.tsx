@@ -26,11 +26,37 @@ export function WalletConnectButton({ locale: _locale }: WalletConnectButtonProp
       chain={avalancheFuji}
       theme="light"
       connectButton={{
-        className: 'rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600',
+        label: 'Connect Wallet',
+        style: {
+          fontSize: '0.75rem',
+          fontWeight: 500,
+          padding: '6px 12px',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb',
+          backgroundColor: 'transparent',
+          color: '#4b5563',
+          height: 'auto',
+          minWidth: 'auto',
+        },
+      }}
+      detailsButton={{
+        style: {
+          fontSize: '0.75rem',
+          fontWeight: 500,
+          padding: '4px 10px',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb',
+          backgroundColor: 'transparent',
+          color: '#4b5563',
+          height: 'auto',
+          minWidth: 'auto',
+          maxHeight: '32px',
+        },
       }}
       connectModal={{
         showThirdwebBranding: false,
       }}
+      
     />
   )
 }
