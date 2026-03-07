@@ -230,7 +230,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
             {model.long_running && <EscrowInfoBanner />}
 
             {/* Pay & Call — real component */}
-            <ModelCallSection model={model} />
+            <ModelCallSection model={model} isAuthenticated={isAuthenticated} />
 
             {/* Creator */}
             {model.creator && (

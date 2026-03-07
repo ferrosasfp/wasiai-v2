@@ -8,11 +8,12 @@ import { Zap } from 'lucide-react'
 
 interface Props {
   model: Model
+  isAuthenticated?: boolean
 }
 
 const TREASURY = process.env.NEXT_PUBLIC_WASIAI_TREASURY
 
-export function ModelCallSection({ model }: Props) {
+export function ModelCallSection({ model, isAuthenticated = false }: Props) {
   const tAnalytics = useTranslations('analytics')
   const tMarket = useTranslations('marketplace')
   if (!TREASURY) {
@@ -47,15 +48,21 @@ export function ModelCallSection({ model }: Props) {
         </div>
       </div>
 
-      {/* T-17: ErrorBoundary prevents payment errors from crashing the entire page */}
-      <ErrorBoundary>
-        <PayToCallButton model={model} />
-      </ErrorBoundary>
-
-      {/* Trust footer */}
-      <p className="mt-3 text-center text-xs text-gray-400">
-        <span className="inline-flex items-center gap-1"><Zap size={11} />Gasless · Powered by WasiAI × Avalanche</span>
-      </p>
+      {/* Payment section — only for authenticated users */}
+      {isAuthenticated ? (
+        <>
+          <ErrorBoundary>
+            <PayToCallButton model={model} />
+          </ErrorBoundary>
+          <p className="mt-3 text-center text-xs text-gray-400">
+            <span className="inline-flex items-center gap-1"><Zap size={11} />Gasless · Powered by WasiAI × Avalanche</span>
+          </p>
+        </>
+      ) : (
+        <p className="text-center text-sm text-gray-500">
+          {tMarket('loginToCall') ?? 'Log in to call this agent'}
+        </p>
+      )}
     </div>
   )
 }
