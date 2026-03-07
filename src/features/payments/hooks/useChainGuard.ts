@@ -1,19 +1,30 @@
-import { useAccount, useWalletClient, useSwitchChain } from 'wagmi'
+'use client'
+
+import { useWalletClient, useSwitchChain } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { FUJI_CHAIN_ID, FUJI_CHAIN_PARAMS } from '@/shared/lib/web3/fuji'
 
 export function useChainGuard() {
-  const { isConnected, isReconnecting, chain } = useAccount()
+  const { isConnected, chain, isThirdweb } = useWallet()
+  const isReconnecting = false // unified hook handles reconnection internally
   const { data: walletClient } = useWalletClient()
   const { switchChainAsync } = useSwitchChain()
 
-  // Esperar a que wagmi estabilice el chain antes de evaluar red incorrecta.
-  // isReconnecting=true o chain=undefined justo después de conectar → no es wrong_network todavía.
+  // thirdweb embedded wallets are chain-agnostic: transactions specify chain
+  // at send-time, so we always treat them as "correct chain".
   const chainSettled = isConnected && !isReconnecting && chain !== undefined
-  const isCorrectChain = chainSettled ? chain.id === FUJI_CHAIN_ID : true
+  const isCorrectChain = isThirdweb
+    ? true
+    : chainSettled
+      ? chain.id === FUJI_CHAIN_ID
+      : true
 
   /** CRÍTICO: esta función SOLO debe llamarse desde un onClick del usuario.
-   *  NUNCA llamarla desde un useEffect — los browsers bloquean el popup de wallet. */
+   *  NUNCA llamarla desde un useEffect — los browsers bloquean el popup de wallet.
+   *  Para thirdweb wallets es un no-op (chain is set at tx time). */
   async function switchToFuji(): Promise<void> {
+    if (isThirdweb) return // thirdweb handles chain at tx time
+
     try {
       await switchChainAsync({ chainId: FUJI_CHAIN_ID })
     } catch (err: unknown) {

@@ -2,8 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { type Abi, type Address, type Hash } from 'viem'
-import { useWalletClient } from 'wagmi'
-import { getPublicClient } from '@/shared/lib/web3/client'
+import { useUnifiedWalletClient } from '@/features/wallet/hooks/useUnifiedWalletClient'
 
 interface UseContractWriteParams {
   address: Address
@@ -13,13 +12,13 @@ interface UseContractWriteParams {
 }
 
 export function useContractWrite({ address, abi, functionName, chainId }: UseContractWriteParams) {
-  const { data: walletClient } = useWalletClient()
+  const { isReady, writeContract } = useUnifiedWalletClient()
   const [hash, setHash] = useState<Hash | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const write = useCallback(async (args: readonly unknown[] = []) => {
-    if (!walletClient) {
+    if (!isReady) {
       setError('Wallet not connected')
       return null
     }
@@ -29,16 +28,13 @@ export function useContractWrite({ address, abi, functionName, chainId }: UseCon
     setHash(null)
 
     try {
-      const client = getPublicClient(chainId)
-      const { request } = await client.simulateContract({
+      const txHash = await writeContract({
         address,
         abi,
         functionName,
-        args: args as unknown[],
-        account: walletClient.account,
+        args,
+        chainId,
       })
-
-      const txHash = await walletClient.writeContract(request)
       setHash(txHash)
       return txHash
     } catch (err) {
@@ -48,7 +44,7 @@ export function useContractWrite({ address, abi, functionName, chainId }: UseCon
     } finally {
       setIsLoading(false)
     }
-  }, [address, abi, functionName, walletClient, chainId])
+  }, [address, abi, functionName, isReady, writeContract, chainId])
 
   return { hash, isLoading, error, write }
 }

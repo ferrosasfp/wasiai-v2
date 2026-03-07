@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useReducer } from 'react'
-import { useAccount } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { useWalletClient } from 'wagmi'
 import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
@@ -50,7 +50,7 @@ export default function AdminPage() {
   const t = useTranslations('admin')
   const [mounted, markMounted] = useReducer(() => true, false)
   useEffect(markMounted, [markMounted])
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useWallet()
   const { data: walletClient }    = useWalletClient()
   const [status, setStatus]       = useState<AdminStatus | null>(null)
   const [treasury, setTreasury]   = useState<TreasuryData | null>(null)

@@ -10,7 +10,7 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { CapabilitiesEditor } from '@/features/publish/CapabilitiesEditor'
 import type { CapabilitiesEditorRef } from '@/features/publish/CapabilitiesEditor'
 import type { CapabilityPayload } from '@/features/publish/types'
-import { useAccount } from 'wagmi'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { createPublicClient, http, encodeFunctionData } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { WASIAI_MARKETPLACE_ABI, toUSDCAtomics } from '@/lib/contracts/WasiAIMarketplace'
@@ -72,7 +72,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const { address: walletAddress, isConnected: walletConnected } = useAccount()
+  const { address: walletAddress, isConnected: walletConnected } = useWallet()
 
   function handleChange(field: keyof typeof form, value: unknown) {
     setForm(prev => ({ ...prev, [field]: value }))
