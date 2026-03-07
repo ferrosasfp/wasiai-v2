@@ -6,7 +6,7 @@ const chain = CHAIN_ID === 43114 ? avalanche : avalancheFuji
 const USDC_ADDRESS = (CHAIN_ID === 43114
   ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
   : '0x5425890298aed601595a70AB815c96711a31Bc65').toLowerCase()
-const OPERATOR_ADDRESS = (process.env.MARKETPLACE_CONTRACT_ADDRESS ?? '').toLowerCase()
+const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '').toLowerCase()
 const RPC_URL = CHAIN_ID === 43114
   ? 'https://api.avax.network/ext/bc/C/rpc'
   : 'https://api.avax-test.network/ext/bc/C/rpc'
