@@ -41,8 +41,8 @@ export function useWallet() {
   const isConnecting = wagmiConnecting
 
   // ── Wave 6c: Normalize chain to wagmi-compatible Chain object ───
-  const chain = isThirdweb
-    ? viemAvalancheFuji  // thirdweb embedded wallets are chain-agnostic; default to Fuji
+  const chain = thirdwebAccount
+    ? viemAvalancheFuji  // cualquier wallet conectada via thirdweb UI → normalizar a Fuji
     : wagmiChain
 
   const connectWallet = useCallback(() => {
