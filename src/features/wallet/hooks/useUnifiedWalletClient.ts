@@ -91,10 +91,30 @@ export function useUnifiedWalletClient() {
     [isThirdweb, wagmiWalletClient],
   )
 
+  /**
+   * Sign a plain message (personal_sign / EIP-191).
+   * Works with ALL wallet types including thirdweb embedded wallets.
+   */
+  const signMessage = useCallback(
+    async (message: string): Promise<Hash> => {
+      if (isThirdweb && thirdwebAccount) {
+        const { signMessage: twSignMessage } = await import('thirdweb/utils')
+        const sig = await twSignMessage({ account: thirdwebAccount, message })
+        return sig as Hash
+      }
+      if (!wagmiWalletClient) {
+        throw new Error('Wallet not connected')
+      }
+      return wagmiWalletClient.signMessage({ message })
+    },
+    [isThirdweb, thirdwebAccount, wagmiWalletClient],
+  )
+
   return {
     isThirdweb,
     isReady: isThirdweb ? !!thirdwebAccount : !!wagmiWalletClient,
     writeContract,
     signTypedData,
+    signMessage,
   }
 }
