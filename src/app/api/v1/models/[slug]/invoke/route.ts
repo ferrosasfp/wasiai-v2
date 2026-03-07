@@ -378,7 +378,7 @@ export async function POST(
     const verification = await verifyUsdcTransfer(paymentTxHash, totalPrice)
     if (!verification.verified) {
       return NextResponse.json(
-        { error: 'Payment verification failed', code: 'payment_invalid', reason: verification.error },
+        { error: 'Payment verification failed', code: 'payment_invalid', reason: verification.error, debug: { txHash: paymentTxHash, totalPrice } },
         { status: 402 }
       )
     }
