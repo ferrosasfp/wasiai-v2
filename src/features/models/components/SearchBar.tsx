@@ -1,108 +1,130 @@
 'use client'
 
-import { useRef } from 'react'
-import { useAgentSearch, type AgentSearchResult } from '../hooks/useAgentSearch'
-import { Search } from 'lucide-react'
+import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { Search, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 interface SearchBarProps {
   defaultValue?: string
   category?:     string
   placeholder?:  string
-  /**
-   * mode='server' → form GET para navegación SSR (mantiene SEO, recarga página)
-   * mode='client' → useAgentSearch reactivo (SPA, sin recarga)
-   */
-  mode?:       'server' | 'client'
-  /** Callback opcional para recibir resultados en modo client */
-  onResults?:  (results: AgentSearchResult[]) => void
+  mode?:         'server' | 'client'
+  onResults?:    (results: import('../hooks/useAgentSearch').AgentSearchResult[]) => void
+  'aria-label'?: string
 }
 
 export function SearchBar({
   defaultValue = '',
-  category,
-  placeholder  = 'Busca agentes por función, tecnología...',
+  placeholder  = 'Search agents...',
   mode         = 'server',
-  /* onResults is intentionally not destructured here — it is forwarded to
-     the parent via useAgentSearch when needed in mode='client' */
   ...rest
 }: SearchBarProps) {
-  void rest // suppress unused destructuring
+  void rest
   const t = useTranslations('search')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const inputRef = useRef<HTMLInputElement>(null)
-  const { query, setQuery, isLoading, error, clear } = useAgentSearch({ category })
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ── Modo server: form GET → recarga SSR con SEO ───────────────────
-  if (mode === 'server') {
+  const [value, setValue] = useState(defaultValue)
+
+  // Sync with URL changes (e.g. back/forward navigation)
+  useEffect(() => {
+    setValue(searchParams.get('search') ?? '')
+  }, [searchParams])
+
+  const pushSearch = useCallback((q: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (q.trim()) {
+      params.set('search', q.trim())
+    } else {
+      params.delete('search')
+    }
+    // Reset to page 1 on new search
+    params.delete('page')
+    const qs = params.toString()
+    router.push(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
+  }, [router, pathname, searchParams])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const q = e.target.value
+    setValue(q)
+
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => pushSearch(q), 350)
+  }
+
+  const handleClear = () => {
+    setValue('')
+    if (timerRef.current) clearTimeout(timerRef.current)
+    pushSearch('')
+    inputRef.current?.focus()
+  }
+
+  // Cleanup
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [])
+
+  // Client mode uses the existing useAgentSearch hook
+  if (mode === 'client') {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { query, setQuery, isLoading, error, clear } = require('../hooks/useAgentSearch').useAgentSearch()
     return (
-      <form method="GET" className="flex items-center gap-2">
-        {category && (
-          <input type="hidden" name="category" value={category} />
-        )}
-        <div className="relative">
+      <div className="relative">
+        <div className="flex items-center gap-2">
           <input
-            ref={inputRef}
             type="search"
-            name="search"
-            defaultValue={defaultValue}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
             placeholder={placeholder}
-            aria-label="Buscar agentes"
-            className={[
-              'w-full rounded-xl border border-gray-200 bg-white',
-              'px-4 py-2 pr-10 text-sm',
-              'focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100',
-              'sm:w-64',
-            ].join(' ')}
+            aria-label="Search agents"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 pr-10 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100 sm:w-64"
           />
-          <button
-            type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            aria-label="Buscar"
-          >
-            <Search size={16} />
-          </button>
+          {query && (
+            <button type="button" onClick={clear} className="text-gray-400 hover:text-gray-600 text-sm" aria-label="Clear search">✕</button>
+          )}
+          {isLoading && (
+            <span className="text-xs text-gray-400 animate-pulse" aria-live="polite">{t('searching')}</span>
+          )}
         </div>
-      </form>
+        {error && <p className="mt-1 text-xs text-red-500" role="alert">{error}</p>}
+      </div>
     )
   }
 
-  // ── Modo client: reactivo con debounce ────────────────────────────
+  // Server mode: debounced URL push (filters as you type)
   return (
     <div className="relative">
-      <div className="flex items-center gap-2">
-        <input
-          type="search"
-          value={query}
-          onChange={e => {
-            setQuery(e.target.value)
-          }}
-          placeholder={placeholder}
-          aria-label="Buscar agentes"
-          className={[
-            'w-full rounded-xl border border-gray-200 bg-white',
-            'px-4 py-2 pr-10 text-sm',
-            'focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100',
-            'sm:w-64',
-          ].join(' ')}
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={clear}
-            className="text-gray-400 hover:text-gray-600 text-sm"
-            aria-label="Limpiar búsqueda"
-          >
-            ✕
-          </button>
-        )}
-        {isLoading && (
-          <span className="text-xs text-gray-400 animate-pulse" aria-live="polite">
-            {t('searching')}
-          </span>
-        )}
-      </div>
-      {error && (
-        <p className="mt-1 text-xs text-red-500" role="alert">{error}</p>
+      <input
+        ref={inputRef}
+        type="search"
+        value={value}
+        onChange={handleChange}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            if (timerRef.current) clearTimeout(timerRef.current)
+            pushSearch(value)
+          }
+        }}
+        placeholder={placeholder}
+        aria-label="Search agents"
+        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 pr-10 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100 sm:w-64"
+      />
+      {value ? (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          aria-label="Clear search"
+        >
+          <X size={16} />
+        </button>
+      ) : (
+        <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
       )}
     </div>
   )
