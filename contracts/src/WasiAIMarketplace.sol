@@ -783,6 +783,71 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         return (totalVolume, totalInvocations, platformFeeBps);
     }
 
+    // ─── ERC-8004 Reputation Registry ─────────────────────────────────────────
+
+    struct ReputationRecord {
+        uint16  avgRating;    // scaled ×100 (e.g. 450 = 4.50 stars, max 500)
+        uint32  voteCount;    // total votes aggregated
+        uint64  lastUpdated;  // block.timestamp of last batch
+    }
+
+    /// slug → on-chain reputation
+    mapping(string => ReputationRecord) public reputations;
+
+    event ReputationBatchSubmitted(
+        uint256 indexed batchSize,
+        uint256 indexed timestamp
+    );
+
+    /**
+     * @notice Submit aggregated reputation scores for a batch of agents.
+     * @dev    Called daily by cron operator. Overwrites previous values.
+     *         avgRatings scaled ×100 (uint16): 0–500 (0.00–5.00 stars).
+     *         For thumbs up/down systems: up=500, down=0, mixed=proportional.
+     * @param slugs       Agent slug identifiers
+     * @param avgRatings  Average rating per agent (uint16, ×100 scaled)
+     * @param voteCounts  Total vote count per agent (cumulative)
+     */
+    function submitReputationBatch(
+        string[] calldata slugs,
+        uint16[] calldata avgRatings,
+        uint32[] calldata voteCounts
+    ) external onlyOperator {
+        lastOperatorActivity = block.timestamp;
+        uint256 len = slugs.length;
+        require(len > 0,                      "WasiAI: empty batch");
+        require(len <= 500,                   "WasiAI: batch too large");
+        require(len == avgRatings.length,     "WasiAI: length mismatch");
+        require(len == voteCounts.length,     "WasiAI: length mismatch");
+
+        for (uint256 i = 0; i < len; i++) {
+            require(avgRatings[i] <= 500,     "WasiAI: rating out of range");
+            require(
+                agents[slugs[i]].creator != address(0),
+                "WasiAI: agent not found"
+            );
+
+            reputations[slugs[i]] = ReputationRecord({
+                avgRating:   avgRatings[i],
+                voteCount:   voteCounts[i],
+                lastUpdated: uint64(block.timestamp)
+            });
+        }
+
+        emit ReputationBatchSubmitted(len, block.timestamp);
+    }
+
+    /**
+     * @notice Read on-chain reputation for an agent.
+     */
+    function getReputation(string calldata slug)
+        external view
+        returns (uint16 avgRating, uint32 voteCount, uint64 lastUpdated)
+    {
+        ReputationRecord memory r = reputations[slug];
+        return (r.avgRating, r.voteCount, r.lastUpdated);
+    }
+
     /// @notice Compute the canonical paymentId for an invocation.
     /// @dev    Off-chain verifiable: anyone can recompute with public data.
     ///         paymentId = keccak256(slug, payer, amount, nonce, chainId)

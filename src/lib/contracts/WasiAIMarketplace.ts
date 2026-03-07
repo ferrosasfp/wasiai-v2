@@ -398,6 +398,37 @@ export const WASIAI_MARKETPLACE_ABI = [
       { name: 'amount', type: 'uint256', indexed: false },
     ],
   },
+  // ── ERC-8004 Reputation Batch ─────────────────────────────────────────────
+  {
+    name: 'submitReputationBatch',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'slugs',      type: 'string[]' },
+      { name: 'avgRatings', type: 'uint16[]' },
+      { name: 'voteCounts', type: 'uint32[]' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'getReputation',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'slug', type: 'string' }],
+    outputs: [
+      { name: 'avgRating',   type: 'uint16' },
+      { name: 'voteCount',   type: 'uint32' },
+      { name: 'lastUpdated', type: 'uint64' },
+    ],
+  },
+  {
+    name: 'ReputationBatchSubmitted',
+    type: 'event',
+    inputs: [
+      { name: 'batchSize', type: 'uint256', indexed: true  },
+      { name: 'timestamp', type: 'uint256', indexed: true  },
+    ],
+  },
 ] as const
 
 // ── Contract address helper ────────────────────────────────────────────────
