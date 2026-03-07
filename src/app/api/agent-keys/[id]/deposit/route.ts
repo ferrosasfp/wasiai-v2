@@ -2,19 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { depositForKeyOnChain, getKeyBalanceOnChain } from '@/lib/contracts/marketplaceClient'
+import { verifyUsdcTransfer } from '@/lib/contracts/verifyUsdcTransfer'
 import { logger } from '@/lib/logger'
 
-const depositSchema = z.object({
+// Route B: EOA — EIP-3009 TransferWithAuthorization
+const depositSchemaEOA = z.object({
   ownerAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid Ethereum address'),
   amount:       z.number().min(0.01).max(1000),
   validAfter:   z.number().int().min(0),
   validBefore:  z.number().int().min(1),
   nonce:        z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid nonce (must be 0x + 64 hex chars)'),
-  // Core Wallet puede devolver v = 0 o 1 — normalizamos a 27/28
   v:            z.number().int().min(0).max(28).transform(v => v < 27 ? v + 27 : v),
   r:            z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid r value'),
   s:            z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid s value'),
 })
+
+// Route C: Embedded wallet — USDC.transfer directo + tx hash
+const depositSchemaRouteC = z.object({
+  ownerAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid Ethereum address'),
+  amount:       z.number().min(0.01).max(1000),
+  txHash:       z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid tx hash'),
+})
+
+const depositSchema = z.union([depositSchemaRouteC, depositSchemaEOA])
 
 /**
  * POST /api/agent-keys/[id]/deposit
@@ -92,38 +102,60 @@ export async function POST(
       )
     }
 
-    // 4. Submit ERC-3009 deposit on-chain (operator-mediated)
-    logger.info('[deposit] initiating depositForKey', {
-      keyId:       keyRow.key_hash.slice(0, 8),
-      amount:      body.amount,
-      owner:       body.ownerAddress,
-      v:           body.v,
-      r:           body.r.slice(0, 10),
-      s:           body.s.slice(0, 10),
-      validBefore: body.validBefore,
-      nonce:       body.nonce.slice(0, 10),
-    })
+    // 4. Submit deposit on-chain — Route C (txHash) or Route B (EIP-3009)
+    let txHash: string
 
-    const txHash = await depositForKeyOnChain({
-      keyId:        keyRow.key_hash,
-      ownerAddress: body.ownerAddress,
-      amount:       body.amount,
-      validAfter:   body.validAfter,
-      validBefore:  body.validBefore,
-      nonce:        body.nonce,
-      v:            body.v,
-      r:            body.r,
-      s:            body.s,
-    })
+    if ('txHash' in body) {
+      // ── Route C: Embedded wallet — verificar Transfer event on-chain ──────
+      logger.info('[deposit] Route C — verifying USDC transfer on-chain', {
+        txHash: body.txHash.slice(0, 10),
+        amount: body.amount,
+        owner:  body.ownerAddress,
+      })
 
-    if (!txHash) {
-      return NextResponse.json(
-        { error: 'On-chain deposit failed — check contract configuration' },
-        { status: 500 },
-      )
+      const verification = await verifyUsdcTransfer(body.txHash, body.amount)
+      if (!verification.verified) {
+        return NextResponse.json(
+          { error: 'Payment verification failed', detail: verification.error },
+          { status: 402 },
+        )
+      }
+      txHash = body.txHash
+      logger.info('[deposit] Route C verified', { txHash })
+    } else {
+      // ── Route B: EOA — EIP-3009 TransferWithAuthorization (existente) ────
+      logger.info('[deposit] Route B — initiating depositForKey', {
+        keyId:       keyRow.key_hash.slice(0, 8),
+        amount:      body.amount,
+        owner:       body.ownerAddress,
+        v:           body.v,
+        r:           body.r.slice(0, 10),
+        s:           body.s.slice(0, 10),
+        validBefore: body.validBefore,
+        nonce:       body.nonce.slice(0, 10),
+      })
+
+      const result = await depositForKeyOnChain({
+        keyId:        keyRow.key_hash,
+        ownerAddress: body.ownerAddress,
+        amount:       body.amount,
+        validAfter:   body.validAfter,
+        validBefore:  body.validBefore,
+        nonce:        body.nonce,
+        v:            body.v,
+        r:            body.r,
+        s:            body.s,
+      })
+
+      if (!result) {
+        return NextResponse.json(
+          { error: 'On-chain deposit failed — check contract configuration' },
+          { status: 500 },
+        )
+      }
+      txHash = result
+      logger.info('[deposit] Route B on-chain tx submitted', { txHash })
     }
-
-    logger.info('[deposit] on-chain tx submitted', { txHash })
 
     // 5. HAL-011: Update budget_usdc atomically via RPC (prevents race condition)
     const { error: updateError } = await supabase.rpc('increment_key_budget', {

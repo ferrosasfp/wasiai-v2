@@ -52,3 +52,4 @@
 | 047 | 2026-03-05 | WAS-160 | EPIC: Dual Registration Off-chain + On-chain (ERC-8004) con Upgrade Path | EPIC | QUALITY | DONE | master |
 | 048 | 2026-03-05 | WAS-161 | Sync precio on-chain al editar agente (creator paga gas, active removido) | feature | QUALITY | DONE | master |
 | 049 | 2026-03-05 | WAS-162 | Transparency Dashboard — on-chain economics en footer + /transparency | feature | QUALITY | DONE | master |
+| 050 | 2026-03-07 | HU-050 | Agent Keys — Migrar wallet a sistema unificado thirdweb | improvement | QUALITY | DONE | feat/050-agent-keys-unified-wallet |

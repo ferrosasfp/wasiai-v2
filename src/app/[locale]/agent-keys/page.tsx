@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { AlertTriangle, Info, KeyRound, Bot } from 'lucide-react'
+import { useWallet } from '@/features/wallet/hooks/useWallet'
+import { useUnifiedWalletClient } from '@/features/wallet/hooks/useUnifiedWalletClient'
 
 interface AgentKey {
   id: string
@@ -16,6 +18,34 @@ interface AgentKey {
   raw_key?: string
   key_hash?: string  // WAS-141: exposed to owner for on-chain withdrawKey call
 }
+
+// ABI para withdrawKey on-chain
+const WITHDRAW_KEY_ABI = [
+  {
+    name: 'withdrawKey',
+    type: 'function' as const,
+    inputs: [
+      { name: 'keyId', type: 'bytes32' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
+// ABI para USDC.transfer (embedded wallet deposit — Route C)
+const USDC_TRANSFER_ABI = [
+  {
+    name: 'transfer',
+    type: 'function' as const,
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+] as const
 
 // USDC contract addresses by chain
 const USDC_BY_CHAIN: Record<number, string> = {
@@ -46,6 +76,8 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
   const [errorMsg, setErrorMsg] = useState('')
   const [txHash, setTxHash]     = useState('')
   const [balance, setBalance]   = useState<number | null>(null)
+  const { address, chain, isThirdweb } = useWallet()
+  const { signTypedData, writeContract, isReady } = useUnifiedWalletClient()
 
   // Load current on-chain balance
   useEffect(() => {
@@ -58,7 +90,6 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
   async function handleDeposit() {
     setErrorMsg('')
 
-    // HAL-013: Guard — never send to empty contract address
     if (CHAIN_ID === 43114 && !MARKETPLACE_ADDRESS) {
       setErrorMsg('Mainnet contract not configured. Contact support.')
       return
@@ -68,45 +99,64 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
       return
     }
 
-    // 1. Check wallet availability
-    const win = window as typeof window & { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }
-    if (!win.ethereum) {
-      setErrorMsg('No wallet detected. Please install Core Wallet or MetaMask.')
+    if (!isReady || !address) {
+      setErrorMsg('Wallet no conectada. Conecta tu wallet para continuar.')
       return
     }
+
+    if (chain?.id !== CHAIN_ID) {
+      setErrorMsg(`Red incorrecta. Cambia a ${CHAIN_ID === 43114 ? 'Avalanche C-Chain' : 'Avalanche Fuji Testnet'}.`)
+      return
+    }
+
+    const atomicAmount = BigInt(Math.round(amount * 1_000_000))
 
     try {
       setStatus('signing')
 
-      // 2. Request accounts
-      const accounts = await win.ethereum.request({ method: 'eth_requestAccounts' }) as string[]
-      const from = accounts[0]
-      if (!from) throw new Error('No account selected')
+      if (isThirdweb) {
+        // ── Route C: Embedded wallet — USDC.transfer directo ────────────────
+        // EIP-3009 no funciona para smart accounts (ecrecover retorna admin EOA)
+        const transferHash = await writeContract({
+          address:      USDC_ADDRESS as `0x${string}`,
+          abi:          USDC_TRANSFER_ABI as unknown as import('viem').Abi,
+          functionName: 'transfer',
+          args:         [MARKETPLACE_ADDRESS as `0x${string}`, atomicAmount],
+          chainId:      CHAIN_ID,
+        })
 
-      // 3. Check we're on the right chain
-      const chainIdHex = await win.ethereum.request({ method: 'eth_chainId' }) as string
-      const connectedChainId = parseInt(chainIdHex, 16)
-      if (connectedChainId !== CHAIN_ID) {
-        throw new Error(`Wrong network. Please switch to ${CHAIN_ID === 43114 ? 'Avalanche C-Chain' : 'Avalanche Fuji Testnet'} (chainId: ${CHAIN_ID}).`)
+        setStatus('submitting')
+
+        const res = await fetch(`/api/agent-keys/${keyId}/deposit`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ ownerAddress: address, amount, txHash: transferHash }),
+        })
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`)
+
+        setTxHash(transferHash)
+        setStatus('success')
+        onSuccess()
+        return
       }
 
-      // 4. Build ERC-3009 / EIP-712 typed data for TransferWithAuthorization
-      const atomicAmount = Math.round(amount * 1_000_000).toString()
-      const validAfter   = 0
-      const validBefore  = Math.floor(Date.now() / 1000) + 86400 // 24 horas from now
+      // ── Route B: EOA — EIP-3009 TransferWithAuthorization ───────────────
+      const validAfter  = 0
+      const validBefore = Math.floor(Date.now() / 1000) + 86400
 
-      // Random 32-byte nonce
       const nonceBytes = crypto.getRandomValues(new Uint8Array(32))
       const nonce      = '0x' + Array.from(nonceBytes).map(b => b.toString(16).padStart(2, '0')).join('')
 
-      const typedData = {
+      const signature = await signTypedData({
+        domain: {
+          name:              'USD Coin',
+          version:           '2',
+          chainId:           CHAIN_ID,
+          verifyingContract: USDC_ADDRESS as `0x${string}`,
+        },
         types: {
-          EIP712Domain: [
-            { name: 'name',              type: 'string'  },
-            { name: 'version',           type: 'string'  },
-            { name: 'chainId',           type: 'uint256' },
-            { name: 'verifyingContract', type: 'address' },
-          ],
           TransferWithAuthorization: [
             { name: 'from',        type: 'address' },
             { name: 'to',         type: 'address' },
@@ -116,62 +166,37 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
             { name: 'nonce',      type: 'bytes32' },
           ],
         },
-        domain: {
-          name:              'USD Coin',
-          version:           '2',
-          chainId:           CHAIN_ID,
-          verifyingContract: USDC_ADDRESS,
-        },
         primaryType: 'TransferWithAuthorization',
         message: {
-          from:         from,
-          to:           MARKETPLACE_ADDRESS,
-          value:        atomicAmount,
-          validAfter:   validAfter.toString(),
-          validBefore:  validBefore.toString(),
-          nonce,
+          from:        address,
+          to:          MARKETPLACE_ADDRESS as `0x${string}`,
+          value:       atomicAmount,
+          validAfter:  BigInt(validAfter),
+          validBefore: BigInt(validBefore),
+          nonce:       nonce as `0x${string}`,
         },
-      }
+      })
 
-      // 5. Sign via eth_signTypedData_v4
-      const signature = await win.ethereum.request({
-        method: 'eth_signTypedData_v4',
-        params: [from, JSON.stringify(typedData)],
-      }) as string
-
-      // 6. Parse v, r, s from signature
-      const sig = signature.startsWith('0x') ? signature.slice(2) : signature
+      const sig = (signature as string).startsWith('0x') ? (signature as string).slice(2) : signature as string
       const r   = '0x' + sig.slice(0, 64)
       const s   = '0x' + sig.slice(64, 128)
       const v   = parseInt(sig.slice(128, 130), 16)
 
       setStatus('submitting')
 
-      // 7. POST to deposit API
       const res = await fetch(`/api/agent-keys/${keyId}/deposit`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          ownerAddress: from,
-          amount,
-          validAfter,
-          validBefore,
-          nonce,
-          v,
-          r,
-          s,
-        }),
+        body:    JSON.stringify({ ownerAddress: address, amount, validAfter, validBefore, nonce, v, r, s }),
       })
 
       const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error ?? `Server error ${res.status}`)
-      }
+      if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`)
 
       setTxHash(data.txHash ?? '')
       setStatus('success')
       onSuccess()
+
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       setErrorMsg(msg)
@@ -284,88 +309,61 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
   const [status,   setStatus]   = useState<'idle' | 'signing' | 'submitted' | 'polling' | 'success' | 'error'>('idle')
   const [txHash,   setTxHash]   = useState('')
   const [errorMsg, setErrorMsg] = useState('')
-
-  // CD-3: keyHashToBytes32 inline
-  function toBytes32(hash: string): string {
-    const hex = hash.replace(/^0x/i, '').toLowerCase()
-    return '0x' + hex.padEnd(64, '0').slice(0, 64)
-  }
+  const { address, chain } = useWallet()
+  const { writeContract, isReady } = useUnifiedWalletClient()
 
   async function handleWithdraw() {
     setErrorMsg('')
 
-    if (!keyHash) {
-      setErrorMsg(t('withdraw.noHash'))
-      return
-    }
+    if (!keyHash) { setErrorMsg(t('withdraw.noHash')); return }
     if (amount <= 0 || amount > balance) {
       setErrorMsg(t('withdraw.invalidAmount').replace('${max}', balance.toFixed(4)))
       return
     }
-    if (!MARKETPLACE_ADDRESS) {
-      setErrorMsg(t('withdraw.noContract'))
+    if (!MARKETPLACE_ADDRESS) { setErrorMsg(t('withdraw.noContract')); return }
+
+    if (!isReady || !address) {
+      setErrorMsg('Wallet no conectada. Conecta tu wallet para continuar.')
       return
     }
 
-    const win = window as typeof window & {
-      ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }
-    }
-    if (!win.ethereum) {
-      setErrorMsg(t('withdraw.noWallet'))
+    if (chain?.id !== CHAIN_ID) {
+      setErrorMsg(t('withdraw.wrongChain').replace('{chainId}', String(CHAIN_ID)))
       return
     }
 
     try {
-      // 1. Conectar wallet
       setStatus('signing')
-      const accounts = await win.ethereum.request({ method: 'eth_requestAccounts' }) as string[]
-      const from = accounts[0]
-      if (!from) throw new Error('No se pudo obtener la cuenta.')
 
-      // 2. Verificar chain
-      const chainIdHex = await win.ethereum.request({ method: 'eth_chainId' }) as string
-      if (parseInt(chainIdHex, 16) !== CHAIN_ID) {
-        throw new Error(t('withdraw.wrongChain').replace('{chainId}', String(CHAIN_ID)))
-      }
-
-      // 3. CD-4: USDC atomics (6 decimals)
       const atomicAmount = BigInt(Math.floor(amount * 1_000_000))
-      const bytes32KeyId = toBytes32(keyHash)
+      const hex          = keyHash.replace(/^0x/i, '').toLowerCase()
+      const bytes32KeyId = ('0x' + hex.padEnd(64, '0').slice(0, 64)) as `0x${string}`
 
-      // 4. CD-7: ABI encode withdrawKey(bytes32, uint256) manualmente
-      // Selector: keccak256("withdrawKey(bytes32,uint256)").slice(0,4)
-      const selector = '0x55665727'  // verified: keccak256("withdrawKey(bytes32,uint256)")
-      const keyIdPadded    = bytes32KeyId.slice(2).padStart(64, '0')
-      const amountPadded   = atomicAmount.toString(16).padStart(64, '0')
-      const data           = selector + keyIdPadded + amountPadded
-
-      // 5. eth_sendTransaction — creator paga gas en AVAX
-      const txHashResult = await win.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [{
-          from,
-          to:   MARKETPLACE_ADDRESS,
-          data,
-        }],
-      }) as string
+      // writeContract: EOA paga gas en AVAX; embedded → thirdweb sponsorea
+      const txHashResult = await writeContract({
+        address:      MARKETPLACE_ADDRESS as `0x${string}`,
+        abi:          WITHDRAW_KEY_ABI as unknown as import('viem').Abi,
+        functionName: 'withdrawKey',
+        args:         [bytes32KeyId, atomicAmount],
+        chainId:      CHAIN_ID,
+      })
 
       setTxHash(txHashResult)
       setStatus('polling')
 
-      // 6. Poll receipt cada 2s (max 60s)
-      let receipt = null
-      for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 2000))
-        receipt = await win.ethereum!.request({
-          method: 'eth_getTransactionReceipt',
-          params: [txHashResult],
-        })
-        if (receipt) break
-      }
+      // Esperar confirmación on-chain via viem publicClient
+      const { createPublicClient, http } = await import('viem')
+      const { avalancheFuji, avalanche } = await import('viem/chains')
+      const publicClient = createPublicClient({
+        chain:     CHAIN_ID === 43114 ? avalanche : avalancheFuji,
+        transport: http(CHAIN_ID === 43114
+          ? 'https://api.avax.network/ext/bc/C/rpc'
+          : 'https://api.avax-test.network/ext/bc/C/rpc'),
+      })
 
-      if (!receipt) throw new Error(t('withdraw.timeout'))
+      await publicClient.waitForTransactionReceipt({ hash: txHashResult, timeout: 30_000 })
 
-      // 7. Sync DB
+      // Sync DB
       setStatus('submitted')
       const res = await fetch(`/api/agent-keys/${keyId}/withdraw`, {
         method:  'POST',
