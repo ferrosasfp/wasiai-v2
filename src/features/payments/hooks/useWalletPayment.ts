@@ -263,7 +263,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
         setFlowState('error')
       }
     }
-  }, [isReady, address, slug, input, signTypedData])
+  }, [isReady, address, isThirdweb, slug, input, signTypedData, unifiedWriteContract])
 
   /** Ejecutar fallback approve — works for both thirdweb and wagmi wallets */
   const executeApprove = useCallback(async (amountWei: bigint) => {
