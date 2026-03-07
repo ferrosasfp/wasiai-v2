@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Zap, Search, Rocket } from 'lucide-react'
+import { Zap } from 'lucide-react'
 
 interface HeroDualCardProps {
   locale: string
@@ -31,27 +31,25 @@ export function HeroDualCard({
   badge,
   tabLabel,
 }: HeroDualCardProps) {
-  // Consumer activo por defecto
   const [active, setActive] = useState<'consumer' | 'creator'>('consumer')
 
   const isConsumer = active === 'consumer'
-  const isCreator  = active === 'creator'
 
   return (
-    <div className="mx-auto max-w-4xl text-center">
+    <div className="mx-auto max-w-3xl text-center">
 
       {/* Badge */}
-      <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-avax-50 border border-avax-100 px-4 py-1.5 text-sm text-avax-600 font-medium">
+      <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-avax-50 border border-avax-100 px-4 py-1.5 text-sm text-avax-600 font-medium">
         <Zap size={14} />
         <span>{badge}</span>
       </div>
 
-      {/* Headline — responsive typography */}
-      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 mb-8">
+      {/* Headline */}
+      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 mb-6">
         {headline}
       </h1>
 
-      {/* Tab toggle — ARIA tablist */}
+      {/* Tab toggle */}
       <div
         role="tablist"
         aria-label={tabLabel}
@@ -60,7 +58,6 @@ export function HeroDualCard({
         <button
           role="tab"
           aria-selected={isConsumer}
-          aria-controls="panel-consumer"
           onClick={() => setActive('consumer')}
           className={`rounded-lg px-5 py-2 text-sm font-semibold transition-all ${
             isConsumer
@@ -72,11 +69,10 @@ export function HeroDualCard({
         </button>
         <button
           role="tab"
-          aria-selected={isCreator}
-          aria-controls="panel-creator"
+          aria-selected={!isConsumer}
           onClick={() => setActive('creator')}
           className={`rounded-lg px-5 py-2 text-sm font-semibold transition-all ${
-            isCreator
+            !isConsumer
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'
           }`}
@@ -85,33 +81,17 @@ export function HeroDualCard({
         </button>
       </div>
 
-      {/* Cards — desktop side-by-side, mobile stacked */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+      {/* Dynamic subtitle */}
+      <p className="text-lg text-gray-600 max-w-xl mx-auto mb-8 leading-relaxed transition-all">
+        {isConsumer ? subtitleConsumer : subtitleCreator}
+      </p>
 
-        {/* Consumer card */}
-        <div
-          id="panel-consumer"
-          role="tabpanel"
-          tabIndex={0}
-          className={`rounded-2xl border-2 p-6 text-left transition-all cursor-pointer ${
-            isConsumer
-              ? 'border-avax-400 bg-avax-50 shadow-md'
-              : 'border-gray-200 bg-white opacity-60 hover:opacity-80'
-          }`}
-          onClick={() => setActive('consumer')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') setActive('consumer')
-          }}
-        >
-          <div className="mb-3 flex justify-center"><Search size={28} className="text-avax-500" /></div>
-          <p className="text-base font-medium text-gray-800 mb-4 leading-relaxed">
-            {subtitleConsumer}
-          </p>
+      {/* Dynamic CTA */}
+      <div className="flex justify-center gap-4">
+        {isConsumer ? (
           <a
             href={`/${locale}#agents`}
             onClick={(e) => {
-              e.stopPropagation()
-              // Si ya estamos en home → scroll suave (no navegación)
               const isHome =
                 window.location.pathname === `/${locale}` ||
                 window.location.pathname === `/${locale}/`
@@ -119,54 +99,23 @@ export function HeroDualCard({
                 e.preventDefault()
                 document.getElementById('agents')?.scrollIntoView({ behavior: 'smooth' })
               }
-              // Si no es home → href="/${locale}#agents" navega normalmente al anchor
             }}
-            className={`inline-flex items-center gap-2 font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm ${
-              isConsumer
-                ? 'bg-avax-500 text-white hover:bg-avax-600'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className="inline-flex items-center gap-2 rounded-full bg-avax-500 px-8 py-3 font-semibold text-white hover:bg-avax-600 transition-colors text-sm shadow-sm"
           >
             {ctaConsumer} →
           </a>
-        </div>
-
-        {/* Creator card */}
-        <div
-          id="panel-creator"
-          role="tabpanel"
-          tabIndex={0}
-          className={`rounded-2xl border-2 p-6 text-left transition-all cursor-pointer ${
-            isCreator
-              ? 'border-avax-400 bg-avax-50 shadow-md'
-              : 'border-gray-200 bg-white opacity-60 hover:opacity-80'
-          }`}
-          onClick={() => setActive('creator')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') setActive('creator')
-          }}
-        >
-          <div className="mb-3 flex justify-center"><Rocket size={28} className="text-avax-500" /></div>
-          <p className="text-base font-medium text-gray-800 mb-4 leading-relaxed">
-            {subtitleCreator}
-          </p>
+        ) : (
           <Link
             href={`/${locale}/publish`}
-            onClick={(e) => e.stopPropagation()}
-            className={`inline-flex items-center gap-2 font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm ${
-              isCreator
-                ? 'bg-avax-500 text-white hover:bg-avax-600'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className="inline-flex items-center gap-2 rounded-full bg-avax-500 px-8 py-3 font-semibold text-white hover:bg-avax-600 transition-colors text-sm shadow-sm"
           >
             {ctaCreator} →
           </Link>
-        </div>
-
+        )}
       </div>
 
       {/* Tagline */}
-      <p className="text-sm text-gray-400 font-medium">{tagline}</p>
+      <p className="mt-8 text-sm text-gray-400 font-medium">{tagline}</p>
 
     </div>
   )
