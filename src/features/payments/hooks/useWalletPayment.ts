@@ -32,19 +32,6 @@ const USDC_ABI_APPROVE = [
   },
 ] as const
 
-const USDC_ABI_TRANSFER = [
-  {
-    name: 'transfer',
-    type: 'function' as const,
-    inputs: [
-      { name: 'to',    type: 'address' },
-      { name: 'value', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'nonpayable',
-  },
-] as const
-
 interface UseWalletPaymentOptions {
   slug:        string
   input:       string
@@ -62,7 +49,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
   const requirementsRef = useRef<X402Requirements | null>(null)
 
   const { address }              = useWallet()
-  const { isThirdweb, isReady, writeContract: unifiedWriteContract, signTypedData } = useUnifiedWalletClient()
+  const { isThirdweb, isReady, writeContract: unifiedWriteContract, signTypedData, signMessage } = useUnifiedWalletClient()
   const { isConnected, isCorrectChain, currentChainName, switchToFuji } = useChainGuard()
   const { usdcBalance, hasEnoughBalance, isLoading: balanceLoading } = useUsdcBalance(priceUsdc)
   const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTx })
@@ -120,37 +107,51 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     requirementsRef.current = requirements
     const amountWei = BigInt(requirements.maxAmountRequired)
 
-    // ── Embedded wallet: direct USDC transfer (1 firma, gasless) ──
+    // ── Embedded wallet: x402 facilitator settlement ──────────────
+    // User signs off-chain → server (facilitator) settles on-chain → facilitator pays gas
     if (isThirdweb) {
       setFlowState('transferring')
       try {
-        // 1. Direct USDC transfer — 1 signature, gasless via sponsorGas
-        const transferHash = await unifiedWriteContract({
-          address:      USDC_FUJI_ADDRESS,
-          abi:          USDC_ABI_TRANSFER as unknown as import('viem').Abi,
-          functionName: 'transfer',
-          args:         [WASIAI_OPERATOR_ADDRESS, amountWei],
-          chainId:      FUJI_CHAIN_ID,
-        })
+        // 1. Check if operator has allowance — if not, approve (one-time, gas sponsored by thirdweb paymaster)
+        const checkRes = await fetch(`/api/v1/payments/check-allowance?address=${address}&amount=${amountWei.toString()}`)
+        const { approved } = await checkRes.json() as { approved: boolean }
 
-        // 2. Invoke agent with x402 payment header (scheme: transfer)
+        if (!approved) {
+          // One-time approve — gas sponsored via smart account
+          await unifiedWriteContract({
+            address:      USDC_FUJI_ADDRESS,
+            abi:          USDC_ABI_APPROVE as unknown as import('viem').Abi,
+            functionName: 'approve',
+            args:         [WASIAI_OPERATOR_ADDRESS, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')],
+            chainId:      FUJI_CHAIN_ID,
+          })
+        }
+
+        // 2. Sign payment authorization off-chain (personal_sign — works on all wallets)
+        const timestamp = Math.floor(Date.now() / 1000)
+        const message = `WasiAI x402 Payment Authorization\nAgent: ${slug}\nAmount: ${amountWei.toString()}\nTo: ${WASIAI_OPERATOR_ADDRESS}\nTimestamp: ${timestamp}`
+        const signature = await signMessage(message)
+
+        // 3. Send x402 payment header with scheme: facilitator
         setFlowState('calling')
-        const x402TransferPayload = {
+        const x402Payload = {
           x402Version: 1,
-          scheme: 'transfer',
+          scheme: 'facilitator',
           network: requirements.network,
           payload: {
-            txHash: transferHash,
+            signature,
             from: address,
             to: WASIAI_OPERATOR_ADDRESS,
             value: amountWei.toString(),
+            timestamp,
+            message,
           },
         }
         const invokeRes = await fetch(`/api/v1/models/${slug}/invoke`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-PAYMENT': btoa(JSON.stringify(x402TransferPayload)),
+            'X-PAYMENT': btoa(JSON.stringify(x402Payload)),
           },
           body: JSON.stringify({ input }),
         })
@@ -162,9 +163,9 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
           return
         }
 
-        const data = await invokeRes.json() as { result?: unknown }
+        const data = await invokeRes.json() as { result?: unknown; meta?: { tx_hash?: `0x${string}` } }
         setResult(typeof data.result === 'string' ? data.result : JSON.stringify(data.result))
-        setTxHash(transferHash)
+        setTxHash(data.meta?.tx_hash)
         setFlowState('success')
       } catch (err: unknown) {
         const code = (err as { code?: number })?.code
@@ -172,7 +173,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
           setErrorMsg('Cancelaste el pago.')
           setFlowState('idle')
         } else {
-          setErrorMsg('Error al transferir USDC.')
+          setErrorMsg('Error al procesar el pago.')
           setFlowState('error')
         }
       }
@@ -273,7 +274,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
         setFlowState('error')
       }
     }
-  }, [isReady, isThirdweb, address, slug, input, signTypedData, unifiedWriteContract])
+  }, [isReady, isThirdweb, address, slug, input, signTypedData, signMessage, unifiedWriteContract])
 
   /** Ejecutar fallback approve — works for both thirdweb and wagmi wallets */
   const executeApprove = useCallback(async (amountWei: bigint) => {

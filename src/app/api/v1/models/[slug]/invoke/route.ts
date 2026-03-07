@@ -30,7 +30,6 @@ import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitB
 import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
 import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits, getSharedRedis } from '@/lib/ratelimit'
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
-import { verifyUsdcTransfer } from '@/lib/contracts/verifyUsdcTransfer'
 import { logger } from '@/lib/logger'
 
 import { calcPlatformOverhead } from '@/lib/pricing/overhead'
@@ -367,41 +366,56 @@ export async function POST(
     return build402Instructions(model, priceStr, resourceUrl)
   }
 
-  // ── 3b. x402 scheme: transfer (embedded wallets — direct USDC transfer) ──
-  if ((paymentHeader as Record<string, unknown>).scheme === 'transfer') {
-    const transferPayload = (paymentHeader as Record<string, unknown>).payload as { txHash?: string } | undefined
-    const paymentTxHash = transferPayload?.txHash
-    if (!paymentTxHash) {
+  // ── 3b. x402 scheme: facilitator (server-side settlement) ──────────────
+  // User signs off-chain, operator (facilitator) executes transferFrom and pays gas
+  if ((paymentHeader as Record<string, unknown>).scheme === 'facilitator') {
+    const facPayload = (paymentHeader as Record<string, unknown>).payload as {
+      signature?: string; from?: string; to?: string; value?: string; timestamp?: number; message?: string
+    } | undefined
+
+    if (!facPayload?.signature || !facPayload?.from || !facPayload?.message) {
       return NextResponse.json(
-        { error: 'Missing txHash in transfer payment', code: 'payment_invalid' },
+        { error: 'Invalid facilitator payment payload', code: 'payment_invalid' },
         { status: 402 }
       )
     }
 
-    // Anti-replay: reject if txHash already used
-    const { data: existing } = await supabase
-      .from('agent_calls')
-      .select('id')
-      .eq('tx_hash', paymentTxHash)
-      .limit(1)
-      .maybeSingle()
-    if (existing) {
+    // Verify signature matches the claimed sender
+    const { verifyMessage } = await import('viem')
+    const sigValid = await verifyMessage({
+      address: facPayload.from as `0x${string}`,
+      message: facPayload.message,
+      signature: facPayload.signature as `0x${string}`,
+    })
+    if (!sigValid) {
       return NextResponse.json(
-        { error: 'Payment already used', code: 'payment_replay' },
+        { error: 'Invalid payment signature', code: 'payment_invalid' },
         { status: 402 }
       )
     }
 
-    const verification = await verifyUsdcTransfer(paymentTxHash, totalPrice)
-    if (!verification.verified) {
+    // Verify timestamp (within 5 minutes)
+    const now = Math.floor(Date.now() / 1000)
+    if (!facPayload.timestamp || Math.abs(now - facPayload.timestamp) > 300) {
       return NextResponse.json(
-        { error: 'Payment verification failed', code: 'payment_invalid', reason: verification.error },
+        { error: 'Payment authorization expired', code: 'payment_expired' },
+        { status: 402 }
+      )
+    }
+
+    // Execute transferFrom via operator wallet (facilitator pays gas)
+    const { settleViaOperator } = await import('@/lib/contracts/operatorSettler')
+    const settlement = await settleViaOperator(facPayload.from, totalPrice)
+
+    if (!settlement.success) {
+      return NextResponse.json(
+        { error: 'Payment settlement failed', code: 'payment_invalid', reason: settlement.error },
         { status: 402 }
       )
     }
 
     const result = await callUpstream(model, request, slug)
-    await logCall(supabase, model, 'human', null, paymentTxHash, result, null, slug)
+    await logCall(supabase, model, 'human', null, settlement.txHash ?? null, result, null, slug)
 
     if (model.creator_id) {
       void triggerAgentEvent(
@@ -411,7 +425,7 @@ export async function POST(
       ).catch(() => {})
     }
 
-    return buildResponse(model, result, paymentTxHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
+    return buildResponse(model, result, settlement.txHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
   }
 
   // ── 4. Verify + Settle (A-01: extracted to settleX402 helper) ─────────────

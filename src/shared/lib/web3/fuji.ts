@@ -9,8 +9,7 @@ if (!_rawOperator || !/^0x[0-9a-fA-F]{40}$/.test(_rawOperator)) {
     console.error('[WasiAI] NEXT_PUBLIC_WASIAI_OPERATOR no configurado o inválido. Los pagos fallarán.')
   }
 }
-export const WASIAI_OPERATOR_ADDRESS = (_rawOperator ?? '0x0000000000000000000000000000000000000000') as `0x${string}`
-// Valor real: '0x2dd1Bd5D69Fe05205C0eecB9e22Bc8Ec99eE7aaB'
+export const WASIAI_OPERATOR_ADDRESS = (_rawOperator ?? '0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba') as `0x${string}`
 
 export const WASIAI_MARKETPLACE_ADDRESS = '0x71CddCdF8a40951a1d8C22C8774448FbcA089b53' as `0x${string}`
 
