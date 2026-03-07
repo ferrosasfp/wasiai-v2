@@ -133,13 +133,24 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
           chainId:      FUJI_CHAIN_ID,
         })
 
-        // 2. Invoke agent with txHash as proof of payment
+        // 2. Invoke agent with x402 payment header (scheme: transfer)
         setFlowState('calling')
+        const x402TransferPayload = {
+          x402Version: 1,
+          scheme: 'transfer',
+          network: requirements.network,
+          payload: {
+            txHash: transferHash,
+            from: address,
+            to: WASIAI_OPERATOR_ADDRESS,
+            value: amountWei.toString(),
+          },
+        }
         const invokeRes = await fetch(`/api/v1/models/${slug}/invoke`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-PAYMENT-TX': transferHash,
+            'X-PAYMENT': btoa(JSON.stringify(x402TransferPayload)),
           },
           body: JSON.stringify({ input }),
         })

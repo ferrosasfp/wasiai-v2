@@ -358,9 +358,26 @@ export async function POST(
     return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown })
   }
 
-  // ── 3b. Route C: Direct USDC transfer (embedded wallets) ──────────────
-  const paymentTxHash = request.headers.get('x-payment-tx')
-  if (paymentTxHash) {
+  // ── 3. Route B: x402 Payment ──────────────────────────────────────────
+  const headers = Object.fromEntries(request.headers.entries())
+  const paymentHeader = extractPaymentFromHeaders(headers) as X402PaymentHeader | null
+
+  if (!paymentHeader) {
+    // No payment — return 402 with x402 payment instructions (A-01: extracted)
+    return build402Instructions(model, priceStr, resourceUrl)
+  }
+
+  // ── 3b. x402 scheme: transfer (embedded wallets — direct USDC transfer) ──
+  if ((paymentHeader as Record<string, unknown>).scheme === 'transfer') {
+    const transferPayload = (paymentHeader as Record<string, unknown>).payload as { txHash?: string } | undefined
+    const paymentTxHash = transferPayload?.txHash
+    if (!paymentTxHash) {
+      return NextResponse.json(
+        { error: 'Missing txHash in transfer payment', code: 'payment_invalid' },
+        { status: 402 }
+      )
+    }
+
     // Anti-replay: reject if txHash already used
     const { data: existing } = await supabase
       .from('agent_calls')
@@ -378,7 +395,7 @@ export async function POST(
     const verification = await verifyUsdcTransfer(paymentTxHash, totalPrice)
     if (!verification.verified) {
       return NextResponse.json(
-        { error: 'Payment verification failed', code: 'payment_invalid', reason: verification.error, debug: { txHash: paymentTxHash, totalPrice } },
+        { error: 'Payment verification failed', code: 'payment_invalid', reason: verification.error },
         { status: 402 }
       )
     }
@@ -395,15 +412,6 @@ export async function POST(
     }
 
     return buildResponse(model, result, paymentTxHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
-  }
-
-  // ── 3. Route B: x402 Payment (Ultravioleta DAO / Avalanche) ──────────────
-  const headers = Object.fromEntries(request.headers.entries())
-  const paymentHeader = extractPaymentFromHeaders(headers) as X402PaymentHeader | null
-
-  if (!paymentHeader) {
-    // No payment — return 402 with x402 payment instructions (A-01: extracted)
-    return build402Instructions(model, priceStr, resourceUrl)
   }
 
   // ── 4. Verify + Settle (A-01: extracted to settleX402 helper) ─────────────
