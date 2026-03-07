@@ -15,7 +15,7 @@ import {
   createWalletClient,
   createPublicClient,
   http,
-  verifyTypedData,
+  recoverTypedDataAddress,
   type Address,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -137,31 +137,9 @@ export async function settlePaymentDirectly(
       }
     }
 
-    // ── 3. EIP-712 signature verification ──────────────────────────────────
-    const isValid = await verifyTypedData({
-      address:     auth.from as Address,
-      domain:      USDC_DOMAIN,
-      types:       TRANSFER_TYPES,
-      primaryType: 'TransferWithAuthorization',
-      message: {
-        from:        auth.from        as Address,
-        to:          auth.to          as Address,
-        value:       BigInt(auth.value),
-        validAfter:  BigInt(auth.validAfter),
-        validBefore: BigInt(auth.validBefore),
-        nonce:       auth.nonce as `0x${string}`,
-      },
-      signature: signature as `0x${string}`,
-    })
-
-    if (!isValid) {
-      return { verified: false, settled: false, error: 'Invalid EIP-712 signature' }
-    }
-
-    // ── 4. Execute transferWithAuthorization via operator wallet ────────────
+    // ── 3. Setup clients (needed for both verification and settlement) ────
     const pkRaw = process.env.OPERATOR_PRIVATE_KEY
     if (!pkRaw) throw new Error('OPERATOR_PRIVATE_KEY not set')
-    // Normalize: strip whitespace and 0x prefix if already present
     const pkHex = pkRaw.trim().replace(/^0x/i, '')
     const account = privateKeyToAccount(`0x${pkHex}` as `0x${string}`)
     const chain   = IS_FUJI ? avalancheFuji : avalanche
@@ -177,6 +155,70 @@ export async function settlePaymentDirectly(
       transport: http(rpcUrl),
     })
 
+    // ── 4. EIP-712 signature verification ──────────────────────────────────
+    const typedDataParams = {
+      domain:      USDC_DOMAIN,
+      types:       TRANSFER_TYPES,
+      primaryType: 'TransferWithAuthorization' as const,
+      message: {
+        from:        auth.from        as Address,
+        to:          auth.to          as Address,
+        value:       BigInt(auth.value),
+        validAfter:  BigInt(auth.validAfter),
+        validBefore: BigInt(auth.validBefore),
+        nonce:       auth.nonce as `0x${string}`,
+      },
+      signature: signature as `0x${string}`,
+    }
+
+    // Recover the actual signer via ecrecover for diagnostics
+    const recoveredAddress = await recoverTypedDataAddress(typedDataParams)
+    const claimedFrom = (auth.from as string).toLowerCase()
+    const recovered   = recoveredAddress.toLowerCase()
+
+    logger.info('[settler] signature check', {
+      claimedFrom: auth.from,
+      recoveredAddress,
+      match: claimedFrom === recovered,
+      domain: USDC_DOMAIN,
+      authTo: auth.to,
+      value: auth.value,
+    })
+
+    if (claimedFrom !== recovered) {
+      // Try ERC-1271 verification (smart account / contract wallet)
+      let erc1271Valid = false
+      try {
+        erc1271Valid = await publicClient.verifyTypedData({
+          address: auth.from as Address,
+          ...typedDataParams,
+        })
+      } catch {
+        // ERC-1271 call failed — not a smart account or contract not deployed
+      }
+
+      if (!erc1271Valid) {
+        return {
+          verified: false,
+          settled: false,
+          error: `Invalid EIP-712 signature (ecrecover: ${recoveredAddress}, expected: ${auth.from})`,
+        }
+      }
+
+      // ERC-1271 verified — but transferWithAuthorization uses ecrecover on-chain
+      // so the on-chain settlement will fail for smart accounts
+      logger.warn('[settler] ERC-1271 verified but transferWithAuthorization requires EOA signer', {
+        smartAccount: auth.from,
+        adminEOA: recoveredAddress,
+      })
+      return {
+        verified: false,
+        settled: false,
+        error: 'Smart account detected — use approve+transfer flow instead of EIP-3009',
+      }
+    }
+
+    // ── 5. Execute transferWithAuthorization via operator wallet ────────────
     // Split compact signature into v, r, s
     const sig = signature as `0x${string}`
     const r = sig.slice(0, 66) as `0x${string}`
