@@ -223,7 +223,9 @@ export async function settlePaymentDirectly(
     const sig = signature as `0x${string}`
     const r = sig.slice(0, 66) as `0x${string}`
     const s = ('0x' + sig.slice(66, 130)) as `0x${string}`
-    const v = parseInt(sig.slice(130, 132), 16)
+    // Normalize v: some wallets (Core, EIP-2098) use 0/1, USDC contract expects 27/28
+    const vRaw = parseInt(sig.slice(130, 132), 16)
+    const v = vRaw < 27 ? vRaw + 27 : vRaw
 
     const txHash = await walletClient.writeContract({
       address:      USDC_ADDR[CHAIN_ID],
