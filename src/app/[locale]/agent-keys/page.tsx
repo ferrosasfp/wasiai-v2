@@ -20,19 +20,6 @@ interface AgentKey {
 }
 
 // ABI para withdrawKey on-chain
-const WITHDRAW_KEY_ABI = [
-  {
-    name: 'withdrawKey',
-    type: 'function' as const,
-    inputs: [
-      { name: 'keyId', type: 'bytes32' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-] as const
-
 // ABI para USDC.transfer (embedded wallet deposit — Route C)
 const USDC_TRANSFER_ABI = [
   {
@@ -297,101 +284,54 @@ interface CloseKeyModalProps {
   onSuccess: (txHash: string | null) => void
 }
 
-// ── WithdrawModal — WAS-141 ────────────────────────────────────────────────────
-// Creator firma withdrawKey on-chain directamente (msg.sender, paga gas en AVAX)
-// Soporta retiro parcial o total. Si retira todo → key se cierra en DB.
-function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }: {
-  keyId: string; keyName: string; balance: number; keyHash: string
+// ── WithdrawModal — HU-056 ─────────────────────────────────────────────────────
+// Retiro server-side: operador ejecuta refundKeyToEarnings + withdrawFor on-chain.
+// El usuario no firma nada — solo confirma en la UI.
+function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
+  keyId: string; keyName: string; balance: number
   onClose: () => void; onSuccess: () => void
 }) {
   const t = useTranslations('agentKeys')
   const [amount,   setAmount]   = useState(balance)
-  const [status,   setStatus]   = useState<'idle' | 'signing' | 'submitted' | 'polling' | 'success' | 'error'>('idle')
+  const [status,   setStatus]   = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [txHash,   setTxHash]   = useState('')
   const [errorMsg, setErrorMsg] = useState('')
-  const { address, chain } = useWallet()
-  const { writeContract, isReady } = useUnifiedWalletClient()
 
   async function handleWithdraw() {
     setErrorMsg('')
 
-    if (!keyHash) { setErrorMsg(t('withdraw.noHash')); return }
     if (amount <= 0 || amount > balance) {
       setErrorMsg(t('withdraw.invalidAmount').replace('${max}', balance.toFixed(4)))
       return
     }
-    if (!MARKETPLACE_ADDRESS) { setErrorMsg(t('withdraw.noContract')); return }
-
-    if (!isReady || !address) {
-      setErrorMsg('Wallet no conectada. Conecta tu wallet para continuar.')
-      return
-    }
-
-    if (chain?.id !== CHAIN_ID) {
-      setErrorMsg(t('withdraw.wrongChain').replace('{chainId}', String(CHAIN_ID)))
-      return
-    }
 
     try {
-      setStatus('signing')
+      setStatus('loading')
 
-      const atomicAmount = BigInt(Math.floor(amount * 1_000_000))
-      const hex          = keyHash.replace(/^0x/i, '').toLowerCase()
-      const bytes32KeyId = ('0x' + hex.padEnd(64, '0').slice(0, 64)) as `0x${string}`
-
-      // writeContract: EOA paga gas en AVAX; embedded → thirdweb sponsorea
-      const txHashResult = await writeContract({
-        address:      MARKETPLACE_ADDRESS as `0x${string}`,
-        abi:          WITHDRAW_KEY_ABI as unknown as import('viem').Abi,
-        functionName: 'withdrawKey',
-        args:         [bytes32KeyId, atomicAmount],
-        chainId:      CHAIN_ID,
-      })
-
-      setTxHash(txHashResult)
-      setStatus('polling')
-
-      // Esperar confirmación on-chain via viem publicClient
-      const { createPublicClient, http } = await import('viem')
-      const { avalancheFuji, avalanche } = await import('viem/chains')
-      const publicClient = createPublicClient({
-        chain:     CHAIN_ID === 43114 ? avalanche : avalancheFuji,
-        transport: http(CHAIN_ID === 43114
-          ? 'https://api.avax.network/ext/bc/C/rpc'
-          : 'https://api.avax-test.network/ext/bc/C/rpc'),
-      })
-
-      await publicClient.waitForTransactionReceipt({ hash: txHashResult, timeout: 30_000 })
-
-      // Sync DB
-      setStatus('submitted')
       const res = await fetch(`/api/agent-keys/${keyId}/withdraw`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ txHash: txHashResult, amount }),
+        body:    JSON.stringify({ amount }),
       })
-      const data2 = await res.json() as { error?: string }
-      if (!res.ok) throw new Error(data2.error ?? `Error ${res.status}`)
 
+      const data = await res.json() as { error?: string; withdrawTxHash?: string }
+      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`)
+
+      setTxHash(data.withdrawTxHash ?? '')
       setStatus('success')
       setTimeout(onSuccess, 1500)
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message
-        : (err && typeof err === 'object' && 'message' in err) ? String((err as { message: unknown }).message)
-        : String(err)
+      const msg = err instanceof Error ? err.message : String(err)
       setErrorMsg(msg)
       setStatus('error')
     }
   }
 
-  const isLoading = ['signing', 'submitted', 'polling'].includes(status)
+  const isLoading = status === 'loading'
 
-  const statusLabel = {
-    signing:   t('withdraw.signing'),
-    submitted: t('withdraw.submitting'),
-    polling:   t('withdraw.polling'),
-  }[status as string] ?? t('withdraw.withdrawBtn').replace('${amount}', amount.toFixed(4))
+  const statusLabel = isLoading
+    ? t('withdraw.submitting')
+    : t('withdraw.withdrawBtn').replace('${amount}', amount.toFixed(4))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -890,7 +830,6 @@ Content-Type: application/json
           keyId={withdrawKey.id}
           keyName={withdrawKey.name}
           balance={withdrawKey.balance}
-          keyHash={withdrawKey.keyHash}
           onClose={() => setWithdrawKey(null)}
           onSuccess={() => { setWithdrawKey(null); setTimeout(loadKeys, 1500) }}
         />
