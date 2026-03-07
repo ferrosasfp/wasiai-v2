@@ -381,12 +381,31 @@ export async function POST(
     }
 
     // Verify signature matches the claimed sender
-    const { verifyMessage } = await import('viem')
-    const sigValid = await verifyMessage({
-      address: facPayload.from as `0x${string}`,
-      message: facPayload.message,
-      signature: facPayload.signature as `0x${string}`,
-    })
+    // Use publicClient.verifyMessage for ERC-1271 support (smart account wallets)
+    const { createPublicClient: createPubClient, http: httpTransport } = await import('viem')
+    const { avalancheFuji: fujiChain, avalanche: avaxChain } = await import('viem/chains')
+    const verifyChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+    const verifyChain = verifyChainId === 43114 ? avaxChain : fujiChain
+    const verifyRpc = verifyChainId === 43114 ? 'https://api.avax.network/ext/bc/C/rpc' : 'https://api.avax-test.network/ext/bc/C/rpc'
+    const pubClient = createPubClient({ chain: verifyChain, transport: httpTransport(verifyRpc) })
+
+    let sigValid = false
+    try {
+      // Try ERC-1271 first (smart accounts), falls back to ecrecover
+      sigValid = await pubClient.verifyMessage({
+        address: facPayload.from as `0x${string}`,
+        message: facPayload.message,
+        signature: facPayload.signature as `0x${string}`,
+      })
+    } catch {
+      // If ERC-1271 fails, try plain ecrecover
+      const { verifyMessage } = await import('viem')
+      sigValid = await verifyMessage({
+        address: facPayload.from as `0x${string}`,
+        message: facPayload.message,
+        signature: facPayload.signature as `0x${string}`,
+      })
+    }
     if (!sigValid) {
       return NextResponse.json(
         { error: 'Invalid payment signature', code: 'payment_invalid' },
