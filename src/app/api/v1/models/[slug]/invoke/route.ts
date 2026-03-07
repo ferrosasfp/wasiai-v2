@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 const X402_CORS_HEADERS = {
-  'Access-Control-Allow-Headers': 'Content-Type, X-PAYMENT, PAYMENT-SIGNATURE, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, X-PAYMENT, PAYMENT-SIGNATURE, Authorization, X-PAYMENT-TX',
   'Access-Control-Expose-Headers': 'X-PAYMENT-RESPONSE, PAYMENT-RESPONSE, PAYMENT-REQUIRED',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 } as const
 import { keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
 import { signReceipt } from '@/lib/receipts/signReceipt'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
+import { verifyUsdcTransfer } from '@/lib/contracts/verifyUsdcTransfer'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitBreaker'
 import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
@@ -356,7 +357,87 @@ export async function POST(
     return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown })
   }
 
-  // ── 3. Route B: x402 Payment (WasiAI-native settlement) ────────────────
+  // ── 3. Route C: Direct USDC Transfer (embedded wallets / smart accounts) ──
+  // Client does USDC.transfer(operator, amount) and sends tx hash for on-chain verification
+  const paymentTxHash = request.headers.get('x-payment-tx')
+  if (paymentTxHash) {
+    // AR-03: Validate tx_hash format before any DB or RPC call
+    if (!/^0x[0-9a-fA-F]{64}$/.test(paymentTxHash)) {
+      return NextResponse.json(
+        { error: 'Invalid transaction hash format', code: 'payment_invalid' },
+        { status: 400, headers: X402_CORS_HEADERS },
+      )
+    }
+
+    // AR-02: Atomic claim — INSERT before verification to prevent TOCTOU double-spend.
+    // UNIQUE partial index on tx_hash ensures only one request can claim a hash.
+    const { data: claimed, error: claimError } = await supabase
+      .from('agent_calls')
+      .insert({
+        agent_id:    model.id,
+        caller_type: 'human',
+        amount_paid: totalPrice,
+        tx_hash:     paymentTxHash,
+        status:      'pending',
+        latency_ms:  0,
+        agent_slug:  slug,
+      })
+      .select('id')
+      .single()
+
+    if (claimError || !claimed) {
+      // UNIQUE constraint violation = replay attempt
+      logger.warn('[invoke] Route C replay attempt', { txHash: paymentTxHash })
+      return NextResponse.json(
+        { error: 'Transaction already used', code: 'payment_replay' },
+        { status: 402, headers: X402_CORS_HEADERS },
+      )
+    }
+
+    const claimId = claimed.id as string
+
+    // Verify USDC Transfer on-chain (retries up to 15s for unmined txs)
+    const verification = await verifyUsdcTransfer(paymentTxHash, totalPrice)
+    if (!verification.verified) {
+      // AR-09: Log error server-side, don't leak verification details to client
+      logger.error('[invoke] Route C payment verification failed', { txHash: paymentTxHash, error: verification.error })
+      // Clean up the pending claim
+      await supabase.from('agent_calls').delete().eq('id', claimId)
+      return NextResponse.json(
+        { error: 'Payment verification failed', code: 'payment_invalid' },
+        { status: 402, headers: X402_CORS_HEADERS },
+      )
+    }
+
+    // Payment valid — call upstream (same post-settlement flow as Route B)
+    const resultC = await callUpstream(model, request, slug)
+
+    // Update the pending claim with actual result
+    await supabase.from('agent_calls').update({
+      status:     resultC.status,
+      latency_ms: resultC.latencyMs,
+    }).eq('id', claimId)
+
+    // Increment stats on success
+    if (resultC.status === 'success') {
+      await supabase.rpc('increment_agent_stats', {
+        p_agent_id: model.id,
+        p_amount:   totalPrice,
+      })
+    }
+
+    if (model.creator_id) {
+      void triggerAgentEvent(
+        resultC.status === 'success' ? 'agent.invoked' : 'agent.error',
+        model.id as string, model.creator_id as string,
+        { slug, status: resultC.status, latency_ms: resultC.latencyMs }
+      ).catch(() => { /* non-fatal */ })
+    }
+
+    return buildResponse(model, resultC, paymentTxHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
+  }
+
+  // ── 4. Route B: x402 Payment (WasiAI-native settlement) ────────────────
   // WAS-134: settlePaymentDirectly() covers Fuji + mainnet — no external facilitator/bundler
   const headers = Object.fromEntries(request.headers.entries())
   const paymentHeader = extractPaymentFromHeaders(headers) as X402PaymentHeader | null
@@ -366,7 +447,7 @@ export async function POST(
     return build402Instructions(model, priceStr, resourceUrl)
   }
 
-  // ── 4. Verify + Settle ─────────────────────────────────────────────────
+  // ── 5. Verify + Settle (Route B) ───────────────────────────────────────
   const settlementOrError = await settleX402(paymentHeader, model, priceStr)
 
   // If helper returned a NextResponse (error), return it directly
@@ -390,7 +471,7 @@ export async function POST(
     )
   }
 
-  // ── 5. Payment valid — call the upstream model ────────────────────────────
+  // ── 6. Payment valid — call the upstream model ────────────────────────────
   const result = await callUpstream(model, request, slug)
   await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
 
@@ -417,7 +498,7 @@ export async function POST(
         error: 'Internal server error',
         ...(process.env.NODE_ENV === 'development' ? { detail: String(err) } : {}),
       },
-      { status: 500 }
+      { status: 500, headers: X402_CORS_HEADERS }
     )
   }
 }

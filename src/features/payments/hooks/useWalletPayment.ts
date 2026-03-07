@@ -32,6 +32,19 @@ const USDC_ABI_APPROVE = [
   },
 ] as const
 
+const USDC_ABI_TRANSFER = [
+  {
+    name: 'transfer',
+    type: 'function' as const,
+    inputs: [
+      { name: 'to',    type: 'address' },
+      { name: 'value', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
 interface UseWalletPaymentOptions {
   slug:        string
   input:       string
@@ -48,7 +61,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
   // Guardar requirements del probe para el flujo fallback
   const requirementsRef = useRef<X402Requirements | null>(null)
 
-  const { address }              = useWallet()
+  const { address, isThirdweb }   = useWallet()
   const { isReady, writeContract: unifiedWriteContract, signTypedData } = useUnifiedWalletClient()
   const { isConnected, isCorrectChain, currentChainName, switchToFuji } = useChainGuard()
   const { usdcBalance, hasEnoughBalance, isLoading: balanceLoading } = useUsdcBalance(priceUsdc)
@@ -59,6 +72,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     // Estados en vuelo tienen prioridad — nunca los interrumpas con condiciones externas
     if (
       flowState === 'signing_eip3009' ||
+      flowState === 'transferring'    ||
       flowState === 'calling'         ||
       flowState === 'approving'
     ) {
@@ -106,9 +120,55 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     requirementsRef.current = requirements
     const amountWei = BigInt(requirements.maxAmountRequired)
 
-    // ── x402 EIP-3009 payment — same flow for ALL wallet types ──────
-    // User signs off-chain (signTypedData) → server settles via thirdweb facilitator
-    // thirdweb embedded wallets support signTypedData via smart account
+    // ── Route C: Smart account → USDC.transfer directo (1 firma, gasless) ──
+    if (isThirdweb) {
+      setFlowState('transferring')
+      try {
+        // AR-01: Transfer to OPERATOR_ADDRESS (not requirements.payTo which is marketplace contract)
+        // verifyUsdcTransfer checks Transfer event to OPERATOR_ADDRESS on-chain
+        const transferHash = await unifiedWriteContract({
+          address:      USDC_FUJI_ADDRESS,
+          abi:          USDC_ABI_TRANSFER as unknown as import('viem').Abi,
+          functionName: 'transfer',
+          args:         [WASIAI_OPERATOR_ADDRESS, amountWei],
+          chainId:      FUJI_CHAIN_ID,
+        })
+        setTxHash(transferHash)
+
+        // Retry invoke con X-PAYMENT-TX header — server verifica on-chain
+        setFlowState('calling')
+        const paidRes = await fetch(`/api/v1/models/${slug}/invoke`, {
+          method:  'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-PAYMENT-TX': transferHash,
+          },
+          body: JSON.stringify({ input }),
+        })
+
+        const paidData = await paidRes.json() as { result?: string; error?: string; meta?: { tx_hash?: `0x${string}` } }
+        if (paidRes.ok) {
+          setResult(typeof paidData.result === 'string' ? paidData.result : JSON.stringify(paidData.result))
+          setTxHash(paidData.meta?.tx_hash ?? transferHash)
+          setFlowState('success')
+        } else {
+          setErrorMsg(paidData.error ?? 'Error procesando el pago.')
+          setFlowState('error')
+        }
+      } catch (err: unknown) {
+        const code = (err as { code?: number })?.code
+        if (code === 4001) {
+          setErrorMsg('Cancelaste la operación. Puedes intentar de nuevo.')
+        } else {
+          setErrorMsg('Error al transferir USDC. Intenta de nuevo.')
+        }
+        setFlowState('error')
+      }
+      return
+    }
+
+    // ── Route B: x402 EIP-3009 payment (EOA wallets) ──────────────────
+    // User signs off-chain (signTypedData) → server settles via transferWithAuthorization
     setFlowState('signing_eip3009')
     try {
       const nonce       = crypto.getRandomValues(new Uint8Array(32))
