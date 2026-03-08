@@ -305,7 +305,12 @@
     "earningsBannerTitle": "You have funds available to withdraw",
     "earningsBannerSub": "They will be transferred directly to your wallet",
     "earningsAccumulatedIn": "Accumulated in",
-    "earningsNone": "No earnings yet"
+    "earningsNone": "No earnings yet",
+    "withdrawBtn": "Withdraw USDC →",
+    "withdrawSigning": "Confirm in wallet…",
+    "withdrawConfirming": "Confirming…",
+    "withdrawViewTx": "View tx",
+    "withdrawNoWallet": "No wallet"
   },
   "onboarding": {
     "step1": {

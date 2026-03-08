@@ -1,48 +1,90 @@
 'use client'
 
-import { useState } from 'react'
+import { useState }                 from 'react'
+import { useTranslations }          from 'next-intl'
+import { useUnifiedWalletClient }   from '@/features/wallet/hooks/useUnifiedWalletClient'
+import { createPublicClient, http } from 'viem'
+import { avalancheFuji, avalanche } from 'viem/chains'
+import { WITHDRAW_EARNINGS_ABI }    from '@/lib/contracts/abis'
+import { snowscanTx }               from '@/lib/chain'
+
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+const MARKETPLACE_ADDRESS = CHAIN_ID === 43114
+  ? (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET ?? '')
+  : (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI    ?? '')
 
 interface Props {
-  pending: number
-  hasWallet: boolean
+  pending:       number
+  hasWallet:     boolean
+  walletAddress: string
 }
 
-export function WithdrawButton({ pending, hasWallet }: Props) {
-  const [loading, setLoading] = useState(false)
-  const [result, setResult]   = useState<{ txHash?: string; error?: string } | null>(null)
+export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
+  const t = useTranslations('dashboard')
+  const { writeContract } = useUnifiedWalletClient()
 
-  async function handleWithdraw() {
-    setLoading(true)
-    setResult(null)
-    try {
-      const res  = await fetch('/api/creator/withdraw', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setResult({ txHash: data.tx_hash })
-    } catch (err) {
-      setResult({ error: err instanceof Error ? err.message : 'Withdrawal failed' })
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [status, setStatus]   = useState<'idle' | 'signing' | 'confirming' | 'success' | 'error'>('idle')
+  const [txHash, setTxHash]   = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
-  if (!hasWallet) {
+  const isDisabled = status === 'signing' || status === 'confirming'
+
+  if (!hasWallet || !walletAddress) {
     return (
-      <button disabled className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed">
-        No wallet
+      <button
+        disabled
+        className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed"
+      >
+        {t('withdrawNoWallet')}
       </button>
     )
   }
 
-  if (result?.txHash) {
+  async function handleWithdraw() {
+    setErrorMsg('')
+    try {
+      setStatus('signing')
+
+      const hash = await writeContract({
+        address:      MARKETPLACE_ADDRESS as `0x${string}`,
+        abi:          WITHDRAW_EARNINGS_ABI,
+        functionName: 'withdraw',
+        chainId:      CHAIN_ID,
+      })
+
+      setStatus('confirming')
+      const pub = createPublicClient({
+        chain:     CHAIN_ID === 43114 ? avalanche : avalancheFuji,
+        transport: http(),
+      })
+      await pub.waitForTransactionReceipt({ hash: hash as `0x${string}`, confirmations: 1 })
+
+      const res = await fetch('/api/creator/withdraw', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ txHash: hash }),
+      })
+      const data = await res.json() as { error?: string; realAmount?: number }
+      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`)
+
+      setTxHash(hash)
+      setStatus('success')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setErrorMsg(msg)
+      setStatus('error')
+    }
+  }
+
+  if (status === 'success' && txHash) {
     return (
       <a
-        href={`https://${Number(process.env.NEXT_PUBLIC_CHAIN_ID) === 43114 ? '' : 'testnet.'}snowscan.xyz/tx/${result.txHash}`}
+        href={snowscanTx(txHash)}
         target="_blank"
         rel="noopener noreferrer"
         className="rounded-xl bg-green-100 px-5 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-200 transition"
       >
-        ✅ View tx ↗
+        ✅ {t('withdrawViewTx')} ↗
       </a>
     )
   }
@@ -51,13 +93,15 @@ export function WithdrawButton({ pending, hasWallet }: Props) {
     <div className="flex flex-col items-end gap-1">
       <button
         onClick={handleWithdraw}
-        disabled={loading || pending <= 0}
+        disabled={isDisabled || pending <= 0}
         className="rounded-xl bg-avax-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? 'Withdrawing…' : 'Withdraw USDC →'}
+        {status === 'signing'    ? <span className="animate-pulse">{t('withdrawSigning')}</span>
+          : status === 'confirming' ? <span className="animate-pulse">{t('withdrawConfirming')}</span>
+          : t('withdrawBtn')}
       </button>
-      {result?.error && (
-        <p className="text-xs text-red-500">{result.error}</p>
+      {errorMsg && (
+        <p className="text-xs text-red-500">{errorMsg}</p>
       )}
     </div>
   )

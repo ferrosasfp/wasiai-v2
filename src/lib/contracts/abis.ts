@@ -3,6 +3,16 @@
  * MUST NOT import any server-only modules.
  */
 
+export const WITHDRAW_EARNINGS_ABI = [
+  {
+    name:            'withdraw',
+    type:            'function' as const,
+    inputs:          [],
+    outputs:         [],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
 export const WITHDRAW_KEY_ABI = [
   {
     name:            'withdrawKey',

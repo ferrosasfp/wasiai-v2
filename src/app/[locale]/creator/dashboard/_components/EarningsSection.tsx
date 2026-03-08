@@ -84,6 +84,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
           <WithdrawButton
             pending={pendingOnChain}
             hasWallet={!!profile?.wallet_address}
+            walletAddress={profile?.wallet_address ?? ''}
           />
         </div>
       </div>
