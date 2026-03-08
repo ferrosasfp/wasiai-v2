@@ -20,7 +20,7 @@ export const CHAIN_LABEL = IS_MAINNET ? 'Avalanche' : 'Avalanche Fuji'
 
 /** USDC contract address */
 export const USDC_ADDRESS = IS_MAINNET
-  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
+  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6'
   : '0x5425890298aed601595a70AB815c96711a31Bc65'
 
 /** Block explorer base URL */

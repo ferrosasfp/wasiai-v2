@@ -26,7 +26,7 @@ import { logger } from '@/lib/logger'
 const CHAIN_ID_NUM = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
 
 const USDC_ADDR: Record<number, `0x${string}`> = {
-  43114: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
+  43114: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6',
   43113: '0x5425890298aed601595a70AB815c96711a31Bc65',
 }
 

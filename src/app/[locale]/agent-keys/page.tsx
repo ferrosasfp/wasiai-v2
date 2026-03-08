@@ -37,7 +37,7 @@ const USDC_TRANSFER_ABI = [
 
 // USDC contract addresses by chain
 const USDC_BY_CHAIN: Record<number, string> = {
-  43114: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', // Avalanche mainnet
+  43114: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6', // Avalanche mainnet
   43113: '0x5425890298aed601595a70AB815c96711a31Bc65', // Fuji testnet
 }
 
