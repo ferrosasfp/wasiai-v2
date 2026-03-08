@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { AlertTriangle, Info, KeyRound, Bot } from 'lucide-react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
