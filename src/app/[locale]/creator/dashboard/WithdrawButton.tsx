@@ -67,6 +67,7 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
         abi:          CLAIM_EARNINGS_ABI,
         functionName: 'claimEarnings',
         args: [
+          walletAddress     as `0x${string}`,
           BigInt(voucher.grossAmountAtomics),
           BigInt(voucher.deadline),
           voucher.nonce     as `0x${string}`,

@@ -10,7 +10,7 @@ import { getTranslations } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
 import { WithdrawButton } from '../WithdrawButton'
 import { WalletSetup } from '../WalletSetup'
-import { IS_MAINNET } from '@/lib/chain'
+
 
 interface EarningsSectionProps {
   userId: string
@@ -28,9 +28,6 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
     .single()
 
   const pendingOnChain = Number(profile?.pending_earnings_usdc ?? 0)
-
-  const contractAddress = process.env.NEXT_PUBLIC_MARKETPLACE_CONTRACT_ADDRESS ?? ''
-  const explorerBase = IS_MAINNET ? 'snowscan.xyz' : 'testnet.snowscan.xyz'
 
   const hasEarnings = pendingOnChain > 0
 
@@ -58,17 +55,6 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
             <span className="inline-block h-2 w-2 rounded-full bg-avax-500" />
             <h2 className="font-semibold text-gray-900">{t('onchainEarnings')}</h2>
           </div>
-          <p className="text-sm text-gray-500">
-            {t('earningsAccumulatedIn')}{' '}
-            <a
-              href={`https://${explorerBase}/address/${contractAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-avax-500 hover:underline"
-            >
-              WasiAIMarketplace.sol
-            </a>
-          </p>
           <WalletSetup initialWallet={profile?.wallet_address ?? null} />
         </div>
         <div className="flex items-center gap-4">

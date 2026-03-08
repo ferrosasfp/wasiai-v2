@@ -453,23 +453,33 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
      * @param nonce        Random bytes32 — prevents replay.
      * @param sig          EIP-712 operator signature.
      */
+    /**
+     * @notice Withdraw earnings for a creator via an operator-signed EIP-712 voucher.
+     * @param creator       The registered creator wallet — USDC is sent here regardless of msg.sender.
+     * @param grossAmount   Gross USDC amount (atomics). Contract deducts platform fee on-chain.
+     * @param deadline      Unix timestamp after which the voucher is invalid.
+     * @param nonce         Unique bytes32 anti-replay identifier.
+     * @param sig           EIP-712 signature from an operator over (creator, grossAmount, deadline, nonce).
+     */
     function claimEarnings(
+        address creator,
         uint256 grossAmount,
         uint256 deadline,
         bytes32 nonce,
         bytes calldata sig
     ) external nonReentrant whenNotPaused {
+        require(creator != address(0),             "WasiAI: zero creator");
         // 1. Expiry guard
-        require(block.timestamp <= deadline, "WasiAI: voucher expired");
+        require(block.timestamp <= deadline,       "WasiAI: voucher expired");
 
         // 2. Anti-replay
-        require(!usedVouchers[nonce], "WasiAI: voucher already used");
+        require(!usedVouchers[nonce],              "WasiAI: voucher already used");
         usedVouchers[nonce] = true;
 
-        // 3. Verify EIP-712 signature from an operator
+        // 3. Verify EIP-712 signature — signed for explicit creator address
         bytes32 structHash = keccak256(abi.encode(
             CLAIM_TYPEHASH,
-            msg.sender,
+            creator,
             grossAmount,
             deadline,
             nonce
@@ -484,17 +494,17 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
             "WasiAI: insufficient free balance"
         );
 
-        // 5. Split: 90% to creator, 10% to treasury
+        // 5. Split: 90% to creator wallet, 10% to treasury
         uint256 platformShare = (grossAmount * platformFeeBps) / 10_000;
         uint256 creatorShare  = grossAmount - platformShare;
 
-        // 6. Transfers
-        usdc.safeTransfer(msg.sender, creatorShare);
+        // 6. Transfers — USDC always goes to registered creator wallet, not msg.sender
+        usdc.safeTransfer(creator, creatorShare);
         if (platformShare > 0) {
             usdc.safeTransfer(treasury, platformShare);
         }
 
-        emit EarningsClaimed(msg.sender, grossAmount, creatorShare, platformShare, nonce);
+        emit EarningsClaimed(creator, grossAmount, creatorShare, platformShare, nonce);
     }
 
     // ─── Pre-funded API Key Flows ─────────────────────────────────────────────

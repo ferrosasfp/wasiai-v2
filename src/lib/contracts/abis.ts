@@ -18,6 +18,7 @@ export const CLAIM_EARNINGS_ABI = [
     name:            'claimEarnings',
     type:            'function' as const,
     inputs:          [
+      { name: 'creator',     type: 'address' },
       { name: 'grossAmount', type: 'uint256' },
       { name: 'deadline',    type: 'uint256' },
       { name: 'nonce',       type: 'bytes32' },
