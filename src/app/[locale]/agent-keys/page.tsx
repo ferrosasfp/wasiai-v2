@@ -320,6 +320,7 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
   onClose: () => void; onSuccess: () => void
 }) {
   const t = useTranslations('agentKeys')
+  const { address } = useWallet()
   const [status,   setStatus]   = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [txHash,   setTxHash]   = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -332,7 +333,7 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
       const res = await fetch(`/api/agent-keys/${keyId}/withdraw`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ amount: balance }),
+        body:    JSON.stringify({ amount: balance, walletAddress: address }),
       })
 
       const data = await res.json() as { error?: string; withdrawTxHash?: string }
@@ -579,6 +580,7 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
 export default function AgentKeysPage() {
   const t = useTranslations('agentKeys')
   const tCommon = useTranslations('common')
+  const { address } = useWallet()   // HU-058: needed for withdraw ownership check
   const [keys, setKeys]         = useState<AgentKey[]>([])
   const [loading, setLoading]   = useState(true)
   const [creating, setCreating] = useState(false)
@@ -768,14 +770,26 @@ export default function AgentKeysPage() {
                           >
                             {t('addUsdc')}
                           </button>
-                          {available > 0 && (
-                            <button
-                              onClick={() => setWithdrawKey({ id: key.id, name: key.name, balance: available, keyHash: key.key_hash ?? '' })}
-                              className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
-                            >
-                              {t('withdrawBtn', { amount: available.toFixed(2) })}
-                            </button>
-                          )}
+                          {available > 0 && (() => {
+                            const canWithdraw = !key.owner_wallet_address ||
+                              !address ||
+                              key.owner_wallet_address.toLowerCase() === address.toLowerCase()
+                            return canWithdraw ? (
+                              <button
+                                onClick={() => setWithdrawKey({ id: key.id, name: key.name, balance: available, keyHash: key.key_hash ?? '' })}
+                                className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
+                              >
+                                {t('withdrawBtn', { amount: available.toFixed(2) })}
+                              </button>
+                            ) : (
+                              <div
+                                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-400 cursor-not-allowed"
+                                title={`Solo puede retirar ${key.owner_wallet_address?.slice(0,6)}…${key.owner_wallet_address?.slice(-4)}`}
+                              >
+                                🔒 {t('withdrawBtn', { amount: available.toFixed(2) })}
+                              </div>
+                            )
+                          })()}
                           <button
                             onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
                             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"

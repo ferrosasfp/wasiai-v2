@@ -15,7 +15,8 @@ import { z } from 'zod'
 import { refundKeyToEarningsOnChain, withdrawForCreator, getKeyBalanceOnChain, getKeyOwnerOnChain } from '@/lib/contracts/marketplaceClient'
 
 const BodySchema = z.object({
-  amount: z.number().positive(),
+  amount:        z.number().positive(),
+  walletAddress: z.string().optional(),   // HU-058: caller's current wallet for ownership check
 })
 
 export async function POST(
@@ -59,6 +60,15 @@ export async function POST(
     return NextResponse.json(
       { error: 'Key owner not found on-chain. Key may not have been deposited yet.' },
       { status: 400 },
+    )
+  }
+
+  // HU-058: Si el caller envía su wallet, verificar que coincide con el owner registrado
+  const callerWallet = parsed.data.walletAddress
+  if (callerWallet && ownerAddress.toLowerCase() !== callerWallet.toLowerCase()) {
+    return NextResponse.json(
+      { error: `Solo la wallet ${ownerAddress.slice(0,6)}…${ownerAddress.slice(-4)} puede retirar de esta key.` },
+      { status: 403 },
     )
   }
 
