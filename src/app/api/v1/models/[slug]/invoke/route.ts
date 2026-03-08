@@ -493,8 +493,8 @@ export async function POST(
   if (result.status === 'success' && model.creator_id) {
     void Promise.resolve(
       supabase.rpc('increment_pending_earnings', {
-        p_creator_id: model.creator_id as string,
-        p_amount:     creatorPrice,
+        p_user_id: model.creator_id as string,
+        p_amount:  creatorPrice,
       })
     ).catch((err: unknown) => logger.error('[invoke] increment_pending_earnings failed', { err }))
   }
