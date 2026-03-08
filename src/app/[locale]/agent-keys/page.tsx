@@ -286,32 +286,26 @@ interface CloseKeyModalProps {
 
 // ── WithdrawModal — HU-056 ─────────────────────────────────────────────────────
 // Retiro server-side: operador ejecuta refundKeyToEarnings + withdrawFor on-chain.
+// Retiro siempre es TOTAL — el contrato no soporta retiro parcial.
 // El usuario no firma nada — solo confirma en la UI.
 function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
   keyId: string; keyName: string; balance: number
   onClose: () => void; onSuccess: () => void
 }) {
   const t = useTranslations('agentKeys')
-  const [amount,   setAmount]   = useState(balance)
   const [status,   setStatus]   = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [txHash,   setTxHash]   = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
   async function handleWithdraw() {
     setErrorMsg('')
-
-    if (amount <= 0 || amount > balance) {
-      setErrorMsg(t('withdraw.invalidAmount').replace('${max}', balance.toFixed(4)))
-      return
-    }
-
     try {
       setStatus('loading')
 
       const res = await fetch(`/api/agent-keys/${keyId}/withdraw`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ amount }),
+        body:    JSON.stringify({ amount: balance }),
       })
 
       const data = await res.json() as { error?: string; withdrawTxHash?: string }
@@ -329,10 +323,6 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
 
   const isLoading = status === 'loading'
 
-  const statusLabel = isLoading
-    ? t('withdraw.submitting')
-    : t('withdraw.withdrawBtn').replace('${amount}', amount.toFixed(4))
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
@@ -349,7 +339,7 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
             <div className="text-4xl">✅</div>
             <p className="font-semibold text-green-700">{t('withdraw.success')}</p>
             <p className="text-sm text-gray-500">
-              {t('withdraw.sentToWallet').replace('{amount}', `$${amount.toFixed(4)}`)}
+              {t('withdraw.sentToWallet').replace('{amount}', `$${balance.toFixed(2)}`)}
             </p>
             {txHash && (
               <a
@@ -364,41 +354,18 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Balance a retirar */}
             <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-4 text-center">
               <p className="text-xs text-gray-500 mb-1">{t('withdraw.availableLabel')}</p>
               <p className="text-3xl font-extrabold text-green-700">
-                ${balance.toFixed(4)} <span className="text-base font-medium text-green-500">USDC</span>
+                ${balance.toFixed(2)} <span className="text-base font-medium text-green-500">USDC</span>
               </p>
             </div>
 
-            {/* Monto a retirar */}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                {t('withdraw.amountLabel')}
-              </label>
-              <div className="flex items-center overflow-hidden rounded-xl border border-gray-200 focus-within:border-avax-400">
-                <span className="border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-400">$</span>
-                <input
-                  type="number"
-                  step="0.0001"
-                  min="0.01"
-                  max={balance}
-                  value={amount}
-                  onChange={e => setAmount(Math.min(balance, Math.max(0, parseFloat(e.target.value) || 0)))}
-                  disabled={isLoading}
-                  className="flex-1 px-3 py-2.5 text-sm focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setAmount(balance)}
-                  className="px-3 py-2.5 text-xs text-avax-500 hover:text-avax-600 font-medium"
-                >
-                  {t('withdraw.max')}
-                </button>
-              </div>
-              {amount >= balance && (
-                <p className="mt-1 text-xs text-amber-600 flex items-center gap-1"><AlertTriangle size={12} /> Retiro total — la key quedará cerrada.</p>
-              )}
+            {/* Advertencia retiro total */}
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2 text-xs text-amber-800">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <span>Se retirarán <strong>${balance.toFixed(2)} USDC</strong> completos a tu wallet. La key quedará cerrada.</span>
             </div>
 
             <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-800">
@@ -421,10 +388,10 @@ function WithdrawModal({ keyId, keyName, balance, onClose, onSuccess }: {
               </button>
               <button
                 onClick={handleWithdraw}
-                disabled={isLoading || amount <= 0 || amount > balance}
+                disabled={isLoading || balance <= 0}
                 className="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition"
               >
-                {isLoading ? statusLabel : t('withdraw.withdrawBtn', { amount: amount.toFixed(4) })}
+                {isLoading ? t('withdraw.submitting') : `Retirar $${balance.toFixed(2)}`}
               </button>
             </div>
           </div>
