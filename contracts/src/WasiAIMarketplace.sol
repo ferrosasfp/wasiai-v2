@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
 
 /**
@@ -52,7 +54,7 @@ interface IERC3009 {
  * @dev Deployed on Avalanche C-Chain (chainId: 43114)
  *      USDC: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
  */
-contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, AutomationCompatibleInterface {
+contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, AutomationCompatibleInterface, EIP712 {
     using SafeERC20 for IERC20;
 
     // ─── Types ────────────────────────────────────────────────────────────────
@@ -120,6 +122,14 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     /// paymentId → already recorded (idempotency guard for recordInvocation)
     mapping(bytes32 => bool) public usedPaymentIds;
 
+    /// nonce → already used (idempotency guard for claimEarnings)
+    mapping(bytes32 => bool) public usedVouchers;
+
+    /// EIP-712 typehash for ClaimEarnings voucher
+    bytes32 private constant CLAIM_TYPEHASH = keccak256(
+        "ClaimEarnings(address creator,uint256 grossAmount,uint256 deadline,bytes32 nonce)"
+    );
+
     /// Timestamp of the last operator activity.
     /// If > EMERGENCY_TIMEOUT has passed, key owners can exit trustlessly.
     uint256 public lastOperatorActivity;
@@ -164,6 +174,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     event DailyCapUpdated(uint256 oldCap, uint256 newCap);
     event RegistrationFeeUpdated(uint256 newFee);
+    event EarningsClaimed(address indexed creator, uint256 grossAmount, uint256 creatorShare, uint256 platformShare, bytes32 nonce);
 
     // ── Pre-funded Key Events ────────────────────────────────────────────────
     event KeyFunded(bytes32 indexed keyId, address indexed owner, uint256 amount);
@@ -185,7 +196,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
-    constructor(address _usdc, address _treasury) Ownable(msg.sender) {
+    constructor(address _usdc, address _treasury) Ownable(msg.sender) EIP712("WasiAIMarketplace", "1") {
         require(_usdc     != address(0), "WasiAI: zero USDC");
         require(_treasury != address(0), "WasiAI: zero treasury");
         usdc     = IERC20(_usdc);
@@ -432,6 +443,58 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         usdc.safeTransfer(creator, amount);
 
         emit Withdrawn(creator, amount);
+    }
+
+    /**
+     * @notice Creator claims earnings via a signed voucher (EIP-712).
+     * @dev Voucher is signed by a backend operator. Deducts 10% to treasury, 90% to creator.
+     * @param grossAmount  Total USDC in atomic units to claim.
+     * @param deadline     Unix timestamp — voucher expires after this.
+     * @param nonce        Random bytes32 — prevents replay.
+     * @param sig          EIP-712 operator signature.
+     */
+    function claimEarnings(
+        uint256 grossAmount,
+        uint256 deadline,
+        bytes32 nonce,
+        bytes calldata sig
+    ) external nonReentrant whenNotPaused {
+        // 1. Expiry guard
+        require(block.timestamp <= deadline, "WasiAI: voucher expired");
+
+        // 2. Anti-replay
+        require(!usedVouchers[nonce], "WasiAI: voucher already used");
+        usedVouchers[nonce] = true;
+
+        // 3. Verify EIP-712 signature from an operator
+        bytes32 structHash = keccak256(abi.encode(
+            CLAIM_TYPEHASH,
+            msg.sender,
+            grossAmount,
+            deadline,
+            nonce
+        ));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(digest, sig);
+        require(operators[signer], "WasiAI: invalid operator signature");
+
+        // 4. Balance guard — protect Agent Key balances
+        require(
+            usdc.balanceOf(address(this)) - totalKeyBalances >= grossAmount,
+            "WasiAI: insufficient free balance"
+        );
+
+        // 5. Split: 90% to creator, 10% to treasury
+        uint256 platformShare = (grossAmount * platformFeeBps) / 10_000;
+        uint256 creatorShare  = grossAmount - platformShare;
+
+        // 6. Transfers
+        usdc.safeTransfer(msg.sender, creatorShare);
+        if (platformShare > 0) {
+            usdc.safeTransfer(treasury, platformShare);
+        }
+
+        emit EarningsClaimed(msg.sender, grossAmount, creatorShare, platformShare, nonce);
     }
 
     // ─── Pre-funded API Key Flows ─────────────────────────────────────────────
