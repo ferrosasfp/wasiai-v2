@@ -53,3 +53,15 @@
 | 048 | 2026-03-05 | WAS-161 | Sync precio on-chain al editar agente (creator paga gas, active removido) | feature | QUALITY | DONE | master |
 | 049 | 2026-03-05 | WAS-162 | Transparency Dashboard — on-chain economics en footer + /transparency | feature | QUALITY | DONE | master |
 | 050 | 2026-03-07 | HU-050 | Agent Keys — Migrar wallet a sistema unificado thirdweb | improvement | QUALITY | DONE | feat/050-agent-keys-unified-wallet |
+| 051 | 2026-03-07 | HU-051 | Fix x402 operator EOA — payTo, settlePayment, isThirdweb detection | hotfix | PATCH | DONE | main |
+| 052 | 2026-03-07 | HU-052 | Dual payment routes — Route B (EIP-3009 EOA) + Route C (embedded approve) | feature | BUGFIX | DONE | main |
+| 053 | 2026-03-07 | HU-053 | Fix payViaApproval post-approve call en PayToCallButton | hotfix | PATCH | DONE | main |
+| 054 | 2026-03-07 | HU-054 | withdrawKey revert — usar refundKeyToEarnings + withdrawFor via operador | hotfix | BUGFIX | DONE | main |
+| 055 | 2026-03-07 | HU-055 | getKeyOwnerOnChain fallback — creator_profiles.wallet_address null bug | hotfix | PATCH | DONE | main |
+| 056 | 2026-03-07 | HU-056 | Retiro completo via operador — refundKeyToEarnings + withdrawFor + DB sync | feature | QUALITY | DONE | main |
+| 057 | 2026-03-07 | HU-057 | receipt.status check en withdrawFor y refundKeyToEarnings — HAL-025 | hotfix | PATCH | DONE | main |
+| 058 | 2026-03-07 | HU-058 | owner_wallet_address en agent_keys — primer depositor lock + warning UI | feature | QUALITY | DONE | main |
+| 059 | 2026-03-07 | HU-059 | Bloquear withdraw/close key para wallets no-owner — UI pill + API 403 | hotfix | PATCH | DONE | main |
+| 060 | 2026-03-07 | HU-060 | Ocultar botones de acción sin wallet conectada | hotfix | PATCH | DONE | main |
+| 061 | 2026-03-07 | HU-061 | Bloquear Route C — embedded wallets no pueden fondear Agent Keys | security | PATCH | DONE | main |
+| 062 | 2026-03-07 | HU-062 | Fix typo USDC mainnet address — trailing E en 10 archivos | hotfix | PATCH | DONE | main |
