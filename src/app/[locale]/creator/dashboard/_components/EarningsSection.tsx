@@ -9,7 +9,6 @@
 import { getTranslations } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
 import { WithdrawButton } from '../WithdrawButton'
-import { WalletSetup } from '../WalletSetup'
 
 
 interface EarningsSectionProps {
@@ -55,7 +54,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
             <span className="inline-block h-2 w-2 rounded-full bg-avax-500" />
             <h2 className="font-semibold text-gray-900">{t('onchainEarnings')}</h2>
           </div>
-          <WalletSetup initialWallet={profile?.wallet_address ?? null} />
+
         </div>
         <div className="flex items-center gap-4">
           {!hasEarnings && (
