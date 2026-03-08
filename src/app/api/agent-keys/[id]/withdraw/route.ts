@@ -75,20 +75,26 @@ export async function POST(
       : 'https://api.avax-test.network/ext/bc/C/rpc'),
   })
 
-  // 6. Leer receipt + verificar status
-  let receipt
-  try {
-    receipt = await pub.getTransactionReceipt({
-      hash: parsed.data.txHash as `0x${string}`,
-    })
-  } catch {
-    return NextResponse.json(
-      { error: 'Transaction not found or not yet mined' },
-      { status: 400 },
-    )
+  // 6. Leer receipt + verificar status (retry hasta 3 veces con delay)
+  let receipt: Awaited<ReturnType<typeof pub.getTransactionReceipt>> | undefined
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      receipt = await pub.getTransactionReceipt({
+        hash: parsed.data.txHash as `0x${string}`,
+      })
+      break
+    } catch {
+      if (attempt === 2) {
+        return NextResponse.json(
+          { error: 'Transaction not found or not yet mined. Please retry in a few seconds.' },
+          { status: 400 },
+        )
+      }
+      await new Promise(r => setTimeout(r, 2000 * (attempt + 1))) // 2s, 4s
+    }
   }
 
-  if (receipt.status !== 'success') {
+  if (!receipt || receipt.status !== 'success') {
     return NextResponse.json({ error: 'Transaction reverted on-chain' }, { status: 400 })
   }
 
@@ -97,7 +103,7 @@ export async function POST(
     ? process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET
     : process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI) ?? ''
 
-  const log = receipt.logs.find(l =>
+  const log = receipt!.logs.find(l =>
     l.topics[0] === KEY_WITHDRAWN_TOPIC &&
     l.address.toLowerCase() === marketplaceAddr.toLowerCase()
   )

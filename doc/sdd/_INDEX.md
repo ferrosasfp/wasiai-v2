@@ -65,3 +65,4 @@
 | 060 | 2026-03-07 | HU-060 | Ocultar botones de acción sin wallet conectada | hotfix | PATCH | DONE | main |
 | 061 | 2026-03-07 | HU-061 | Bloquear Route C — embedded wallets no pueden fondear Agent Keys | security | PATCH | DONE | main |
 | 062 | 2026-03-07 | HU-062 | Fix typo USDC mainnet address — trailing E en 10 archivos | hotfix | PATCH | DONE | main |
+| 064 | 2026-03-08 | HU-064 | Withdraw earnings directo desde wallet del creator | improvement | QUALITY | PENDING | feat/064-withdraw-earnings-direct |

@@ -8,6 +8,8 @@ import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { useUnifiedWalletClient } from '@/features/wallet/hooks/useUnifiedWalletClient'
 import { WITHDRAW_KEY_ABI }       from '@/lib/contracts/abis'
 import { keyHashToBytes32 }       from '@/lib/contracts/marketplaceClient'
+import { createPublicClient, http } from 'viem'
+import { avalancheFuji, avalanche }  from 'viem/chains'
 
 interface AgentKey {
   id: string
@@ -343,7 +345,14 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
         chainId:      CHAIN_ID,
       })
 
+      // Esperar confirmación on-chain antes de llamar al API (evita "not yet mined")
       setStatus('submitting')
+      const pub = createPublicClient({
+        chain:     CHAIN_ID === 43114 ? avalanche : avalancheFuji,
+        transport: http(),
+      })
+      await pub.waitForTransactionReceipt({ hash: hash as `0x${string}`, confirmations: 1 })
+
       const res = await fetch(`/api/agent-keys/${keyId}/withdraw`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
