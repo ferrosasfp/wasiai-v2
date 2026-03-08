@@ -211,7 +211,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             )
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {models.map((model, i) => (
                   <ModelCard
                     key={model.id}
@@ -299,7 +299,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             {freeTrialAgents.length > 0 && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">{t('freeToTry')}</h3>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {freeTrialAgents.map((agent: Record<string, unknown>, i: number) => (
                     <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
                   ))}
@@ -309,7 +309,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             {trendingAgents.length > 0 && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">{t('trending')}</h3>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {trendingAgents.map((agent: Record<string, unknown>, i: number) => (
                     <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
                   ))}
@@ -319,7 +319,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             {topRatedAgents.length > 0 && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">{t('topRated')}</h3>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {topRatedAgents.map((agent: Record<string, unknown>, i: number) => (
                     <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
                   ))}
@@ -329,7 +329,7 @@ export default async function HomePage({ params, searchParams }: Props) {
             {newAgents.length > 0 && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">{t('justLaunched')}</h3>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {newAgents.map((agent: Record<string, unknown>, i: number) => (
                     <ModelCard key={agent.id as string} model={agent as unknown as import('@/features/models/types/models.types').Model} locale={locale} index={i} />
                   ))}
