@@ -66,7 +66,7 @@ export async function POST(
     // 3. Get key from DB — verify ownership
     const { data: keyRow, error: keyError } = await supabase
       .from('agent_keys')
-      .select('id, key_hash, budget_usdc, is_active, owner_id')
+      .select('id, key_hash, budget_usdc, is_active, owner_id, owner_wallet_address')
       .eq('id', id)
       .eq('owner_id', user.id)
       .single()
@@ -83,24 +83,11 @@ export async function POST(
       return NextResponse.json({ error: 'Key has no hash — cannot identify on-chain' }, { status: 500 })
     }
 
-    // HAL-020: Verify ownerAddress matches authenticated user's wallet
-    const { data: creatorProfile } = await supabase
-      .from('creator_profiles')
-      .select('wallet_address')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!creatorProfile?.wallet_address) {
-      // Auto-registrar wallet_address si el creator no lo tiene configurado aún
-      await supabase
-        .from('creator_profiles')
-        .upsert({ user_id: user.id, wallet_address: body.ownerAddress }, { onConflict: 'user_id' })
-    } else if (body.ownerAddress.toLowerCase() !== creatorProfile.wallet_address.toLowerCase()) {
-      return NextResponse.json(
-        { error: 'ownerAddress does not match your configured wallet address' },
-        { status: 403 },
-      )
-    }
+    // ── HU-058: Owner wallet enforcement ───────────────────────────────────────
+    const registeredWallet = (keyRow as { owner_wallet_address?: string | null }).owner_wallet_address?.toLowerCase()
+    const incomingWallet   = body.ownerAddress.toLowerCase()
+    const ownerDiffers     = !!registeredWallet && registeredWallet !== incomingWallet
+    // ownerDiffers → depósito se permite, warning en response (RN-3)
 
     // 4. Submit deposit on-chain — Route C (txHash) or Route B (EIP-3009)
     let txHash: string
@@ -173,7 +160,16 @@ export async function POST(
       logger.error('[deposit] DB budget_usdc atomic update failed (tx already submitted)', { updateError, txHash })
     }
 
-    // 6. Fetch on-chain balance for response
+    // 6. Persistir owner_wallet_address en primer depósito (HAL-025: solo después de tx OK)
+    if (!registeredWallet) {
+      await supabase
+        .from('agent_keys')
+        .update({ owner_wallet_address: body.ownerAddress })
+        .eq('id', id)
+        .eq('owner_id', user.id)
+    }
+
+    // 7. Fetch on-chain balance for response
     const onChainBalance = await getKeyBalanceOnChain(keyRow.key_hash)
     const newBudget = Number(keyRow.budget_usdc) + body.amount  // optimistic estimate
 
@@ -182,6 +178,9 @@ export async function POST(
       txHash,
       newBudgetDb:   newBudget,
       onChainBalance,
+      ...(ownerDiffers ? {
+        warning: `Este depósito se acreditó a la key. El retiro solo se puede hacer con ${keyRow.owner_wallet_address}.`,
+      } : {}),
     })
   } catch (err) {
     logger.error('[deposit] unhandled error', { err })

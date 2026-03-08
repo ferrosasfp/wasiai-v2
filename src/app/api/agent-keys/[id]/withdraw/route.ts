@@ -42,7 +42,7 @@ export async function POST(
   // 3. Ownership check + fetch key_hash
   const { data: keyRow } = await supabase
     .from('agent_keys')
-    .select('id, key_hash, is_active, owner_id')
+    .select('id, key_hash, is_active, owner_id, owner_wallet_address')
     .eq('id', id)
     .eq('owner_id', user.id)
     .single()
@@ -51,8 +51,10 @@ export async function POST(
   if (!keyRow.is_active) return NextResponse.json({ error: 'Key already revoked' }, { status: 400 })
   if (!keyRow.key_hash) return NextResponse.json({ error: 'Key has no hash' }, { status: 500 })
 
-  // 4. Obtener wallet address del owner desde el contrato on-chain (fuente autoritativa)
-  const ownerAddress = await getKeyOwnerOnChain(keyRow.key_hash)
+  // 4. Resolver wallet del owner — DB primero, fallback on-chain (RN-1 / HU-058)
+  const ownerAddress = (keyRow as { owner_wallet_address?: string | null }).owner_wallet_address
+    ?? await getKeyOwnerOnChain(keyRow.key_hash)
+
   if (!ownerAddress) {
     return NextResponse.json(
       { error: 'Key owner not found on-chain. Key may not have been deposited yet.' },

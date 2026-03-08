@@ -11,6 +11,7 @@ export interface AgentKey {
   is_active: boolean
   last_used_at: string | null
   created_at: string
+  owner_wallet_address?: string | null   // HU-058: first depositor's wallet
   // Only returned on creation
   raw_key?: string
 }

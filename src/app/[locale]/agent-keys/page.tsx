@@ -16,7 +16,8 @@ interface AgentKey {
   last_used_at: string | null
   created_at: string
   raw_key?: string
-  key_hash?: string  // WAS-141: exposed to owner for on-chain withdrawKey call
+  key_hash?: string                      // WAS-141: exposed to owner for on-chain withdrawKey call
+  owner_wallet_address?: string | null   // HU-058: first depositor's wallet
 }
 
 // ABI para withdrawKey on-chain
@@ -50,19 +51,21 @@ const MARKETPLACE_ADDRESS = CHAIN_ID === 43114
 // ── DepositModal ──────────────────────────────────────────────────────────────
 
 interface DepositModalProps {
-  keyId:     string
-  keyName:   string
-  onClose:   () => void
-  onSuccess: () => void
+  keyId:               string
+  keyName:             string
+  ownerWalletAddress?: string | null   // HU-058: first depositor's wallet
+  onClose:             () => void
+  onSuccess:           () => void
 }
 
-function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps) {
+function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }: DepositModalProps) {
   const t = useTranslations('agentKeys')
-  const [amount, setAmount]     = useState(10)
-  const [status, setStatus]     = useState<'idle' | 'signing' | 'submitting' | 'success' | 'error'>('idle')
-  const [errorMsg, setErrorMsg] = useState('')
-  const [txHash, setTxHash]     = useState('')
-  const [balance, setBalance]   = useState<number | null>(null)
+  const [amount, setAmount]         = useState(10)
+  const [status, setStatus]         = useState<'idle' | 'signing' | 'submitting' | 'success' | 'error'>('idle')
+  const [errorMsg, setErrorMsg]     = useState('')
+  const [txHash, setTxHash]         = useState('')
+  const [balance, setBalance]       = useState<number | null>(null)
+  const [depositWarning, setDepositWarning] = useState('')  // HU-058
   const { address, chain, isThirdweb } = useWallet()
   const { signTypedData, writeContract, isReady } = useUnifiedWalletClient()
 
@@ -122,6 +125,7 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
 
         const data = await res.json()
         if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`)
+        if (data.warning) setDepositWarning(data.warning)
 
         setTxHash(transferHash)
         setStatus('success')
@@ -179,6 +183,7 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`)
+      if (data.warning) setDepositWarning(data.warning)
 
       setTxHash(data.txHash ?? '')
       setStatus('success')
@@ -219,6 +224,12 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
                 Tx: {txHash.slice(0, 20)}...{txHash.slice(-8)}
               </p>
             )}
+            {depositWarning && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 text-left flex items-start gap-2">
+                <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                <span>{depositWarning}</span>
+              </div>
+            )}
             <button
               onClick={onClose}
               className="mt-2 w-full rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600"
@@ -248,6 +259,22 @@ function DepositModal({ keyId, keyName, onClose, onSuccess }: DepositModalProps)
             {errorMsg && (
               <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
                 <p className="text-xs text-red-700">{errorMsg}</p>
+              </div>
+            )}
+
+            {/* HU-058: Warning si la key ya tiene otra wallet registrada */}
+            {ownerWalletAddress &&
+             address &&
+             ownerWalletAddress.toLowerCase() !== address.toLowerCase() && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2 text-xs text-amber-800">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                <span>
+                  Esta key solo puede retirarse con{' '}
+                  <span className="font-mono font-semibold">
+                    {ownerWalletAddress.slice(0,6)}…{ownerWalletAddress.slice(-4)}
+                  </span>.
+                  Tu wallet actual puede depositar pero no retirar.
+                </span>
               </div>
             )}
 
@@ -561,7 +588,7 @@ export default function AgentKeysPage() {
   const [copied, setCopied]     = useState(false)
 
   // Modal state
-  const [depositKey,  setDepositKey]  = useState<{ id: string; name: string } | null>(null)
+  const [depositKey,  setDepositKey]  = useState<{ id: string; name: string; ownerWalletAddress?: string | null } | null>(null)
   const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number } | null>(null)
   const [withdrawKey, setWithdrawKey] = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
 
@@ -735,7 +762,7 @@ export default function AgentKeysPage() {
                       {key.is_active && (
                         <div className="flex shrink-0 gap-2">
                           <button
-                            onClick={() => setDepositKey({ id: key.id, name: key.name })}
+                            onClick={() => setDepositKey({ id: key.id, name: key.name, ownerWalletAddress: key.owner_wallet_address })}
                             className="rounded-lg border border-avax-200 bg-avax-50 px-3 py-1.5 text-xs font-medium text-avax-700 hover:bg-avax-100 transition"
                             title={t('addUsdc')}
                           >
@@ -806,10 +833,10 @@ Content-Type: application/json
         <DepositModal
           keyId={depositKey.id}
           keyName={depositKey.name}
+          ownerWalletAddress={depositKey.ownerWalletAddress}
           onClose={() => setDepositKey(null)}
           onSuccess={() => {
             setDepositKey(null)
-            // Pequeño delay para que la DB confirme el update antes de recargar
             setTimeout(loadKeys, 1500)
           }}
         />
