@@ -8,7 +8,6 @@
  */
 import { getTranslations } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
-import { getPendingEarnings } from '@/lib/contracts/marketplaceClient'
 import { WithdrawButton } from '../WithdrawButton'
 import { WalletSetup } from '../WalletSetup'
 import { IS_MAINNET } from '@/lib/chain'
@@ -21,16 +20,14 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
   const t = await getTranslations('dashboard')
   const supabase = await createClient()
 
+  // HU-067: earnings now tracked off-chain in Supabase (pending_earnings_usdc)
   const { data: profile } = await supabase
     .from('creator_profiles')
-    .select('wallet_address')
+    .select('wallet_address, pending_earnings_usdc')
     .eq('id', userId)
     .single()
 
-  // On-chain RPC call — may be slow
-  const pendingOnChain = profile?.wallet_address
-    ? await getPendingEarnings(profile.wallet_address).catch(() => 0)
-    : 0
+  const pendingOnChain = Number(profile?.pending_earnings_usdc ?? 0)
 
   const contractAddress = process.env.NEXT_PUBLIC_MARKETPLACE_CONTRACT_ADDRESS ?? ''
   const explorerBase = IS_MAINNET ? 'snowscan.xyz' : 'testnet.snowscan.xyz'
