@@ -1,273 +1,226 @@
-# Story File #064 — Withdraw Earnings Directo
+# Story File — #064: Withdraw Earnings Directo desde Wallet del Creator
 
-## Tu trabajo como dev
-
-Implementar W1→W2→W3→W4 en orden. Luego QG.
+> SDD: doc/sdd/064-withdraw-earnings-direct/sdd.md
+> Fecha: 2026-03-08
+> Branch: feat/064-withdraw-earnings-direct
 
 ---
 
-## W1 — abis.ts: agregar WITHDRAW_EARNINGS_ABI
+## Goal
 
-**Archivo:** `src/lib/contracts/abis.ts`
+Reemplazar el flujo de retiro de earnings del creator (actualmente via operador) por una llamada directa del creator a `withdraw()` en `WasiAIMarketplace.sol`. El creator firma la tx desde su wallet — el operador ya no paga gas ni interviene.
 
-Agregar después de `WITHDRAW_KEY_ABI`:
+## Acceptance Criteria (EARS)
 
+1. WHEN el creator hace click en "Withdraw USDC →", THE UI SHALL solicitar firma de `withdraw()` directamente al creator via su wallet conectada
+2. WHEN la tx es confirmada on-chain, THE API SHALL verificar el evento `Withdrawn(creator, amount)` en el receipt antes de retornar éxito
+3. IF `receipt.status !== 'success'`, THEN THE UI SHALL mostrar mensaje de error y NO actualizar ningún estado de éxito
+4. WHILE no hay wallet conectada (`!hasWallet || !walletAddress`), THE botón SHALL renderizarse deshabilitado con texto "Sin wallet"
+5. WHEN la tx es exitosa, THE UI SHALL mostrar link al explorer con el txHash real del creator
+6. IF `earnings[msg.sender] == 0`, THE contrato revertirá y THE UI SHALL mostrar el mensaje de error del revert
+7. WHILE el status es `signing` o `confirming`, THE botón SHALL mostrar estado de carga animado e impedirse double-click
+
+## Files to Modify/Create
+
+| # | Archivo | Acción | Qué hacer | Exemplar |
+|---|---------|--------|-----------|----------|
+| 1 | `src/lib/contracts/abis.ts` | Modificar | Agregar `WITHDRAW_EARNINGS_ABI` después de `WITHDRAW_KEY_ABI` | `src/lib/contracts/abis.ts` (WITHDRAW_KEY_ABI como patrón) |
+| 2 | `src/app/api/creator/withdraw/route.ts` | Modificar | Reescribir handler `POST`: recibir `{ txHash }`, verificar evento `Withdrawn`, retornar `{ ok, realAmount }`. `GET` sin cambios. | `src/app/api/agent-keys/[id]/withdraw/route.ts` |
+| 3 | `src/app/[locale]/creator/dashboard/WithdrawButton.tsx` | Modificar | Reescribir completo: `useUnifiedWalletClient` + `writeContract` + `waitForTransactionReceipt` + estados signing/confirming/success/error + i18n | `src/app/[locale]/agent-keys/page.tsx` (WithdrawModal, ~líneas 330-480) |
+| 4 | `src/app/[locale]/creator/dashboard/_components/EarningsSection.tsx` | Modificar | Agregar prop `walletAddress={profile?.wallet_address ?? ''}` al `<WithdrawButton>` | El mismo archivo (ya tiene `profile?.wallet_address`) |
+| 5 | `messages/en.json` | Modificar | Agregar 5 claves al namespace `dashboard` | `messages/en.json` (claves dashboard existentes) |
+| 6 | `messages/es.json` | Modificar | Agregar 5 claves al namespace `dashboard` | `messages/es.json` (claves dashboard existentes) |
+
+## Exemplars
+
+### Exemplar 1: WITHDRAW_KEY_ABI — patrón para el ABI
+**Archivo**: `src/lib/contracts/abis.ts`
+**Usar para**: Archivo #1
+**Patrón clave**:
 ```typescript
-export const WITHDRAW_EARNINGS_ABI = [
+export const WITHDRAW_KEY_ABI = [
   {
-    name:            'withdraw',        // ← debe ser 'withdraw' (nombre real en contrato)
+    name:            'withdrawKey',
     type:            'function' as const,
-    inputs:          [],
+    inputs:          [
+      { name: 'keyId',  type: 'bytes32' },
+      { name: 'amount', type: 'uint256' },
+    ],
     outputs:         [],
     stateMutability: 'nonpayable',
   },
 ] as const
 ```
+Para `WITHDRAW_EARNINGS_ABI`: mismo patrón, `name: 'withdraw'`, `inputs: []`.
 
----
+### Exemplar 2: API route withdraw de agent-keys — patrón completo
+**Archivo**: `src/app/api/agent-keys/[id]/withdraw/route.ts`
+**Usar para**: Archivo #2
+**Patrón clave**:
+- Imports: `z`, `createPublicClient`, `http`, `avalancheFuji`, `avalanche` de `viem`
+- `validateCsrf(req)` primero
+- `supabase.auth.getUser()` para auth
+- Retry loop 3× con `await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))`
+- `pub.getTransactionReceipt({ hash: txHash as \`0x\${string}\` })`
+- `receipt.status !== 'success'` → 400
+- `log.topics[0] === TOPIC` para encontrar el evento
+- `log.topics[N]?.slice(-40)` para extraer address de topic indexado
+- `Number(BigInt(log.data)) / 1_000_000` para convertir amount
 
-## W2 — POST /api/creator/withdraw: verificar evento Withdrawn
+### Exemplar 3: WithdrawModal en agent-keys — patrón frontend
+**Archivo**: `src/app/[locale]/agent-keys/page.tsx` (líneas ~330-480)
+**Usar para**: Archivo #3
+**Patrón clave**:
+- `const { writeContract } = useUnifiedWalletClient()`
+- `useState<'idle'|'signing'|'submitting'|'success'|'error'>('idle')`
+- `await writeContract({ address, abi, functionName, chainId })`
+- `const pub = createPublicClient({ chain: ..., transport: http() })`
+- `await pub.waitForTransactionReceipt({ hash: hash as \`0x\${string}\`, confirmations: 1 })`
+- `await fetch('/api/...', { method: 'POST', body: JSON.stringify({ txHash: hash }) })`
+- `t('key')` para todos los strings UI
 
-**Archivo:** `src/app/api/creator/withdraw/route.ts`
-
-Reemplazar el `POST` handler completo:
-
-```typescript
-const WITHDRAWN_TOPIC = '0x7084f5476618d8e60b11ef0d7d3f06914655adb8793e28ff7f018d4c76d505d5'
-
-const BodySchema = z.object({ txHash: z.string().startsWith('0x') })
-
-export async function POST(req: NextRequest) {
-  const csrfError = validateCsrf(req)
-  if (csrfError) return csrfError
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const parsed = BodySchema.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
-
-  const { data: profile } = await supabase
-    .from('creator_profiles')
-    .select('wallet_address')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.wallet_address) {
-    return NextResponse.json({ error: 'No wallet configured' }, { status: 400 })
-  }
-
-  const walletAddress = profile.wallet_address
-  const chainId       = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-  const pub           = createPublicClient({
-    chain:     chainId === 43114 ? avalanche : avalancheFuji,
-    transport: http(chainId === 43114
-      ? 'https://api.avax.network/ext/bc/C/rpc'
-      : 'https://api.avax-test.network/ext/bc/C/rpc'),
-  })
-
-  // Retry 3× con backoff
-  let receipt: Awaited<ReturnType<typeof pub.getTransactionReceipt>> | undefined
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      receipt = await pub.getTransactionReceipt({ hash: parsed.data.txHash as `0x${string}` })
-      break
-    } catch {
-      if (attempt === 2) return NextResponse.json({ error: 'Transaction not found or not yet mined' }, { status: 400 })
-      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))
-    }
-  }
-
-  if (!receipt || receipt.status !== 'success') {
-    return NextResponse.json({ error: 'Transaction reverted on-chain' }, { status: 400 })
-  }
-
-  const marketplaceAddr = (chainId === 43114
-    ? process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET
-    : process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI) ?? ''
-
-  const log = receipt!.logs.find(l =>
-    l.topics[0] === WITHDRAWN_TOPIC &&
-    l.address.toLowerCase() === marketplaceAddr.toLowerCase()
-  )
-
-  if (!log) return NextResponse.json({ error: 'Withdrawn event not found in receipt' }, { status: 400 })
-
-  // Verificar que el evento es del creator autenticado
-  const eventCreator = '0x' + (log.topics[1]?.slice(-40) ?? '')
-  if (eventCreator.toLowerCase() !== walletAddress.toLowerCase()) {
-    return NextResponse.json({ error: 'Receipt creator does not match authenticated wallet' }, { status: 403 })
-  }
-
-  const realAmount = Number(BigInt(log.data)) / 1_000_000
-
-  return NextResponse.json({ ok: true, txHash: parsed.data.txHash, realAmount })
-}
-```
-
-Agregar imports necesarios (igual que withdraw route de agent-keys):
-```typescript
-import { z }                                    from 'zod'
-import { createPublicClient, http }             from 'viem'
-import { avalancheFuji, avalanche }             from 'viem/chains'
-```
-
-El `GET` handler NO se toca.
-
----
-
-## W3 — WithdrawButton: llamada directa + i18n
-
-**Archivo:** `src/app/[locale]/creator/dashboard/WithdrawButton.tsx`
-
-Reemplazar el archivo completo:
-
-```typescript
-'use client'
-
-import { useState }                              from 'react'
-import { useTranslations }                       from 'next-intl'
-import { createPublicClient, http }              from 'viem'
-import { avalancheFuji, avalanche }              from 'viem/chains'
-import { useUnifiedWalletClient }                from '@/features/wallet/hooks/useUnifiedWalletClient'
-import { WITHDRAW_EARNINGS_ABI }                 from '@/lib/contracts/abis'
-import { IS_MAINNET, CHAIN_ID }                  from '@/lib/chain'
-
-const MARKETPLACE_ADDRESS = IS_MAINNET
-  ? process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET
-  : process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI
-
-interface Props {
-  pending:       number
-  hasWallet:     boolean
-  walletAddress: string
-}
-
-export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
-  const t = useTranslations('dashboard')
-  const { writeContract } = useUnifiedWalletClient()
-  const [status,  setStatus]  = useState<'idle'|'signing'|'confirming'|'success'|'error'>('idle')
-  const [txHash,  setTxHash]  = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
-
-  const isDisabled = status === 'signing' || status === 'confirming'
-
-  async function handleWithdraw() {
-    setErrorMsg('')
-    try {
-      setStatus('signing')
-      const hash = await writeContract({
-        address:      MARKETPLACE_ADDRESS as `0x${string}`,
-        abi:          WITHDRAW_EARNINGS_ABI,
-        functionName: 'withdraw',
-        chainId:      CHAIN_ID,
-      })
-
-      setStatus('confirming')
-      const pub = createPublicClient({
-        chain:     CHAIN_ID === 43114 ? avalanche : avalancheFuji,
-        transport: http(),
-      })
-      await pub.waitForTransactionReceipt({ hash: hash as `0x${string}`, confirmations: 1 })
-
-      await fetch('/api/creator/withdraw', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ txHash: hash }),
-      })
-
-      setTxHash(hash)
-      setStatus('success')
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : String(err))
-      setStatus('error')
-    }
-  }
-
-  if (!hasWallet || !walletAddress) {
-    return (
-      <button disabled className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed">
-        {t('withdrawNoWallet')}
-      </button>
-    )
-  }
-
-  if (status === 'success' && txHash) {
-    const explorerBase = IS_MAINNET ? 'snowscan.xyz' : 'testnet.snowscan.xyz'
-    return (
-      <a
-        href={`https://${explorerBase}/tx/${txHash}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-xl bg-green-100 px-5 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-200 transition"
-      >
-        ✅ {t('withdrawViewTx')} ↗
-      </a>
-    )
-  }
-
-  const label = status === 'signing'    ? t('withdrawSigning')
-              : status === 'confirming' ? t('withdrawConfirming')
-              : t('withdrawBtn')
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <button
-        onClick={handleWithdraw}
-        disabled={isDisabled || pending <= 0}
-        className="rounded-xl bg-avax-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {isDisabled ? <span className="animate-pulse">{label}</span> : label}
-      </button>
-      {status === 'error' && errorMsg && (
-        <p className="text-xs text-red-500">{errorMsg}</p>
-      )}
-    </div>
-  )
-}
-```
-
-Agregar claves i18n al namespace `dashboard` antes de implementar:
-
-**`messages/en.json`** — dashboard:
-```json
-"withdrawBtn":        "Withdraw USDC →",
-"withdrawSigning":    "Confirm in wallet…",
-"withdrawConfirming": "Confirming…",
-"withdrawViewTx":     "View tx",
-"withdrawNoWallet":   "No wallet"
-```
-
-**`messages/es.json`** — dashboard:
-```json
-"withdrawBtn":        "Retirar USDC →",
-"withdrawSigning":    "Confirma en tu wallet…",
-"withdrawConfirming": "Confirmando…",
-"withdrawViewTx":     "Ver tx",
-"withdrawNoWallet":   "Sin wallet"
-```
-
----
-
-## W4 — EarningsSection: pasar walletAddress
-
-**Archivo:** `src/app/[locale]/creator/dashboard/_components/EarningsSection.tsx`
-
+### Exemplar 4: EarningsSection — server component con props a client
+**Archivo**: `src/app/[locale]/creator/dashboard/_components/EarningsSection.tsx`
+**Usar para**: Archivo #4
+**Patrón clave**:
 ```tsx
 <WithdrawButton
   pending={pendingOnChain}
   hasWallet={!!profile?.wallet_address}
+  // AGREGAR:
   walletAddress={profile?.wallet_address ?? ''}
 />
 ```
+`profile?.wallet_address` ya existe en el componente (línea ~31).
+
+## Contrato de Integración ⚠️ BLOQUEANTE
+
+### WithdrawButton (client) → POST /api/creator/withdraw
+
+**Request:**
+```json
+{
+  "txHash": "0x<hash de la tx firmada por el creator>"
+}
+```
+
+**Response exitoso (200):**
+```json
+{
+  "ok": true,
+  "txHash": "0x...",
+  "realAmount": 12.50
+}
+```
+
+**Errores:**
+| HTTP | Cuándo |
+|------|--------|
+| 400 | Body inválido / tx no encontrada después de 3 reintentos / receipt.status !== 'success' / evento Withdrawn no encontrado |
+| 401 | Usuario no autenticado |
+| 403 | El evento creator no coincide con wallet_address del usuario autenticado |
+| 400 | creator_profiles sin wallet_address |
 
 ---
 
-## QG
+## Constraint Directives
 
-```bash
-npx tsc --noEmit          # 0 errores
-npm run lint -- --max-warnings 0
-npm run build
-```
+### OBLIGATORIO
+- `WITHDRAW_EARNINGS_ABI.name` debe ser `'withdraw'` (nombre exacto de la función en el contrato)
+- Seguir patrón retry 3× de `agent-keys/[id]/withdraw/route.ts` para `getTransactionReceipt`
+- `WITHDRAWN_TOPIC` hardcodeado: `'0x7084f5476618d8e60b11ef0d7d3f06914655adb8793e28ff7f018d4c76d505d5'`
+- Verificar `log.topics[1]?.slice(-40) === walletAddress.toLowerCase()` antes de retornar éxito
+- `realAmount = Number(BigInt(log.data)) / 1_000_000`
+- Todos los strings UI vía `useTranslations('dashboard')` — 0 hardcoded
+- `isDisabled` bloquea el botón mientras `status === 'signing' || status === 'confirming'`
+- `disabled={isDisabled || pending <= 0}` — botón inactivo si no hay earnings
+- Usar `snowscanTx(hash)` de `@/lib/chain` para el link del explorer (no construir URL a mano)
+- Si `!hasWallet || !walletAddress` → renderizar botón deshabilitado "Sin wallet"
+
+### PROHIBIDO
+- NO agregar dependencias nuevas — solo módulos ya presentes en el proyecto
+- NO modificar el handler `GET /api/creator/withdraw` — solo el `POST`
+- NO modificar `marketplaceClient.ts` — `withdrawForCreator` se conserva como fallback
+- NO tocar archivos fuera de la tabla "Files to Modify/Create"
+- NO hardcodear strings UI — todo por i18n
+- NO omitir el ownership check del evento (`topics[1]` vs `walletAddress`)
+- NO confiar en el `amount` del cliente — leerlo del evento on-chain (`log.data`)
+- NO usar `IS_MAINNET` para construir la URL del explorer — usar `snowscanTx()` directamente
+
+## Test Expectations
+
+| Test | ACs que cubre | Framework | Tipo |
+|------|--------------|-----------|------|
+| N/A | — | — | — |
+
+### Criterio Test-First
+
+| Tipo de cambio | Test-first? |
+|----------------|-------------|
+| ABI constant | No |
+| API route (POST) | No — lógica on-chain requiere mocks complejos, verificación manual |
+| WithdrawButton UI | No — componente de UI |
+| EarningsSection prop | No — prop pass-through |
+
+> Justificación: la lógica crítica (verificación del evento on-chain) requiere mock de `createPublicClient` que no existe en el proyecto. La cobertura se hace via F4 manual en Fuji testnet.
+
+## Waves
+
+### Wave 0 (Serial Gate — completar antes de todo)
+- [ ] W0.1: Agregar i18n keys a `messages/en.json` y `messages/es.json` (namespace `dashboard`):
+  - `withdrawBtn`: "Withdraw USDC →" / "Retirar USDC →"
+  - `withdrawSigning`: "Confirm in wallet…" / "Confirma en tu wallet…"
+  - `withdrawConfirming`: "Confirming…" / "Confirmando…"
+  - `withdrawViewTx`: "View tx" / "Ver tx"
+  - `withdrawNoWallet`: "No wallet" / "Sin wallet"
+- [ ] W0.2: Agregar `WITHDRAW_EARNINGS_ABI` a `src/lib/contracts/abis.ts`
+- [ ] W0.verify: `npx tsc --noEmit` pasa ✅
+
+### Wave 1 (Parallelizable)
+- [ ] W1.1: Reescribir `POST` en `src/app/api/creator/withdraw/route.ts` → Exemplar 2
+- [ ] W1.2: Reescribir `src/app/[locale]/creator/dashboard/WithdrawButton.tsx` → Exemplar 3
+- [ ] W1.verify: `npx tsc --noEmit` pasa ✅
+
+### Wave 2 (Depende de W1)
+- [ ] W2.1: Agregar `walletAddress` prop en `EarningsSection.tsx` → Exemplar 4
+- [ ] W2.verify: `npx tsc --noEmit` pasa ✅
+
+### Wave 3 (QG final)
+- [ ] W3.1: `npx tsc --noEmit` — 0 errores
+- [ ] W3.2: `npm run lint -- --max-warnings 0`
+- [ ] W3.3: `npm run build`
+
+### Verificación Incremental
+
+| Wave | Verificación al completar |
+|------|--------------------------|
+| W0 | `tsc --noEmit` pasa |
+| W1 | `tsc --noEmit` pasa |
+| W2 | `tsc --noEmit` pasa |
+| W3 | `tsc --noEmit` + `lint` + `build` todos pasan |
+
+## Out of Scope
+
+- `GET /api/creator/withdraw` — sin cambios
+- `marketplaceClient.ts` — `withdrawForCreator` se conserva (fallback operador)
+- `creator_profiles` schema — sin cambios de BD
+- Flujo x402, depósito Agent Keys, sandbox
+- Tests automatizados nuevos
+- NO "mejorar" el código adyacente (EarningsSection layout, estilos, etc.)
+- NO agregar funcionalidad de retiro parcial (contrato solo tiene `withdraw()` total)
+
+## Escalation Rule
+
+> **Si algo no está en este Story File, Dev PARA y escala a Architect.**
+> No inventar. No asumir. No improvisar.
+
+Situaciones de escalation:
+- Algún import de los Exemplars no existe en el proyecto
+- `useUnifiedWalletClient` no tiene `writeContract` disponible
+- `snowscanTx` no exporta desde `@/lib/chain`
+- `EarningsSection` no tiene `profile?.wallet_address` disponible
+- Hay ambigüedad en algún AC
+
+---
+
+*Story File generado por NexusAgil — F2.5 | Reescrito con quality_pipeline.md completo*
