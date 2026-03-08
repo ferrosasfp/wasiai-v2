@@ -242,7 +242,7 @@
     "draftQuestion": "¿Quieres continuar donde lo dejaste?",
     "walletRequired": "Configura tu wallet antes de publicar este agente.",
     "step1NamePlaceholder": "Ej: Traductor Español GPT",
-    "step1DescPlaceholder": "Describe qué hace tu agente…",
+    "step1DescPlaceholder": "Ej: Analiza el sentimiento de textos en español e inglés. Recibe un string de texto y retorna un score entre -1 (negativo) y 1 (positivo).",
     "step3AuthNote": "Se envía como cabecera Authorization en cada llamada a tu API",
     "step3TestBtn": "Probar endpoint",
     "step3Testing": "Probando...",
@@ -254,7 +254,18 @@
       "offChainOption": "Registrar gratis",
       "offChainDesc": "Funcionalidad completa. Escala a on-chain cuando quieras.",
       "gasEstimate": "Gas estimado: {amount} AVAX"
-    }
+    },
+    "coverImageDrop": "Clic o arrastra imagen aquí",
+    "coverImageDropActive": "Suelta para subir",
+    "coverImageUploading": "Subiendo…",
+    "slugLabel": "Slug",
+    "descriptionGuide": "¿Qué problema resuelve tu agente? ¿Qué recibe de input y qué retorna?",
+    "categoryNlpDesc": "Texto, chat, comprensión de lenguaje",
+    "categoryVisionDesc": "Reconocimiento de imágenes, video",
+    "categoryAudioDesc": "Voz, música, procesamiento de audio",
+    "categoryCodeDesc": "Generación de código, revisión, automatización",
+    "categoryMultimodalDesc": "Texto + imagen + audio combinados",
+    "categoryDataDesc": "Análisis de datos, gráficas, insights"
   },
   "dashboard": {
     "title": "Panel del Creator",

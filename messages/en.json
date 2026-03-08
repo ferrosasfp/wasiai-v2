@@ -242,7 +242,7 @@
     "draftQuestion": "Do you want to continue where you left off?",
     "walletRequired": "Set up your wallet before publishing this agent.",
     "step1NamePlaceholder": "e.g. DeFi Sentiment Analyzer",
-    "step1DescPlaceholder": "Describe what your agent does…",
+    "step1DescPlaceholder": "e.g. Analyzes sentiment in English and Spanish texts. Receives a string and returns a score from -1 (negative) to 1 (positive).",
     "step3AuthNote": "Sent as Authorization header on every call to your API",
     "step3TestBtn": "Test endpoint",
     "step3Testing": "Testing...",
@@ -254,7 +254,18 @@
       "offChainOption": "Register free",
       "offChainDesc": "Full functionality. Upgrade to on-chain anytime.",
       "gasEstimate": "Estimated gas: {amount} AVAX"
-    }
+    },
+    "coverImageDrop": "Click or drag image here",
+    "coverImageDropActive": "Drop to upload",
+    "coverImageUploading": "Uploading…",
+    "slugLabel": "Slug",
+    "descriptionGuide": "What problem does your agent solve? What input does it receive and what does it return?",
+    "categoryNlpDesc": "Text, chat, language understanding",
+    "categoryVisionDesc": "Image recognition, video analysis",
+    "categoryAudioDesc": "Speech, music, sound processing",
+    "categoryCodeDesc": "Code generation, review, automation",
+    "categoryMultimodalDesc": "Text + image + audio combined",
+    "categoryDataDesc": "Data analysis, charts, insights"
   },
   "dashboard": {
     "title": "Creator Dashboard",

@@ -19,13 +19,13 @@ const CATEGORY_ICONS: Record<string, string> = {
   nlp: '💬', vision: '👁️', audio: '🎵', code: '💻', multimodal: '🤖', data: '📊',
 }
 
-const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  nlp:        'Text, chat, language understanding',
-  vision:     'Image recognition, video analysis',
-  audio:      'Speech, music, sound processing',
-  code:       'Code generation, review, automation',
-  multimodal: 'Text + image + audio combined',
-  data:       'Data analysis, charts, insights',
+const CATEGORY_DESC_KEYS: Record<string, string> = {
+  nlp:        'categoryNlpDesc',
+  vision:     'categoryVisionDesc',
+  audio:      'categoryAudioDesc',
+  code:       'categoryCodeDesc',
+  multimodal: 'categoryMultimodalDesc',
+  data:       'categoryDataDesc',
 }
 
 const MAX_DESC = 500
@@ -72,13 +72,13 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
       {/* ── Cover image — C mejorada ──────────────────────────────────────── */}
       <div>
         <label className="mb-2 block text-sm font-semibold text-gray-700">
-          Cover Image <span className="font-normal text-gray-400 text-xs">(optional · max 5MB)</span>
+          {t('coverImage')} <span className="font-normal text-gray-400 text-xs">({t('coverImageHint')})</span>
         </label>
 
         {data.cover_image ? (
           /* Estado: imagen subida */
           <div className="relative h-32 w-32 overflow-hidden rounded-2xl border-2 border-avax-200 shadow-sm">
-            <Image src={data.cover_image} alt="Cover" fill className="object-cover" sizes="128px" />
+            <Image src={data.cover_image} alt={t('coverImage')} fill className="object-cover" sizes="128px" />
             <button
               type="button"
               onClick={() => onChange('cover_image', null)}
@@ -105,14 +105,14 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
             }`}
           >
             {uploading ? (
-              <p className="animate-pulse text-sm text-avax-500">Uploading…</p>
+              <p className="animate-pulse text-sm text-avax-500">{t('coverImageUploading')}</p>
             ) : (
               <>
                 <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${dragOver ? 'bg-avax-100' : 'bg-gray-100'}`}>
                   <Upload size={18} className={dragOver ? 'text-avax-500' : 'text-gray-400'} />
                 </div>
                 <p className="text-sm font-medium text-gray-600">
-                  {dragOver ? 'Drop to upload' : 'Click or drag image here'}
+                  {dragOver ? t('coverImageDropActive') : t('coverImageDrop')}
                 </p>
                 <p className="text-xs text-gray-400">PNG, JPG, WebP, GIF</p>
               </>
@@ -135,7 +135,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
       {/* ── Agent name — D con slug live ────────────────────────────────── */}
       <div>
         <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-          Agent name <span className="text-red-400">*</span>
+          {t('step1.agentName')} <span className="text-red-400">*</span>
         </label>
         <input
           type="text"
@@ -153,7 +153,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
         {/* Slug generado en vivo */}
         {nameSlug && !allErrors.name && (
           <p className="mt-1.5 text-xs text-gray-400">
-            Slug: <span className="font-mono text-gray-600">{nameSlug}</span>
+            {t('slugLabel')}: <span className="font-mono text-gray-600">{nameSlug}</span>
           </p>
         )}
         {allErrors.name && <p className="mt-1 text-xs text-red-500">{allErrors.name}</p>}
@@ -163,13 +163,13 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
       <div>
         <div className="mb-1.5 flex items-baseline justify-between">
           <label className="text-sm font-semibold text-gray-700">
-            Description <span className="text-red-500">*</span>
+            {t('description')} <span className="text-red-500">*</span>
           </label>
           <span className={`text-xs tabular-nums ${descLen >= MAX_DESC ? 'text-red-500' : 'text-gray-400'}`}>
             {descLen}/{MAX_DESC}
           </span>
         </div>
-        <p className="mb-2 text-xs text-gray-400">¿Qué problema resuelve tu agente? ¿Qué recibe de input y qué retorna?</p>
+        <p className="mb-2 text-xs text-gray-400">{t('descriptionGuide')}</p>
         <textarea
           data-field="description"
           value={data.description ?? ''}
@@ -177,7 +177,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
             if (e.target.value.length <= MAX_DESC) onChange('description', e.target.value)
             if (localErrors.description) setLocalErrors(prev => { const n = { ...prev }; delete n.description; return n })
           }}
-          placeholder="Ej: Analiza el sentimiento de textos en español e inglés. Recibe un string de texto y retorna un score entre -1 (negativo) y 1 (positivo)."
+          placeholder={t('step1DescPlaceholder')}
           rows={4}
           className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100 transition resize-none ${
             allErrors.description ? 'border-red-400 bg-red-50' : 'border-gray-200'
@@ -189,7 +189,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
       {/* ── Category — D con chips visuales ─────────────────────────────── */}
       <div>
         <label className="mb-2 block text-sm font-semibold text-gray-700">
-          Category <span className="text-red-400">*</span>
+          {t('category')} <span className="text-red-400">*</span>
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {MODEL_CATEGORIES.map(c => (
@@ -209,7 +209,7 @@ export function Step1Basic({ data, onChange, errors, onNext, saving }: Props) {
             >
               <span className="text-base">{CATEGORY_ICONS[c] ?? '🔧'}</span>
               <span className="text-xs font-semibold text-gray-800 capitalize">{c}</span>
-              <span className="text-[10px] text-gray-400 leading-tight">{CATEGORY_DESCRIPTIONS[c]}</span>
+              <span className="text-[10px] text-gray-400 leading-tight">{t(CATEGORY_DESC_KEYS[c] ?? 'category')}</span>
             </button>
           ))}
         </div>
