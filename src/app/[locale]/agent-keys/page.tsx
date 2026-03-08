@@ -761,8 +761,9 @@ export default function AgentKeysPage() {
                         )}
                       </div>
 
-                      {key.is_active && (
+                      {key.is_active && address && (
                         <div className="flex shrink-0 gap-2">
+                          {/* Add USDC — cualquier wallet conectada puede depositar */}
                           <button
                             onClick={() => setDepositKey({ id: key.id, name: key.name, ownerWalletAddress: key.owner_wallet_address })}
                             className="rounded-lg border border-avax-200 bg-avax-50 px-3 py-1.5 text-xs font-medium text-avax-700 hover:bg-avax-100 transition"
@@ -770,32 +771,51 @@ export default function AgentKeysPage() {
                           >
                             {t('addUsdc')}
                           </button>
-                          {available > 0 && (() => {
-                            const canWithdraw = !key.owner_wallet_address ||
-                              !address ||
+
+                          {/* Withdraw + Close Key — solo la wallet owner */}
+                          {(() => {
+                            const isOwnerWallet = !key.owner_wallet_address ||
                               key.owner_wallet_address.toLowerCase() === address.toLowerCase()
-                            return canWithdraw ? (
-                              <button
-                                onClick={() => setWithdrawKey({ id: key.id, name: key.name, balance: available, keyHash: key.key_hash ?? '' })}
-                                className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
-                              >
-                                {t('withdrawBtn', { amount: available.toFixed(2) })}
-                              </button>
-                            ) : (
-                              <div
-                                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-400 cursor-not-allowed"
-                                title={`Solo puede retirar ${key.owner_wallet_address?.slice(0,6)}…${key.owner_wallet_address?.slice(-4)}`}
-                              >
-                                🔒 {t('withdrawBtn', { amount: available.toFixed(2) })}
-                              </div>
+                            const ownerShort = key.owner_wallet_address
+                              ? `${key.owner_wallet_address.slice(0,6)}…${key.owner_wallet_address.slice(-4)}`
+                              : ''
+                            return (
+                              <>
+                                {available > 0 && (
+                                  isOwnerWallet ? (
+                                    <button
+                                      onClick={() => setWithdrawKey({ id: key.id, name: key.name, balance: available, keyHash: key.key_hash ?? '' })}
+                                      className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
+                                    >
+                                      {t('withdrawBtn', { amount: available.toFixed(2) })}
+                                    </button>
+                                  ) : (
+                                    <div
+                                      className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-400 cursor-not-allowed"
+                                      title={`Solo puede retirar ${ownerShort}`}
+                                    >
+                                      🔒 {t('withdrawBtn', { amount: available.toFixed(2) })}
+                                    </div>
+                                  )
+                                )}
+                                {isOwnerWallet ? (
+                                  <button
+                                    onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
+                                    className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
+                                  >
+                                    {t('closeKey')}
+                                  </button>
+                                ) : (
+                                  <div
+                                    className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-400 cursor-not-allowed"
+                                    title={`Solo puede cerrar ${ownerShort}`}
+                                  >
+                                    🔒 {t('closeKey')}
+                                  </div>
+                                )}
+                              </>
                             )
                           })()}
-                          <button
-                            onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
-                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
-                          >
-                            {t('closeKey')}
-                          </button>
                         </div>
                       )}
                     </div>
