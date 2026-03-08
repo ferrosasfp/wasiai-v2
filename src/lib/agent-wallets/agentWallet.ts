@@ -167,7 +167,7 @@ export async function getAgentWalletClient(agentId: string) {
 /**
  * Lee el balance USDC de la wallet del agente.
  * USDC Fuji: 0x5425890298aed601595a70AB815c96711a31Bc65
- * USDC Mainnet: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6
+ * USDC Mainnet: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
  */
 const USDC_ABI = [
   {
@@ -182,7 +182,7 @@ const USDC_ABI = [
 // CHAIN_ID: usar variable de servidor; fallback a Fuji (43113)
 const CHAIN_ID   = Number(process.env.CHAIN_ID ?? process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
 const USDC_ADDR  = CHAIN_ID === 43114
-  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6' as const
+  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E' as const
   : '0x5425890298aed601595a70AB815c96711a31Bc65' as const
 
 export async function getAgentWalletUsdcBalance(

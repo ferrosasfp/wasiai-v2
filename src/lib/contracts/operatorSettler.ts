@@ -15,7 +15,7 @@ const RPC_URL = CHAIN_ID === 43114
   : 'https://api.avax-test.network/ext/bc/C/rpc'
 
 const USDC_ADDRESS = (CHAIN_ID === 43114
-  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6'
+  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
   : '0x5425890298aed601595a70AB815c96711a31Bc65') as `0x${string}`
 
 const OPERATOR_PRIVATE_KEY = process.env.OPERATOR_PRIVATE_KEY

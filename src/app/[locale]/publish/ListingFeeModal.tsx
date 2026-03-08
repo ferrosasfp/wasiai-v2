@@ -61,7 +61,7 @@ export default function ListingFeeModal({
           name:              'USD Coin',
           version:           '2',
           chainId:           43114,
-          verifyingContract: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6',
+          verifyingContract: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
         },
         types: {
           TransferWithAuthorization: [

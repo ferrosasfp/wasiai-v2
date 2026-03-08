@@ -26,7 +26,7 @@ const CHAIN_ID_NUM     = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
 
 const CHAIN      = CHAIN_ID_NUM === 43114 ? 'avalanche' : 'avalanche-testnet'
 const USDC_ADDR  = CHAIN_ID_NUM === 43114
-  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6'   // Avalanche mainnet USDC
+  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'   // Avalanche mainnet USDC
   : '0x5425890298aed601595a70AB815c96711a31Bc65'   // Avalanche Fuji USDC (Circle test token)
 
 import { SITE_URL } from '@/lib/constants'
@@ -533,7 +533,7 @@ export async function GET(
       settlement: 'wasiai-native',
       // USDC: native (mainnet) or Circle test token (Fuji)
       usdc_contract: IS_MAINNET
-        ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6'
+        ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
         : '0x5425890298aed601595a70AB815c96711a31Bc65',
       marketplace_contract: CONTRACT_ADDRESS,
       treasury: process.env.WASIAI_TREASURY_ADDRESS ?? '',
