@@ -311,7 +311,8 @@
     "withdrawConfirming": "Confirming…",
     "withdrawViewTx": "View tx",
     "withdrawRequesting": "Requesting voucher…",
-    "withdrawNoWallet": "No wallet"
+    "withdrawNoWallet": "No wallet",
+    "withdrawNeedsExternalWallet": "Connect MetaMask or Core Wallet to withdraw"
   },
   "onboarding": {
     "step1": {

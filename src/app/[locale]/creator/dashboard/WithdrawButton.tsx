@@ -21,7 +21,7 @@ interface Props {
 
 export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
   const t = useTranslations('dashboard')
-  const { writeContract } = useUnifiedWalletClient()
+  const { writeContract, isThirdweb } = useUnifiedWalletClient()
 
   const [status, setStatus]   = useState<'idle' | 'requesting' | 'signing' | 'confirming' | 'success' | 'error'>('idle')
   const [txHash, setTxHash]   = useState('')
@@ -100,6 +100,21 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
       setErrorMsg(msg)
       setStatus('error')
     }
+  }
+
+  // Embedded wallets (Google/thirdweb) cannot send on-chain txs via bundler.
+  // Same pattern as Agent Keys — show amber notice, require EOA.
+  if (isThirdweb) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <button disabled className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed">
+          {t('withdrawBtn')}
+        </button>
+        <p className="text-xs text-amber-600 max-w-[200px] text-right">
+          {t('withdrawNeedsExternalWallet')}
+        </p>
+      </div>
+    )
   }
 
   if (status === 'success' && txHash) {
