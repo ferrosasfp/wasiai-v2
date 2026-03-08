@@ -219,6 +219,11 @@ export async function withdrawForCreator(creatorWallet: string): Promise<string 
     logger.info('[marketplace] withdrawFor tx', { creatorWallet, txHash })
     const receipt = await pub.waitForTransactionReceipt({ hash: txHash as `0x${string}`, timeout: 30_000 })
     logger.info('[marketplace] withdrawFor confirmed', { status: receipt.status })
+    // HAL-025: receipt.status 'reverted' = on-chain failure — return null so caller won't update DB
+    if (receipt.status !== 'success') {
+      logger.error('[marketplace] withdrawFor reverted on-chain', { creatorWallet, txHash })
+      return null
+    }
     return txHash
   } catch (err) {
     logger.error('[marketplace] withdrawFor failed', { err: String(err).slice(0, 300) })
@@ -310,6 +315,11 @@ export async function refundKeyToEarningsOnChain(keyHash: string): Promise<strin
     const txHash = await wallet.writeContract(request)
     const receipt = await pub.waitForTransactionReceipt({ hash: txHash as `0x${string}`, timeout: 30_000 })
     logger.info('[marketplace] refundKeyToEarnings tx', { txHash, status: receipt.status })
+    // HAL-025: check on-chain status before returning
+    if (receipt.status !== 'success') {
+      logger.error('[marketplace] refundKeyToEarnings reverted on-chain', { txHash })
+      return null
+    }
     return txHash
   } catch (err) {
     logger.error('[marketplace] refundKeyToEarnings failed', { err: String(err).slice(0, 300) })
