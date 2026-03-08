@@ -84,8 +84,8 @@ export function DocsSidebar() {
 
   return (
     <>
-      {/* Mobile toggle button */}
-      <div className="lg:hidden sticky top-14 z-40 bg-white border-b border-gray-100 px-4 py-2">
+      {/* Mobile: barra sticky con toggle — full width, fuera del flex principal */}
+      <div className="lg:hidden fixed top-14 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 py-2 flex items-center justify-between">
         <button
           onClick={() => setDrawerOpen(!drawerOpen)}
           className="flex items-center gap-2 text-sm font-medium text-gray-700"
@@ -95,20 +95,23 @@ export function DocsSidebar() {
               ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />}
           </svg>
-          {activeLabel ? t(activeLabel.key) : t('contents')}
+          <span className="text-gray-500">{activeLabel ? t(activeLabel.key) : t('contents')}</span>
         </button>
       </div>
 
+      {/* Spacer para compensar la barra sticky en mobile */}
+      <div className="lg:hidden h-10" aria-hidden="true" />
+
       {/* Mobile drawer */}
       {drawerOpen && (
-        <div className="lg:hidden fixed inset-0 z-30 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex">
           <div
             role="presentation"
-            className="fixed inset-0 bg-black/30"
+            className="fixed inset-0 bg-black/40"
             onClick={() => setDrawerOpen(false)}
             onKeyDown={(e) => e.key === 'Escape' && setDrawerOpen(false)}
           />
-          <div className="relative w-64 bg-white p-4 shadow-xl">
+          <div className="relative w-72 max-w-[85vw] bg-white p-4 shadow-xl overflow-y-auto">
             <NavList active={active} onNav={handleNavClick} />
           </div>
         </div>
