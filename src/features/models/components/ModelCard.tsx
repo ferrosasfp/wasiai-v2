@@ -44,12 +44,12 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
   return (
     <Link
       href={`/${locale}/models/${model.slug}`}
-      className="group block rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
+      className="group block rounded-2xl border border-gray-200 bg-white p-3 sm:p-5 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-avax-400 to-avax-600 text-lg shrink-0 overflow-hidden">
+          <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-avax-400 to-avax-600 text-lg shrink-0 overflow-hidden">
             {model.cover_image && !imgError ? (
               // P-04: sizes avoids downloading unnecessarily large images; priority for LCP candidates
               <Image
@@ -79,9 +79,9 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
         </span>
       </div>
 
-      {/* Description */}
+      {/* Description — oculta en mobile (2 cols), visible en sm+ */}
       {model.description && (
-        <p className="mt-3 text-sm text-gray-600 line-clamp-2">{model.description}</p>
+        <p className="hidden sm:block mt-3 text-sm text-gray-600 line-clamp-2">{model.description}</p>
       )}
 
       {/* Agent type + registration badges */}

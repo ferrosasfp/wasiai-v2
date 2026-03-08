@@ -39,13 +39,13 @@ export function HeroDualCard({
     <div className="mx-auto max-w-3xl text-center">
 
       {/* Badge */}
-      <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-avax-50 border border-avax-100 px-4 py-1.5 text-sm text-avax-600 font-medium">
+      <div className="mb-4 sm:mb-6 inline-flex items-center gap-2 rounded-full bg-avax-50 border border-avax-100 px-4 py-1.5 text-sm text-avax-600 font-medium">
         <Zap size={14} />
         <span>{badge}</span>
       </div>
 
       {/* Headline */}
-      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 mb-6">
+      <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 mb-4 sm:mb-6">
         {headline}
       </h1>
 
@@ -53,7 +53,7 @@ export function HeroDualCard({
       <div
         role="tablist"
         aria-label={tabLabel}
-        className="inline-flex rounded-xl border border-gray-200 bg-gray-100 p-1 mb-8"
+        className="inline-flex rounded-xl border border-gray-200 bg-gray-100 p-1 mb-5 sm:mb-8"
       >
         <button
           role="tab"
@@ -82,7 +82,7 @@ export function HeroDualCard({
       </div>
 
       {/* Dynamic subtitle */}
-      <p className="text-lg text-gray-600 max-w-xl mx-auto mb-8 leading-relaxed transition-all">
+      <p className="text-base sm:text-lg text-gray-600 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed transition-all">
         {isConsumer ? subtitleConsumer : subtitleCreator}
       </p>
 
@@ -115,7 +115,7 @@ export function HeroDualCard({
       </div>
 
       {/* Tagline */}
-      <p className="mt-8 text-sm text-gray-400 font-medium">{tagline}</p>
+      <p className="mt-4 sm:mt-8 text-xs sm:text-sm text-gray-400 font-medium">{tagline}</p>
 
     </div>
   )
