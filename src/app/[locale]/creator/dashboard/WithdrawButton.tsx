@@ -3,7 +3,6 @@
 import { useState, useEffect }      from 'react'
 import { useTranslations }          from 'next-intl'
 import { useUnifiedWalletClient }   from '@/features/wallet/hooks/useUnifiedWalletClient'
-import { useWallet }                from '@/features/wallet/hooks/useWallet'
 import { createPublicClient, http } from 'viem'
 import { avalancheFuji, avalanche } from 'viem/chains'
 import { CLAIM_EARNINGS_ABI }       from '@/lib/contracts/abis'
@@ -23,7 +22,6 @@ interface Props {
 export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
   const t = useTranslations('dashboard')
   const { writeContract, isReady } = useUnifiedWalletClient()
-  const { isThirdweb }             = useWallet() // true ONLY for inApp (Google/email) embedded wallets
 
   // Avoid hydration mismatch — wallet state only known client-side
   const [mounted, setMounted] = useState(false)
@@ -66,7 +64,7 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
       }
       if (!voucherRes.ok) throw new Error(voucher.error ?? `Voucher error ${voucherRes.status}`)
 
-      // Step 2: Sign and submit claimEarnings tx
+      // Step 2: Submit claimEarnings tx
       setStatus('signing')
       const hash = await writeContract({
         address:      MARKETPLACE_ADDRESS as `0x${string}`,
@@ -108,7 +106,7 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
     }
   }
 
-  // Wait for client mount to avoid hydration mismatch (wallet state is client-only)
+  // Wait for client mount to avoid hydration mismatch
   if (!mounted) {
     return (
       <button disabled className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed">
@@ -117,27 +115,12 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
     )
   }
 
-  // No wallet connected at all — button disabled, no message
+  // No wallet connected
   if (!isReady) {
     return (
       <button disabled className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed">
         {t('withdrawBtn')}
       </button>
-    )
-  }
-
-  // Embedded wallet (Google/email via inApp) — cannot sign on-chain txs.
-  // Same pattern as Agent Keys: show amber notice, require EOA (Core, MetaMask).
-  if (isThirdweb) {
-    return (
-      <div className="flex flex-col items-end gap-1">
-        <button disabled className="rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed">
-          {t('withdrawBtn')}
-        </button>
-        <p className="text-xs text-amber-600 max-w-[200px] text-right">
-          {t('withdrawNeedsExternalWallet')}
-        </p>
-      </div>
     )
   }
 

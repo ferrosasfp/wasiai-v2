@@ -1,63 +1,25 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
-import { useActiveAccount, useActiveWallet, useDisconnect as useThirdwebDisconnect } from 'thirdweb/react'
-import { useAccount, useConnect, useDisconnect as useWagmiDisconnect } from 'wagmi'
+import { useCallback } from 'react'
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
-import { avalancheFuji as viemAvalancheFuji } from 'viem/chains'
 
+/**
+ * Unified wallet hook — wagmi only (HU-071: Thirdweb removed).
+ * EIP-6963 auto-discovers Core Wallet, MetaMask, Rabby, etc. via wagmi injected connector.
+ */
 export function useWallet() {
-  // thirdweb state
-  const thirdwebAccount = useActiveAccount()
-  const thirdwebWallet = useActiveWallet()
-  // thirdwebChain no longer needed — we normalize to viemAvalancheFuji
-  // const thirdwebChain = useActiveWalletChain()
-  const { disconnect: thirdwebDisconnect } = useThirdwebDisconnect()
-
-  // wagmi state
-  const { address: wagmiAddress, isConnected: wagmiConnected, isConnecting: wagmiConnecting, chain: wagmiChain } = useAccount()
-  const { connect } = useConnect()
-  const { disconnect: wagmiDisconnect } = useWagmiDisconnect()
-
-  // isThirdweb = true ONLY for embedded wallets (Google/email) — affects payment routing
-  // External wallets (Core, MetaMask) connected via thirdweb UI are NOT embedded
-  const isThirdweb = !!thirdwebAccount && thirdwebWallet?.id === 'inApp'
-
-  // ── Dual-connection guard ───────────────────────────────────────
-  // If both providers are connected, auto-disconnect the secondary one
-  // to prevent address mismatch between display and signing.
-  useEffect(() => {
-    if (thirdwebAccount && wagmiConnected) {
-      // thirdweb wins (most recent connect) → disconnect wagmi
-      wagmiDisconnect()
-    }
-  }, [thirdwebAccount, wagmiConnected, wagmiDisconnect])
-
-  // Use thirdweb address for any wallet connected via thirdweb UI (embedded or external)
-  const address = thirdwebAccount
-    ? (thirdwebAccount.address as `0x${string}`)
-    : wagmiAddress
-  const isConnected = !!thirdwebAccount || wagmiConnected
-  const isConnecting = wagmiConnecting
-
-  // ── Wave 6c: Normalize chain to wagmi-compatible Chain object ───
-  const chain = thirdwebAccount
-    ? viemAvalancheFuji  // cualquier wallet conectada via thirdweb UI → normalizar a Fuji
-    : wagmiChain
+  const { address, isConnected, isConnecting, chain } = useAccount()
+  const { connect }    = useConnect()
+  const { disconnect } = useDisconnect()
 
   const connectWallet = useCallback(() => {
     connect({ connector: injected() })
   }, [connect])
 
-  // Disconnect ALL providers to prevent dangling connections (Issue 3a)
-  const disconnect = useCallback(() => {
-    if (thirdwebWallet) {
-      thirdwebDisconnect(thirdwebWallet)
-    }
-    if (wagmiConnected) {
-      wagmiDisconnect()
-    }
-  }, [thirdwebWallet, thirdwebDisconnect, wagmiConnected, wagmiDisconnect])
+  const disconnectWallet = useCallback(() => {
+    disconnect()
+  }, [disconnect])
 
   return {
     address,
@@ -65,7 +27,7 @@ export function useWallet() {
     isConnecting,
     chain,
     connectWallet,
-    disconnect,
-    isThirdweb,
+    disconnect: disconnectWallet,
+    // isThirdweb removed — no embedded wallets
   }
 }
