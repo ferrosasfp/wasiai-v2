@@ -311,6 +311,7 @@ interface CloseKeyModalProps {
   keyId:     string
   keyName:   string
   balance:   number
+  keyHash:   string
   onClose:   () => void
   onSuccess: (txHash: string | null) => void
 }
@@ -478,18 +479,54 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
 const IS_FUJI = CHAIN_ID === 43113
 
 // ── CloseKeyModal ─────────────────────────────────────────────────────────────
-function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKeyModalProps) {
+function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }: CloseKeyModalProps) {
   const t = useTranslations('agentKeys')
   const tCommon = useTranslations('common')
-  const [status, setStatus]     = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const { writeContract }       = useUnifiedWalletClient()
+  const [status, setStatus]     = useState<'idle' | 'signing' | 'withdrawing' | 'closing' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [result, setResult]     = useState<{ txHash: string | null; refundedUsdc: number } | null>(null)
 
   async function handleClose() {
-    setStatus('loading')
     setErrorMsg('')
     try {
-      // Desactivar la clave — los fondos se retiran por separado con WithdrawModal
+      let withdrawTxHash: string | null = null
+
+      // Si hay fondos: retirar on-chain primero (usuario firma withdrawKey)
+      if (balance > 0) {
+        setStatus('signing')
+        const bytes32KeyId = keyHashToBytes32(keyHash)
+        const atomicAmount = BigInt(Math.round(balance * 1_000_000))
+
+        const hash = await writeContract({
+          address:      MARKETPLACE_ADDRESS as `0x${string}`,
+          abi:          WITHDRAW_KEY_ABI,
+          functionName: 'withdrawKey',
+          args:         [bytes32KeyId, atomicAmount],
+          chainId:      CHAIN_ID,
+        })
+        withdrawTxHash = hash
+
+        // Esperar confirmación antes de sincronizar DB
+        setStatus('withdrawing')
+        const pub = createPublicClient({
+          chain:     CHAIN_ID === 43114 ? avalanche : avalancheFuji,
+          transport: http(),
+        })
+        await pub.waitForTransactionReceipt({ hash: hash as `0x${string}`, confirmations: 1 })
+
+        // Sincronizar retiro en DB
+        const wRes = await fetch(`/api/agent-keys/${keyId}/withdraw`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ txHash: hash, amount: balance }),
+        })
+        const wData = await wRes.json() as { error?: string }
+        if (!wRes.ok) throw new Error(wData.error ?? `Withdraw sync failed: ${wRes.status}`)
+      }
+
+      // Marcar key como inactiva en DB
+      setStatus('closing')
       const res = await fetch(`/api/agent-keys/${keyId}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -498,14 +535,20 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`)
 
-      setResult({ txHash: null, refundedUsdc: 0 })
+      setResult({ txHash: withdrawTxHash, refundedUsdc: balance })
       setStatus('success')
-      onSuccess(data.txHash)
+      onSuccess(withdrawTxHash)
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : String(err))
       setStatus('error')
     }
   }
+
+  const isDisabled = status === 'signing' || status === 'withdrawing' || status === 'closing'
+  const statusLabel = status === 'signing' ? 'Confirma en tu wallet…'
+    : status === 'withdrawing' ? 'Retirando fondos on-chain…'
+    : status === 'closing' ? 'Cerrando key…'
+    : balance > 0 ? 'Retirar y cerrar key' : t('close.confirmBtn')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -579,41 +622,27 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
               </div>
             )}
 
-            {balance > 0 ? (
-              // Con fondos: CTA principal = cerrar de todos modos (con advertencia)
-              // El backend mueve fondos a Earnings automáticamente (HAL-025)
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={handleClose}
-                  disabled={status === 'loading'}
-                  className="w-full rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
-                >
-                  {status === 'loading' ? t('close.closing') : 'Cerrar key (fondos van a Earnings)'}
-                </button>
-                <button
-                  onClick={onClose}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
-                >
-                  Cancelar — quiero retirar primero
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
-                >
-                  {tCommon('cancel')}
-                </button>
-                <button
-                  onClick={handleClose}
-                  disabled={status === 'loading'}
-                  className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
-                >
-                  {status === 'loading' ? t('close.closing') : t('close.confirmBtn')}
-                </button>
-              </div>
+            {/* Estado de progreso */}
+            {(status === 'signing' || status === 'withdrawing' || status === 'closing') && (
+              <p className="text-center text-sm text-gray-500 animate-pulse">{statusLabel}</p>
             )}
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleClose}
+                disabled={isDisabled}
+                className="w-full rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
+              >
+                {isDisabled ? statusLabel : (balance > 0 ? 'Retirar fondos y cerrar key' : t('close.confirmBtn'))}
+              </button>
+              <button
+                onClick={onClose}
+                disabled={isDisabled}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+              >
+                {balance > 0 ? 'Cancelar — retirar por separado' : tCommon('cancel')}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -637,7 +666,7 @@ export default function AgentKeysPage() {
 
   // Modal state
   const [depositKey,  setDepositKey]  = useState<{ id: string; name: string; ownerWalletAddress?: string | null } | null>(null)
-  const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number } | null>(null)
+  const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
   const [withdrawKey, setWithdrawKey] = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
 
   const loadKeys = useCallback(() => {
@@ -855,7 +884,7 @@ export default function AgentKeysPage() {
                                 )}
                                 {isOwnerWallet ? (
                                   <button
-                                    onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available })}
+                                    onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available, keyHash: key.key_hash ?? '' })}
                                     className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
                                   >
                                     {t('closeKey')}
@@ -938,6 +967,7 @@ Content-Type: application/json
           keyId={closeKey.id}
           keyName={closeKey.name}
           balance={closeKey.balance}
+          keyHash={closeKey.keyHash}
           onClose={() => setCloseKey(null)}
           onSuccess={() => {
             setCloseKey(null)
