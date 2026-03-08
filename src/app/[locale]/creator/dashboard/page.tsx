@@ -147,11 +147,15 @@ export default async function CreatorDashboardPage({
 
         {/* Agents table */}
         <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">{t('yourAgents')}</h2>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-1 rounded-full bg-avax-500" />
+              <h2 className="font-bold text-gray-900">{t('yourAgents')}</h2>
+              <span className="text-xs text-gray-400 font-normal">({safeModels.length})</span>
+            </div>
             <Link
               href={`/${locale}/publish`}
-              className="rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600 transition"
+              className="rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold text-white hover:bg-avax-600 transition shrink-0"
             >
               {t('publishAgent')}
             </Link>
@@ -235,7 +239,10 @@ export default async function CreatorDashboardPage({
 
         {/* Recent calls */}
         <section>
-          <h2 className="mb-4 font-semibold text-gray-900">{t('recentCalls')}</h2>
+          <div className="mb-4 flex items-center gap-2">
+            <div className="h-5 w-1 rounded-full bg-violet-500" />
+            <h2 className="font-bold text-gray-900">{t('recentCalls')}</h2>
+          </div>
 
           {recentCalls.length === 0 && callsPage === 1 ? (
             <EmptyState
@@ -247,24 +254,24 @@ export default async function CreatorDashboardPage({
             <>
             <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
               {/* WAS-55: min-w fuerza overflow real en mobile */}
-              <table className="w-full min-w-[560px] text-sm">
+              <table className="w-full min-w-[520px] text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>
-                    <th className="px-6 py-3 text-left">{t('colAgent')}</th>
-                    <th className="px-6 py-3 text-left">{t('colCaller')}</th>
-                    <th className="px-6 py-3 text-right">{t('colAmount')}</th>
-                    <th className="px-6 py-3 text-right">{t('colLatency')}</th>
-                    <th className="px-6 py-3 text-center">{t('colStatus')}</th>
-                    <th className="px-6 py-3 text-right">{t('colTime')}</th>
+                    <th className="px-4 py-2.5 text-left">{t('colAgent')}</th>
+                    <th className="px-4 py-2.5 text-left">{t('colCaller')}</th>
+                    <th className="px-4 py-2.5 text-right">{t('colAmount')}</th>
+                    <th className="px-4 py-2.5 text-right">{t('colLatency')}</th>
+                    <th className="px-4 py-2.5 text-center">{t('colStatus')}</th>
+                    <th className="px-4 py-2.5 text-right">{t('colTime')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {recentCalls.map((call) => (
                     <tr key={call.id} className="hover:bg-gray-50/50 transition">
-                      <td className="px-6 py-3 font-medium text-gray-800">
+                      <td className="px-4 py-2.5 font-medium text-gray-800 text-sm">
                         {call.agent?.name ?? '—'}
                       </td>
-                      <td className="px-6 py-3">
+                      <td className="px-4 py-2.5">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                           call.caller_type === 'agent'
                             ? 'bg-violet-100 text-violet-700'
@@ -273,16 +280,16 @@ export default async function CreatorDashboardPage({
                           {call.caller_type === 'agent' ? t('callerAgent') : t('callerHuman')}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-right text-green-600">
+                      <td className="px-4 py-2.5 text-right font-semibold text-green-600 text-sm">
                         ${Number(call.amount_paid).toFixed(3)}
                       </td>
-                      <td className="px-6 py-3 text-right text-gray-500">
+                      <td className="px-4 py-2.5 text-right text-gray-400 text-xs">
                         {call.latency_ms != null ? `${call.latency_ms}ms` : '—'}
                       </td>
-                      <td className="px-6 py-3 text-center">
+                      <td className="px-4 py-2.5 text-center">
                         <StatusBadge status={call.status} />
                       </td>
-                      <td className="px-6 py-3 text-right text-xs text-gray-400">
+                      <td className="px-4 py-2.5 text-right text-xs text-gray-400">
                         {new Date(call.called_at).toLocaleString('en-US')}
                       </td>
                     </tr>
@@ -343,16 +350,22 @@ function StatCard({
   highlight?: boolean
 }) {
   return (
-    <div className={`rounded-2xl p-5 shadow-sm border ${
+    <div className={`rounded-2xl p-5 shadow-sm border flex flex-col gap-3 ${
       highlight
-        ? 'border-green-200 bg-green-50'
+        ? 'border-green-200 bg-gradient-to-br from-green-50 to-white'
         : 'border-gray-100 bg-white'
     }`}>
-      <div className="flex items-center">{icon}</div>
-      <div className={`mt-2 text-2xl font-bold ${highlight ? 'text-green-700' : 'text-gray-900'}`}>
-        {value}
+      <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+        highlight ? 'bg-green-100' : 'bg-gray-50'
+      }`}>
+        {icon}
       </div>
-      <div className="text-xs text-gray-500">{label}</div>
+      <div>
+        <div className={`text-2xl font-extrabold ${highlight ? 'text-green-700' : 'text-gray-900'}`}>
+          {value}
+        </div>
+        <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+      </div>
     </div>
   )
 }

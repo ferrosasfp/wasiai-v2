@@ -35,8 +35,26 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
   const contractAddress = process.env.NEXT_PUBLIC_MARKETPLACE_CONTRACT_ADDRESS ?? ''
   const explorerBase = IS_MAINNET ? 'snowscan.xyz' : 'testnet.snowscan.xyz'
 
+  const hasEarnings = pendingOnChain > 0
+
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-6">
+    <section className={`rounded-2xl border p-6 ${
+      hasEarnings
+        ? 'border-green-200 bg-gradient-to-br from-green-50 to-white'
+        : 'border-gray-200 bg-white'
+    }`}>
+      {/* Hero banner cuando hay fondos disponibles */}
+      {hasEarnings && (
+        <div className="mb-5 flex items-center gap-3 rounded-xl bg-green-500 px-4 py-3 text-white">
+          <span className="text-2xl">💰</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm">Tienes fondos disponibles para retirar</p>
+            <p className="text-xs text-green-100">Se transferirán directamente a tu wallet</p>
+          </div>
+          <p className="text-2xl font-extrabold shrink-0">${pendingOnChain.toFixed(2)}</p>
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -44,7 +62,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
             <h2 className="font-semibold text-gray-900">{t('onchainEarnings')}</h2>
           </div>
           <p className="text-sm text-gray-500">
-            Your USDC earnings accumulated in{' '}
+            Acumulado en{' '}
             <a
               href={`https://${explorerBase}/address/${contractAddress}`}
               target="_blank"
@@ -57,12 +75,12 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
           <WalletSetup initialWallet={profile?.wallet_address ?? null} />
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-3xl font-bold text-gray-900">
-              ${pendingOnChain.toFixed(2)}
-            </p>
-            <p className="text-xs text-gray-500">{t('onchainEarnings')}</p>
-          </div>
+          {!hasEarnings && (
+            <div className="text-right">
+              <p className="text-3xl font-bold text-gray-400">$0.00</p>
+              <p className="text-xs text-gray-400">Sin earnings aún</p>
+            </div>
+          )}
           <WithdrawButton
             pending={pendingOnChain}
             hasWallet={!!profile?.wallet_address}
