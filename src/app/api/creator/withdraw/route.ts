@@ -16,7 +16,6 @@ import { avalancheFuji, avalanche } from 'viem/chains'
 import {
   getPendingEarnings,
 } from '@/lib/contracts/marketplaceClient'
-import { snowscanTx } from '@/lib/chain'
 
 // topic0 = keccak256("Withdrawn(address,uint256)")
 const WITHDRAWN_TOPIC = '0x7084f5476618d8e60b11ef0d7d3f06914655adb8793e28ff7f018d4c76d505d5'
