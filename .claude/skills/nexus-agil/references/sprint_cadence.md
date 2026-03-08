@@ -1,8 +1,7 @@
 # Sprint Cadence — NexusAgil
 
-> SM (Scrum Master) facilita tres ceremonias. Las fechas son referenciales — las ceremonias se ejecutan cuando el humano las solicita, no solo en el día propuesto.
-> Activar con: "sprint planning", "status meeting", "retro", "ceremonia de [dia]", "review", "hagamos el review", "dame el status".
-> **Regla:** Cualquier resumen de sprint, review o status SIEMPRE lo genera el SM en su formato formal. Nunca un resumen informal directo.
+> SM (Scrum Master) facilita tres ceremonias semanales.
+> Activar con: "sprint planning", "status meeting", "retro", "ceremonia de [dia]".
 
 ## Gates de Ceremonia
 
