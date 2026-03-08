@@ -3,7 +3,7 @@
 import { useCallback } from 'react'
 import { type Abi, type Address, type Hash, encodeFunctionData } from 'viem'
 import { useWalletClient } from 'wagmi'
-import { useActiveAccount } from 'thirdweb/react'
+import { useActiveAccount, useActiveWallet } from 'thirdweb/react'
 import { prepareTransaction, sendTransaction } from 'thirdweb'
 import { avalancheFuji } from 'thirdweb/chains'
 import { thirdwebClient } from '@/shared/lib/web3/thirdwebClient'
@@ -18,9 +18,16 @@ import { getPublicClient } from '@/shared/lib/web3/client'
  */
 export function useUnifiedWalletClient() {
   const thirdwebAccount = useActiveAccount()
+  const thirdwebWallet  = useActiveWallet()
   const { data: wagmiWalletClient } = useWalletClient()
 
-  const isThirdweb = !!thirdwebAccount
+  // isThirdweb for UI guard: true ONLY for embedded wallets (Google/email via inApp)
+  // Used by WithdrawButton to block bundler path — same logic as useWallet.ts
+  const isThirdweb = !!thirdwebAccount && thirdwebWallet?.id === 'inApp'
+
+  // isThirdwebConnected: true for ANY wallet connected via thirdweb UI (inApp OR external EOA)
+  // Used internally for signing — thirdweb handles signing for all its connected wallets
+  const isThirdwebConnected = !!thirdwebAccount
 
   const writeContract = useCallback(
     async ({
@@ -36,8 +43,8 @@ export function useUnifiedWalletClient() {
       args?: readonly unknown[]
       chainId?: number
     }): Promise<Hash> => {
-      if (isThirdweb && thirdwebAccount) {
-        // ── thirdweb path ──────────────────────────────────────────
+      if (isThirdwebConnected && thirdwebAccount) {
+        // ── thirdweb path (inApp + external EOA via thirdweb UI) ───
         const data = encodeFunctionData({ abi, functionName, args: args as unknown[] })
 
         const tx = prepareTransaction({
@@ -71,7 +78,7 @@ export function useUnifiedWalletClient() {
 
       return wagmiWalletClient.writeContract(request)
     },
-    [isThirdweb, thirdwebAccount, wagmiWalletClient],
+    [isThirdwebConnected, thirdwebAccount, wagmiWalletClient],
   )
 
   /**
@@ -80,7 +87,7 @@ export function useUnifiedWalletClient() {
    */
   const signTypedData = useCallback(
     async (params: Parameters<NonNullable<typeof wagmiWalletClient>['signTypedData']>[0]) => {
-      if (isThirdweb && thirdwebAccount) {
+      if (isThirdwebConnected && thirdwebAccount) {
         // thirdweb v5 smart accounts support signTypedData
         // Use the account's signTypedData method directly
         if (!thirdwebAccount.signTypedData) {
@@ -94,7 +101,7 @@ export function useUnifiedWalletClient() {
       }
       return wagmiWalletClient.signTypedData(params)
     },
-    [isThirdweb, thirdwebAccount, wagmiWalletClient],
+    [isThirdwebConnected, thirdwebAccount, wagmiWalletClient],
   )
 
   /**
@@ -103,7 +110,7 @@ export function useUnifiedWalletClient() {
    */
   const signMessage = useCallback(
     async (message: string): Promise<Hash> => {
-      if (isThirdweb && thirdwebAccount) {
+      if (isThirdwebConnected && thirdwebAccount) {
         const { signMessage: twSignMessage } = await import('thirdweb/utils')
         const sig = await twSignMessage({ account: thirdwebAccount, message })
         return sig as Hash
@@ -113,12 +120,12 @@ export function useUnifiedWalletClient() {
       }
       return wagmiWalletClient.signMessage({ message })
     },
-    [isThirdweb, thirdwebAccount, wagmiWalletClient],
+    [isThirdwebConnected, thirdwebAccount, wagmiWalletClient],
   )
 
   return {
     isThirdweb,
-    isReady: isThirdweb ? !!thirdwebAccount : !!wagmiWalletClient,
+    isReady: isThirdwebConnected ? !!thirdwebAccount : !!wagmiWalletClient,
     writeContract,
     signTypedData,
     signMessage,
