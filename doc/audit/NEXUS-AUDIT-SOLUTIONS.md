@@ -1,650 +1,326 @@
-# WasiAI v2.1 — Audit Solutions Guide
+# NEXUS-AUDIT-SOLUTIONS v3.0
+## WasiAI Marketplace — Solutions Guide
 
-**Fecha:** 2026-03-05
-**Companion de:** `NEXUS-AUDIT-REPORT.md` (16 findings)
+**Fecha:** 2026-03-08
+**Companion de:** `NEXUS-AUDIT-REPORT.md` v3.0 (8 nuevos hallazgos + 3 abiertos de v2)
 **Instrucciones:** Cada solucion tiene codigo sugerido listo para implementar. El equipo de desarrollo aplica los fixes — este documento es solo guia.
 
 ---
 
-## Indice por Prioridad
+## NG-108 (MEDIUM) — withdraw/route.ts: agregar guard de unicidad txHash
 
-| Prioridad | IDs | Esfuerzo Total |
-|-----------|-----|----------------|
-| INMEDIATA | NG-101 | 2h |
-| ALTA | NG-102, NG-103, NG-104, NG-105, NA-301, NA-302 | 4.5h |
-| MEDIA | NG-106, NG-107, NG-108, NA-303, NA-304 | 1.5h |
-| INFO | NG-109, NG-110, NA-305, NA-306 | No requiere accion |
+**Archivo:** `src/app/api/agent-keys/[id]/withdraw/route.ts`
 
-**Total estimado: ~8 horas de desarrollo**
+### Opcion A: Tabla dedicada `key_withdrawals` (recomendada)
 
----
-
-## [NG-101] CRITICAL: Verificar txHash es selfRegisterAgent al Contrato Correcto
-
-**Archivo:** `src/app/api/creator/agents/[slug]/upgrade-onchain/route.ts`
-**Lineas a modificar:** 60-95
-
-### Solucion
-
-Despues de obtener el receipt, verificar que:
-1. La transaccion fue enviada al contrato WasiAI Marketplace (`receipt.to`)
-2. Los logs del receipt contienen el evento `AgentRegistered` con el slug correcto
-
-```typescript
-// upgrade-onchain/route.ts — REEMPLAZAR el bloque try/catch de verificacion (lineas 60-95)
-
-import { decodeEventLog } from 'viem'
-import { getContractAddress } from '@/lib/contracts/config'
-import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
-
-// Dentro del handler, despues de obtener el receipt:
-try {
-  const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-  const chain = chainId === 43114 ? avalanche : avalancheFuji
-  const rpcUrl = (chainId === 43114
-    ? process.env.NEXT_PUBLIC_RPC_MAINNET
-    : process.env.NEXT_PUBLIC_RPC_TESTNET
-  )?.trim() || undefined
-
-  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
-  const contractAddress = getContractAddress()
-
-  const receipt = await publicClient.waitForTransactionReceipt({
-    hash: result.data.txHash as `0x${string}`,
-    timeout: 30_000,
-  })
-
-  if (receipt.status === 'reverted') {
-    return NextResponse.json(
-      { error: 'Transaction was reverted on-chain' },
-      { status: 422 },
-    )
-  }
-
-  // NG-101 FIX: Verificar que la tx fue al contrato correcto
-  if (receipt.to?.toLowerCase() !== contractAddress.toLowerCase()) {
-    return NextResponse.json(
-      { error: 'Transaction was not sent to the WasiAI Marketplace contract' },
-      { status: 422 },
-    )
-  }
-
-  // NG-101 FIX: Verificar que el evento AgentRegistered fue emitido con el slug correcto
-  let agentRegisteredFound = false
-  for (const log of receipt.logs) {
-    try {
-      const decoded = decodeEventLog({
-        abi: WASIAI_MARKETPLACE_ABI,
-        data: log.data,
-        topics: log.topics,
-      })
-      if (
-        decoded.eventName === 'AgentRegistered' &&
-        (decoded.args as { slug?: string }).slug === slug
-      ) {
-        agentRegisteredFound = true
-        break
-      }
-    } catch {
-      // Log no es del ABI del marketplace — skip
-    }
-  }
-
-  if (!agentRegisteredFound) {
-    return NextResponse.json(
-      { error: 'Transaction does not contain AgentRegistered event for this slug' },
-      { status: 422 },
-    )
-  }
-
-  logger.info('[upgrade-onchain] Receipt verified', {
-    slug,
-    txHash: result.data.txHash,
-    blockNumber: receipt.blockNumber.toString(),
-  })
-} catch (err) {
-  // ... existing catch
-}
-```
-
-**Imports adicionales necesarios:**
-```typescript
-import { decodeEventLog } from 'viem'
-import { getContractAddress } from '@/lib/contracts/config'
-import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
-```
-
----
-
-## [NG-102] MEDIUM: Rate Limiting en upgrade-onchain
-
-**Archivo:** `src/app/api/creator/agents/[slug]/upgrade-onchain/route.ts`
-**Lineas a modificar:** 19-24
-
-### Solucion
-
-Agregar rate limiting al inicio del handler. Reusar `getRegisterLimit()` ya que upgrade-onchain es similar en frecuencia a register.
-
-```typescript
-// upgrade-onchain/route.ts — AGREGAR despues de la linea 9 (imports)
-import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
-
-// AGREGAR al inicio del handler POST (despues de validateCsrf):
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> },
-) {
-  const csrfError = validateCsrf(req)
-  if (csrfError) return csrfError
-
-  // NG-102 FIX: Rate limiting
-  const rlHit = await checkRateLimit(getRegisterLimit(), getIdentifier(req))
-  if (rlHit) return rlHit
-
-  // ... resto del handler
-```
-
----
-
-## [NG-103] MEDIUM: No Retornar on_chain_registered:true Sin Confirmacion
-
-**Archivo:** `src/app/api/v1/agents/register/route.ts`
-**Lineas a modificar:** 194, 250-257, 272-273
-
-### Solucion
-
-Cambiar la logica para que:
-1. El agente se inserte con `registration_type: 'off_chain'` siempre
-2. Solo se marque como `'on_chain'` despues de que la tx on-chain confirme
-3. La response indique `on_chain_registered: 'pending'` en vez de `true`
-
-```typescript
-// register/route.ts — CAMBIAR linea 194
-// ANTES:
-registration_type: (registerOnChain && data.creator_wallet) ? 'on_chain' : 'off_chain',
-// DESPUES (NG-103 FIX):
-registration_type: 'off_chain', // Siempre empieza off-chain, se actualiza cuando la tx confirme
-
-// register/route.ts — CAMBIAR lineas 250-257
-// ANTES:
-if (registerOnChain && data.creator_wallet) {
-  registerAgentOnChain({...}).catch(err => logger.error('[register] on-chain failed', { err }))
-}
-// DESPUES (NG-103 FIX):
-if (registerOnChain && data.creator_wallet) {
-  registerAgentOnChain({
-    slug:             data.slug,
-    pricePerCallUSDC: data.price_per_call,
-    creatorWallet:    data.creator_wallet,
-  }).then(async (txHash) => {
-    if (txHash) {
-      // Solo marcar on-chain si la tx tuvo exito
-      await serviceClient
-        .from('agents')
-        .update({
-          registration_type: 'on_chain',
-          on_chain_registered: true,
-          chain_registered_at: new Date().toISOString(),
-        })
-        .eq('slug', data.slug)
-      logger.info('[register] on-chain confirmed', { slug: data.slug, txHash })
-    }
-  }).catch(err => logger.error('[register] on-chain failed', { err }))
-}
-
-// register/route.ts — CAMBIAR linea 272
-// ANTES:
-on_chain_registered: registerOnChain && !!data.creator_wallet,
-// DESPUES (NG-103 FIX):
-on_chain_registered: false, // Se actualizara async cuando la tx confirme
-on_chain_registration_requested: registerOnChain && !!data.creator_wallet,
-```
-
----
-
-## [NG-104] MEDIUM: Cambiar discover_agents_v2 a SECURITY INVOKER
-
-**Archivo:** Nueva migracion SQL (ej: `supabase/migrations/040_fix_discover_security.sql`)
-
-### Solucion
-
-Cambiar la funcion de `SECURITY DEFINER` a `SECURITY INVOKER` y limitar las columnas retornadas.
+Crear una tabla que registre cada retiro procesado, con UNIQUE constraint en `tx_hash`:
 
 ```sql
--- 040_fix_discover_security.sql
+-- Nueva migracion: 043_key_withdrawals.sql
+CREATE TABLE IF NOT EXISTS key_withdrawals (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key_id      UUID NOT NULL REFERENCES agent_keys(id),
+  tx_hash     TEXT NOT NULL UNIQUE,
+  amount_usdc NUMERIC(18, 6) NOT NULL,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- NG-104 FIX: Cambiar SECURITY DEFINER a SECURITY INVOKER
--- y limitar columnas retornadas (no retornar endpoint_url, metadata, etc.)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_key_withdrawals_tx_hash
+  ON key_withdrawals (tx_hash);
+```
 
-CREATE OR REPLACE FUNCTION discover_agents_v2(
-  p_category TEXT DEFAULT NULL,
-  p_max_price NUMERIC DEFAULT NULL,
-  p_limit INT DEFAULT 20
-)
-RETURNS TABLE (
-  id UUID,
-  name TEXT,
-  slug TEXT,
-  description TEXT,
-  category TEXT,
-  price_per_call NUMERIC,
-  currency TEXT,
-  chain TEXT,
-  agent_type TEXT,
-  registration_type registration_type,
-  capabilities JSONB,
-  total_calls BIGINT,
-  avg_rating NUMERIC,
-  is_featured BOOLEAN,
-  status TEXT,
-  created_at TIMESTAMPTZ
-)
-LANGUAGE sql
-STABLE
-SECURITY INVOKER  -- NG-104: Respetar RLS del caller
+En el route, insertar ANTES de actualizar agent_keys (patron atomic claim):
+
+```typescript
+// withdraw/route.ts — agregar ANTES del update de budget_usdc (paso 11)
+const { error: claimError } = await serviceClient
+  .from('key_withdrawals')
+  .insert({
+    key_id:      id,
+    tx_hash:     parsed.data.txHash,
+    amount_usdc: realAmount,
+  })
+
+if (claimError) {
+  // UNIQUE violation = replay attempt
+  logger.warn('[withdraw] txHash replay attempt blocked', { txHash: parsed.data.txHash })
+  return NextResponse.json(
+    { error: 'Transaction already processed', code: 'REPLAY_DETECTED' },
+    { status: 409 }
+  )
+}
+// ... continuar con el update de agent_keys
+```
+
+### Opcion B: Insertar en agent_calls con key_id
+
+Si no se quiere una tabla nueva, insertar el retiro en `agent_calls` (la migracion 041 ya tiene UNIQUE en tx_hash):
+
+```typescript
+// Antes del update de budget_usdc
+const { error: claimError } = await serviceClient
+  .from('agent_calls')
+  .insert({
+    agent_id:    keyRow.key_id ?? 'withdraw',  // campo nullable
+    caller_type: 'withdraw',
+    tx_hash:     parsed.data.txHash,
+    amount_paid: realAmount,
+    status:      'success',
+    latency_ms:  0,
+  })
+if (claimError) {
+  return NextResponse.json({ error: 'Transaction already processed' }, { status: 409 })
+}
+```
+
+---
+
+## NG-111 (MEDIUM) — Route C custodial: documentar o migrar a settlement on-chain
+
+**Archivos:** `src/features/payments/hooks/useWalletPayment.ts`, `src/lib/contracts/verifyUsdcTransfer.ts`
+
+### Opcion A: Documentar diseno custodial (si es intencional)
+
+Si Route C es intencionalmente custodial por simplicidad para embedded wallets, agregar:
+
+1. Comentario explicito en el codigo:
+```typescript
+// useWalletPayment.ts:124 — agregar comentario
+// DESIGN DECISION: Route C is a custodial payment flow.
+// USDC goes to OPERATOR_ADDRESS (not marketplace contract).
+// The operator settles earnings to creators via off-chain DB accounting.
+// This is acceptable for Thirdweb embedded wallets (Google/email login)
+// which cannot sign EIP-3009 (required for on-chain settlement).
+// Audited as WAS-X / NG-111. See doc/audit/NEXUS-AUDIT-SOLUTIONS.md.
+```
+
+2. Mostrar en el dashboard que el pago es off-chain:
+```typescript
+// En el componente que muestra el resultado del pago
+{isThirdweb && (
+  <p className="text-xs text-gray-400 mt-1">
+    Pago procesado off-chain. El creador recibe sus ganancias diariamente.
+  </p>
+)}
+```
+
+### Opcion B: Migrar Route C a settlement on-chain
+
+Para garantizar que los creadores ven sus fondos inmediatamente en el contrato, el operador debe llamar `recordInvocation()` tras recibir el USDC de Route C:
+
+```typescript
+// En invoke/route.ts, dentro del bloque Route C, tras actualizar DB:
+if (resultC.status === 'success' && CONTRACT_ADDRESS) {
+  // Fire-and-forget: liquidar on-chain para que el creador vea sus earnings
+  const paymentId = keccak256(encodePacked(
+    ['string', 'address', 'uint256'],
+    [slug, fromAddress, BigInt(Math.round(totalPrice * 1e6))]
+  ))
+  void recordInvocationOnChain({
+    slug,
+    payerAddress: fromAddress,  // del receipt verificado
+    amountUSDC:   creatorPrice,
+    paymentId,
+  }).catch(err => logger.warn('[invoke-routeC] recordInvocation failed', { err }))
+}
+```
+
+**Prerequisito:** El operador debe primero transferir el USDC al contrato, o el contrato debe tener saldo suficiente. Alternativa: usar `recordInvocation` solo para el split de earnings sin requerir que el USDC ya este en el contrato.
+
+---
+
+## NA-R01 (LOW) — safeTransferFrom en selfRegisterAgent
+
+**Archivo:** `contracts/src/WasiAIMarketplace.sol:262-265`
+
+```solidity
+// ANTES (bare transferFrom):
+require(
+    usdc.transferFrom(msg.sender, address(this), registrationFee),
+    "Fee transfer failed"
+);
+
+// DESPUES (SafeERC20 pattern — consistente con el resto del contrato):
+usdc.safeTransferFrom(msg.sender, address(this), registrationFee);
+// safeTransferFrom revierte automaticamente si retorna false o si no retorna bool
+```
+
+El contrato ya tiene `using SafeERC20 for IERC20`, por lo que no se necesitan cambios de imports.
+
+---
+
+## NA-R02 (LOW) — Reordenar validaciones en selfRegisterAgent
+
+**Archivo:** `contracts/src/WasiAIMarketplace.sol:254-287`
+
+```solidity
+// ANTES — validaciones despues del cobro de fee:
+function selfRegisterAgent(string calldata slug, uint256 pricePerCall, uint64 erc8004Id)
+    external whenNotPaused
+{
+    uint256 userCount = userRegistrationCount[msg.sender];
+    if (registrationFee > 0 && userCount >= freeRegistrationsPerUser) {
+        require(usdc.transferFrom(msg.sender, address(this), registrationFee), "Fee transfer failed");
+    }
+    userRegistrationCount[msg.sender] = userCount + 1;
+    require(bytes(slug).length > 0 && bytes(slug).length <= 80, "Invalid slug length");
+    require(pricePerCall >= 1000 && pricePerCall <= 100_000_000, "Price out of range");
+    require(agents[slug].creator == address(0), "WasiAI: slug taken");
+    // ...
+}
+
+// DESPUES — validar inputs primero, cobrar fee despues:
+function selfRegisterAgent(string calldata slug, uint256 pricePerCall, uint64 erc8004Id)
+    external whenNotPaused
+{
+    // 1. Validar todos los inputs ANTES de cualquier transferencia
+    require(bytes(slug).length > 0 && bytes(slug).length <= 80, "Invalid slug length");
+    require(pricePerCall >= 1000 && pricePerCall <= 100_000_000, "Price out of range");
+    require(agents[slug].creator == address(0), "WasiAI: slug taken");
+
+    // 2. Cobrar fee solo si los inputs son validos
+    uint256 userCount = userRegistrationCount[msg.sender];
+    if (registrationFee > 0 && userCount >= freeRegistrationsPerUser) {
+        usdc.safeTransferFrom(msg.sender, address(this), registrationFee);  // NA-R01 fix incluido
+    }
+    userRegistrationCount[msg.sender] = userCount + 1;
+
+    // 3. Registrar agente
+    agents[slug] = Agent({ creator: msg.sender, pricePerCall: pricePerCall, erc8004Id: erc8004Id });
+    emit AgentRegistered(slug, msg.sender, pricePerCall, erc8004Id);
+}
+```
+
+---
+
+## NG-109 (LOW) — Eliminar fallback hardcodeado en verifyUsdcTransfer.ts
+
+**Archivo:** `src/lib/contracts/verifyUsdcTransfer.ts:10-14`
+
+```typescript
+// ANTES — fallback hardcodeado silencioso:
+const OPERATOR_ADDRESS = (
+  process.env.NEXT_PUBLIC_WASIAI_OPERATOR
+  ?? process.env.NEXT_PUBLIC_OPERATOR_ADDRESS
+  ?? '0x2dd1Bd5D69Fe05205C0eecB9e22Bc8Ec99eE7aaB'
+).toLowerCase()
+
+// DESPUES — fallar explicitamente si env var no configurada:
+const _operatorRaw = process.env.NEXT_PUBLIC_WASIAI_OPERATOR
+  ?? process.env.NEXT_PUBLIC_OPERATOR_ADDRESS
+
+if (!_operatorRaw) {
+  throw new Error('[verifyUsdcTransfer] NEXT_PUBLIC_WASIAI_OPERATOR not configured')
+}
+const OPERATOR_ADDRESS = _operatorRaw.toLowerCase()
+```
+
+O si se prefiere manejar gracefully:
+```typescript
+const OPERATOR_ADDRESS = (
+  process.env.NEXT_PUBLIC_WASIAI_OPERATOR
+  ?? process.env.NEXT_PUBLIC_OPERATOR_ADDRESS
+  ?? (() => { throw new Error('NEXT_PUBLIC_WASIAI_OPERATOR not set') })()
+).toLowerCase()
+```
+
+---
+
+## NA-R03 (INFO) — Agregar whenNotPaused a submitReputationBatch
+
+**Archivo:** `contracts/src/WasiAIMarketplace.sol:811`
+
+```solidity
+// ANTES:
+function submitReputationBatch(
+    string[] calldata slugs,
+    uint16[] calldata avgRatings,
+    uint32[] calldata voteCounts
+) external onlyOperator {
+
+// DESPUES — consistente con el patron del contrato:
+function submitReputationBatch(
+    string[] calldata slugs,
+    uint16[] calldata avgRatings,
+    uint32[] calldata voteCounts
+) external onlyOperator whenNotPaused {
+```
+
+Si el diseno intencional es permitir escribir reputaciones incluso en pausa, agregar un comentario explicito:
+```solidity
+// NOTE: Intentionally no whenNotPaused — reputation data is non-financial
+// and should remain updatable even during contract emergency pause.
+```
+
+---
+
+## NG-112 (INFO) — Debounce en dual-connection guard de useWallet.ts
+
+**Archivo:** `src/features/wallet/hooks/useWallet.ts:29-34`
+
+```typescript
+// ANTES — puede dispararse en ventanas de transicion:
+useEffect(() => {
+  if (thirdwebAccount && wagmiConnected) {
+    wagmiDisconnect()
+  }
+}, [thirdwebAccount, wagmiConnected, wagmiDisconnect])
+
+// DESPUES — con debounce para evitar race conditions:
+useEffect(() => {
+  if (!thirdwebAccount || !wagmiConnected) return
+
+  // Debounce 200ms: esperar que ambos estados se estabilicen
+  const timeout = setTimeout(() => {
+    if (thirdwebAccount && wagmiConnected) {
+      wagmiDisconnect()
+    }
+  }, 200)
+
+  return () => clearTimeout(timeout)
+}, [thirdwebAccount, wagmiConnected, wagmiDisconnect])
+```
+
+---
+
+## NG-113 (INFO) — Agregar indice en owner_wallet_address
+
+**Archivo:** `supabase/migrations/042_owner_wallet_address.sql` (o nueva migracion 043)
+
+```sql
+-- Agregar al final de 042, o en una nueva migracion 043:
+CREATE INDEX IF NOT EXISTS idx_agent_keys_owner_wallet_address
+  ON agent_keys (owner_wallet_address)
+  WHERE owner_wallet_address IS NOT NULL;
+```
+
+---
+
+## Hallazgos Abiertos de v2 (No Resueltos en v3)
+
+### NG-103 (MEDIUM) — register/route.ts fire-and-forget
+
+Solucion propuesta en NEXUS-AUDIT-SOLUTIONS v2.0 (seccion NG-103). Requiere cambiar el flujo de registro off-chain para no establecer `on_chain_registered: true` hasta confirmar el tx. El patron HAL-025 implementado en `upgrade-onchain/route.ts` es el modelo a seguir.
+
+### NG-104 (MEDIUM) — discover_agents_v2 SECURITY DEFINER
+
+Solucion propuesta en NEXUS-AUDIT-SOLUTIONS v2.0 (seccion NG-104). Cambiar `SECURITY DEFINER` a `SECURITY INVOKER` en la funcion RPC de PostgreSQL.
+
+```sql
+-- supabase/migrations/039_dual_registration.sql (fix parcial):
+CREATE OR REPLACE FUNCTION discover_agents_v2(...)
+RETURNS TABLE (...)
+LANGUAGE plpgsql
+SECURITY INVOKER  -- cambiar de DEFINER a INVOKER
 AS $$
-  SELECT
-    a.id, a.name, a.slug, a.description, a.category,
-    a.price_per_call, a.currency, a.chain, a.agent_type,
-    a.registration_type, a.capabilities, a.total_calls,
-    a.avg_rating, a.is_featured, a.status, a.created_at
-  FROM agents a
-  WHERE a.status = 'active'
-    AND (p_category IS NULL OR a.category = p_category)
-    AND (p_max_price IS NULL OR a.price_per_call <= p_max_price)
-  ORDER BY
-    CASE WHEN a.registration_type = 'on_chain' THEN 1 ELSE 0 END DESC,
-    a.total_calls DESC
-  LIMIT p_limit;
+-- ...
 $$;
 ```
 
-**Nota:** Si RLS no permite lectura publica de `agents`, agregar una policy:
-```sql
-CREATE POLICY "Public can read active agents"
-  ON agents FOR SELECT
-  USING (status = 'active');
-```
+### NA-302 (MEDIUM) — Sin cron de reconciliacion on-chain
+
+Solucion propuesta en NEXUS-AUDIT-SOLUTIONS v2.0 (seccion NA-302). Crear endpoint cron que compare `agents.registration_type` en DB vs `agents[slug].creator != address(0)` en el contrato para detectar divergencias.
 
 ---
 
-## [NG-105] MEDIUM: Redis Mutex Fail-Closed o Log+Alert
-
-**Archivo:** `src/app/api/v1/models/[slug]/invoke/route.ts`
-**Lineas a modificar:** 248-251
-
-### Solucion
-
-Opcion A (Recomendada): Fail-closed — retornar 503 si Redis no esta disponible:
-
-```typescript
-// invoke/route.ts — REEMPLAZAR lineas 248-251
-} catch (redisErr) {
-  // NG-105 FIX: fail-closed — sin mutex no hay proteccion contra double-spend
-  logger.error('[invoke] Redis mutex unavailable — blocking invocation', {
-    keyId: keyRow.id,
-    err: String(redisErr).slice(0, 200)
-  })
-  return NextResponse.json(
-    { error: 'Service temporarily unavailable', code: 'mutex_unavailable' },
-    { status: 503, headers: { 'Retry-After': '5' } }
-  )
-}
-```
-
-Opcion B (Alternativa): Fail-open con alerta:
-
-```typescript
-// invoke/route.ts — REEMPLAZAR lineas 248-251
-} catch (redisErr) {
-  // NG-105 ALT: fail-open pero con alarma
-  logger.error('[invoke] ALERT: Redis mutex unavailable — proceeding WITHOUT double-spend protection', {
-    keyId: keyRow.id,
-    severity: 'HIGH',
-  })
-  // TODO: Integrar con monitoring (PagerDuty, Slack alert)
-}
-```
-
----
-
-## [NA-301] MEDIUM: Mitigacion Slug Squatting en selfRegisterAgent
-
-**Archivo:** `contracts/src/WasiAIMarketplace.sol`
-**Lineas a modificar:** 229-247
-
-### Solucion
-
-Agregar una de estas mitigaciones (en orden de recomendacion):
-
-**Opcion A (Recomendada): Registration Fee**
-
-```solidity
-// WasiAIMarketplace.sol — agregar estado
-uint256 public selfRegistrationFee = 1e6; // 1 USDC
-
-event SelfRegistrationFeeUpdated(uint256 oldFee, uint256 newFee);
-
-// Modificar selfRegisterAgent:
-function selfRegisterAgent(
-    string  calldata slug,
-    uint256 pricePerCall,
-    uint64  erc8004Id
-) external whenNotPaused {
-    require(bytes(slug).length > 0,  "WasiAI: empty slug");
-    require(bytes(slug).length <= 80, "WasiAI: slug too long");  // NA-303 fix
-    require(pricePerCall >= 1000,     "WasiAI: price too low");  // NA-304 fix ($0.001 min)
-    require(pricePerCall <= 100e6,    "WasiAI: price too high"); // NA-304 fix ($100 max)
-    require(
-        agents[slug].creator == address(0),
-        "WasiAI: slug taken"
-    );
-
-    // NA-301: Require registration fee to prevent spam
-    if (selfRegistrationFee > 0) {
-        usdc.safeTransferFrom(msg.sender, treasury, selfRegistrationFee);
-    }
-
-    agents[slug] = Agent({
-        creator:       msg.sender,
-        pricePerCall:  pricePerCall,
-        erc8004Id:     erc8004Id
-    });
-
-    emit AgentRegistered(slug, msg.sender, pricePerCall, erc8004Id);
-}
-
-// Admin function para ajustar fee
-function setSelfRegistrationFee(uint256 newFee) external onlyOwner {
-    require(newFee <= 100e6, "WasiAI: fee too high"); // max 100 USDC
-    uint256 old = selfRegistrationFee;
-    selfRegistrationFee = newFee;
-    emit SelfRegistrationFeeUpdated(old, newFee);
-}
-```
-
-**Opcion B (Mas Simple): Slug Length Limit + Price Bounds Only**
-
-```solidity
-function selfRegisterAgent(
-    string  calldata slug,
-    uint256 pricePerCall,
-    uint64  erc8004Id
-) external whenNotPaused {
-    require(bytes(slug).length > 0,   "WasiAI: empty slug");
-    require(bytes(slug).length <= 80, "WasiAI: slug too long");  // NA-303
-    require(pricePerCall >= 1000,     "WasiAI: price too low");  // NA-304 ($0.001)
-    require(pricePerCall <= 100e6,    "WasiAI: price too high"); // NA-304 ($100)
-    require(
-        agents[slug].creator == address(0),
-        "WasiAI: slug taken"
-    );
-    // ... rest unchanged
-}
-```
-
----
-
-## [NA-302] MEDIUM: Reconciliacion On-chain/Off-chain
-
-**Archivos:** `src/app/api/v1/agents/register/route.ts`, nueva migracion o cron
-
-### Solucion
-
-Agregar un cron job que reconcilie el estado DB con el estado on-chain:
-
-```typescript
-// src/app/api/cron/reconcile-onchain/route.ts (NUEVO)
-import { NextRequest, NextResponse } from 'next/server'
-import { createPublicClient, http } from 'viem'
-import { avalanche, avalancheFuji } from 'viem/chains'
-import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
-import { getContractAddress } from '@/lib/contracts/config'
-import { createServiceClient } from '@/lib/supabase/server'
-import { logger } from '@/lib/logger'
-import type { Address } from 'viem'
-
-export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
-  if (request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const supabase = createServiceClient()
-  const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-  const chain = chainId === 43114 ? avalanche : avalancheFuji
-  const client = createPublicClient({ chain, transport: http() })
-  const contractAddress = getContractAddress()
-
-  // Find agents marked as on_chain in DB
-  const { data: onChainAgents } = await supabase
-    .from('agents')
-    .select('id, slug, registration_type')
-    .eq('registration_type', 'on_chain')
-
-  let fixed = 0
-  for (const agent of onChainAgents ?? []) {
-    try {
-      const onChainAgent = await client.readContract({
-        address: contractAddress,
-        abi: WASIAI_MARKETPLACE_ABI,
-        functionName: 'getAgent',
-        args: [agent.slug],
-      }) as { creator: Address }
-
-      // If creator is zero address, agent is NOT registered on-chain
-      if (onChainAgent.creator === '0x0000000000000000000000000000000000000000') {
-        await supabase
-          .from('agents')
-          .update({ registration_type: 'off_chain', on_chain_registered: false })
-          .eq('id', agent.id)
-        logger.warn('[reconcile] Agent marked on_chain but not found on-chain', { slug: agent.slug })
-        fixed++
-      }
-    } catch (err) {
-      logger.error('[reconcile] Error checking agent', { slug: agent.slug, err: String(err).slice(0, 200) })
-    }
-  }
-
-  return NextResponse.json({ checked: onChainAgents?.length ?? 0, fixed })
-}
-```
-
----
-
-## [NG-106] LOW: Sanitizar Error Messages de RPC
-
-**Archivo:** `src/app/api/creator/agents/[slug]/upgrade-onchain/route.ts`
-**Lineas a modificar:** 88-94
-
-### Solucion
-
-```typescript
-// upgrade-onchain/route.ts — REEMPLAZAR lineas 88-94
-} catch (err) {
-  const msg = err instanceof Error ? err.message : String(err)
-  logger.error('[upgrade-onchain] Receipt verification failed', { slug, err: msg })
-  // NG-106 FIX: No exponer mensaje interno de RPC al usuario
-  return NextResponse.json(
-    { error: 'Could not verify transaction on-chain. Please try again or contact support.' },
-    { status: 422 },
-  )
-}
-```
-
----
-
-## [NG-107] LOW: Popular token_id en Upgrade Flow
-
-**Archivo:** `src/app/api/creator/agents/[slug]/upgrade-onchain/route.ts`
-**Lineas a modificar:** 98-106
-
-### Solucion
-
-Extraer el `erc8004Id` del evento `AgentRegistered` y guardarlo como `token_id`:
-
-```typescript
-// upgrade-onchain/route.ts — AGREGAR despues de verificar el evento AgentRegistered
-// (requiere que NG-101 ya este implementado)
-
-// Extraer token_id del evento
-let tokenId: bigint | null = null
-for (const log of receipt.logs) {
-  try {
-    const decoded = decodeEventLog({
-      abi: WASIAI_MARKETPLACE_ABI,
-      data: log.data,
-      topics: log.topics,
-    })
-    if (decoded.eventName === 'AgentRegistered') {
-      const args = decoded.args as { erc8004Id?: bigint }
-      tokenId = args.erc8004Id ?? null
-      break
-    }
-  } catch { /* skip */ }
-}
-
-// MODIFICAR el update para incluir token_id
-const { error } = await serviceClient
-  .from('agents')
-  .update({
-    registration_type: 'on_chain',
-    on_chain_registered: true,
-    chain_registered_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    token_id: tokenId ? Number(tokenId) : null, // NG-107 FIX
-  })
-  .eq('id', existing.id)
-```
-
----
-
-## [NG-108] LOW: Rate Limit en Stats Endpoint
-
-**Archivo:** `src/app/api/transparency/stats/route.ts`
-**Lineas a modificar:** 1-9
-
-### Solucion
-
-```typescript
-// transparency/stats/route.ts — AGREGAR imports y rate limiting
-
-import { type NextRequest, NextResponse } from 'next/server'
-import { createPublicClient, http } from 'viem'
-import { avalanche, avalancheFuji } from 'viem/chains'
-import { WASIAI_MARKETPLACE_ABI, fromUSDCAtomics } from '@/lib/contracts/WasiAIMarketplace'
-import { getContractAddress } from '@/lib/contracts/config'
-// NG-108 FIX: Rate limiting
-import { checkRateLimit, getIdentifier } from '@/lib/ratelimit'
-import { Ratelimit } from '@upstash/ratelimit'
-import { getSharedRedis } from '@/lib/ratelimit'
-
-let _statsLimit: Ratelimit | null = null
-function getStatsLimit() {
-  return _statsLimit ??= new Ratelimit({
-    redis: getSharedRedis(),
-    limiter: Ratelimit.slidingWindow(30, '1 m'),
-    prefix: 'rl:stats',
-  })
-}
-
-export const revalidate = 60
-
-// CAMBIAR signature para aceptar request
-export async function GET(request: NextRequest) {
-  // NG-108 FIX: Rate limiting
-  const rlHit = await checkRateLimit(getStatsLimit(), getIdentifier(request))
-  if (rlHit) return rlHit
-
-  try {
-    // ... existing logic
-```
-
----
-
-## [NA-303] LOW: Max Slug Length en selfRegisterAgent
-
-**Archivo:** `contracts/src/WasiAIMarketplace.sol`
-**Lineas a modificar:** 234
-
-### Solucion
-
-```solidity
-// WasiAIMarketplace.sol:234 — AGREGAR despues del check de empty slug
-require(bytes(slug).length > 0,   "WasiAI: empty slug");
-require(bytes(slug).length <= 80, "WasiAI: slug too long");  // NA-303 FIX
-```
-
-**Nota:** Aplicar el mismo fix a `registerAgent()` (linea 208) por consistencia:
-```solidity
-// WasiAIMarketplace.sol:208 — AGREGAR
-require(bytes(slug).length > 0, "WasiAI: empty slug");
-require(bytes(slug).length <= 80, "WasiAI: slug too long");  // NA-303 FIX
-```
-
----
-
-## [NA-304] LOW: Min/Max pricePerCall en selfRegisterAgent
-
-**Archivo:** `contracts/src/WasiAIMarketplace.sol`
-**Lineas a modificar:** 229-247
-
-### Solucion
-
-```solidity
-// WasiAIMarketplace.sol — AGREGAR despues del slug length check
-function selfRegisterAgent(
-    string  calldata slug,
-    uint256 pricePerCall,
-    uint64  erc8004Id
-) external whenNotPaused {
-    require(bytes(slug).length > 0,    "WasiAI: empty slug");
-    require(bytes(slug).length <= 80,  "WasiAI: slug too long");     // NA-303
-    require(pricePerCall >= 1000,      "WasiAI: price too low");     // NA-304 ($0.001 min)
-    require(pricePerCall <= 100_000_000, "WasiAI: price too high");  // NA-304 ($100 max)
-    // ... rest unchanged
-```
-
-**Nota:** Estos limites deben ser consistentes con el schema Zod del backend:
-```typescript
-// register/route.ts ya tiene:
-price_per_call: z.number().min(0.001).max(100)
-// 0.001 * 1e6 = 1000 atomics, 100 * 1e6 = 100_000_000 atomics — consistente
-```
-
----
-
-## Resumen de Archivos a Modificar
-
-| Archivo | Findings | Tipo |
-|---------|----------|------|
-| `src/app/api/creator/agents/[slug]/upgrade-onchain/route.ts` | NG-101, NG-102, NG-106, NG-107 | MODIFY |
-| `src/app/api/v1/agents/register/route.ts` | NG-103 | MODIFY |
-| `supabase/migrations/040_fix_discover_security.sql` | NG-104 | NEW |
-| `src/app/api/v1/models/[slug]/invoke/route.ts` | NG-105 | MODIFY |
-| `src/app/api/transparency/stats/route.ts` | NG-108 | MODIFY |
-| `contracts/src/WasiAIMarketplace.sol` | NA-301, NA-303, NA-304 | MODIFY |
-| `src/app/api/cron/reconcile-onchain/route.ts` | NA-302 | NEW |
-
----
-
-## Orden de Implementacion Recomendado
-
-1. **NG-101** (CRITICAL) — Sin esto, el badge on-chain es falsificable
-2. **NG-102** + **NG-108** — Rate limiting (rapido, 15min cada uno)
-3. **NA-303** + **NA-304** — Input validation on-chain (requiere redeploy)
-4. **NG-103** — Consistencia registration_type
-5. **NG-104** — SECURITY INVOKER migration
-6. **NG-105** — Redis mutex decision (fail-closed vs alert)
-7. **NA-301** — Slug squatting mitigation (requiere redeploy)
-8. **NA-302** — Cron de reconciliacion
-9. **NG-106** + **NG-107** — Mejoras menores
-
-**Nota sobre redeploy:** NA-301, NA-303, NA-304 requieren redeploy del smart contract. Se recomienda agrupar estos cambios en un solo redeploy para minimizar gas y riesgo.
-
----
-
-*Soluciones generadas para NEXUS-AUDIT-REPORT.md v2.1*
-*Cada solucion tiene codigo sugerido concreto con archivo:linea*
-*El equipo de desarrollo implementa — este documento es guia, no implementacion*
+*Generado por NexusAudit v2.0 + NexusGuard v1.0 | WasiAI Security Framework | 2026-03-08*
