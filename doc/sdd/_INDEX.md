@@ -67,3 +67,4 @@
 | 062 | 2026-03-07 | HU-062 | Fix typo USDC mainnet address — trailing E en 10 archivos | hotfix | PATCH | DONE | main |
 | 064 | 2026-03-08 | HU-064 | Withdraw earnings directo desde wallet del creator | improvement | QUALITY | DONE | main |
 | 067 | 2026-03-08 | HU-067 | Earnings Voucher Architecture — x402 earnings funcionales | feature | QUALITY | DONE | main |
+| 068 | 2026-03-08 | Hotfix #068 | claimEarnings explicit creator — fix invalid operator signature | hotfix | mini | DONE | main |
