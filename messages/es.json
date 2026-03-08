@@ -310,6 +310,7 @@
     "withdrawSigning": "Confirma en tu wallet…",
     "withdrawConfirming": "Confirmando…",
     "withdrawViewTx": "Ver tx",
+    "withdrawRequesting": "Solicitando voucher…",
     "withdrawNoWallet": "Sin wallet"
   },
   "onboarding": {

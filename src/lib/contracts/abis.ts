@@ -13,6 +13,21 @@ export const WITHDRAW_EARNINGS_ABI = [
   },
 ] as const
 
+export const CLAIM_EARNINGS_ABI = [
+  {
+    name:            'claimEarnings',
+    type:            'function' as const,
+    inputs:          [
+      { name: 'grossAmount', type: 'uint256' },
+      { name: 'deadline',    type: 'uint256' },
+      { name: 'nonce',       type: 'bytes32' },
+      { name: 'sig',         type: 'bytes'   },
+    ],
+    outputs:         [],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
 export const WITHDRAW_KEY_ABI = [
   {
     name:            'withdrawKey',

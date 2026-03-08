@@ -489,6 +489,16 @@ export async function POST(
     ).catch(() => { /* non-fatal */ })
   }
 
+  // HU-067: Contabilidad off-chain de earnings — fire-and-forget, nunca bloquea TTFB
+  if (result.status === 'success' && model.creator_id) {
+    void Promise.resolve(
+      supabase.rpc('increment_pending_earnings', {
+        p_creator_id: model.creator_id as string,
+        p_amount:     creatorPrice,
+      })
+    ).catch((err: unknown) => logger.error('[invoke] increment_pending_earnings failed', { err }))
+  }
+
   return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
   } catch (err) {
     logger.error('[invoke] unhandled error', { err })
