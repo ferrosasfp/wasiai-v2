@@ -99,8 +99,7 @@ export function DocsSidebar() {
         </button>
       </div>
 
-      {/* Spacer para compensar la barra sticky en mobile */}
-      <div className="lg:hidden h-10" aria-hidden="true" />
+
 
       {/* Mobile drawer */}
       {drawerOpen && (
