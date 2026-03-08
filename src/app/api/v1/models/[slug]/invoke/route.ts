@@ -202,7 +202,10 @@ export async function POST(
     )
   }
 
-  const creatorPrice = Number(model.creator_price ?? model.price_per_call)
+  // HU-073: use price_per_call (what the user pays) as the base price.
+  // creator_price is a legacy field that may be misconfigured; price_per_call is the source of truth.
+  // The 10% platform fee is deducted at withdrawal time by the contract, not here.
+  const creatorPrice = Number(model.price_per_call)
   const { overhead, breakdown, circuitBreaker } = await calcPlatformOverhead(creatorPrice)
 
   if (circuitBreaker) {

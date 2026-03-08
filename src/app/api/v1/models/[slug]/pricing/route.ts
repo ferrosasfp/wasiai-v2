@@ -25,7 +25,8 @@ export async function GET(
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
   }
 
-  const creatorPrice = Number(model.creator_price ?? model.price_per_call)
+  // HU-073: use price_per_call as the base price — source of truth set by the creator.
+  const creatorPrice = Number(model.price_per_call)
   const result = await calcPlatformOverhead(creatorPrice)
 
   return NextResponse.json(
