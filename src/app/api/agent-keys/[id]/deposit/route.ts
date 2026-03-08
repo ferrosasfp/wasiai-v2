@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { depositForKeyOnChain, getKeyBalanceOnChain } from '@/lib/contracts/marketplaceClient'
-import { verifyUsdcTransfer } from '@/lib/contracts/verifyUsdcTransfer'
 import { logger } from '@/lib/logger'
 
 // Route B: EOA — EIP-3009 TransferWithAuthorization
@@ -93,26 +92,21 @@ export async function POST(
     let txHash: string
 
     if ('txHash' in body) {
-      // ── Route C: Embedded wallet — verificar Transfer event on-chain ──────
-      logger.info('[deposit] Route C — verifying USDC transfer on-chain', {
-        txHash: body.txHash.slice(0, 10),
-        amount: body.amount,
-        owner:  body.ownerAddress,
+      // ── Route C: Embedded wallet — BLOQUEADO (HU-058) ────────────────────
+      // Route C (USDC.transfer directo) no llama depositKey on-chain.
+      // Los fondos llegan al contrato pero no se registran al key — irrecuperables.
+      // Para fondear Agent Keys se requiere wallet EOA (MetaMask, Core Wallet, etc.)
+      logger.warn('[deposit] Route C rejected — embedded wallet deposit not supported', {
+        owner: body.ownerAddress,
       })
-
-      const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-      const marketplaceAddr = chainId === 43114
-        ? (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET ?? '')
-        : (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI    ?? '')
-      const verification = await verifyUsdcTransfer(body.txHash, body.amount, marketplaceAddr)
-      if (!verification.verified) {
-        return NextResponse.json(
-          { error: 'Payment verification failed', detail: verification.error },
-          { status: 402 },
-        )
-      }
-      txHash = body.txHash
-      logger.info('[deposit] Route C verified', { txHash })
+      return NextResponse.json(
+        {
+          error:  'Embedded wallets (Google/email) cannot fund Agent Keys directly.',
+          detail: 'Please connect an EOA wallet (MetaMask, Core Wallet, etc.) to deposit USDC. Your Thirdweb session remains active for other features.',
+          code:   'EMBEDDED_WALLET_NOT_SUPPORTED',
+        },
+        { status: 403 },
+      )
     } else {
       // ── Route B: EOA — EIP-3009 TransferWithAuthorization (existente) ────
       logger.info('[deposit] Route B — initiating depositForKey', {

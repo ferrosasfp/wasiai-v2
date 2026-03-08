@@ -580,7 +580,7 @@ function CloseKeyModal({ keyId, keyName, balance, onClose, onSuccess }: CloseKey
 export default function AgentKeysPage() {
   const t = useTranslations('agentKeys')
   const tCommon = useTranslations('common')
-  const { address } = useWallet()   // HU-058: needed for withdraw ownership check
+  const { address, isThirdweb } = useWallet()   // HU-058: ownership check + embedded wallet detection
   const [keys, setKeys]         = useState<AgentKey[]>([])
   const [loading, setLoading]   = useState(true)
   const [creating, setCreating] = useState(false)
@@ -763,14 +763,23 @@ export default function AgentKeysPage() {
 
                       {key.is_active && address && (
                         <div className="flex shrink-0 gap-2">
-                          {/* Add USDC — cualquier wallet conectada puede depositar */}
-                          <button
-                            onClick={() => setDepositKey({ id: key.id, name: key.name, ownerWalletAddress: key.owner_wallet_address })}
-                            className="rounded-lg border border-avax-200 bg-avax-50 px-3 py-1.5 text-xs font-medium text-avax-700 hover:bg-avax-100 transition"
-                            title={t('addUsdc')}
-                          >
-                            {t('addUsdc')}
-                          </button>
+                          {/* Add USDC — solo wallets EOA; embedded wallets no soportadas */}
+                          {isThirdweb ? (
+                            <div
+                              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 cursor-help max-w-[180px]"
+                              title="Para fondear Agent Keys conecta una wallet EOA (MetaMask, Core Wallet). Tu sesión Google/email sigue activa para otras funciones."
+                            >
+                              🔒 Conecta MetaMask o Core Wallet para depositar
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDepositKey({ id: key.id, name: key.name, ownerWalletAddress: key.owner_wallet_address })}
+                              className="rounded-lg border border-avax-200 bg-avax-50 px-3 py-1.5 text-xs font-medium text-avax-700 hover:bg-avax-100 transition"
+                              title={t('addUsdc')}
+                            >
+                              {t('addUsdc')}
+                            </button>
+                          )}
 
                           {/* Withdraw + Close Key — solo la wallet owner */}
                           {(() => {
