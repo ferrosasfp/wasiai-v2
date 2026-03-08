@@ -84,19 +84,25 @@ export function DocsSidebar() {
 
   return (
     <>
-      {/* Mobile: barra sticky con toggle — full width, fuera del flex principal */}
-      <div className="lg:hidden fixed top-14 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 py-2 flex items-center justify-between">
+      {/* Mobile: barra sticky con toggle */}
+      <div className="lg:hidden fixed top-14 left-0 right-0 z-40 bg-white border-b border-gray-200 px-4 py-2.5 flex items-center gap-3 shadow-sm">
         <button
           onClick={() => setDrawerOpen(!drawerOpen)}
-          className="flex items-center gap-2 text-sm font-medium text-gray-700"
+          className="flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             {drawerOpen
               ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />}
           </svg>
-          <span className="text-gray-500">{activeLabel ? t(activeLabel.key) : t('contents')}</span>
+          <span>Contents</span>
         </button>
+        {/* Sección activa */}
+        {activeLabel && (
+          <span className="text-sm text-avax-600 font-semibold truncate">
+            → {t(activeLabel.key)}
+          </span>
+        )}
       </div>
 
 
