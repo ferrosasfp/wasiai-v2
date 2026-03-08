@@ -1,11 +1,89 @@
+# Story File #066 — UI Polish
+
+## Tu trabajo como dev
+
+Implementar en orden estricto W0→W1→W2→W3→W4→W5, luego QG.
+
+---
+
+## W0 — useApiKeyBalance: escuchar CustomEvent
+
+**Archivo:** `src/features/layout/hooks/useApiKeyBalance.ts`
+
+En el `useEffect` (el que tiene el `fetchBalance` inicial + interval + visibilitychange), agregar al listeners block:
+
+```typescript
+window.addEventListener('apikey:refresh', fetchBalance as EventListener)
+```
+
+Y en el cleanup del return:
+```typescript
+window.removeEventListener('apikey:refresh', fetchBalance as EventListener)
+```
+
+---
+
+## W1 — Agent Keys: dispatch tras cada acción exitosa
+
+**Archivo:** `src/app/[locale]/agent-keys/page.tsx`
+
+Agregar helper justo antes del componente `AgentKeysPage`:
+```typescript
+function refreshNavBalance() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('apikey:refresh'))
+  }
+}
+```
+
+Llamar `refreshNavBalance()` en:
+1. `DepositModal` → en el bloque de éxito tras `setStatus('success')` y `setTimeout(onSuccess, ...)`
+2. `WithdrawModal` → justo antes de `onSuccess()`
+3. `CloseKeyModal` → justo antes de `onSuccess(withdrawTxHash)`
+
+---
+
+## W2 — Navbar: mover Docs después de Dashboard
+
+**Archivo:** `src/components/WasiNavBar.tsx`
+
+```typescript
+// ANTES
+const secondaryLinksPublic = [
+  { path: '/sandbox', label: tNav('sandbox') },
+  { path: '/docs',    label: tNav('docs')    },
+]
+const secondaryLinksAuth = [
+  { path: '/creator/dashboard', label: tNav('dashboard') },
+]
+
+// DESPUÉS
+const secondaryLinksPublic = [
+  { path: '/sandbox', label: tNav('sandbox') },
+]
+const secondaryLinksAuth = [
+  { path: '/creator/dashboard', label: tNav('dashboard') },
+  { path: '/docs',              label: tNav('docs')      },
+]
+```
+
+---
+
+## W3 — WalletConnectButton: componente custom
+
+**Archivo:** `src/features/payments/components/WalletConnectButton.tsx`
+
+Reemplazar el contenido del archivo completo con esto:
+
+```typescript
 'use client'
 
-import { useState, useRef, useEffect }                                     from 'react'
-import { ConnectButton, useActiveAccount, useWalletBalance,
-         useDisconnect, useActiveWallet }                                   from 'thirdweb/react'
-import { inAppWallet, createWallet }                                        from 'thirdweb/wallets'
-import { avalancheFuji }                                                    from 'thirdweb/chains'
-import { thirdwebClient }                                                   from '@/shared/lib/web3/thirdwebClient'
+import { useState, useRef, useEffect } from 'react'
+import { ConnectButton }               from 'thirdweb/react'
+import { useActiveAccount, useWalletBalance, useDisconnect, useActiveWallet } from 'thirdweb/react'
+import { inAppWallet, createWallet }   from 'thirdweb/wallets'
+import { avalancheFuji }               from 'thirdweb/chains'
+import { thirdwebClient }              from '@/shared/lib/web3/thirdwebClient'
 
 interface WalletConnectButtonProps { locale: string }
 
@@ -21,8 +99,8 @@ const wallets = [
 
 // ── Pill mostrado cuando hay wallet conectada ─────────────────────────────────
 function WalletDetailsPill() {
-  const account        = useActiveAccount()
-  const activeWallet   = useActiveWallet()
+  const account       = useActiveAccount()
+  const activeWallet  = useActiveWallet()
   const { disconnect } = useDisconnect()
   const { data: balance } = useWalletBalance({
     chain:   avalancheFuji,
@@ -117,3 +195,60 @@ export function WalletConnectButton({ locale: _locale }: WalletConnectButtonProp
     />
   )
 }
+```
+
+---
+
+## W4 — Layout: reservar espacio para BottomTabBar
+
+**Archivo:** `src/app/[locale]/layout.tsx`
+
+```tsx
+// Antes
+{children}
+
+// Después  
+<div className="pb-20 sm:pb-0">{children}</div>
+```
+
+---
+
+## W5 — Home: separar FilterPanel del header
+
+**Archivo:** `src/app/[locale]/page.tsx`
+
+Busca el bloque:
+```tsx
+<div className="mb-8 flex items-center justify-between gap-4">
+  <h2 className="text-2xl font-bold text-gray-900 shrink-0">...
+  </h2>
+  <div className="flex items-center gap-3">
+    <Suspense><SearchBar .../></Suspense>
+    <Suspense><FilterPanel /></Suspense>
+  </div>
+</div>
+```
+
+Reemplazar por:
+```tsx
+<div className="mb-4 flex items-center justify-between gap-4 flex-wrap">
+  <h2 className="text-2xl font-bold text-gray-900 shrink-0">...
+  </h2>
+  <Suspense><SearchBar .../></Suspense>
+</div>
+<div className="mb-6 overflow-x-auto">
+  <Suspense><FilterPanel /></Suspense>
+</div>
+```
+
+---
+
+## QG — Quality Gate
+
+```bash
+npx tsc --noEmit
+npm run lint -- --max-warnings 0
+npm run build
+```
+
+Los 3 deben pasar en 0 errores.

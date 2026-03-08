@@ -151,21 +151,20 @@ export default async function HomePage({ params, searchParams }: Props) {
       {/* ── Models ───────────────────────────────────────────────────────── */}
       <section id="agents" className="px-6 py-12">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-8 flex items-center justify-between gap-4">
+          <div className="mb-4 flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-2xl font-bold text-gray-900 shrink-0">{t('availableModels')}
               {total > 0 && (
                 <span className="ml-2 text-sm font-normal text-gray-400">({total})</span>
               )}
             </h2>
-
-            <div className="flex items-center gap-3">
-              <Suspense>
-                <SearchBar mode="server" defaultValue={search} category={category} placeholder={tc('search')} aria-label="Buscar modelos y agentes" />
-              </Suspense>
-              <Suspense>
-                <FilterPanel />
-              </Suspense>
-            </div>
+            <Suspense>
+              <SearchBar mode="server" defaultValue={search} category={category} placeholder={tc('search')} aria-label="Buscar modelos y agentes" />
+            </Suspense>
+          </div>
+          <div className="mb-6 overflow-x-auto">
+            <Suspense>
+              <FilterPanel />
+            </Suspense>
           </div>
 
           {models.length === 0 ? (

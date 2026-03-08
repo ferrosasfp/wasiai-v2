@@ -97,11 +97,11 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
 
   const secondaryLinksPublic = [
     { path: '/sandbox',           label: tNav('sandbox')   },
-    { path: '/docs',              label: tNav('docs')      },
   ]
 
   const secondaryLinksAuth = [
     { path: '/creator/dashboard', label: tNav('dashboard') },
+    { path: '/docs',              label: tNav('docs')      },
   ]
 
   const createItems = [

@@ -132,6 +132,7 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }
 
         setTxHash(transferHash)
         setStatus('success')
+        refreshNavBalance()
         onSuccess()
         return
       }
@@ -190,6 +191,7 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }
 
       setTxHash(data.txHash ?? '')
       setStatus('success')
+      refreshNavBalance()
       onSuccess()
 
     } catch (err: unknown) {
@@ -363,6 +365,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
 
       setTxHash(hash)
       setStatus('success')
+      refreshNavBalance()
       onSuccess()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -639,6 +642,12 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
+
+function refreshNavBalance() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('apikey:refresh'))
+  }
+}
 
 export default function AgentKeysPage() {
   const t = useTranslations('agentKeys')

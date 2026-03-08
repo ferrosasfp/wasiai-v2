@@ -121,11 +121,14 @@ export function useApiKeyBalance(
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    // Refresh desde agent-keys page tras Add USDC / Withdraw / Close Key
+    window.addEventListener('apikey:refresh', fetchBalance as EventListener)
 
     return () => {
       isMounted.current = false
       clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('apikey:refresh', fetchBalance as EventListener)
     }
   }, [enabled, fetchBalance])
 

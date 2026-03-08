@@ -34,7 +34,7 @@ export default async function LocaleLayout({ children, params }: Props) {
     <NextIntlClientProvider>
       <Web3Provider>
         <WasiNavBar initialEmail={user?.email ?? null} />
-        {children}
+        <div className="pb-20 sm:pb-0">{children}</div>
         {/* Bottom Tab Bar — visible solo en mobile (sm:hidden dentro del componente) */}
         <BottomTabBar locale={locale} initialEmail={user?.email ?? null} />
       </Web3Provider>
