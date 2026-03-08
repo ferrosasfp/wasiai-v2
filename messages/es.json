@@ -301,7 +301,11 @@
     "callerAgent": "🤖 agente",
     "callerHuman": "👤 humano",
     "apiQuickStartLabel": "🤖 Otros agentes descubren y pagan a tus agentes automáticamente:",
-    "manageAgentKeys": "Administrar Agent Keys →"
+    "manageAgentKeys": "Administrar Agent Keys →",
+    "earningsBannerTitle": "Tienes fondos disponibles para retirar",
+    "earningsBannerSub": "Se transferirán directamente a tu wallet",
+    "earningsAccumulatedIn": "Acumulado en",
+    "earningsNone": "Sin earnings aún"
   },
   "onboarding": {
     "step1": {
@@ -509,7 +513,20 @@
       "max": "Max"
     },
     "withdrawBtn": "Retirar ${amount}",
-    "withdrawBtnShort": "Retirar"
+    "withdrawBtnShort": "Retirar",
+    "errorWalletNotConnected": "Wallet no conectada. Conecta tu wallet para continuar.",
+    "errorWrongNetwork": "Red incorrecta. Cambia a {network}.",
+    "withdrawGasNote": "Necesitas AVAX en tu wallet para pagar el gas del retiro (~0.001 AVAX).",
+    "withdrawConfirmWallet": "Confirma en tu wallet...",
+    "withdrawOnChain": "Retirando fondos on-chain...",
+    "withdrawAmountBtn": "Retirar ${amount}",
+    "closeSigningLabel": "Confirma en tu wallet…",
+    "closeWithdrawingLabel": "Retirando fondos on-chain…",
+    "closeClosingLabel": "Cerrando key…",
+    "closeFundsReceived": "${amount} USDC enviados a tu wallet ✓",
+    "closeWithFundsBanner": "Antes de cerrar, tus {amount} USDC se enviarán a tu wallet automáticamente.",
+    "closeWithFundsGasNote": "Tendrás que firmar la transacción en tu wallet y pagar una pequeña comisión de red en AVAX.",
+    "closeAndReceiveBtn": "Cerrar y recibir fondos →"
   },
   "editAgent": {
     "backToDashboard": "← Volver al Dashboard",

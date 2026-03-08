@@ -93,12 +93,12 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }
     }
 
     if (!isReady || !address) {
-      setErrorMsg('Wallet no conectada. Conecta tu wallet para continuar.')
+      setErrorMsg(t('errorWalletNotConnected'))
       return
     }
 
     if (chain?.id !== CHAIN_ID) {
-      setErrorMsg(`Red incorrecta. Cambia a ${CHAIN_ID === 43114 ? 'Avalanche C-Chain' : 'Avalanche Fuji Testnet'}.`)
+      setErrorMsg(t('errorWrongNetwork', { network: CHAIN_ID === 43114 ? 'Avalanche C-Chain' : 'Avalanche Fuji Testnet' }))
       return
     }
 
@@ -434,12 +434,12 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
             {/* Aviso gas AVAX */}
             <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 flex items-start gap-2 text-xs text-blue-800">
               <Info size={13} className="shrink-0 mt-0.5" />
-              <span>Necesitas AVAX en tu wallet para pagar el gas del retiro (~0.001 AVAX).</span>
+              <span>{t('withdrawGasNote')}</span>
             </div>
 
             {/* Estados signing / submitting */}
             {status === 'signing' && (
-              <p className="text-center text-sm text-gray-500 animate-pulse">Confirma en tu wallet...</p>
+              <p className="text-center text-sm text-gray-500 animate-pulse">{t('withdrawConfirmWallet')}</p>
             )}
             {status === 'submitting' && (
               <p className="text-center text-sm text-gray-500 animate-pulse">Sincronizando...</p>
@@ -468,7 +468,7 @@ function WithdrawModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
                 disabled={isDisabled || amount <= 0 || amount > balance}
                 className="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition"
               >
-                {isDisabled ? t('withdraw.submitting') : `Retirar $${amount.toFixed(2)}`}
+                {isDisabled ? t('withdraw.submitting') : t('withdrawAmountBtn', { amount: amount.toFixed(2) })}
               </button>
             </div>
           </div>
@@ -547,9 +547,9 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
   }
 
   const isDisabled = status === 'signing' || status === 'withdrawing' || status === 'closing'
-  const statusLabel = status === 'signing' ? 'Confirma en tu wallet…'
-    : status === 'withdrawing' ? 'Retirando fondos on-chain…'
-    : status === 'closing' ? 'Cerrando key…'
+  const statusLabel = status === 'signing' ? t('closeSigningLabel')
+    : status === 'withdrawing' ? t('closeWithdrawingLabel')
+    : status === 'closing' ? t('closeClosingLabel')
     : balance > 0 ? 'Retirar y cerrar key' : t('close.confirmBtn')
 
   return (
@@ -569,7 +569,7 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
             <p className="text-center font-semibold text-green-700">{t('close.success')}</p>
             {result.refundedUsdc > 0 && (
               <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 text-center">
-                <p className="font-semibold">${result.refundedUsdc.toFixed(2)} USDC enviados a tu wallet ✓</p>
+                <p className="font-semibold">{t('closeFundsReceived', { amount: result.refundedUsdc.toFixed(2) })}</p>
               </div>
             )}
             {result.txHash && (
@@ -591,10 +591,10 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
               <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-4 text-sm text-center space-y-2">
                 <p className="text-2xl">✋</p>
                 <p className="font-semibold text-gray-800">
-                  Antes de cerrar, tus <span className="text-avax-600 font-bold">${balance.toFixed(2)} USDC</span> se enviarán a tu wallet automáticamente.
+                  {t('closeWithFundsBanner', { amount: `$${balance.toFixed(2)}` })}
                 </p>
                 <p className="text-xs text-gray-500">
-                  Tendrás que firmar la transacción en tu wallet y pagar una pequeña comisión de red en AVAX.
+                  {t('closeWithFundsGasNote')}
                 </p>
               </div>
             ) : (
@@ -624,7 +624,7 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
                 disabled={isDisabled}
                 className="w-full rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
               >
-                {isDisabled ? statusLabel : (balance > 0 ? 'Cerrar y recibir fondos →' : t('close.confirmBtn'))}
+                {isDisabled ? statusLabel : (balance > 0 ? t('closeAndReceiveBtn') : t('close.confirmBtn'))}
               </button>
               <button
                 onClick={onClose}

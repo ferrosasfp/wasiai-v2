@@ -48,8 +48,8 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
         <div className="mb-5 flex items-center gap-3 rounded-xl bg-green-500 px-4 py-3 text-white">
           <span className="text-2xl">💰</span>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm">Tienes fondos disponibles para retirar</p>
-            <p className="text-xs text-green-100">Se transferirán directamente a tu wallet</p>
+            <p className="font-semibold text-sm">{t('earningsBannerTitle')}</p>
+            <p className="text-xs text-green-100">{t('earningsBannerSub')}</p>
           </div>
           <p className="text-2xl font-extrabold shrink-0">${pendingOnChain.toFixed(2)}</p>
         </div>
@@ -62,7 +62,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
             <h2 className="font-semibold text-gray-900">{t('onchainEarnings')}</h2>
           </div>
           <p className="text-sm text-gray-500">
-            Acumulado en{' '}
+            {t('earningsAccumulatedIn')}{' '}
             <a
               href={`https://${explorerBase}/address/${contractAddress}`}
               target="_blank"
@@ -78,7 +78,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
           {!hasEarnings && (
             <div className="text-right">
               <p className="text-3xl font-bold text-gray-400">$0.00</p>
-              <p className="text-xs text-gray-400">Sin earnings aún</p>
+              <p className="text-xs text-gray-400">{t('earningsNone')}</p>
             </div>
           )}
           <WithdrawButton

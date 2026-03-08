@@ -301,7 +301,11 @@
     "callerAgent": "🤖 agent",
     "callerHuman": "👤 human",
     "apiQuickStartLabel": "🤖 Other agents discover and pay your agents automatically:",
-    "manageAgentKeys": "Manage Agent Keys →"
+    "manageAgentKeys": "Manage Agent Keys →",
+    "earningsBannerTitle": "You have funds available to withdraw",
+    "earningsBannerSub": "They will be transferred directly to your wallet",
+    "earningsAccumulatedIn": "Accumulated in",
+    "earningsNone": "No earnings yet"
   },
   "onboarding": {
     "step1": {
@@ -509,7 +513,20 @@
       "max": "Max"
     },
     "withdrawBtn": "Withdraw ${amount}",
-    "withdrawBtnShort": "Withdraw"
+    "withdrawBtnShort": "Withdraw",
+    "errorWalletNotConnected": "Wallet not connected. Connect your wallet to continue.",
+    "errorWrongNetwork": "Wrong network. Switch to {network}.",
+    "withdrawGasNote": "You need AVAX in your wallet to pay gas (~0.001 AVAX).",
+    "withdrawConfirmWallet": "Confirm in your wallet...",
+    "withdrawOnChain": "Withdrawing on-chain...",
+    "withdrawAmountBtn": "Withdraw ${amount}",
+    "closeSigningLabel": "Confirm in your wallet…",
+    "closeWithdrawingLabel": "Withdrawing on-chain…",
+    "closeClosingLabel": "Closing key…",
+    "closeFundsReceived": "${amount} USDC sent to your wallet ✓",
+    "closeWithFundsBanner": "Before closing, your {amount} USDC will be sent to your wallet automatically.",
+    "closeWithFundsGasNote": "You'll need to sign the transaction in your wallet and pay a small network fee in AVAX.",
+    "closeAndReceiveBtn": "Close and receive funds →"
   },
   "editAgent": {
     "backToDashboard": "← Back to Dashboard",
