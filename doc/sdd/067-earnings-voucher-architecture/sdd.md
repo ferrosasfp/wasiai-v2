@@ -103,7 +103,7 @@ contract WasiAIMarketplace is
     Pausable,
     ReentrancyGuard,
     AutomationCompatibleInterface,
-    EIP712("WasiAIMarketplace", "1")   // ← nuevo
+    EIP712                             // ← nuevo (sin args — se inicializa en constructor)
 
 // Nuevo storage
 mapping(bytes32 => bool) public usedVouchers;
@@ -132,6 +132,12 @@ function claimEarnings(
     require(block.timestamp <= deadline,    "WasiAI: voucher expired");
     require(!usedVouchers[nonce],           "WasiAI: voucher already used");
     require(grossAmount > 0,               "WasiAI: zero amount");
+
+    // B-1 FIX: Constructor actualizado para inicializar EIP712:
+    // constructor(address _usdc, address _treasury)
+    //     Ownable(msg.sender)
+    //     EIP712("WasiAIMarketplace", "1")   ← AGREGAR
+    // { ... resto sin cambios ... }
 
     // Verificar firma del operador
     bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
@@ -171,12 +177,14 @@ function claimEarnings(
 // Body recibido: {} (sin parámetros — el amount viene de Supabase)
 // Proceso:
 // 1. Auth check
-// 2. Leer creator_profiles.pending_earnings_usdc (monto bruto)
-// 3. Verificar wallet_address configurada
-// 4. Generar nonce: keccak256(creator + timestamp + random)
-// 5. deadline = now + 3600 (1 hora)
-// 6. Firmar EIP-712 con operador
-// 7. Retornar { grossAmount, deadline, nonce, signature }
+// 2. Leer creator_profiles.pending_earnings_usdc + wallet_address
+// 3. Guard: IF !wallet_address → 400 "No wallet configured"  (M-2 fix)
+// 4. Guard: IF pending_earnings_usdc <= 0 → 400 "No pending earnings"
+// 5. Generar nonce: keccak256(creator + timestamp + random)
+// 6. deadline = Math.floor(Date.now() / 1000) + 3600 (1 hora, en segundos)
+// 7. grossAmount = pending_earnings_usdc (USDC humanos → convertir a atomics al firmar)
+// 8. Firmar EIP-712 con operador
+// 9. Retornar { grossAmount, grossAmountAtomics, deadline, nonce, signature }
 ```
 
 Firma EIP-712 en TypeScript (viem):
@@ -222,18 +230,23 @@ const signature = await operatorAccount.signTypedData({
 
 ### 4.3 Backend — invoke route: sumar earnings post-settlement
 
-Insertar después de línea ~476 (post settlement verificado, pre `buildResponse`):
+Insertar después de `logCall` (línea ~476), solo si `result.status === 'success'`:
 
 ```typescript
-// HU-067: Sumar earnings off-chain para el creator
-if (settlement.verified && model.creator_id) {
-  const atomicPrice = Math.round(creatorPrice * 1_000_000)
+// HU-067: Acreditar earnings al creator SOLO en invocaciones exitosas
+// Decisión: invocaciones fallidas NO generan earnings (creator no cobró por un resultado)
+// Reporte de calls exitosas vs fallidas → tabla agent_calls (ya persiste via logCall)
+if (settlement.verified && model.creator_id && result.status === 'success') {
   await supabase.rpc('increment_pending_earnings', {
     p_user_id: model.creator_id as string,
-    p_amount:  atomicPrice / 1_000_000,   // NUMERIC en USDC, no atomics
+    p_amount:  creatorPrice,   // ← USDC humanos (ej: 0.01), NO atomics (NO 10000)
   }).catch(err => logger.error('[invoke] increment_pending_earnings failed', { err }))
 }
 ```
+
+> Nota: `logCall` ya persiste TODAS las invocaciones (exitosas y fallidas) en `agent_calls`.
+> El reporte por creator de calls efectivas vs fallidas se obtiene consultando `agent_calls`
+> filtrando por `result->>'status'`. No se requiere tabla nueva.
 
 ### 4.4 Frontend — `WithdrawButton` flujo voucher
 
@@ -307,6 +320,17 @@ export const CLAIM_EARNINGS_ABI = [
 [✅] ECDSA + EIP712 disponibles en lib OZ instalada
 [✅] operators[] mapping verificado en contrato (patrón para signer check)
 ```
+
+---
+
+## 6b. Decisiones SAR resueltas
+
+| # | Blocker | Decisión |
+|---|---------|----------|
+| B-1 | Constructor EIP712 | Agregar `EIP712("WasiAIMarketplace","1")` al initializer list del constructor |
+| B-2 | Earnings en calls fallidas | **Solo `result.status === 'success'`** acredita earnings. Calls fallidas persisten en `agent_calls` para reporte — no requiere tabla nueva |
+| M-1 | Unidades `p_amount` | Pasar `creatorPrice` (USDC humanos, ej: `0.01`) — NO `atomicPrice` (10,000) |
+| M-2 | Guard wallet en voucher | Guard explícito: `!wallet_address → 400` antes de firmar |
 
 ---
 
