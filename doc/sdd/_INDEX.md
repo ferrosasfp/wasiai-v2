@@ -66,3 +66,4 @@
 | 061 | 2026-03-07 | HU-061 | Bloquear Route C — embedded wallets no pueden fondear Agent Keys | security | PATCH | DONE | main |
 | 062 | 2026-03-07 | HU-062 | Fix typo USDC mainnet address — trailing E en 10 archivos | hotfix | PATCH | DONE | main |
 | 064 | 2026-03-08 | HU-064 | Withdraw earnings directo desde wallet del creator | improvement | QUALITY | DONE | main |
+| 067 | 2026-03-08 | HU-067 | Earnings Voucher Architecture — x402 earnings funcionales | feature | QUALITY | DONE | main |
