@@ -565,16 +565,10 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
           <div className="space-y-3">
             <div className="text-center text-4xl">✅</div>
             <p className="text-center font-semibold text-green-700">{t('close.success')}</p>
-            {result.refundedUsdc > 0 ? (
-              <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
-                <p className="font-medium">{t('close.refunded', { amount: result.refundedUsdc.toFixed(4) })}</p>
-                <p className="mt-1 text-xs text-green-600">
-                  {t('close.claimHint')}{' '}
-                  <Link href="/creator/dashboard" className="underline">→</Link>
-                </p>
+            {result.refundedUsdc > 0 && (
+              <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 text-center">
+                <p className="font-semibold">${result.refundedUsdc.toFixed(2)} USDC enviados a tu wallet ✓</p>
               </div>
-            ) : (
-              <p className="text-center text-sm text-gray-500">{t('close.noRefund')}</p>
             )}
             {result.txHash && (
               <p className="text-center text-xs text-gray-400 font-mono break-all">
@@ -591,19 +585,14 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
         ) : (
           <div className="space-y-4">
 
-            {/* Advertencia fondos pendientes — bloquea cierre */}
             {balance > 0 ? (
-              <div className="rounded-xl bg-red-50 border border-red-300 px-4 py-4 text-sm">
-                <div className="flex justify-center mb-2"><AlertTriangle size={24} className="text-red-400" /></div>
-                <p className="font-semibold text-red-800 text-center">
-                  Tienes <strong>${balance.toFixed(4)} USDC</strong> sin retirar
+              <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-4 text-sm text-center space-y-2">
+                <p className="text-2xl">✋</p>
+                <p className="font-semibold text-gray-800">
+                  Antes de cerrar, tus <span className="text-avax-600 font-bold">${balance.toFixed(2)} USDC</span> se enviarán a tu wallet automáticamente.
                 </p>
-                <p className="mt-2 text-xs text-red-700 text-center">
-                  Si cierras esta key, el saldo se moverá a tus Earnings en el contrato.
-                  Retira primero para recibirlos directamente en tu wallet.
-                </p>
-                <p className="mt-1 text-xs text-red-500 text-center">
-                  🔜 Próximamente: tú pagarás el gas de este cierre desde tu wallet.
+                <p className="text-xs text-gray-500">
+                  Tendrás que firmar la transacción en tu wallet y pagar una pequeña comisión de red en AVAX.
                 </p>
               </div>
             ) : (
@@ -633,14 +622,14 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
                 disabled={isDisabled}
                 className="w-full rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition"
               >
-                {isDisabled ? statusLabel : (balance > 0 ? 'Retirar fondos y cerrar key' : t('close.confirmBtn'))}
+                {isDisabled ? statusLabel : (balance > 0 ? 'Cerrar y recibir fondos →' : t('close.confirmBtn'))}
               </button>
               <button
                 onClick={onClose}
                 disabled={isDisabled}
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30"
               >
-                {balance > 0 ? 'Cancelar — retirar por separado' : tCommon('cancel')}
+                {tCommon('cancel')}
               </button>
             </div>
           </div>
