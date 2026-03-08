@@ -9,6 +9,7 @@
 import { getTranslations } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
 import { WithdrawButton } from '../WithdrawButton'
+import { WalletSetup }    from '../WalletSetup'
 
 
 interface EarningsSectionProps {
@@ -68,6 +69,9 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
             hasWallet={!!profile?.wallet_address}
             walletAddress={profile?.wallet_address ?? ''}
           />
+        </div>
+        <div className="mt-4 border-t pt-4">
+          <WalletSetup initialWallet={profile?.wallet_address ?? null} />
         </div>
       </div>
     </section>
