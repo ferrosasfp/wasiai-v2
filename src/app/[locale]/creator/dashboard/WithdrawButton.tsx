@@ -5,7 +5,7 @@ import { useTranslations }          from 'next-intl'
 import { useUnifiedWalletClient }   from '@/features/wallet/hooks/useUnifiedWalletClient'
 import { createPublicClient, http } from 'viem'
 import { avalancheFuji, avalanche } from 'viem/chains'
-import { WITHDRAW_EARNINGS_ABI }    from '@/lib/contracts/abis'
+import { CLAIM_EARNINGS_ABI }       from '@/lib/contracts/abis'
 import { snowscanTx }               from '@/lib/chain'
 
 const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
@@ -23,11 +23,11 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
   const t = useTranslations('dashboard')
   const { writeContract } = useUnifiedWalletClient()
 
-  const [status, setStatus]   = useState<'idle' | 'signing' | 'confirming' | 'success' | 'error'>('idle')
+  const [status, setStatus]   = useState<'idle' | 'requesting' | 'signing' | 'confirming' | 'success' | 'error'>('idle')
   const [txHash, setTxHash]   = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
-  const isDisabled = status === 'signing' || status === 'confirming'
+  const isDisabled = status === 'requesting' || status === 'signing' || status === 'confirming'
 
   if (!hasWallet || !walletAddress) {
     return (
@@ -43,15 +43,39 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
   async function handleWithdraw() {
     setErrorMsg('')
     try {
-      setStatus('signing')
+      // Step 1: Request voucher from backend
+      setStatus('requesting')
+      const voucherRes = await fetch('/api/creator/earnings/voucher', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({}),
+      })
+      const voucher = await voucherRes.json() as {
+        grossAmountAtomics: number
+        grossAmountUsdc:    number
+        deadline:           string
+        nonce:              string
+        signature:          string
+        error?:             string
+      }
+      if (!voucherRes.ok) throw new Error(voucher.error ?? `Voucher error ${voucherRes.status}`)
 
+      // Step 2: Sign and submit claimEarnings tx
+      setStatus('signing')
       const hash = await writeContract({
         address:      MARKETPLACE_ADDRESS as `0x${string}`,
-        abi:          WITHDRAW_EARNINGS_ABI,
-        functionName: 'withdraw',
-        chainId:      CHAIN_ID,
+        abi:          CLAIM_EARNINGS_ABI,
+        functionName: 'claimEarnings',
+        args: [
+          BigInt(voucher.grossAmountAtomics),
+          BigInt(voucher.deadline),
+          voucher.nonce     as `0x${string}`,
+          voucher.signature as `0x${string}`,
+        ],
+        chainId: CHAIN_ID,
       })
 
+      // Step 3: Wait for confirmation
       setStatus('confirming')
       const pub = createPublicClient({
         chain:     CHAIN_ID === 43114 ? avalanche : avalancheFuji,
@@ -59,6 +83,7 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
       })
       await pub.waitForTransactionReceipt({ hash: hash as `0x${string}`, confirmations: 1 })
 
+      // Step 4: Notify backend to zero out pending_earnings_usdc
       const res = await fetch('/api/creator/withdraw', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,7 +121,8 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
         disabled={isDisabled || pending <= 0}
         className="rounded-xl bg-avax-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {status === 'signing'    ? <span className="animate-pulse">{t('withdrawSigning')}</span>
+        {status === 'requesting'  ? <span className="animate-pulse">{t('withdrawRequesting')}</span>
+          : status === 'signing'    ? <span className="animate-pulse">{t('withdrawSigning')}</span>
           : status === 'confirming' ? <span className="animate-pulse">{t('withdrawConfirming')}</span>
           : t('withdrawBtn')}
       </button>

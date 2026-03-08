@@ -1,24 +1,22 @@
 /**
  * POST /api/creator/withdraw
  *
- * HU-064: Retiro directo desde wallet del creator via withdraw().
- * El creator ya ejecutó la tx on-chain — este endpoint solo verifica el evento.
+ * HU-067: Retiro via voucher EIP-712. El creator ya ejecutó claimEarnings() on-chain.
+ * Este endpoint verifica el evento EarningsClaimed y pone pending_earnings_usdc = 0.
  *
- * HAL-025: Solo retorna éxito tras verificar el evento Withdrawn en el receipt.
+ * HAL-025: Solo retorna éxito tras verificar el evento en el receipt.
  */
-import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { validateCsrf } from '@/lib/security/csrf'
-import { logger } from '@/lib/logger'
-import { z } from 'zod'
-import { createPublicClient, http } from 'viem'
-import { avalancheFuji, avalanche } from 'viem/chains'
-import {
-  getPendingEarnings,
-} from '@/lib/contracts/marketplaceClient'
+import { type NextRequest, NextResponse }        from 'next/server'
+import { createClient, createServiceClient }     from '@/lib/supabase/server'
+import { validateCsrf }                          from '@/lib/security/csrf'
+import { logger }                               from '@/lib/logger'
+import { z }                                    from 'zod'
+import { createPublicClient, http }             from 'viem'
+import { avalancheFuji, avalanche }             from 'viem/chains'
+import { getPendingEarnings }                   from '@/lib/contracts/marketplaceClient'
 
-// topic0 = keccak256("Withdrawn(address,uint256)")
-const WITHDRAWN_TOPIC = '0x7084f5476618d8e60b11ef0d7d3f06914655adb8793e28ff7f018d4c76d505d5'
+// topic0 = keccak256("EarningsClaimed(address,uint256,uint256,uint256,bytes32)")
+const EARNINGS_CLAIMED_TOPIC = '0x7c1baf99431f82a970a4a3490e0d9ba64bffbe05e26ccc6e03ec6646aed8d667'
 
 const BodySchema = z.object({
   txHash: z.string().startsWith('0x'),
@@ -87,19 +85,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Transaction reverted on-chain' }, { status: 400 })
   }
 
-  // 6. Extraer evento Withdrawn
+  // 6. Extraer evento EarningsClaimed
   const marketplaceAddr = (chainId === 43114
     ? process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET
     : process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI) ?? ''
 
   const log = receipt.logs.find(l =>
-    l.topics[0] === WITHDRAWN_TOPIC &&
+    l.topics[0] === EARNINGS_CLAIMED_TOPIC &&
     l.address.toLowerCase() === marketplaceAddr.toLowerCase()
   )
 
   if (!log) {
     return NextResponse.json(
-      { error: 'Withdrawn event not found in receipt' },
+      { error: 'EarningsClaimed event not found in receipt' },
       { status: 400 },
     )
   }
@@ -111,18 +109,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Receipt creator does not match authenticated wallet' }, { status: 403 })
   }
 
-  // 8. Extraer monto real del evento (log.data = ABI-encoded uint256)
-  const realAmount = Number(BigInt(log.data)) / 1_000_000
+  // 8. Extraer monto real del evento: topics[2] = grossAmount (indexed uint256)
+  const realAmount = Number(BigInt(log.topics[2] ?? '0x0')) / 1_000_000
 
-  logger.info('[creator/withdraw] completed', {
+  // 9. Poner pending_earnings_usdc = 0 en Supabase
+  const serviceClient = createServiceClient()
+  const { error: updateError } = await serviceClient
+    .from('creator_profiles')
+    .update({ pending_earnings_usdc: 0 })
+    .eq('id', user.id)
+
+  if (updateError) {
+    logger.error('[creator/withdraw] DB update failed after verified on-chain claim', {
+      txHash: parsed.data.txHash, updateError,
+    })
+    return NextResponse.json({
+      ok:        true,
+      realAmount,
+      warning:   'DB sync failed — contact support if balance shows incorrectly.',
+    })
+  }
+
+  logger.info('[creator/withdraw] EarningsClaimed verified', {
     txHash: parsed.data.txHash, realAmount, walletAddress,
   })
 
-  return NextResponse.json({
-    ok:         true,
-    txHash:     parsed.data.txHash,
-    realAmount,
-  })
+  return NextResponse.json({ ok: true, realAmount })
 }
 
 /**
