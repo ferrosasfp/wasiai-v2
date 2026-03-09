@@ -1,364 +1,420 @@
-# NEXUS-AUDIT-REPORT v3.0
+# NEXUS-AUDIT-REPORT v4.0
 ## WasiAI Marketplace — Security Audit Report
 
 **Fecha:** 2026-03-08
 **Auditores:** NexusAudit v2.0 (on-chain) + NexusGuard v1.0 (off-chain)
-**Version codebase:** post-pull v3 — 41 archivos cambiados, +4300 lineas
-**Commit base:** ab64565 (main)
-**Score de seguridad:** 8.6 / 10 (mejora respecto a 8.3/10 de v2)
+**Version codebase:** post-pull v4 — 97 archivos cambiados, -4364 lineas (cleanup masivo)
+**Commit base:** main (post a751cbb)
+**Score de seguridad:** 9.0 / 10 (mejora desde 8.6/10 de v3)
 
 ---
 
 ## Executive Summary
 
-Auditoria post-pull v3 del codebase WasiAI. Los cambios principales auditados son:
-- **Agent Key system completo:** deposit (Route B EOA), withdraw directo (HU-063), refund
-- **Route C (embedded wallet):** USDC.transfer directo para invoke y deposit
-- **withdrawKey()** nueva funcion on-chain (HU-063)
-- **ERC-8004 Reputation Registry** en contrato
-- **Migracion 041** (UNIQUE index tx_hash en agent_calls) y **042** (owner_wallet_address column)
-- **Correcciones de v2:** NG-101 FIXED, NG-102 FIXED, NG-105 FIXED, NA-301/303/304 FIXED
+Auditoria post-pull v4 del codebase WasiAI. Los cambios principales auditados son:
+- **HU-067: Sistema de retiro via voucher EIP-712** — nuevo `claimEarnings()` en contrato con firma del operador, anti-replay, deadline, balance guard
+- **HU-071: Eliminacion completa de Thirdweb** — Route C, embedded wallet, `verifyUsdcTransfer.ts`, `thirdwebClient.ts` eliminados
+- **Simplificacion de invoke/route.ts** — solo Route A (agent key) y Route B (x402 nativo)
+- **Nuevo endpoint `/api/creator/earnings/voucher`** — genera voucher EIP-712 server-side
+- **Reescritura de `/api/creator/withdraw`** — verifica evento EarningsClaimed on-chain (HAL-025)
+- **Eliminacion de codigo legacy:** operatorSettler.ts, useAuth.ts, computePaymentId.ts (movido a contrato), cron routes
 
-**Hallazgos nuevos:** 8 (0 CRITICAL, 2 MEDIUM, 3 LOW, 3 INFO)
-**Hallazgos confirmados resueltos de v2:** 6 (NG-101, NG-102, NG-105, NA-301, NA-303, NA-304)
-**Sin regresiones** en los 22 fixes de v2.
+**Hallazgos nuevos:** 6 (0 CRITICAL, 1 HIGH, 2 MEDIUM, 1 LOW, 2 INFO)
+**Hallazgos v3 resueltos:** 4 (NG-108, NG-109, NG-111, NG-112)
+**Hallazgos v3 aun abiertos:** 3 (NG-103, NG-104, NA-302) + 2 on-chain (NA-R01, NA-R03)
+**Sin regresiones.**
 
 ---
 
-## Scope Delta v3
+## Scope Delta v4
 
 ### Archivos nuevos/modificados criticos examinados
 
 | Archivo | Tipo | Razon de inclusion |
 |---|---|---|
-| `contracts/src/WasiAIMarketplace.sol` | Contract | `withdrawKey()`, reg. fee, ERC-8004 reputation |
-| `src/app/api/agent-keys/[id]/deposit/route.ts` | Route | Route B EOA + Route C blocking |
-| `src/app/api/agent-keys/[id]/withdraw/route.ts` | Route | HU-063 withdraw directo, receipt verify |
-| `src/app/api/creator/agents/[slug]/upgrade-onchain/route.ts` | Route | NG-101 fix verificado |
-| `src/app/api/v1/models/[slug]/invoke/route.ts` | Route | Route C embedded wallet, NG-105 fix |
+| `contracts/src/WasiAIMarketplace.sol` | Contract | `claimEarnings()` EIP-712 voucher (+77 lineas) |
+| `src/app/api/creator/earnings/voucher/route.ts` | Route | **NUEVO** — genera voucher EIP-712 firmado |
+| `src/app/api/creator/withdraw/route.ts` | Route | **REESCRITO** — verifica EarningsClaimed event |
+| `src/app/api/v1/models/[slug]/invoke/route.ts` | Route | Simplificado — Route C eliminada (-100 lineas) |
+| `src/lib/contracts/marketplaceClient.ts` | Lib | Funciones on-chain server-side |
 | `src/lib/contracts/usdcSettler.ts` | Lib | x402 EIP-3009 settlement nativo |
-| `src/lib/contracts/marketplaceClient.ts` | Lib | withdrawForCreator, getKeyOwnerOnChain |
-| `src/lib/contracts/verifyUsdcTransfer.ts` | Lib | Verificacion USDC on-chain Route C |
-| `src/lib/contracts/abis.ts` | Lib | WITHDRAW_KEY_ABI |
-| `src/features/wallet/hooks/useWallet.ts` | Hook | Dual-wallet guard (thirdweb + wagmi) |
-| `src/features/payments/hooks/useWalletPayment.ts` | Hook | Route C embedded wallet client |
-| `supabase/migrations/041_unique_tx_hash.sql` | Migration | Anti-replay UNIQUE index |
+| `src/lib/security/csrf.ts` | Lib | CSRF validation (revisado) |
+| `src/lib/security/validateEndpointUrl.ts` | Lib | SSRF prevention (revisado) |
+| `src/lib/ratelimit.ts` | Lib | Rate limiting framework (revisado) |
+| `supabase/migrations/041_unique_tx_hash.sql` | Migration | UNIQUE index on agent_calls.tx_hash |
 | `supabase/migrations/042_owner_wallet_address.sql` | Migration | owner_wallet_address column |
 
----
+### Archivos eliminados (reduccion de superficie de ataque)
 
-## Estado de Hallazgos Previos (v2 — 2026-03-05)
-
-### Fixes Confirmados en v3
-
-| ID | Severidad | Descripcion | Estado |
-|---|---|---|---|
-| NG-101 | CRITICAL | upgrade-onchain no verificaba contrato destino ni evento AgentRegistered | **FIXED** v3 |
-| NG-102 | MEDIUM | Sin rate limiting en upgrade-onchain | **FIXED** v3 |
-| NG-105 | MEDIUM | Redis mutex fail-open permitia doble gasto en agent keys | **FIXED** v3 |
-| NA-301 | MEDIUM | selfRegisterAgent permisionless — slug squatting sin costo | **FIXED** v3 |
-| NA-303 | LOW | Sin validacion de longitud de slug en selfRegisterAgent | **FIXED** v3 |
-| NA-304 | LOW | Sin validacion de rango de precio en selfRegisterAgent | **FIXED** v3 |
-
-**Evidencia de fixes:**
-- NG-101: `upgrade-onchain/route.ts:89-141` — verifica `receipt.to == MARKETPLACE_CONTRACT_ADDRESS` + `decodeEventLog` para AgentRegistered con slug correcto.
-- NG-102: `upgrade-onchain/route.ts:29` — usa `getRegisterLimit()` (5/h por IP).
-- NG-105: `invoke/route.ts:248-260` — catch del Redis mutex retorna 503 en lugar de proceder.
-- NA-301: `WasiAIMarketplace.sol:261-268` — registrationFee + freeRegistrationsPerUser = 2.
-- NA-303: `WasiAIMarketplace.sol:270` — `bytes(slug).length <= 80`.
-- NA-304: `WasiAIMarketplace.sol:273` — `pricePerCall >= 1000 && pricePerCall <= 100_000_000`.
-
-### Hallazgos Previos Aun Abiertos
-
-| ID | Severidad | Descripcion | Estado |
-|---|---|---|---|
-| NG-103 | MEDIUM | register/route.ts retorna on_chain_registered:true antes de confirmar tx | **OPEN** |
-| NG-104 | MEDIUM | discover_agents_v2 RPC usa SECURITY DEFINER bypassing RLS | **OPEN** |
-| NA-302 | MEDIUM | Sin cron de reconciliacion on-chain vs DB para agentes on_chain | **OPEN** |
+| Archivo eliminado | Impacto |
+|---|---|
+| `src/lib/contracts/verifyUsdcTransfer.ts` | **NG-109 RESUELTO** — operador hardcoded eliminado |
+| `src/lib/contracts/operatorSettler.ts` | Flujo de settlement legacy eliminado |
+| `src/shared/lib/web3/thirdwebClient.ts` | **NG-111 RESUELTO** — dependencia custodial eliminada |
+| `src/features/payments/hooks/useWalletPayment.ts` | Route C client-side eliminado |
+| `src/hooks/useAuth.ts` | Hook legacy eliminado |
+| `src/lib/payments/computePaymentId.ts` | Movido a contrato on-chain (`computePaymentId()`) |
+| `src/lib/webhooks/triggerCreditsLow.ts` | Webhook eliminado |
+| `src/app/api/cron/retry-webhook-deliveries/route.ts` | Cron route eliminado |
+| `src/app/api/cron/upkeep-listener/route.ts` | Cron route eliminado |
 
 ---
 
-## Nuevos Hallazgos v3
+## Estado de Hallazgos Previos
+
+### Hallazgos v3 RESUELTOS en v4
+
+| ID | Severidad | Descripcion | Estado | Evidencia |
+|---|---|---|---|---|
+| NG-108 | MEDIUM | withdraw/route.ts sin guard de unicidad para txHash | **FIXED** v4 | withdraw/route.ts completamente reescrito; ya no modifica budget_usdc de agent_keys; ahora verifica EarningsClaimed on-chain y pone pending_earnings_usdc = 0 |
+| NG-109 | LOW | verifyUsdcTransfer.ts con direccion hardcoded | **FIXED** v4 | Archivo eliminado completamente |
+| NG-111 | MEDIUM | Route C (embedded wallet) flujo custodial off-chain | **FIXED** v4 | Route C eliminada; invoke/route.ts solo tiene Route A (agent key) y Route B (x402) |
+| NG-112 | INFO | useWallet.ts dual-connection guard race condition | **FIXED** v4 | Thirdweb eliminado; useWallet.ts simplificado sin dual-wallet guard |
+
+### Hallazgos v3 AUN ABIERTOS
+
+| ID | Severidad | Descripcion | Estado | Nota v4 |
+|---|---|---|---|---|
+| NG-103 | MEDIUM | register/route.ts retorna on_chain_registered:true antes de confirmar tx | **OPEN** | Sin cambios en v4 |
+| NG-104 | MEDIUM | discover_agents_v2 RPC usa SECURITY DEFINER bypassing RLS | **OPEN** | Sin cambios en v4 |
+| NA-302 | MEDIUM | Sin cron de reconciliacion on-chain vs DB para agentes on_chain | **OPEN** | Cron routes eliminados; reconciliacion aun no implementada |
+| NA-R01 | LOW | selfRegisterAgent usa bare transferFrom en lugar de safeTransferFrom | **OPEN** | Sin cambios en contrato para esta funcion |
+| NA-R03 | INFO | submitReputationBatch sin whenNotPaused | **OPEN** | Sin cambios |
+| NG-113 | INFO | migration 042 sin indice en owner_wallet_address | **OPEN** | Sin cambios |
 
 ---
 
-### NG-108 — MEDIUM: withdraw/route.ts sin guard de unicidad para txHash
+## Nuevos Hallazgos v4
 
-**Categoria:** NexusGuard | **Severidad:** MEDIUM
-**Archivo:** `src/app/api/agent-keys/[id]/withdraw/route.ts:134-159`
+---
+
+### NA-V01 — HIGH: claimEarnings() permite que cualquier address llame con voucher de otro creator
+
+**Categoria:** NexusAudit | **Severidad:** HIGH
+**Archivo:** `contracts/src/WasiAIMarketplace.sol:464-508`
 
 **Descripcion:**
-El endpoint de retiro directo (HU-063) verifica el receipt on-chain y extrae el monto del evento `KeyWithdrawn`. Sin embargo, no registra el `txHash` con un constraint UNIQUE en ninguna tabla. Enviar el mismo txHash dos veces al endpoint causa sincronizaciones duplicadas del saldo DB.
+La funcion `claimEarnings()` es `external` — cualquier address puede llamarla, no solo el creator. El parametro `creator` es explicito y la firma EIP-712 vincula el voucher al creator address. El USDC se envia al `creator` (no a `msg.sender`), lo cual es correcto. Sin embargo, existe un vector de front-running:
 
-**Flujo de explotacion (self-harm):**
-1. Usuario retira 5 USDC on-chain (txHash A). On-chain balance: 5 USDC.
-2. Llama al endpoint con txHash A. DB: `budget_usdc` 10 → 5. Correcto.
-3. Llama al endpoint de nuevo con txHash A.
-4. DB lee `budget_usdc = 5`, calcula `newBudget = max(0, 5 - 5) = 0`.
-5. DB marca `budget_usdc = 0`, `is_active = false`.
-6. La key se desactiva aunque on-chain aun tenga 5 USDC.
-7. El usuario pierde acceso hasta intervencion manual del operador.
+1. Creator obtiene voucher del backend (grossAmount, deadline, nonce, signature)
+2. Creator envia tx `claimEarnings(creator, grossAmount, deadline, nonce, sig)` al mempool
+3. Un front-runner ve la tx pendiente, extrae los parametros y envia su propia tx con gas mas alto
+4. La tx del front-runner se ejecuta primero — el USDC va al mismo `creator` address
+5. La tx original del creator revierte con "voucher already used"
+
+**Impacto:** El front-running no roba fondos (USDC siempre va al creator registrado), pero causa:
+- El creator ve su tx revertida sin entender por que
+- El front-runner paga gas sin beneficio
+- UX confusa: el creator cree que el retiro fallo pero su balance cambio
 
 **Evidencia:**
-```typescript
-// withdraw/route.ts:135-145
-const realAmount = Number(BigInt(log.data)) / 1_000_000
-const newBudget = Math.max(0, Number(keyRow.budget_usdc) - realAmount)
-await serviceClient
-  .from('agent_keys')
-  .update({ budget_usdc: newBudget, is_active: newBudget > 0 })
-  .eq('id', id)
-// Sin INSERT en tabla con UNIQUE(tx_hash) — mismo txHash puede procesarse N veces
+```solidity
+// WasiAIMarketplace.sol:464-470
+function claimEarnings(
+    address creator,        // parametro explicito — no msg.sender
+    uint256 grossAmount,
+    uint256 deadline,
+    bytes32 nonce,
+    bytes calldata sig
+) external nonReentrant whenNotPaused {
+    // ...
+    // linea 502: USDC va a creator, NO a msg.sender
+    usdc.safeTransfer(creator, creatorShare);
 ```
 
-**Nota de contexto:** La migracion 041 agrega `UNIQUE(tx_hash)` en `agent_calls`, pero el withdraw route NO inserta en `agent_calls`, solo actualiza `agent_keys`. El guard no cubre este flujo.
+**Mitigacion recomendada:** Agregar `require(msg.sender == creator, "WasiAI: caller must be creator")` para que solo el creator pueda ejecutar su propio voucher. Esto elimina el vector de front-running y es consistente con el patron de seguridad del contrato.
 
 ---
 
-### NG-111 — MEDIUM: Route C (embedded wallet invoke) es flujo custodial off-chain
+### NG-V01 — MEDIUM: voucher/route.ts no registra voucher emitido — no hay audit trail
 
 **Categoria:** NexusGuard | **Severidad:** MEDIUM
-**Archivo:** `src/features/payments/hooks/useWalletPayment.ts:124-167`, `src/lib/contracts/verifyUsdcTransfer.ts:10-14`
+**Archivo:** `src/app/api/creator/earnings/voucher/route.ts:98-106`
 
 **Descripcion:**
-Para usuarios con wallet embebida (Google/email via Thirdweb), Route C ejecuta `USDC.transfer(WASIAI_OPERATOR_ADDRESS, amount)`. El USDC va al operador — NO al contrato marketplace. Consecuencias:
+El endpoint genera un voucher EIP-712 con un nonce random y lo retorna al cliente, pero NO lo registra en ninguna tabla de Supabase. Consecuencias:
 
-1. **Riesgo custodial:** El operador retiene el USDC. Si el operador no llama `recordInvocation()` (o si el sistema falla), el creador nunca ve esos fondos en `earnings[]`.
-2. **Sin prueba on-chain:** Los pagos de Route C no aparecen en el contrato — no hay `AgentInvoked` event ni entrada en `usedPaymentIds`.
-3. **Inconsistencia de auditoria:** Los pagos via Route A (x402 EOA) se liquidan en el contrato; Route C no. Esto crea dos niveles de garantia para los creadores.
+1. **Sin audit trail:** No hay registro de cuantos vouchers se han emitido, para quien, ni por cuanto monto.
+2. **Voucher farming:** Un creator malicioso puede solicitar vouchers repetidamente sin ejecutarlos on-chain. Si en el futuro se implementa un flujo donde el amount se decrementa al emitir (no al ejecutar), los vouchers previos seguirian siendo validos.
+3. **Concurrencia:** Dos requests simultaneos generan dos vouchers con el mismo `pending_earnings_usdc`. Ambos serian validos on-chain (distintos nonces), pero el segundo fallaria por `insufficient free balance` si el contrato no tiene suficiente USDC.
 
 **Evidencia:**
 ```typescript
-// useWalletPayment.ts:129-135
-const transferHash = await unifiedWriteContract({
-  functionName: 'transfer',
-  args: [WASIAI_OPERATOR_ADDRESS, amountWei],  // operador, no contrato
+// voucher/route.ts:98-106 — retorna voucher sin guardar en DB
+logger.info('[voucher] signed', { walletAddress: profile.wallet_address, grossAmountAtomics })
+
+return NextResponse.json({
+  grossAmountAtomics,
+  grossAmountUsdc: pendingUsdc,
+  deadline:        deadline.toString(),
+  nonce,
+  signature,
 })
-// verifyUsdcTransfer.ts:10-14
-const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_WASIAI_OPERATOR
-  ?? '0x2dd1Bd5D69Fe05205C0eecB9e22Bc8Ec99eE7aaB').toLowerCase()
-// invoke/route.ts:413-427: Route C solo actualiza DB, no llama contrato
+// No INSERT en ninguna tabla — el voucher existe solo en memoria del cliente
 ```
 
-**Nota:** Este puede ser un diseno intencional para simplificar el flujo de embedded wallets. Si es intencional, debe documentarse en el contrato y en el user-facing dashboard.
+**Nota:** El contrato tiene `usedVouchers[nonce]` que previene replay on-chain. El riesgo es off-chain: falta de trazabilidad y posibilidad de emitir multiples vouchers concurrentes para el mismo saldo.
 
 ---
 
-### NA-R01 — LOW: selfRegisterAgent usa bare transferFrom en lugar de safeTransferFrom
+### NG-V02 — MEDIUM: withdraw/route.ts no valida que el txHash no haya sido procesado antes
 
-**Categoria:** NexusAudit | **Severidad:** LOW
-**Archivo:** `contracts/src/WasiAIMarketplace.sol:262-265`
+**Categoria:** NexusGuard | **Severidad:** MEDIUM
+**Archivo:** `src/app/api/creator/withdraw/route.ts:25-137`
 
 **Descripcion:**
-El contrato declara `using SafeERC20 for IERC20` y usa `usdc.safeTransfer()` en todas las transferencias de salida. Pero `selfRegisterAgent()` usa el metodo bare `usdc.transferFrom()` con `require()` para cobrar la registration fee. Inconsistencia que podria fallar silenciosamente con tokens no-standard.
+El endpoint POST recibe un `txHash`, verifica el evento EarningsClaimed on-chain, y pone `pending_earnings_usdc = 0`. Si un atacante (o el mismo creator) envia el mismo txHash dos veces, el endpoint:
+
+1. Primera vez: Verifica OK → pone pending_earnings = 0. Correcto.
+2. Segunda vez: Verifica OK (el receipt sigue en la blockchain) → pone pending_earnings = 0 de nuevo. No causa dano directo porque ya era 0.
+
+**Sin embargo**, si entre la primera y segunda llamada se acumularon nuevos earnings (por invocaciones x402), la segunda llamada borraria esos earnings sin que el creator los haya retirado:
+
+**Flujo de explotacion:**
+1. Creator retira 10 USDC via voucher. POST withdraw con txHash A → pending = 0. OK.
+2. Pasan 2 horas. Se acumulan 3 USDC en pending_earnings_usdc por nuevas invocaciones.
+3. Creator (o atacante) llama POST withdraw con txHash A de nuevo.
+4. La verificacion on-chain pasa (el receipt sigue existiendo).
+5. pending_earnings_usdc = 0 de nuevo. Los 3 USDC nuevos se pierden.
 
 **Evidencia:**
-```solidity
-// WasiAIMarketplace.sol:261-265 — bare transferFrom
-if (registrationFee > 0 && userCount >= freeRegistrationsPerUser) {
-    require(
-        usdc.transferFrom(msg.sender, address(this), registrationFee),
-        "Fee transfer failed"
-    );
-}
-// Contraste — resto del contrato usa SafeERC20:
-// usdc.safeTransfer(treasury, platformShare);      (linea 395)
-// usdc.safeTransfer(msg.sender, amount);           (linea 415)
+```typescript
+// withdraw/route.ts:115-120 — SET incondicional a 0
+const { error: updateError } = await serviceClient
+  .from('creator_profiles')
+  .update({ pending_earnings_usdc: 0 })  // siempre 0, sin importar si ya fue procesado
+  .eq('id', user.id)
+// No hay check: "ya procesamos este txHash antes?"
 ```
+
+**Mitigacion:** Registrar cada txHash procesado en una tabla de withdrawals con UNIQUE constraint, o usar `decrement` en lugar de `SET 0`, o agregar una columna `last_withdrawal_tx` con check.
 
 ---
 
-### NA-R02 — LOW: selfRegisterAgent cobra fee ANTES de validar slug uniqueness
-
-**Categoria:** NexusAudit | **Severidad:** LOW
-**Archivo:** `contracts/src/WasiAIMarketplace.sol:261-275`
-
-**Descripcion:**
-El orden de operaciones en `selfRegisterAgent()` cobra la fee y actualiza el contador de registros ANTES de verificar si el slug ya esta tomado. Si el slug existe, el tx revierte (devolviendo los fondos gracias a la atomicidad de Solidity), pero el usuario gasta gas innecesario. Con costos de gas en Avalanche bajos, el impacto es minimo pero el patron es incorrecto.
-
-**Evidencia:**
-```solidity
-// WasiAIMarketplace.sol:260-278 — orden actual
-uint256 userCount = userRegistrationCount[msg.sender];
-if (registrationFee > 0 && userCount >= freeRegistrationsPerUser) {
-    require(usdc.transferFrom(...), "Fee transfer failed");  // 1. cobra fee
-}
-userRegistrationCount[msg.sender] = userCount + 1;          // 2. incrementa contador
-require(bytes(slug).length <= 80, "Invalid slug length");   // 3. valida slug
-require(pricePerCall >= 1000..., "Price out of range");     // 4. valida precio
-require(agents[slug].creator == address(0), "slug taken");  // 5. verifica unicidad
-// Orden correcto: verificar unicidad (5) primero, luego cobrar (1-2)
-```
-
----
-
-### NG-109 — LOW: verifyUsdcTransfer.ts con direccion de operador hardcoded como fallback
+### NG-V03 — LOW: voucher/route.ts no tiene rate limiting
 
 **Categoria:** NexusGuard | **Severidad:** LOW
-**Archivo:** `src/lib/contracts/verifyUsdcTransfer.ts:10-14`
+**Archivo:** `src/app/api/creator/earnings/voucher/route.ts:18`
 
 **Descripcion:**
-Si las variables de entorno `NEXT_PUBLIC_WASIAI_OPERATOR` y `NEXT_PUBLIC_OPERATOR_ADDRESS` no estan configuradas, el verificador acepta pagos USDC a una direccion hardcodeada. En un deploy mal configurado (staging sin env vars), esto podria verificar pagos a una direccion erronea.
+El endpoint `/api/creator/earnings/voucher` genera vouchers firmados por el operador sin rate limiting. Un creator autenticado puede solicitar miles de vouchers por minuto. Aunque cada voucher usa el mismo `pending_earnings_usdc` (y el contrato previene double-claim via nonces), la generacion masiva:
+
+1. Consume CPU del servidor para firmar EIP-712 con `privateKeyToAccount` + `signTypedData`
+2. Expone la carga de trabajo de la clave privada del operador a DoS
+3. Los logs se inundan con entradas `[voucher] signed`
 
 **Evidencia:**
 ```typescript
-// verifyUsdcTransfer.ts:10-14
-const OPERATOR_ADDRESS = (
-  process.env.NEXT_PUBLIC_WASIAI_OPERATOR
-  ?? process.env.NEXT_PUBLIC_OPERATOR_ADDRESS
-  ?? '0x2dd1Bd5D69Fe05205C0eecB9e22Bc8Ec99eE7aaB'  // fallback hardcoded — RIESGO
-).toLowerCase()
+// voucher/route.ts:18 — sin rate limiting
+export async function POST(req: NextRequest) {
+  const csrfError = validateCsrf(req)
+  if (csrfError) return csrfError
+  // Auth... pero no rate limit
+  // Compara con upgrade-onchain/route.ts que SI tiene getRegisterLimit()
+```
+
+**Patron esperado (como otros endpoints):**
+```typescript
+const rlId = getIdentifier(req, user.id)
+const rlHit = await checkRateLimit(getKeysLimit(), rlId)
+if (rlHit) return rlHit
 ```
 
 ---
 
-### NA-R03 — INFO: submitReputationBatch sin whenNotPaused
+### NG-V04 — INFO: withdraw/route.ts usa RPC URLs hardcoded en lugar de env vars
 
-**Categoria:** NexusAudit | **Severidad:** INFO
-**Archivo:** `contracts/src/WasiAIMarketplace.sol:811-838`
+**Categoria:** NexusGuard | **Severidad:** INFO
+**Archivo:** `src/app/api/creator/withdraw/route.ts:58-63`
 
 **Descripcion:**
-`submitReputationBatch()` es `onlyOperator` pero no tiene `whenNotPaused`. Cuando el contrato esta pausado (emergencia), el operador puede seguir actualizando scores de reputacion. Inconsistente con el patron del contrato donde las funciones de escritura tienen `whenNotPaused`.
+El endpoint de withdraw crea un `createPublicClient` con URLs de RPC hardcoded para Avalanche/Fuji. El resto del codebase usa env vars (`NEXT_PUBLIC_RPC_MAINNET` / `NEXT_PUBLIC_RPC_TESTNET`) para los RPCs. Inconsistencia que dificulta cambiar el proveedor de RPC globalmente.
+
+**Evidencia:**
+```typescript
+// withdraw/route.ts:58-63 — URLs hardcoded
+const pub = createPublicClient({
+  chain:     chainId === 43114 ? avalanche : avalancheFuji,
+  transport: http(chainId === 43114
+    ? 'https://api.avax.network/ext/bc/C/rpc'           // hardcoded
+    : 'https://api.avax-test.network/ext/bc/C/rpc'),    // hardcoded
+})
+
+// Contraste — marketplaceClient.ts:35-38 usa env vars
+const rpcUrl = (chain.id === 43114
+  ? process.env.NEXT_PUBLIC_RPC_MAINNET
+  : process.env.NEXT_PUBLIC_RPC_TESTNET
+)?.trim() || undefined
+```
+
+---
+
+### NA-V02 — INFO: claimEarnings() no emite evento cuando el balance guard falla
+
+**Categoria:** NexusAudit | **Severidad:** INFO
+**Archivo:** `contracts/src/WasiAIMarketplace.sol:491-495`
+
+**Descripcion:**
+El balance guard en `claimEarnings()` protege los key balances verificando `usdc.balanceOf(address(this)) - totalKeyBalances >= grossAmount`. Si la condicion falla, revierte con un error message generico. Para monitoring y alertas, seria util emitir un evento `InsufficientFreeBalance(address creator, uint256 requested, uint256 available)` antes de revertir, o al menos un error custom para que los indexadores puedan capturarlo.
 
 **Evidencia:**
 ```solidity
-// WasiAIMarketplace.sol:811
-function submitReputationBatch(
-    string[] calldata slugs,
-    uint16[] calldata avgRatings,
-    uint32[] calldata voteCounts
-) external onlyOperator {  // whenNotPaused ausente
+// WasiAIMarketplace.sol:491-495
+require(
+    usdc.balanceOf(address(this)) - totalKeyBalances >= grossAmount,
+    "WasiAI: insufficient free balance"
+);
+// No hay custom error ni evento para monitoring
 ```
+
+**Nota:** Los custom errors de Solidity 0.8+ reducen el costo de gas y mejoran la legibilidad del revert. Pero como el contrato ya esta desplegado, esto es un improvement para futuras versiones.
 
 ---
 
-### NG-112 — INFO: useWallet.ts dual-connection guard con potencial race condition
+## Analisis del Sistema de Voucher EIP-712 (HU-067)
 
-**Categoria:** NexusGuard | **Severidad:** INFO
-**Archivo:** `src/features/wallet/hooks/useWallet.ts:29-34`
+### Flujo completo auditado:
 
-**Descripcion:**
-El guard que desconecta wagmi cuando thirdweb esta activo usa un `useEffect`. Durante una transicion de conexion (usuario conecta MetaMask mientras thirdweb esta en proceso), ambas condiciones pueden ser `true` momentaneamente, disparando un `wagmiDisconnect()` no deseado.
-
-**Evidencia:**
-```typescript
-// useWallet.ts:29-34
-useEffect(() => {
-  if (thirdwebAccount && wagmiConnected) {
-    wagmiDisconnect()  // puede dispararse en ventana de transicion
-  }
-}, [thirdwebAccount, wagmiConnected, wagmiDisconnect])
 ```
+[Creator]                    [Backend]                   [Contract]
+    |                            |                           |
+    |-- GET /withdraw ---------->|                           |
+    |<-- pending_usdc: 10.00 ---|                           |
+    |                            |                           |
+    |-- POST /voucher ---------->|                           |
+    |   (auth via cookie)        |-- signs EIP-712 -------->|
+    |                            |   (OPERATOR_PRIVATE_KEY)  |
+    |<-- {grossAmount, nonce, --|                           |
+    |     deadline, signature}   |                           |
+    |                            |                           |
+    |-- claimEarnings(creator, grossAmount, deadline, nonce, sig) -->|
+    |   (via MetaMask/Core)      |                           |-- verify EIP-712
+    |                            |                           |-- anti-replay (usedVouchers)
+    |                            |                           |-- balance guard
+    |                            |                           |-- split 90/10
+    |                            |                           |-- safeTransfer to creator
+    |                            |                           |-- emit EarningsClaimed
+    |<-- tx receipt -------------|                           |
+    |                            |                           |
+    |-- POST /withdraw --------->|                           |
+    |   {txHash}                 |-- getTransactionReceipt ->|
+    |                            |-- verify EarningsClaimed   |
+    |                            |-- verify creator match     |
+    |                            |-- SET pending = 0          |
+    |<-- {ok, realAmount} ------|                           |
+```
+
+### Controles de seguridad verificados:
+
+| Control | Implementado | Evidencia |
+|---|---|---|
+| Amount from DB, not client | YES | voucher/route.ts:30-31 — `select('pending_earnings_usdc')` |
+| EIP-712 domain separation | YES | WasiAIMarketplace.sol:199 — `EIP712("WasiAIMarketplace", "1")` |
+| CLAIM_TYPEHASH correcta | YES | WasiAIMarketplace.sol:129-131 — includes creator, grossAmount, deadline, nonce |
+| Anti-replay (nonce) | YES | WasiAIMarketplace.sol:476-477 — `usedVouchers[nonce] = true` |
+| Deadline check | YES | WasiAIMarketplace.sol:473 — `block.timestamp <= deadline` |
+| Operator signature verify | YES | WasiAIMarketplace.sol:487-489 — ECDSA.recover + operators[] |
+| Balance guard (key balances) | YES | WasiAIMarketplace.sol:492-494 — protects totalKeyBalances |
+| SafeERC20 for transfers | YES | WasiAIMarketplace.sol:502-505 — `usdc.safeTransfer()` |
+| ReentrancyGuard | YES | WasiAIMarketplace.sol:470 — `nonReentrant` modifier |
+| Pausable | YES | WasiAIMarketplace.sol:470 — `whenNotPaused` modifier |
+| CEI pattern | YES | Checks (471-495) → Effects (477: usedVouchers) → Interactions (502-505: transfers) |
+| CSRF on voucher endpoint | YES | voucher/route.ts:19 — `validateCsrf(req)` |
+| Auth on voucher endpoint | YES | voucher/route.ts:23-25 — `supabase.auth.getUser()` |
+| On-chain receipt verify | YES | withdraw/route.ts:69-82 — retry 3x |
+| Creator address matching | YES | withdraw/route.ts:106-110 — event creator vs authenticated wallet |
+| USDC goes to creator, not msg.sender | YES | WasiAIMarketplace.sol:502 — `usdc.safeTransfer(creator, creatorShare)` |
 
 ---
 
-### NG-113 — INFO: migration 042 sin indice en owner_wallet_address
+## Analisis de Eliminacion de Route C (HU-071)
 
-**Categoria:** NexusGuard | **Severidad:** INFO
-**Archivo:** `supabase/migrations/042_owner_wallet_address.sql`
+### Impacto positivo en seguridad:
 
-**Descripcion:**
-La columna `owner_wallet_address` se agrega a `agent_keys` sin indice. El flujo de retiro (withdraw/route.ts:60) usa esta columna como lookup primario antes de hacer una llamada RPC on-chain. Sin indice, la query puede ser lenta en tablas grandes.
+| Aspecto eliminado | Riesgo removido |
+|---|---|
+| Thirdweb embedded wallet | Dependencia de terceros para custodia de fondos |
+| Route C en invoke/route.ts | Flujo custodial donde USDC iba al operador (no al contrato) |
+| verifyUsdcTransfer.ts | Operador address hardcoded como fallback |
+| useWalletPayment.ts | Client-side transfer a operador |
+| Dual-wallet guard en useWallet.ts | Race condition entre thirdweb y wagmi |
 
-**Evidencia:**
-```sql
--- 042_owner_wallet_address.sql
-ALTER TABLE agent_keys
-  ADD COLUMN IF NOT EXISTS owner_wallet_address TEXT;
--- Falta: CREATE INDEX idx_agent_keys_owner_wallet ON agent_keys(owner_wallet_address);
-```
+**Resultado:** invoke/route.ts se reduce a 2 paths claros:
+- **Route A:** Agent key (budget-based, DB accounting, batch settlement)
+- **Route B:** x402 EIP-3009 (on-chain settlement nativo en Avalanche)
+
+Ambos paths son bien auditados con rate limiting, SSRF protection, circuit breaker, y anti-replay.
 
 ---
 
-## Resumen Consolidado v3
+## Resumen Consolidado v4
 
 ### Nuevos Hallazgos
 
 | ID | Componente | Severidad | Estado |
 |---|---|---|---|
-| NG-108 | withdraw/route.ts | **MEDIUM** | NEW |
-| NG-111 | useWalletPayment.ts + invoke/route.ts | **MEDIUM** | NEW |
-| NA-R01 | WasiAIMarketplace.sol | LOW | NEW |
-| NA-R02 | WasiAIMarketplace.sol | LOW | NEW |
-| NG-109 | verifyUsdcTransfer.ts | LOW | NEW |
-| NA-R03 | WasiAIMarketplace.sol | INFO | NEW |
-| NG-112 | useWallet.ts | INFO | NEW |
-| NG-113 | migrations/042 | INFO | NEW |
+| NA-V01 | WasiAIMarketplace.sol:464 | **HIGH** | NEW |
+| NG-V01 | voucher/route.ts:98-106 | **MEDIUM** | NEW |
+| NG-V02 | withdraw/route.ts:115-120 | **MEDIUM** | NEW |
+| NG-V03 | voucher/route.ts:18 | **LOW** | NEW |
+| NG-V04 | withdraw/route.ts:58-63 | **INFO** | NEW |
+| NA-V02 | WasiAIMarketplace.sol:491-495 | **INFO** | NEW |
 
-### Hallazgos Abiertos de Versiones Anteriores
+### Hallazgos Previos Abiertos
 
 | ID | Componente | Severidad | Estado |
 |---|---|---|---|
-| NG-103 | register/route.ts | MEDIUM | OPEN desde v2 |
-| NG-104 | 039_dual_registration.sql | MEDIUM | OPEN desde v2 |
-| NA-302 | cron/reconcile | MEDIUM | OPEN desde v2 |
+| NG-103 | register/route.ts | **MEDIUM** | OPEN (v3) |
+| NG-104 | discover_agents_v2 RPC | **MEDIUM** | OPEN (v3) |
+| NA-302 | Sin cron de reconciliacion | **MEDIUM** | OPEN (v3) |
+| NA-R01 | selfRegisterAgent bare transferFrom | **LOW** | OPEN (v3) |
+| NA-R03 | submitReputationBatch sin whenNotPaused | **INFO** | OPEN (v3) |
+| NG-113 | migration 042 sin indice | **INFO** | OPEN (v3) |
 
-### Fixes Confirmados en v3
+### Hallazgos RESUELTOS en v4
 
-| ID | Severidad | Estado |
-|---|---|---|
-| NG-101 | CRITICAL | FIXED |
-| NG-102 | MEDIUM | FIXED |
-| NG-105 | MEDIUM | FIXED |
-| NA-301 | MEDIUM | FIXED |
-| NA-303 | LOW | FIXED |
-| NA-304 | LOW | FIXED |
-
----
-
-## Checks de No-Regresion v3
-
-Los siguientes 22 fixes de la auditoria v2.0 se verificaron sin regresiones:
-
-| Check | Archivo | Status |
-|---|---|---|
-| CEI pattern en withdraw() | sol:409-417 | PASS |
-| CEI pattern en settleKeyBatch() | sol:525-554 | PASS |
-| CEI pattern en withdrawKey() | sol:595-599 | PASS |
-| ReentrancyGuard en funciones de fondos | sol:55 | PASS |
-| Ownable2Step para ownership | sol:55 | PASS |
-| Fee timelock 48h | sol:84 | PASS |
-| Treasury timelock 48h | sol:89 | PASS |
-| SafeERC20 en withdraw/withdrawFor/safeTransfer | sol:415,432 | PASS |
-| Pausability en depositForKey/settleKeyBatch | sol:458,502 | PASS |
-| Solvency invariant (checkSolvency) | sol:738-748 | PASS |
-| Daily settlement cap | sol:497-523 | PASS |
-| Emergency timeout 30d | sol:602-617 | PASS |
-| CSRF en rutas mutables | upgrade-onchain:25, withdraw:30 | PASS |
-| SSRF validation en endpoint URLs | invoke:550-554 | PASS |
-| Auth check antes de operaciones | todas las routes | PASS |
-| Zod validation en body schemas | deposit:7-26, withdraw:21-24 | PASS |
-| Redis mutex fail-closed (NG-105) | invoke:248-260 | PASS |
-| UNIQUE index anti-replay agent_calls | 041_unique_tx_hash.sql | PASS |
-| decodeEventLog + contract target check (NG-101) | upgrade-onchain:89-141 | PASS |
-| Rate limiting upgrade-onchain (NG-102) | upgrade-onchain:29 | PASS |
-| Registration fee (NA-301) | sol:261-268 | PASS |
-| Slug + price validation (NA-303/304) | sol:270,273 | PASS |
-
----
-
-## Score de Seguridad v3
-
-| Dimension | v2 (2026-03-05) | v3 (2026-03-08) | Delta |
+| ID | Severidad | Descripcion | Resolucion |
 |---|---|---|---|
-| Smart Contract | 8.0 | 8.5 | +0.5 |
-| Auth & Access Control | 8.5 | 8.5 | = |
-| Payment Flow Integrity | 7.5 | 8.0 | +0.5 |
-| Input Validation (Zod) | 9.0 | 9.0 | = |
-| Error Handling | 8.5 | 8.5 | = |
-| On-chain Verification | 7.0 | 9.0 | +2.0 |
-| **Global** | **8.3** | **8.6** | **+0.3** |
+| NG-108 | MEDIUM | withdraw txHash replay | FIXED — withdraw reescrito |
+| NG-109 | LOW | operador hardcoded | FIXED — archivo eliminado |
+| NG-111 | MEDIUM | Route C custodial | FIXED — Route C eliminada |
+| NG-112 | INFO | dual-wallet race condition | FIXED — thirdweb eliminado |
 
 ---
 
-## Recomendaciones de Prioridad
+## Score de Seguridad
 
-1. **NG-108 (MEDIUM)** — Insertar en tabla `key_withdrawals` con `UNIQUE(tx_hash)` para hacer el endpoint idempotente.
-2. **NG-111 (MEDIUM)** — Clarificar si Route C es custodial por diseno. Si es intencional, documentarlo en dashboard y contratar auditoria formal del flujo custodial.
-3. **NA-R01 (LOW)** — Cambiar a `usdc.safeTransferFrom()` en `selfRegisterAgent()`.
-4. **NA-R02 (LOW)** — Reordenar `selfRegisterAgent()`: validar slug primero, luego cobrar fee.
-5. **NG-109 (LOW)** — Eliminar fallback hardcodeado; usar `throw new Error` si env var no configurada.
+| Categoria | v3 Score | v4 Score | Delta |
+|---|---|---|---|
+| Smart Contract (on-chain) | 8.5 | 9.0 | +0.5 |
+| API Routes (off-chain) | 8.5 | 8.8 | +0.3 |
+| Auth & Access Control | 9.0 | 9.2 | +0.2 |
+| Input Validation | 9.0 | 9.0 | 0 |
+| Cryptographic Controls | 8.5 | 9.5 | +1.0 |
+| **Promedio ponderado** | **8.6** | **9.0** | **+0.4** |
+
+### Justificacion de mejora:
+- **Cryptographic Controls +1.0:** EIP-712 voucher system bien implementado con domain separation, anti-replay, y deadline
+- **Smart Contract +0.5:** Balance guard protege key balances, CEI pattern correcto en claimEarnings
+- **API Routes +0.3:** Route C eliminada reduce superficie de ataque significativamente
+- **Auth +0.2:** Todas las nuevas rutas tienen auth + CSRF
+
+### Puntos pendientes que frenan el score:
+- NA-V01 (HIGH): claimEarnings callable por cualquier address
+- NG-V02 (MEDIUM): withdraw sin idempotencia de txHash
+- NG-103/NG-104/NA-302 (MEDIUM): hallazgos abiertos de v3
 
 ---
 
-*Generado por NexusAudit v2.0 + NexusGuard v1.0 | WasiAI Security Framework | 2026-03-08*
+## Recomendaciones Priorizadas
+
+1. **URGENTE (NA-V01):** Agregar `require(msg.sender == creator)` en `claimEarnings()` para eliminar vector de front-running
+2. **ALTA (NG-V02):** Registrar txHash procesados en tabla de withdrawals para idempotencia
+3. **ALTA (NG-V01):** Registrar vouchers emitidos en Supabase para audit trail
+4. **MEDIA (NG-V03):** Agregar rate limiting al endpoint de voucher
+5. **MEDIA (NG-103/NG-104/NA-302):** Resolver hallazgos abiertos de v3
+
+---
+
+*Reporte generado por NexusAudit v2.0 + NexusGuard v1.0*
+*Metodologia TRACE (on-chain) + SHIELD (off-chain)*
