@@ -332,3 +332,24 @@ Los siguientes hallazgos siguen abiertos de auditorias anteriores:
 
 **Contrato activo Fuji (post-sprint):** `0xC01DEF0ca66b86E9F8655dc202347F1cf104b7A7`
 **Score post-implementación estimado:** 10.0/10 — todos los hallazgos del audit v4.0 cerrados.
+
+---
+
+## HU-071 — Remove Thirdweb (wagmi-only stack)
+
+**Commit:** `57d6be6` (en main como resultado de rebase; equivalente a `92e2b7a` local)
+**Estado:** ✅ DONE — en producción desde 2026-03-08
+
+**Cambios:**
+- `useWallet.ts` — wagmi only, `isThirdweb` removed
+- `useUnifiedWalletClient.ts` — viem WalletClient only, no thirdweb paths
+- `WalletConnectButton.tsx` — reescrito con `useConnectors` + `WalletConnectModal`
+- `WalletConnectModal.tsx` — wagmi connectors (injected + coinbaseWallet)
+- `Web3Provider.tsx` — ThirdwebProvider removed
+- `thirdwebClient.ts` — deleted
+- `agent-keys/page.tsx` — Route C (embedded wallet) removed
+- `WithdrawButton.tsx` — isThirdweb guard removed
+- `useWalletPayment.ts` — Route C (isThirdweb branch) removed
+- `useChainGuard.ts` / `useNetwork.ts` — isThirdweb guards removed
+
+**Verificación SAR 2026-03-08:** `92e2b7a` local === `57d6be6` en origin/main (mismo commit post-rebase). No conflictos con HU-078/082/083. Todo el trabajo posterior fue construido sobre base wagmi-only.
