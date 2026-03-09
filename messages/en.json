@@ -132,7 +132,8 @@
     "currency": "Currency",
     "freeTrial": "Try Free · {count} calls",
     "freeTrialFilter": "Free to Try",
-    "verifiedCreator": "Verified Creator"
+    "verifiedCreator": "Verified Creator",
+    "perCall": "per call · USDC · Avalanche"
   },
   "publish": {
     "title": "Publish an Agent",
@@ -590,7 +591,10 @@
     "getAgentKey": "Get Agent Key →",
     "modelSpecJson": "Model Spec (JSON) ↗",
     "optionA": "Option A — Agent Key (budget-based)",
-    "optionB": "Option B — x402 Direct Payment (Avalanche USDC)"
+    "optionB": "Option B — x402 Direct Payment (Avalanche USDC)",
+    "pricingHeader": "Estimated price per invocation (x402)",
+    "freeTrial": "🎁 Free Trial",
+    "agent": "agent"
   },
   "wallet": {
     "connectWallet": "Connect Wallet",

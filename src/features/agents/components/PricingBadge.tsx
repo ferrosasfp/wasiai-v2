@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface PricingData {
   creatorPrice: number
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function PricingBadge({ slug, basePrice }: Props) {
+  const t = useTranslations('modelDetail')
   const [data, setData]       = useState<PricingData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -60,7 +62,7 @@ export function PricingBadge({ slug, basePrice }: Props) {
         ~${fmtPrice(data.totalPrice)} USDC
       </span>
       <span className="text-xs text-gray-500">
-        ${fmtPrice(data.creatorPrice)} agente
+        ${fmtPrice(data.creatorPrice)} {t('agent')}
         {gasVisible && <> + ${fmtPrice(data.gasFee)} gas</>}
       </span>
     </div>

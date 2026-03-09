@@ -115,7 +115,7 @@ export function AgentRating({ slug, initialScore, initialCount, compact = false 
                 : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-green-50 hover:border-green-200 hover:text-green-700'}
               disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            👍 Useful
+            👍 {t('up')}
           </button>
           <button
             onClick={() => vote('down')}
@@ -126,7 +126,7 @@ export function AgentRating({ slug, initialScore, initialCount, compact = false 
                 : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-red-50 hover:border-red-200 hover:text-red-700'}
               disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            👎 Not useful
+            👎 {t('down')}
           </button>
         </div>
       )}

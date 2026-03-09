@@ -33,7 +33,7 @@ export function ModelCallSection({ model, isAuthenticated = false }: Props) {
       {/* Price header */}
       <div className="mb-5 text-center">
         <p className="text-4xl font-extrabold text-gray-900">${model.price_per_call}</p>
-        <p className="text-sm text-gray-500">per call · USDC · Avalanche</p>
+        <p className="text-sm text-gray-500">{tMarket('perCall')}</p>
       </div>
 
       {/* Stats */}

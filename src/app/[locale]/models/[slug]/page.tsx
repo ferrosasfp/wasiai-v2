@@ -74,7 +74,7 @@ export default async function ModelDetailPage({ params }: Props) {
                     {/* HU-3.3: Badge Free Trial — solo si el creator lo activó */}
                     {model.free_trial_enabled && (
                       <span className="rounded-full bg-green-50 border border-green-200 px-3 py-0.5 text-xs font-semibold text-green-700">
-                        🎁 Free Trial
+                        {tDetail('freeTrial')}
                       </span>
                     )}
                     {model.registration_type === 'on_chain' && (
@@ -217,7 +217,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
             {model.price_per_call > 0 && (
               <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Precio estimado por invocación (x402)
+                  {tDetail('pricingHeader')}
                 </p>
                 <PricingBadge slug={model.slug} basePrice={model.price_per_call} />
               </div>
