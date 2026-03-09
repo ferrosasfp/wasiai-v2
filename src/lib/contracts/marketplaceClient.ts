@@ -382,7 +382,16 @@ export async function depositForKeyOnChain(params: {
     })
 
     const txHash = await wallet.writeContract(request)
-    logger.info('[marketplace] depositForKey tx', { txHash, keyId: params.keyId.slice(0, 8) })
+    logger.info('[marketplace] depositForKey tx submitted', { txHash, keyId: params.keyId.slice(0, 8) })
+
+    // HAL-025: wait for confirmation before returning — DB must only update after on-chain success
+    const receipt = await pub.waitForTransactionReceipt({ hash: txHash, confirmations: 1 })
+    if (receipt.status !== 'success') {
+      logger.error('[marketplace] depositForKey reverted on-chain', { txHash })
+      return null
+    }
+
+    logger.info('[marketplace] depositForKey confirmed', { txHash, keyId: params.keyId.slice(0, 8) })
     return txHash
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
