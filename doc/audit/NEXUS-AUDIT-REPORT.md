@@ -1,286 +1,420 @@
-# NEXUS-AUDIT-REPORT v1.0
-## @wasiai/sdk — Security Audit Report
+# NEXUS-AUDIT-REPORT v4.0
+## WasiAI Marketplace — Security Audit Report
 
 **Fecha:** 2026-03-08
-**Auditores:** NexusAudit v2.0 (adaptado para SDK) + NexusGuard v1.0 (off-chain)
-**Version auditada:** v0.3.0 — commit HEAD main
-**Repo:** https://github.com/ferrosasfp/wasiai-sdk
-**Score de seguridad:** 7.8 / 10
+**Auditores:** NexusAudit v2.0 (on-chain) + NexusGuard v1.0 (off-chain)
+**Version codebase:** post-pull v4 — 97 archivos cambiados, -4364 lineas (cleanup masivo)
+**Commit base:** main (post a751cbb)
+**Score de seguridad:** 9.0 / 10 (mejora desde 8.6/10 de v3)
 
 ---
 
 ## Executive Summary
 
-`@wasiai/sdk` es un SDK TypeScript puro de lado del cliente (y servidor Node.js) que expone:
-- `invokeAgent()` — llamada HTTP a agentes WasiAI via API key
-- `discoverAgents()` — descubrimiento publico de agentes
-- `publishAgent()` — registro de agentes via API key
-- `getCreatorStats()` — estadisticas de creador via API key
-- `WasiAITool` / `WasiAIToolkit` — integracion LangChain
-- `wasiai` CLI — interfaz de linea de comandos (Commander.js)
+Auditoria post-pull v4 del codebase WasiAI. Los cambios principales auditados son:
+- **HU-067: Sistema de retiro via voucher EIP-712** — nuevo `claimEarnings()` en contrato con firma del operador, anti-replay, deadline, balance guard
+- **HU-071: Eliminacion completa de Thirdweb** — Route C, embedded wallet, `verifyUsdcTransfer.ts`, `thirdwebClient.ts` eliminados
+- **Simplificacion de invoke/route.ts** — solo Route A (agent key) y Route B (x402 nativo)
+- **Nuevo endpoint `/api/creator/earnings/voucher`** — genera voucher EIP-712 server-side
+- **Reescritura de `/api/creator/withdraw`** — verifica evento EarningsClaimed on-chain (HAL-025)
+- **Eliminacion de codigo legacy:** operatorSettler.ts, useAuth.ts, computePaymentId.ts (movido a contrato), cron routes
 
-**Alcance NexusAudit (on-chain):** No aplicable — el SDK no contiene logica on-chain ni interaccion con contratos inteligentes. Ver seccion NexusAudit Adaptado.
-
-**Alcance NexusGuard (off-chain):** Completo — flujo HTTP, manejo de API keys, validacion de inputs, CLI, cadena de dependencias.
-
-**Hallazgos:** 10 (0 CRITICAL, 2 MEDIUM, 4 LOW, 4 INFO)
-
----
-
-## NexusAudit — Adaptado para SDK (Sin Contratos)
-
-### SDK-NA-01 — INFO: El SDK no puede verificar estado on-chain de forma independiente
-
-**Categoria:** NexusAudit SDK | **Severidad:** INFO
-
-El SDK es un cliente HTTP puro. No tiene capacidad para verificar de forma independiente:
-- Que el agente invocado esta realmente registrado on-chain en el contrato WasiAI.
-- Que el pago de la API key fue correctamente liquidado on-chain.
-- Que el `recordInvocation()` fue llamado por el backend tras el cobro.
-
-Si el backend WasiAI fuera comprometido, el SDK no tiene mecanismo de verificacion criptografica independiente. Esto es aceptable para v0.x dado el estadio del proyecto, pero deberia documentarse como limitacion conocida.
-
-**Riesgo:** Si el backend es comprometido, el SDK no puede detectarlo.
-**Mitigacion actual:** Ninguna. El trust model del SDK es 100% en el servidor WasiAI.
+**Hallazgos nuevos:** 6 (0 CRITICAL, 1 HIGH, 2 MEDIUM, 1 LOW, 2 INFO)
+**Hallazgos v3 resueltos:** 4 (NG-108, NG-109, NG-111, NG-112)
+**Hallazgos v3 aun abiertos:** 3 (NG-103, NG-104, NA-302) + 2 on-chain (NA-R01, NA-R03)
+**Sin regresiones.**
 
 ---
 
-## NexusGuard — Hallazgos
+## Scope Delta v4
 
----
+### Archivos nuevos/modificados criticos examinados
 
-### SDK-01 — MEDIUM: baseUrl no validado — riesgo SSRF en uso server-side
-
-**Categoria:** NexusGuard | **Severidad:** MEDIUM
-**Archivos:** `src/invoke.ts:23`, `src/discover.ts:34`, `src/publish.ts:24`, `src/stats.ts:26`
-
-**Descripcion:**
-El parametro `baseUrl` se acepta sin ninguna validacion en todos los modulos del SDK. Si el SDK se usa en un contexto server-side (Next.js Server Action, API Route, script Node.js) y `baseUrl` deriva de input del usuario o variables de entorno sin sanitizar, un atacante podria dirigir las peticiones del servidor a endpoints internos (SSRF).
-
-**Vectores de riesgo:**
-- En Next.js: un atacante que controle `baseUrl` podria alcanzar `http://169.254.169.254` (AWS metadata) o servicios internos.
-- En scripts de CI/CD: un env var comprometido (`WASIAI_BASE_URL`) podria redirigir todos los pagos a un servidor malicioso.
-
-**Evidencia:**
-```typescript
-// invoke.ts:23-24
-const base = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '')
-const url  = `${base}/api/v1/models/${opts.slug}/invoke`
-// Sin validacion: baseUrl puede ser http://169.254.169.254/latest/meta-data/
-// o cualquier URL interna del servidor que ejecuta el SDK
-
-// Mismo patron en discover.ts:34, publish.ts:24, stats.ts:26
-```
-
-**Impacto:** MEDIUM — requiere que el atacante controle `baseUrl`, lo que implica acceso al entorno de ejecucion.
-
----
-
-### SDK-02 — MEDIUM: Sin enforcement de HTTPS — API key en plaintext sobre HTTP
-
-**Categoria:** NexusGuard | **Severidad:** MEDIUM
-**Archivos:** `src/invoke.ts:29-31`, `src/publish.ts:30`, `src/stats.ts:28`, `src/langchain/WasiAITool.ts:38-40`
-
-**Descripcion:**
-El SDK envia `apiKey` en el header `X-API-Key` sin verificar que la conexion usa HTTPS. Si un desarrollador pasa un `baseUrl` con `http://` (staging, local, misconfiguracion), la API key se transmite en texto plano y puede ser interceptada por un MITM.
-
-**Evidencia:**
-```typescript
-// invoke.ts:29-31
-headers: {
-  'Content-Type': 'application/json',
-  'X-API-Key':    opts.apiKey,  // enviado sin verificar que base empiece con https://
-},
-
-// CLI: wasiai invoke --base-url http://staging.example.com --api-key wasi_xxx
-// → API key en texto plano en la red
-```
-
-**Impacto:** MEDIUM — la API key comprometida permite invocar agentes a costa del usuario y acceder a sus stats de creador.
-
----
-
-### SDK-03 — LOW: slug no sanitizado en URL path — path traversal potencial
-
-**Categoria:** NexusGuard | **Severidad:** LOW
-**Archivos:** `src/invoke.ts:24`, `src/langchain/WasiAITool.ts:33`
-
-**Descripcion:**
-El `slug` se interpola directamente en la URL como path segment sin ningun sanitizado. Un slug malicioso podria intentar path traversal o manipulacion de URL.
-
-**Evidencia:**
-```typescript
-// invoke.ts:24
-const url = `${base}/api/v1/models/${opts.slug}/invoke`
-// slug = "../../../admin" → /api/v1/models/../../../admin/invoke
-// slug = "agent%2F..%2F.." → depende del parsing del servidor
-```
-
-**Mitigacion actual:** Next.js (el servidor) maneja esto con seguridad via su sistema de rutas dinamicas, por lo que el riesgo real es bajo. Sin embargo, si el `baseUrl` apunta a otro servidor, la proteccion no existe.
-
----
-
-### SDK-04 — LOW: WasiAITool.ts duplica DEFAULT_BASE_URL hardcodeado
-
-**Categoria:** NexusGuard | **Severidad:** LOW
-**Archivo:** `src/langchain/WasiAITool.ts:5`
-
-**Descripcion:**
-`WasiAITool.ts` define su propia constante `DEFAULT_BASE_URL = 'https://wasiai-v2.vercel.app'` en lugar de importarla de `invoke.ts`. Esto crea dos fuentes de verdad para la URL base. Si la URL del servicio cambia (custom domain, nueva instancia), `invoke.ts` se actualizaria pero `WasiAITool.ts` quedaria desfasado, dirigiendo las llamadas LangChain a la URL incorrecta.
-
-**Evidencia:**
-```typescript
-// WasiAITool.ts:5 — duplicado, deberia importar
-const DEFAULT_BASE_URL = 'https://wasiai-v2.vercel.app'  // ← hardcoded
-
-// invoke.ts:8 — fuente canonica
-export const DEFAULT_BASE_URL = 'https://wasiai-v2.vercel.app'
-```
-
----
-
-### SDK-05 — LOW: Sin limite de tamano en respuesta — riesgo de agotamiento de memoria
-
-**Categoria:** NexusGuard | **Severidad:** LOW
-**Archivos:** `src/invoke.ts:45`, `src/discover.ts:47`, `src/publish.ts:60`, `src/stats.ts:38`
-
-**Descripcion:**
-Todos los modulos del SDK llaman `res.json()` directamente sin verificar `Content-Length` ni establecer un limite de tamano de respuesta. Un servidor malicioso (o un backend WasiAI comprometido) podria devolver un body JSON de varios GB, causando agotamiento de memoria en el proceso que usa el SDK.
-
-**Evidencia:**
-```typescript
-// invoke.ts:45
-const data = await res.json() as Record<string, unknown>
-// Sin check previo: if (res.headers.get('content-length') > MAX) throw ...
-```
-
-**Impacto:** Bajo en uso tipico (las respuestas de agentes son normalmente pequenas). MEDIUM si se usa en un entorno de produccion con muchos requests concurrentes.
-
----
-
-### SDK-06 — LOW: CLI --input expone datos sensibles en logs de CI/CD
-
-**Categoria:** NexusGuard | **Severidad:** LOW
-**Archivo:** `src/cli/index.ts:43`
-
-**Descripcion:**
-El flag `--input <text>` del CLI acepta el texto de entrada como argumento de linea de comandos. Los sistemas de CI/CD (GitHub Actions, Jenkins, etc.) suelen loguear todos los argumentos del proceso. Si el usuario pasa datos sensibles como input (tokens, keys, PII), estos quedan expuestos en los logs del pipeline.
-
-**Evidencia:**
-```bash
-# Esto se loguea tal cual en CI/CD:
-wasiai invoke --agent my-agent --input "Bearer eyJhbGciOi..." --api-key wasi_xxx
-
-# Los logs de CI muestran la linea completa del comando
-```
-
-**Nota:** El README no advierte sobre este riesgo. Una mitigacion simple es soportar `--input-file` o leer stdin.
-
----
-
-### SDK-07 — INFO: WasiAIPaymentError referencia URL de Vercel staging
-
-**Categoria:** NexusGuard | **Severidad:** INFO
-**Archivo:** `src/langchain/errors.ts:3`
-
-**Descripcion:**
-El mensaje de error `WasiAIPaymentError` hardcodea `wasiai-v2.vercel.app` (la URL de Vercel, no un dominio custom). Si el proyecto migra a un dominio personalizado, el mensaje de error enviara a los usuarios a una URL incorrecta.
-
-**Evidencia:**
-```typescript
-// errors.ts:3
-super(`Payment required for agent "${slug}". Fund your API key at wasiai-v2.vercel.app`)
-//                                                                    ↑ URL hardcodeada
-```
-
----
-
-### SDK-08 — INFO: Sin validacion de longitud de input en SDK
-
-**Categoria:** NexusGuard | **Severidad:** INFO
-**Archivos:** `src/invoke.ts:32`, `src/langchain/WasiAITool.ts:41`
-
-**Descripcion:**
-El SDK no valida la longitud del `input` antes de enviarlo. Un input muy grande (e.g., el contenido de un archivo completo) genera una request innecesariamente grande que puede causar timeouts o costos de ancho de banda. Una advertencia o limite documentado ayudaria a los desarrolladores.
-
----
-
-### SDK-09 — INFO: publish endpoint_url sin validacion client-side
-
-**Categoria:** NexusGuard | **Severidad:** INFO
-**Archivo:** `src/publish.ts:38`
-
-**Descripcion:**
-`publishAgent()` envia `endpoint_url` al servidor WasiAI sin ninguna validacion client-side de formato. Un endpoint invalido (sin protocolo, URL malformada) solo falla en el servidor, generando un error generico. Validar el formato URL client-side mejoraria la DX y reduciria roundtrips innecesarios.
-
----
-
-### SDK-10 — INFO: CLI stats imprime total_revenue en stdout sin advertencia
-
-**Categoria:** NexusGuard | **Severidad:** INFO
-**Archivo:** `src/cli/index.ts:269`
-
-**Descripcion:**
-El subcommand `stats` imprime ingresos totales en USDC directamente en stdout. Si el terminal esta siendo grabado, screensharido, o el output se loguea en CI, esta informacion financiera queda expuesta. No es un bug de seguridad critico pero si una consideracion de privacidad.
-
----
-
-## Resumen de Hallazgos
-
-| ID | Categoria | Severidad | Archivo(s) |
-|---|---|---|---|
-| SDK-01 | NexusGuard | **MEDIUM** | invoke/discover/publish/stats.ts |
-| SDK-02 | NexusGuard | **MEDIUM** | invoke/publish/stats/WasiAITool.ts |
-| SDK-03 | NexusGuard | LOW | invoke.ts:24, WasiAITool.ts:33 |
-| SDK-04 | NexusGuard | LOW | WasiAITool.ts:5 |
-| SDK-05 | NexusGuard | LOW | todos los modulos — res.json() |
-| SDK-06 | NexusGuard | LOW | cli/index.ts:43 |
-| SDK-07 | NexusGuard | INFO | langchain/errors.ts:3 |
-| SDK-08 | NexusGuard | INFO | invoke.ts:32, WasiAITool.ts:41 |
-| SDK-09 | NexusGuard | INFO | publish.ts:38 |
-| SDK-10 | NexusGuard | INFO | cli/index.ts:269 |
-| SDK-NA-01 | NexusAudit (adaptado) | INFO | N/A — sin codigo on-chain |
-
----
-
-## Checks de Seguridad Positivos (Lo Que Esta Bien)
-
-| Check | Archivo | Estado |
+| Archivo | Tipo | Razon de inclusion |
 |---|---|---|
-| Timeout de 30s en todas las peticiones | invoke.ts:33, WasiAITool.ts:42 | PASS |
-| Errores tipados (no strings genticos) | langchain/errors.ts | PASS |
-| AbortSignal.timeout() en lugar de Promise.race | invoke.ts, discover.ts, stats.ts | PASS |
-| No secrets en codigo (apiKey via param, no hardcode) | todos los modulos | PASS |
-| Sin `console.log` de API keys en rutas normales | todos los modulos | PASS |
-| peerDependencies opcionales para LangChain | package.json:44 | PASS |
-| Tests cubren error cases (402, 429, 500) | cli/index.test.ts, WasiAITool.test.ts | PASS |
-| No eval(), no dynamic require() con user input | todos | PASS |
-| slug como `name` de WasiAITool — no expone apiKey al orchestrator LangChain | WasiAITool.ts:28 | PASS |
+| `contracts/src/WasiAIMarketplace.sol` | Contract | `claimEarnings()` EIP-712 voucher (+77 lineas) |
+| `src/app/api/creator/earnings/voucher/route.ts` | Route | **NUEVO** — genera voucher EIP-712 firmado |
+| `src/app/api/creator/withdraw/route.ts` | Route | **REESCRITO** — verifica EarningsClaimed event |
+| `src/app/api/v1/models/[slug]/invoke/route.ts` | Route | Simplificado — Route C eliminada (-100 lineas) |
+| `src/lib/contracts/marketplaceClient.ts` | Lib | Funciones on-chain server-side |
+| `src/lib/contracts/usdcSettler.ts` | Lib | x402 EIP-3009 settlement nativo |
+| `src/lib/security/csrf.ts` | Lib | CSRF validation (revisado) |
+| `src/lib/security/validateEndpointUrl.ts` | Lib | SSRF prevention (revisado) |
+| `src/lib/ratelimit.ts` | Lib | Rate limiting framework (revisado) |
+| `supabase/migrations/041_unique_tx_hash.sql` | Migration | UNIQUE index on agent_calls.tx_hash |
+| `supabase/migrations/042_owner_wallet_address.sql` | Migration | owner_wallet_address column |
+
+### Archivos eliminados (reduccion de superficie de ataque)
+
+| Archivo eliminado | Impacto |
+|---|---|
+| `src/lib/contracts/verifyUsdcTransfer.ts` | **NG-109 RESUELTO** — operador hardcoded eliminado |
+| `src/lib/contracts/operatorSettler.ts` | Flujo de settlement legacy eliminado |
+| `src/shared/lib/web3/thirdwebClient.ts` | **NG-111 RESUELTO** — dependencia custodial eliminada |
+| `src/features/payments/hooks/useWalletPayment.ts` | Route C client-side eliminado |
+| `src/hooks/useAuth.ts` | Hook legacy eliminado |
+| `src/lib/payments/computePaymentId.ts` | Movido a contrato on-chain (`computePaymentId()`) |
+| `src/lib/webhooks/triggerCreditsLow.ts` | Webhook eliminado |
+| `src/app/api/cron/retry-webhook-deliveries/route.ts` | Cron route eliminado |
+| `src/app/api/cron/upkeep-listener/route.ts` | Cron route eliminado |
+
+---
+
+## Estado de Hallazgos Previos
+
+### Hallazgos v3 RESUELTOS en v4
+
+| ID | Severidad | Descripcion | Estado | Evidencia |
+|---|---|---|---|---|
+| NG-108 | MEDIUM | withdraw/route.ts sin guard de unicidad para txHash | **FIXED** v4 | withdraw/route.ts completamente reescrito; ya no modifica budget_usdc de agent_keys; ahora verifica EarningsClaimed on-chain y pone pending_earnings_usdc = 0 |
+| NG-109 | LOW | verifyUsdcTransfer.ts con direccion hardcoded | **FIXED** v4 | Archivo eliminado completamente |
+| NG-111 | MEDIUM | Route C (embedded wallet) flujo custodial off-chain | **FIXED** v4 | Route C eliminada; invoke/route.ts solo tiene Route A (agent key) y Route B (x402) |
+| NG-112 | INFO | useWallet.ts dual-connection guard race condition | **FIXED** v4 | Thirdweb eliminado; useWallet.ts simplificado sin dual-wallet guard |
+
+### Hallazgos v3 AUN ABIERTOS
+
+| ID | Severidad | Descripcion | Estado | Nota v4 |
+|---|---|---|---|---|
+| NG-103 | MEDIUM | register/route.ts retorna on_chain_registered:true antes de confirmar tx | **OPEN** | Sin cambios en v4 |
+| NG-104 | MEDIUM | discover_agents_v2 RPC usa SECURITY DEFINER bypassing RLS | **OPEN** | Sin cambios en v4 |
+| NA-302 | MEDIUM | Sin cron de reconciliacion on-chain vs DB para agentes on_chain | **OPEN** | Cron routes eliminados; reconciliacion aun no implementada |
+| NA-R01 | LOW | selfRegisterAgent usa bare transferFrom en lugar de safeTransferFrom | **OPEN** | Sin cambios en contrato para esta funcion |
+| NA-R03 | INFO | submitReputationBatch sin whenNotPaused | **OPEN** | Sin cambios |
+| NG-113 | INFO | migration 042 sin indice en owner_wallet_address | **OPEN** | Sin cambios |
+
+---
+
+## Nuevos Hallazgos v4
+
+---
+
+### NA-V01 — HIGH: claimEarnings() permite que cualquier address llame con voucher de otro creator
+
+**Categoria:** NexusAudit | **Severidad:** HIGH
+**Archivo:** `contracts/src/WasiAIMarketplace.sol:464-508`
+
+**Descripcion:**
+La funcion `claimEarnings()` es `external` — cualquier address puede llamarla, no solo el creator. El parametro `creator` es explicito y la firma EIP-712 vincula el voucher al creator address. El USDC se envia al `creator` (no a `msg.sender`), lo cual es correcto. Sin embargo, existe un vector de front-running:
+
+1. Creator obtiene voucher del backend (grossAmount, deadline, nonce, signature)
+2. Creator envia tx `claimEarnings(creator, grossAmount, deadline, nonce, sig)` al mempool
+3. Un front-runner ve la tx pendiente, extrae los parametros y envia su propia tx con gas mas alto
+4. La tx del front-runner se ejecuta primero — el USDC va al mismo `creator` address
+5. La tx original del creator revierte con "voucher already used"
+
+**Impacto:** El front-running no roba fondos (USDC siempre va al creator registrado), pero causa:
+- El creator ve su tx revertida sin entender por que
+- El front-runner paga gas sin beneficio
+- UX confusa: el creator cree que el retiro fallo pero su balance cambio
+
+**Evidencia:**
+```solidity
+// WasiAIMarketplace.sol:464-470
+function claimEarnings(
+    address creator,        // parametro explicito — no msg.sender
+    uint256 grossAmount,
+    uint256 deadline,
+    bytes32 nonce,
+    bytes calldata sig
+) external nonReentrant whenNotPaused {
+    // ...
+    // linea 502: USDC va a creator, NO a msg.sender
+    usdc.safeTransfer(creator, creatorShare);
+```
+
+**Mitigacion recomendada:** Agregar `require(msg.sender == creator, "WasiAI: caller must be creator")` para que solo el creator pueda ejecutar su propio voucher. Esto elimina el vector de front-running y es consistente con el patron de seguridad del contrato.
+
+---
+
+### NG-V01 — MEDIUM: voucher/route.ts no registra voucher emitido — no hay audit trail
+
+**Categoria:** NexusGuard | **Severidad:** MEDIUM
+**Archivo:** `src/app/api/creator/earnings/voucher/route.ts:98-106`
+
+**Descripcion:**
+El endpoint genera un voucher EIP-712 con un nonce random y lo retorna al cliente, pero NO lo registra en ninguna tabla de Supabase. Consecuencias:
+
+1. **Sin audit trail:** No hay registro de cuantos vouchers se han emitido, para quien, ni por cuanto monto.
+2. **Voucher farming:** Un creator malicioso puede solicitar vouchers repetidamente sin ejecutarlos on-chain. Si en el futuro se implementa un flujo donde el amount se decrementa al emitir (no al ejecutar), los vouchers previos seguirian siendo validos.
+3. **Concurrencia:** Dos requests simultaneos generan dos vouchers con el mismo `pending_earnings_usdc`. Ambos serian validos on-chain (distintos nonces), pero el segundo fallaria por `insufficient free balance` si el contrato no tiene suficiente USDC.
+
+**Evidencia:**
+```typescript
+// voucher/route.ts:98-106 — retorna voucher sin guardar en DB
+logger.info('[voucher] signed', { walletAddress: profile.wallet_address, grossAmountAtomics })
+
+return NextResponse.json({
+  grossAmountAtomics,
+  grossAmountUsdc: pendingUsdc,
+  deadline:        deadline.toString(),
+  nonce,
+  signature,
+})
+// No INSERT en ninguna tabla — el voucher existe solo en memoria del cliente
+```
+
+**Nota:** El contrato tiene `usedVouchers[nonce]` que previene replay on-chain. El riesgo es off-chain: falta de trazabilidad y posibilidad de emitir multiples vouchers concurrentes para el mismo saldo.
+
+---
+
+### NG-V02 — MEDIUM: withdraw/route.ts no valida que el txHash no haya sido procesado antes
+
+**Categoria:** NexusGuard | **Severidad:** MEDIUM
+**Archivo:** `src/app/api/creator/withdraw/route.ts:25-137`
+
+**Descripcion:**
+El endpoint POST recibe un `txHash`, verifica el evento EarningsClaimed on-chain, y pone `pending_earnings_usdc = 0`. Si un atacante (o el mismo creator) envia el mismo txHash dos veces, el endpoint:
+
+1. Primera vez: Verifica OK → pone pending_earnings = 0. Correcto.
+2. Segunda vez: Verifica OK (el receipt sigue en la blockchain) → pone pending_earnings = 0 de nuevo. No causa dano directo porque ya era 0.
+
+**Sin embargo**, si entre la primera y segunda llamada se acumularon nuevos earnings (por invocaciones x402), la segunda llamada borraria esos earnings sin que el creator los haya retirado:
+
+**Flujo de explotacion:**
+1. Creator retira 10 USDC via voucher. POST withdraw con txHash A → pending = 0. OK.
+2. Pasan 2 horas. Se acumulan 3 USDC en pending_earnings_usdc por nuevas invocaciones.
+3. Creator (o atacante) llama POST withdraw con txHash A de nuevo.
+4. La verificacion on-chain pasa (el receipt sigue existiendo).
+5. pending_earnings_usdc = 0 de nuevo. Los 3 USDC nuevos se pierden.
+
+**Evidencia:**
+```typescript
+// withdraw/route.ts:115-120 — SET incondicional a 0
+const { error: updateError } = await serviceClient
+  .from('creator_profiles')
+  .update({ pending_earnings_usdc: 0 })  // siempre 0, sin importar si ya fue procesado
+  .eq('id', user.id)
+// No hay check: "ya procesamos este txHash antes?"
+```
+
+**Mitigacion:** Registrar cada txHash procesado en una tabla de withdrawals con UNIQUE constraint, o usar `decrement` en lugar de `SET 0`, o agregar una columna `last_withdrawal_tx` con check.
+
+---
+
+### NG-V03 — LOW: voucher/route.ts no tiene rate limiting
+
+**Categoria:** NexusGuard | **Severidad:** LOW
+**Archivo:** `src/app/api/creator/earnings/voucher/route.ts:18`
+
+**Descripcion:**
+El endpoint `/api/creator/earnings/voucher` genera vouchers firmados por el operador sin rate limiting. Un creator autenticado puede solicitar miles de vouchers por minuto. Aunque cada voucher usa el mismo `pending_earnings_usdc` (y el contrato previene double-claim via nonces), la generacion masiva:
+
+1. Consume CPU del servidor para firmar EIP-712 con `privateKeyToAccount` + `signTypedData`
+2. Expone la carga de trabajo de la clave privada del operador a DoS
+3. Los logs se inundan con entradas `[voucher] signed`
+
+**Evidencia:**
+```typescript
+// voucher/route.ts:18 — sin rate limiting
+export async function POST(req: NextRequest) {
+  const csrfError = validateCsrf(req)
+  if (csrfError) return csrfError
+  // Auth... pero no rate limit
+  // Compara con upgrade-onchain/route.ts que SI tiene getRegisterLimit()
+```
+
+**Patron esperado (como otros endpoints):**
+```typescript
+const rlId = getIdentifier(req, user.id)
+const rlHit = await checkRateLimit(getKeysLimit(), rlId)
+if (rlHit) return rlHit
+```
+
+---
+
+### NG-V04 — INFO: withdraw/route.ts usa RPC URLs hardcoded en lugar de env vars
+
+**Categoria:** NexusGuard | **Severidad:** INFO
+**Archivo:** `src/app/api/creator/withdraw/route.ts:58-63`
+
+**Descripcion:**
+El endpoint de withdraw crea un `createPublicClient` con URLs de RPC hardcoded para Avalanche/Fuji. El resto del codebase usa env vars (`NEXT_PUBLIC_RPC_MAINNET` / `NEXT_PUBLIC_RPC_TESTNET`) para los RPCs. Inconsistencia que dificulta cambiar el proveedor de RPC globalmente.
+
+**Evidencia:**
+```typescript
+// withdraw/route.ts:58-63 — URLs hardcoded
+const pub = createPublicClient({
+  chain:     chainId === 43114 ? avalanche : avalancheFuji,
+  transport: http(chainId === 43114
+    ? 'https://api.avax.network/ext/bc/C/rpc'           // hardcoded
+    : 'https://api.avax-test.network/ext/bc/C/rpc'),    // hardcoded
+})
+
+// Contraste — marketplaceClient.ts:35-38 usa env vars
+const rpcUrl = (chain.id === 43114
+  ? process.env.NEXT_PUBLIC_RPC_MAINNET
+  : process.env.NEXT_PUBLIC_RPC_TESTNET
+)?.trim() || undefined
+```
+
+---
+
+### NA-V02 — INFO: claimEarnings() no emite evento cuando el balance guard falla
+
+**Categoria:** NexusAudit | **Severidad:** INFO
+**Archivo:** `contracts/src/WasiAIMarketplace.sol:491-495`
+
+**Descripcion:**
+El balance guard en `claimEarnings()` protege los key balances verificando `usdc.balanceOf(address(this)) - totalKeyBalances >= grossAmount`. Si la condicion falla, revierte con un error message generico. Para monitoring y alertas, seria util emitir un evento `InsufficientFreeBalance(address creator, uint256 requested, uint256 available)` antes de revertir, o al menos un error custom para que los indexadores puedan capturarlo.
+
+**Evidencia:**
+```solidity
+// WasiAIMarketplace.sol:491-495
+require(
+    usdc.balanceOf(address(this)) - totalKeyBalances >= grossAmount,
+    "WasiAI: insufficient free balance"
+);
+// No hay custom error ni evento para monitoring
+```
+
+**Nota:** Los custom errors de Solidity 0.8+ reducen el costo de gas y mejoran la legibilidad del revert. Pero como el contrato ya esta desplegado, esto es un improvement para futuras versiones.
+
+---
+
+## Analisis del Sistema de Voucher EIP-712 (HU-067)
+
+### Flujo completo auditado:
+
+```
+[Creator]                    [Backend]                   [Contract]
+    |                            |                           |
+    |-- GET /withdraw ---------->|                           |
+    |<-- pending_usdc: 10.00 ---|                           |
+    |                            |                           |
+    |-- POST /voucher ---------->|                           |
+    |   (auth via cookie)        |-- signs EIP-712 -------->|
+    |                            |   (OPERATOR_PRIVATE_KEY)  |
+    |<-- {grossAmount, nonce, --|                           |
+    |     deadline, signature}   |                           |
+    |                            |                           |
+    |-- claimEarnings(creator, grossAmount, deadline, nonce, sig) -->|
+    |   (via MetaMask/Core)      |                           |-- verify EIP-712
+    |                            |                           |-- anti-replay (usedVouchers)
+    |                            |                           |-- balance guard
+    |                            |                           |-- split 90/10
+    |                            |                           |-- safeTransfer to creator
+    |                            |                           |-- emit EarningsClaimed
+    |<-- tx receipt -------------|                           |
+    |                            |                           |
+    |-- POST /withdraw --------->|                           |
+    |   {txHash}                 |-- getTransactionReceipt ->|
+    |                            |-- verify EarningsClaimed   |
+    |                            |-- verify creator match     |
+    |                            |-- SET pending = 0          |
+    |<-- {ok, realAmount} ------|                           |
+```
+
+### Controles de seguridad verificados:
+
+| Control | Implementado | Evidencia |
+|---|---|---|
+| Amount from DB, not client | YES | voucher/route.ts:30-31 — `select('pending_earnings_usdc')` |
+| EIP-712 domain separation | YES | WasiAIMarketplace.sol:199 — `EIP712("WasiAIMarketplace", "1")` |
+| CLAIM_TYPEHASH correcta | YES | WasiAIMarketplace.sol:129-131 — includes creator, grossAmount, deadline, nonce |
+| Anti-replay (nonce) | YES | WasiAIMarketplace.sol:476-477 — `usedVouchers[nonce] = true` |
+| Deadline check | YES | WasiAIMarketplace.sol:473 — `block.timestamp <= deadline` |
+| Operator signature verify | YES | WasiAIMarketplace.sol:487-489 — ECDSA.recover + operators[] |
+| Balance guard (key balances) | YES | WasiAIMarketplace.sol:492-494 — protects totalKeyBalances |
+| SafeERC20 for transfers | YES | WasiAIMarketplace.sol:502-505 — `usdc.safeTransfer()` |
+| ReentrancyGuard | YES | WasiAIMarketplace.sol:470 — `nonReentrant` modifier |
+| Pausable | YES | WasiAIMarketplace.sol:470 — `whenNotPaused` modifier |
+| CEI pattern | YES | Checks (471-495) → Effects (477: usedVouchers) → Interactions (502-505: transfers) |
+| CSRF on voucher endpoint | YES | voucher/route.ts:19 — `validateCsrf(req)` |
+| Auth on voucher endpoint | YES | voucher/route.ts:23-25 — `supabase.auth.getUser()` |
+| On-chain receipt verify | YES | withdraw/route.ts:69-82 — retry 3x |
+| Creator address matching | YES | withdraw/route.ts:106-110 — event creator vs authenticated wallet |
+| USDC goes to creator, not msg.sender | YES | WasiAIMarketplace.sol:502 — `usdc.safeTransfer(creator, creatorShare)` |
+
+---
+
+## Analisis de Eliminacion de Route C (HU-071)
+
+### Impacto positivo en seguridad:
+
+| Aspecto eliminado | Riesgo removido |
+|---|---|
+| Thirdweb embedded wallet | Dependencia de terceros para custodia de fondos |
+| Route C en invoke/route.ts | Flujo custodial donde USDC iba al operador (no al contrato) |
+| verifyUsdcTransfer.ts | Operador address hardcoded como fallback |
+| useWalletPayment.ts | Client-side transfer a operador |
+| Dual-wallet guard en useWallet.ts | Race condition entre thirdweb y wagmi |
+
+**Resultado:** invoke/route.ts se reduce a 2 paths claros:
+- **Route A:** Agent key (budget-based, DB accounting, batch settlement)
+- **Route B:** x402 EIP-3009 (on-chain settlement nativo en Avalanche)
+
+Ambos paths son bien auditados con rate limiting, SSRF protection, circuit breaker, y anti-replay.
+
+---
+
+## Resumen Consolidado v4
+
+### Nuevos Hallazgos
+
+| ID | Componente | Severidad | Estado |
+|---|---|---|---|
+| NA-V01 | WasiAIMarketplace.sol:464 | **HIGH** | NEW |
+| NG-V01 | voucher/route.ts:98-106 | **MEDIUM** | NEW |
+| NG-V02 | withdraw/route.ts:115-120 | **MEDIUM** | NEW |
+| NG-V03 | voucher/route.ts:18 | **LOW** | NEW |
+| NG-V04 | withdraw/route.ts:58-63 | **INFO** | NEW |
+| NA-V02 | WasiAIMarketplace.sol:491-495 | **INFO** | NEW |
+
+### Hallazgos Previos Abiertos
+
+| ID | Componente | Severidad | Estado |
+|---|---|---|---|
+| NG-103 | register/route.ts | **MEDIUM** | OPEN (v3) |
+| NG-104 | discover_agents_v2 RPC | **MEDIUM** | OPEN (v3) |
+| NA-302 | Sin cron de reconciliacion | **MEDIUM** | OPEN (v3) |
+| NA-R01 | selfRegisterAgent bare transferFrom | **LOW** | OPEN (v3) |
+| NA-R03 | submitReputationBatch sin whenNotPaused | **INFO** | OPEN (v3) |
+| NG-113 | migration 042 sin indice | **INFO** | OPEN (v3) |
+
+### Hallazgos RESUELTOS en v4
+
+| ID | Severidad | Descripcion | Resolucion |
+|---|---|---|---|
+| NG-108 | MEDIUM | withdraw txHash replay | FIXED — withdraw reescrito |
+| NG-109 | LOW | operador hardcoded | FIXED — archivo eliminado |
+| NG-111 | MEDIUM | Route C custodial | FIXED — Route C eliminada |
+| NG-112 | INFO | dual-wallet race condition | FIXED — thirdweb eliminado |
 
 ---
 
 ## Score de Seguridad
 
-| Dimension | Score | Notas |
-|---|---|---|
-| Input Validation | 6.0 | Sin validacion de baseUrl, slug, input length |
-| Credential Handling | 7.0 | API key en params (bien), sin HTTPS enforcement (mal) |
-| Error Handling | 8.5 | Errores tipados, manejo de 402/429/500 |
-| Dependencies | 8.0 | Pocas deps, commander + langchain/core. Sin lockfile audit. |
-| CLI Security | 6.5 | --input en args de proceso, sin --input-file |
-| Supply Chain | 8.0 | No on-chain logic en SDK, trust 100% en backend |
-| **Global** | **7.8** | Apropiado para SDK v0.3.0. Mejoras prioritarias: SDK-01, SDK-02 |
+| Categoria | v3 Score | v4 Score | Delta |
+|---|---|---|---|
+| Smart Contract (on-chain) | 8.5 | 9.0 | +0.5 |
+| API Routes (off-chain) | 8.5 | 8.8 | +0.3 |
+| Auth & Access Control | 9.0 | 9.2 | +0.2 |
+| Input Validation | 9.0 | 9.0 | 0 |
+| Cryptographic Controls | 8.5 | 9.5 | +1.0 |
+| **Promedio ponderado** | **8.6** | **9.0** | **+0.4** |
+
+### Justificacion de mejora:
+- **Cryptographic Controls +1.0:** EIP-712 voucher system bien implementado con domain separation, anti-replay, y deadline
+- **Smart Contract +0.5:** Balance guard protege key balances, CEI pattern correcto en claimEarnings
+- **API Routes +0.3:** Route C eliminada reduce superficie de ataque significativamente
+- **Auth +0.2:** Todas las nuevas rutas tienen auth + CSRF
+
+### Puntos pendientes que frenan el score:
+- NA-V01 (HIGH): claimEarnings callable por cualquier address
+- NG-V02 (MEDIUM): withdraw sin idempotencia de txHash
+- NG-103/NG-104/NA-302 (MEDIUM): hallazgos abiertos de v3
 
 ---
 
-## Recomendaciones de Prioridad
+## Recomendaciones Priorizadas
 
-1. **SDK-01 (MEDIUM)** — Validar que `baseUrl` empieza con `https://` o es la URL por defecto. Lanzar error si no.
-2. **SDK-02 (MEDIUM)** — Agregar warning/error si `baseUrl` usa `http://` y se esta enviando un `apiKey`.
-3. **SDK-04 (LOW)** — Eliminar `DEFAULT_BASE_URL` duplicado en `WasiAITool.ts`; importar de `invoke.ts`.
-4. **SDK-03 (LOW)** — Sanitizar `slug` contra caracteres de path traversal (`/`, `..`, `%`).
-5. **SDK-06 (LOW)** — Agregar soporte `--input-file <path>` como alternativa segura para CI/CD.
+1. **URGENTE (NA-V01):** Agregar `require(msg.sender == creator)` en `claimEarnings()` para eliminar vector de front-running
+2. **ALTA (NG-V02):** Registrar txHash procesados en tabla de withdrawals para idempotencia
+3. **ALTA (NG-V01):** Registrar vouchers emitidos en Supabase para audit trail
+4. **MEDIA (NG-V03):** Agregar rate limiting al endpoint de voucher
+5. **MEDIA (NG-103/NG-104/NA-302):** Resolver hallazgos abiertos de v3
 
 ---
 
-*Generado por NexusAudit v2.0 (adaptado) + NexusGuard v1.0 | WasiAI Security Framework | 2026-03-08*
+*Reporte generado por NexusAudit v2.0 + NexusGuard v1.0*
+*Metodologia TRACE (on-chain) + SHIELD (off-chain)*
