@@ -89,14 +89,14 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const buttonLabel =
     ctx.state === 'no_wallet'            ? t('connectWallet')   :
     ctx.state === 'wrong_network'        ? t('switchNetwork')   :
-    ctx.state === 'insufficient_balance' ? 'USDC insuficiente'  :
-    ctx.state === 'signing_eip3009'      ? t('signing')         :
-    ctx.state === 'transferring'         ? 'Procesando pago...' :
-    ctx.state === 'calling'              ? t('calling')         :
-    ctx.state === 'approving'            ? 'Aprobando...'       :
-    ctx.state === 'success'              ? t('done')            :
-    ctx.state === 'error'                ? t('retry')           :
-    `Pagar $${model.price_per_call} USDC`
+    ctx.state === 'insufficient_balance' ? t('insufficient')                          :
+    ctx.state === 'signing_eip3009'      ? t('signing')                               :
+    ctx.state === 'transferring'         ? t('processing')                            :
+    ctx.state === 'calling'              ? t('calling')                               :
+    ctx.state === 'approving'            ? t('approving')                             :
+    ctx.state === 'success'              ? t('done')                                  :
+    ctx.state === 'error'                ? t('retry')                                 :
+    t('pay', { price: model.price_per_call })
 
   const isProcessing = (
     ctx.state === 'signing_eip3009' ||

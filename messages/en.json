@@ -569,7 +569,11 @@
     "errorSwitched": "Network switched! Click \"Pay & Call\" again to continue.",
     "errorSwitchFailed": "Please switch to Avalanche network in your wallet and try again.",
     "errorSwitchedFuji": "Please switch to Avalanche Fuji network in your wallet and try again.",
-    "switchNetwork": "Switch to Fuji"
+    "switchNetwork": "Switch to Fuji",
+    "pay": "Pay ${{price}} USDC",
+    "insufficient": "Insufficient USDC",
+    "processing": "Processing payment...",
+    "approving": "Approving..."
   },
   "freeTrial": {
     "label": "Free Trial",

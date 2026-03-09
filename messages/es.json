@@ -569,7 +569,11 @@
     "errorSwitched": "Red cambiada. Haz clic en \"Pagar y Llamar\" de nuevo para continuar.",
     "errorSwitchFailed": "Cambia tu wallet a la red Avalanche e intenta de nuevo.",
     "errorSwitchedFuji": "Cambia tu wallet a Avalanche Fuji Testnet e intenta de nuevo.",
-    "switchNetwork": "Cambiar a Fuji"
+    "switchNetwork": "Cambiar a Fuji",
+    "pay": "Pagar ${{price}} USDC",
+    "insufficient": "USDC insuficiente",
+    "processing": "Procesando pago...",
+    "approving": "Aprobando..."
   },
   "freeTrial": {
     "label": "Free Trial",
