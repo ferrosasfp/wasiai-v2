@@ -7,7 +7,7 @@ export function ApiReferenceSection() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">API Reference</h2>
         <p className="mt-2 text-gray-600">
-          Base URL: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">https://wasiai-v2.vercel.app/api/v1</code>
+          Base URL: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">https://app.wasiai.io/api/v1</code>
           <br />
           Auth: send your API key as <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">X-API-Key: wai_...</code> header.
         </p>
@@ -125,7 +125,7 @@ export function ApiReferenceSection() {
   "meta": {
     "invoke_endpoint": "/api/v1/models/{slug}/invoke",
     "auth_methods": ["x-agent-key", "x402"],
-    "docs_url": "https://wasiai-v2.vercel.app/docs",
+    "docs_url": "https://app.wasiai.io/docs",
     "sdk": "npm install @wasiai/sdk"
   }
 }`}

@@ -18,7 +18,7 @@ import { UpgradeOnChainButton } from '@/features/agents/components/UpgradeOnChai
 // PERF-04: ISR — revalidate detail pages every 5 minutes
 export const revalidate = 300
 
-const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'
 
 interface Props {
   params: Promise<{ locale: string; slug: string }>

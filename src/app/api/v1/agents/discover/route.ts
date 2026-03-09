@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     meta: {
       invoke_endpoint: '/api/v1/models/{slug}/invoke',
       auth_methods: ['x-agent-key', 'x402'],
-      docs_url: 'https://wasiai-v2.vercel.app/docs',
+      docs_url: 'https://app.wasiai.io/docs',
       sdk: 'npm install @wasiai/sdk',
     },
   })

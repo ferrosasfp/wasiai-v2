@@ -9,7 +9,7 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'
 
 export const metadata: Metadata = {
   title: 'WasiAI — The marketplace for the agentic economy',

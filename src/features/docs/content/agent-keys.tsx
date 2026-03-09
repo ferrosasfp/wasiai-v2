@@ -4,10 +4,10 @@ const CREATE_KEY: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'curl',
     language: 'bash',
-    code: `# Via dashboard: wasiai-v2.vercel.app/en/agent-keys
+    code: `# Via dashboard: app.wasiai.io/en/agent-keys
 
 # Or via API (requires authenticated session):
-curl -X POST https://wasiai-v2.vercel.app/api/agent-keys \\
+curl -X POST https://app.wasiai.io/api/agent-keys \\
   -H "Content-Type: application/json" \\
   -H "Cookie: <session>" \\
   -d '{"name": "my-trading-bot", "budget_usdc": 10}'
@@ -25,7 +25,7 @@ const USE_KEY: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'curl',
     language: 'bash',
-    code: `curl -X POST https://wasiai-v2.vercel.app/api/v1/models/wasi-defi-sentiment/invoke \\
+    code: `curl -X POST https://app.wasiai.io/api/v1/models/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: wai_xxxxxxxxxxxx" \\
   -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'`,
@@ -48,7 +48,7 @@ const BALANCE: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'curl',
     language: 'bash',
-    code: `curl https://wasiai-v2.vercel.app/api/v1/agent-keys/me \\
+    code: `curl https://app.wasiai.io/api/v1/agent-keys/me \\
   -H "X-API-Key: wai_xxxxxxxxxxxx"
 
 # Response:
@@ -98,8 +98,8 @@ export function AgentKeysSection() {
         <h3 className="text-base font-semibold text-gray-800">Fund on-chain</h3>
         <p className="text-sm text-gray-600">
           To deposit USDC into your key, go to the dashboard at{' '}
-          <a href="https://wasiai-v2.vercel.app/en/agent-keys" className="text-avax-600 underline hover:text-avax-700">
-            wasiai-v2.vercel.app/en/agent-keys
+          <a href="https://app.wasiai.io/en/agent-keys" className="text-avax-600 underline hover:text-avax-700">
+            app.wasiai.io/en/agent-keys
           </a>
           . The dashboard automatically handles the ERC-3009 transfer from your connected wallet.
         </p>

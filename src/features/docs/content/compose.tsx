@@ -4,7 +4,7 @@ const SERIAL_EXAMPLE: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Serial pipeline',
     language: 'json',
-    code: `POST https://wasiai-v2.vercel.app/api/v1/compose
+    code: `POST https://app.wasiai.io/api/v1/compose
 X-API-Key: wai_your_key_here
 {
   "steps": [
@@ -30,7 +30,7 @@ const PARALLEL_EXAMPLE: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Parallel pipeline',
     language: 'json',
-    code: `POST https://wasiai-v2.vercel.app/api/v1/compose
+    code: `POST https://app.wasiai.io/api/v1/compose
 X-API-Key: wai_your_key_here
 {
   "steps": [

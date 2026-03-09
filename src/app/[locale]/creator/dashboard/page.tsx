@@ -319,10 +319,10 @@ export default async function CreatorDashboardPage({
             {t('apiQuickStartLabel')}
           </p>
           <pre className="overflow-auto rounded-xl bg-black/30 p-4 text-sm text-green-400">{`# Discovery
-GET ${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'}/api/v1/models?category=nlp
+GET ${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'}/api/v1/models?category=nlp
 
 # Invoke (x402)
-POST ${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'}/api/v1/models/{slug}/invoke
+POST ${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'}/api/v1/models/{slug}/invoke
 x-payment: <usdc-tx-hash>
 Content-Type: application/json
 { "input": "..." }`}</pre>

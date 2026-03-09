@@ -23,7 +23,7 @@ const CORS = {
 }
 
 const CHAIN_ID = BigInt(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-const APP_URL  = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://wasiai-v2.vercel.app'
+const APP_URL  = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS })

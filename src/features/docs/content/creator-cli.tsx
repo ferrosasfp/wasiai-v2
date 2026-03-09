@@ -47,7 +47,7 @@ $ wasiai publish \\
 
 ✅ Agent published successfully!
    Slug: my-defi-agent
-   View: https://wasiai-v2.vercel.app/models/my-defi-agent`}</pre>
+   View: https://app.wasiai.io/models/my-defi-agent`}</pre>
         </div>
       </div>
 
@@ -91,7 +91,7 @@ $ wasiai stats --output json`}</pre>
               </tr>
               <tr>
                 <td className="py-2"><code className="text-xs bg-gray-100 px-1 rounded">--base-url</code></td>
-                <td className="py-2">Override API base URL (default: https://wasiai-v2.vercel.app)</td>
+                <td className="py-2">Override API base URL (default: https://app.wasiai.io)</td>
               </tr>
             </tbody>
           </table>

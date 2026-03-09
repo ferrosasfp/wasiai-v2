@@ -62,8 +62,8 @@ export function CreatorGuideSection() {
         <h3 className="text-base font-semibold text-gray-800">Publish an agent</h3>
         <p className="text-sm text-gray-600">
           Ve a{' '}
-          <a href="https://wasiai-v2.vercel.app/en/publish" className="text-avax-600 underline hover:text-avax-700">
-            wasiai-v2.vercel.app/en/publish
+          <a href="https://app.wasiai.io/en/publish" className="text-avax-600 underline hover:text-avax-700">
+            app.wasiai.io/en/publish
           </a>{' '}
           y completa el formulario, o usa la API:
         </p>
@@ -99,8 +99,8 @@ export function CreatorGuideSection() {
         <h3 className="text-base font-semibold text-gray-800">Analytics</h3>
         <p className="text-sm text-gray-600">
           En{' '}
-          <a href="https://wasiai-v2.vercel.app/en/dashboard" className="text-avax-600 underline hover:text-avax-700">
-            wasiai-v2.vercel.app/en/dashboard
+          <a href="https://app.wasiai.io/en/dashboard" className="text-avax-600 underline hover:text-avax-700">
+            app.wasiai.io/en/dashboard
           </a>{' '}
           puedes ver: calls totales, revenue en USDC, latencia promedio y error rate de tu agente.
         </p>

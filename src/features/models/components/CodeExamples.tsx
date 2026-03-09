@@ -5,7 +5,7 @@ import { CodeExamplesTabs } from './CodeExamplesTabs'
 const SITE_URL = (
   process.env.SITE_URL ??
   process.env.NEXT_PUBLIC_SITE_URL ??
-  'https://wasiai-v2.vercel.app'
+  'https://app.wasiai.io'
 ).replace(/\/$/, '')
 
 interface Props {

@@ -5,7 +5,7 @@ const FLOW: Parameters<typeof CodeBlock>[0]['tabs'] = [
     label: 'Flujo x402',
     language: 'bash',
     code: `# 1. POST sin header de pago → 402 Payment Required
-curl -X POST https://wasiai-v2.vercel.app/api/v1/models/wasi-defi-sentiment/invoke \\
+curl -X POST https://app.wasiai.io/api/v1/models/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
   -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'
 # → HTTP 402 + { amount, recipient, chain }
@@ -13,7 +13,7 @@ curl -X POST https://wasiai-v2.vercel.app/api/v1/models/wasi-defi-sentiment/invo
 # 2. Firmar ERC-3009 con viem (ver código abajo)
 
 # 3. Re-enviar con X-402-Payment header
-curl -X POST https://wasiai-v2.vercel.app/api/v1/models/wasi-defi-sentiment/invoke \\
+curl -X POST https://app.wasiai.io/api/v1/models/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
   -H "X-402-Payment: <base64_payload>" \\
   -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'

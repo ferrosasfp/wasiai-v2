@@ -42,7 +42,7 @@ print(result.output)
   {
     label: 'curl',
     language: 'bash',
-    code: `curl -X POST https://wasiai-v2.vercel.app/api/v1/agents/wasi-defi-sentiment/invoke \\
+    code: `curl -X POST https://app.wasiai.io/api/v1/agents/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: wai_your_key_here" \\
   -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'`,

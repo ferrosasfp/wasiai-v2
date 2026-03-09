@@ -8,7 +8,7 @@ const CLAUDE_DESKTOP_CONFIG: Parameters<typeof CodeBlock>[0]['tabs'] = [
     code: `{
   "mcpServers": {
     "wasiai": {
-      "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wai_YOUR_KEY"
+      "url": "https://app.wasiai.io/api/v1/mcp?key=wai_YOUR_KEY"
     }
   }
 }`,
@@ -22,7 +22,7 @@ const CURSOR_CONFIG: Parameters<typeof CodeBlock>[0]['tabs'] = [
     code: `{
   "mcpServers": {
     "wasiai": {
-      "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wai_YOUR_KEY"
+      "url": "https://app.wasiai.io/api/v1/mcp?key=wai_YOUR_KEY"
     }
   }
 }`,
@@ -33,7 +33,7 @@ const VERIFY_CONFIG: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Verificar conexión',
     language: 'bash',
-    code: `curl https://wasiai-v2.vercel.app/api/v1/mcp
+    code: `curl https://app.wasiai.io/api/v1/mcp
 # Respuesta: server info + lista de tools disponibles (agentes activos)`,
   },
 ]
@@ -111,7 +111,7 @@ export function McpSection() {
         <p className="text-sm text-gray-600">
           Go to{' '}
           <Link href="/en/agent-keys" className="text-avax-600 hover:underline font-medium">
-            wasiai-v2.vercel.app/en/agent-keys
+            app.wasiai.io/en/agent-keys
           </Link>{' '}
           and create an Agent Key. Fund it with USDC — each agent invocation will automatically
           deduct <code className="text-xs bg-gray-100 rounded px-1 py-0.5">price_per_call</code> USDC
@@ -228,7 +228,7 @@ export function McpSection() {
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700">MCP Server URL</p>
           <p className="text-sm font-mono bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 select-all">
-            https://wasiai-v2.vercel.app/api/v1/mcp
+            https://app.wasiai.io/api/v1/mcp
           </p>
         </div>
 

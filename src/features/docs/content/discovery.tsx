@@ -24,7 +24,7 @@ export function DiscoverySection() {
         <h3 className="text-sm font-semibold text-gray-400 mb-3">Example: Find a cheap DeFi agent</h3>
         <pre className="overflow-auto text-xs text-green-400">{`// 1. Discover agents under $0.10 in defi-risk category
 const res = await fetch(
-  "https://wasiai-v2.vercel.app/api/v1/agents/discover?category=defi-risk&max_price=0.10&limit=5"
+  "https://app.wasiai.io/api/v1/agents/discover?category=defi-risk&max_price=0.10&limit=5"
 );
 const { agents, meta } = await res.json();
 
@@ -33,7 +33,7 @@ const best = agents.sort((a, b) => b.reputation_score - a.reputation_score)[0];
 
 // 3. Invoke it
 const result = await fetch(
-  \`https://wasiai-v2.vercel.app/api/v1/models/\${best.slug}/invoke\`,
+  \`https://app.wasiai.io/api/v1/models/\${best.slug}/invoke\`,
   {
     method: "POST",
     headers: {

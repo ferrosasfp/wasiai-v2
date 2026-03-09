@@ -14,7 +14,7 @@ import { getInvokeLimit, checkRateLimit } from '@/lib/ratelimit'
  * as tools — with real budget-based payment via Agent Keys.
  *
  * Setup (claude_desktop_config.json):
- *   { "mcpServers": { "wasiai": { "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wasi_YOUR_KEY" } } }
+ *   { "mcpServers": { "wasiai": { "url": "https://app.wasiai.io/api/v1/mcp?key=wasi_YOUR_KEY" } } }
  *
  * GET  /api/v1/mcp?key=...  → Server info + tool list (free, no key needed)
  * POST /api/v1/mcp?key=...  → Execute a tool (requires valid agent key with budget)
@@ -113,7 +113,7 @@ export async function GET() {
     ],
     auth: {
       required: 'agent_key',
-      setup: 'Get a key at https://wasiai-v2.vercel.app/en/agent-keys',
+      setup: 'Get a key at https://app.wasiai.io/en/agent-keys',
       usage: 'Append ?key=wasi_YOUR_KEY to the MCP server URL',
     },
   })
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
     if (!rawKey || !rawKey.startsWith('wasi_')) {
       return mcpError(
         'Agent key required. Add ?key=wasi_YOUR_KEY to the MCP server URL. ' +
-        'Get a key at https://wasiai-v2.vercel.app/en/agent-keys',
+        'Get a key at https://app.wasiai.io/en/agent-keys',
       )
     }
 
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
     if (!keyRow) {
       return mcpError(
         'Invalid or inactive agent key. ' +
-        'Verify your key at https://wasiai-v2.vercel.app/en/agent-keys',
+        'Verify your key at https://app.wasiai.io/en/agent-keys',
       )
     }
 
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
       return mcpError(
         `Agent key budget exhausted. ` +
         `Remaining: $${remaining.toFixed(4)} USDC — needed: $${model.price_per_call} USDC. ` +
-        `Top up at https://wasiai-v2.vercel.app/en/agent-keys`,
+        `Top up at https://app.wasiai.io/en/agent-keys`,
       )
     }
 

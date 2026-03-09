@@ -47,7 +47,7 @@ print(response.json()['output'])${freeNote}`
   return { curl, node, python }
 }
 
-const BASE = 'https://wasiai-v2.vercel.app'
+const BASE = 'https://app.wasiai.io'
 
 describe('generateSnippets', () => {
   it('includes slug in all snippets', () => {
@@ -70,9 +70,9 @@ describe('generateSnippets', () => {
     expect(curl).toContain(customBase)
     expect(node).toContain(customBase)
     expect(python).toContain(customBase)
-    expect(curl).not.toContain('wasiai-v2.vercel.app')
-    expect(node).not.toContain('wasiai-v2.vercel.app')
-    expect(python).not.toContain('wasiai-v2.vercel.app')
+    expect(curl).not.toContain('app.wasiai.io')
+    expect(node).not.toContain('app.wasiai.io')
+    expect(python).not.toContain('app.wasiai.io')
   })
 
   it('adds # free agent comment when priceUsdc is null', () => {

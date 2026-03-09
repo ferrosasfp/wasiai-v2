@@ -38,7 +38,7 @@ const INDEX_CODE: Parameters<typeof CodeBlock>[0]['tabs'] = [
 import { signERC3009Payment } from './pay'
 import { invokeAgent } from './invoke'
 
-const BASE_URL = 'https://wasiai-v2.vercel.app'
+const BASE_URL = 'https://app.wasiai.io'
 
 async function main() {
   // 1. Descubrir el agente en el catálogo
