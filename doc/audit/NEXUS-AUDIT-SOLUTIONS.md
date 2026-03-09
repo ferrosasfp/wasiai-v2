@@ -1,8 +1,8 @@
-# NEXUS-AUDIT-SOLUTIONS v4.0
+# NEXUS-AUDIT-SOLUTIONS v1.0
 ## WasiAI Marketplace — Solutions Guide
 
 **Fecha:** 2026-03-08
-**Companion de:** `NEXUS-AUDIT-REPORT.md` v4.0 (6 nuevos hallazgos + 6 abiertos de v3)
+**Companion de:** `NEXUS-AUDIT-REPORT.md` v1.0 (6 nuevos hallazgos + 6 abiertos previos)
 **Instrucciones:** Cada solucion tiene codigo sugerido listo para implementar. El equipo de desarrollo aplica los fixes — este documento es solo guia.
 
 ---
@@ -274,9 +274,9 @@ if (freeBalance < grossAmount) {
 
 ---
 
-## Hallazgos Abiertos de v3 (recordatorio)
+## Hallazgos Abiertos Previos (recordatorio)
 
-Los siguientes hallazgos siguen abiertos desde v3. Referir `NEXUS-AUDIT-SOLUTIONS.md v3.0` para las soluciones originales:
+Los siguientes hallazgos siguen abiertos de auditorias anteriores:
 
 | ID | Severidad | Solucion resumida |
 |---|---|---|
@@ -308,4 +308,4 @@ Los siguientes hallazgos siguen abiertos desde v3. Referir `NEXUS-AUDIT-SOLUTION
 ---
 
 *Soluciones generadas por NexusAudit v2.0 + NexusGuard v1.0*
-*Companion de NEXUS-AUDIT-REPORT.md v4.0*
+*Companion de NEXUS-AUDIT-REPORT.md v1.0*

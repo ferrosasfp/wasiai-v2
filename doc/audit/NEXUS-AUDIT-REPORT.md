@@ -1,17 +1,17 @@
-# NEXUS-AUDIT-REPORT v4.0
+# NEXUS-AUDIT-REPORT v1.0
 ## WasiAI Marketplace — Security Audit Report
 
 **Fecha:** 2026-03-08
 **Auditores:** NexusAudit v2.0 (on-chain) + NexusGuard v1.0 (off-chain)
-**Version codebase:** post-pull v4 — 97 archivos cambiados, -4364 lineas (cleanup masivo)
+**Version codebase:** post-pull — 97 archivos cambiados, -4364 lineas (cleanup masivo)
 **Commit base:** main (post a751cbb)
-**Score de seguridad:** 9.0 / 10 (mejora desde 8.6/10 de v3)
+**Score de seguridad:** 9.0 / 10
 
 ---
 
 ## Executive Summary
 
-Auditoria post-pull v4 del codebase WasiAI. Los cambios principales auditados son:
+Auditoria del codebase WasiAI. Los cambios principales auditados son:
 - **HU-067: Sistema de retiro via voucher EIP-712** — nuevo `claimEarnings()` en contrato con firma del operador, anti-replay, deadline, balance guard
 - **HU-071: Eliminacion completa de Thirdweb** — Route C, embedded wallet, `verifyUsdcTransfer.ts`, `thirdwebClient.ts` eliminados
 - **Simplificacion de invoke/route.ts** — solo Route A (agent key) y Route B (x402 nativo)
@@ -20,13 +20,13 @@ Auditoria post-pull v4 del codebase WasiAI. Los cambios principales auditados so
 - **Eliminacion de codigo legacy:** operatorSettler.ts, useAuth.ts, computePaymentId.ts (movido a contrato), cron routes
 
 **Hallazgos nuevos:** 6 (0 CRITICAL, 1 HIGH, 2 MEDIUM, 1 LOW, 2 INFO)
-**Hallazgos v3 resueltos:** 4 (NG-108, NG-109, NG-111, NG-112)
-**Hallazgos v3 aun abiertos:** 3 (NG-103, NG-104, NA-302) + 2 on-chain (NA-R01, NA-R03)
+**Hallazgos previos resueltos:** 4 (NG-108, NG-109, NG-111, NG-112)
+**Hallazgos previos aun abiertos:** 3 (NG-103, NG-104, NA-302) + 2 on-chain (NA-R01, NA-R03)
 **Sin regresiones.**
 
 ---
 
-## Scope Delta v4
+## Scope
 
 ### Archivos nuevos/modificados criticos examinados
 
@@ -62,21 +62,21 @@ Auditoria post-pull v4 del codebase WasiAI. Los cambios principales auditados so
 
 ## Estado de Hallazgos Previos
 
-### Hallazgos v3 RESUELTOS en v4
+### Hallazgos Previos RESUELTOS
 
 | ID | Severidad | Descripcion | Estado | Evidencia |
 |---|---|---|---|---|
-| NG-108 | MEDIUM | withdraw/route.ts sin guard de unicidad para txHash | **FIXED** v4 | withdraw/route.ts completamente reescrito; ya no modifica budget_usdc de agent_keys; ahora verifica EarningsClaimed on-chain y pone pending_earnings_usdc = 0 |
-| NG-109 | LOW | verifyUsdcTransfer.ts con direccion hardcoded | **FIXED** v4 | Archivo eliminado completamente |
-| NG-111 | MEDIUM | Route C (embedded wallet) flujo custodial off-chain | **FIXED** v4 | Route C eliminada; invoke/route.ts solo tiene Route A (agent key) y Route B (x402) |
-| NG-112 | INFO | useWallet.ts dual-connection guard race condition | **FIXED** v4 | Thirdweb eliminado; useWallet.ts simplificado sin dual-wallet guard |
+| NG-108 | MEDIUM | withdraw/route.ts sin guard de unicidad para txHash | **FIXED** | withdraw/route.ts completamente reescrito; ya no modifica budget_usdc de agent_keys; ahora verifica EarningsClaimed on-chain y pone pending_earnings_usdc = 0 |
+| NG-109 | LOW | verifyUsdcTransfer.ts con direccion hardcoded | **FIXED** | Archivo eliminado completamente |
+| NG-111 | MEDIUM | Route C (embedded wallet) flujo custodial off-chain | **FIXED** | Route C eliminada; invoke/route.ts solo tiene Route A (agent key) y Route B (x402) |
+| NG-112 | INFO | useWallet.ts dual-connection guard race condition | **FIXED** | Thirdweb eliminado; useWallet.ts simplificado sin dual-wallet guard |
 
-### Hallazgos v3 AUN ABIERTOS
+### Hallazgos Previos AUN ABIERTOS
 
-| ID | Severidad | Descripcion | Estado | Nota v4 |
+| ID | Severidad | Descripcion | Estado | Nota |
 |---|---|---|---|---|
-| NG-103 | MEDIUM | register/route.ts retorna on_chain_registered:true antes de confirmar tx | **OPEN** | Sin cambios en v4 |
-| NG-104 | MEDIUM | discover_agents_v2 RPC usa SECURITY DEFINER bypassing RLS | **OPEN** | Sin cambios en v4 |
+| NG-103 | MEDIUM | register/route.ts retorna on_chain_registered:true antes de confirmar tx | **OPEN** | Sin cambios |
+| NG-104 | MEDIUM | discover_agents_v2 RPC usa SECURITY DEFINER bypassing RLS | **OPEN** | Sin cambios |
 | NA-302 | MEDIUM | Sin cron de reconciliacion on-chain vs DB para agentes on_chain | **OPEN** | Cron routes eliminados; reconciliacion aun no implementada |
 | NA-R01 | LOW | selfRegisterAgent usa bare transferFrom en lugar de safeTransferFrom | **OPEN** | Sin cambios en contrato para esta funcion |
 | NA-R03 | INFO | submitReputationBatch sin whenNotPaused | **OPEN** | Sin cambios |
@@ -84,7 +84,7 @@ Auditoria post-pull v4 del codebase WasiAI. Los cambios principales auditados so
 
 ---
 
-## Nuevos Hallazgos v4
+## Nuevos Hallazgos
 
 ---
 
@@ -347,7 +347,7 @@ Ambos paths son bien auditados con rate limiting, SSRF protection, circuit break
 
 ---
 
-## Resumen Consolidado v4
+## Resumen Consolidado
 
 ### Nuevos Hallazgos
 
@@ -364,14 +364,14 @@ Ambos paths son bien auditados con rate limiting, SSRF protection, circuit break
 
 | ID | Componente | Severidad | Estado |
 |---|---|---|---|
-| NG-103 | register/route.ts | **MEDIUM** | OPEN (v3) |
-| NG-104 | discover_agents_v2 RPC | **MEDIUM** | OPEN (v3) |
-| NA-302 | Sin cron de reconciliacion | **MEDIUM** | OPEN (v3) |
-| NA-R01 | selfRegisterAgent bare transferFrom | **LOW** | OPEN (v3) |
-| NA-R03 | submitReputationBatch sin whenNotPaused | **INFO** | OPEN (v3) |
-| NG-113 | migration 042 sin indice | **INFO** | OPEN (v3) |
+| NG-103 | register/route.ts | **MEDIUM** | OPEN |
+| NG-104 | discover_agents_v2 RPC | **MEDIUM** | OPEN |
+| NA-302 | Sin cron de reconciliacion | **MEDIUM** | OPEN |
+| NA-R01 | selfRegisterAgent bare transferFrom | **LOW** | OPEN |
+| NA-R03 | submitReputationBatch sin whenNotPaused | **INFO** | OPEN |
+| NG-113 | migration 042 sin indice | **INFO** | OPEN |
 
-### Hallazgos RESUELTOS en v4
+### Hallazgos RESUELTOS
 
 | ID | Severidad | Descripcion | Resolucion |
 |---|---|---|---|
@@ -384,7 +384,7 @@ Ambos paths son bien auditados con rate limiting, SSRF protection, circuit break
 
 ## Score de Seguridad
 
-| Categoria | v3 Score | v4 Score | Delta |
+| Categoria | Previo | Actual | Delta |
 |---|---|---|---|
 | Smart Contract (on-chain) | 8.5 | 9.0 | +0.5 |
 | API Routes (off-chain) | 8.5 | 8.8 | +0.3 |
@@ -402,7 +402,7 @@ Ambos paths son bien auditados con rate limiting, SSRF protection, circuit break
 ### Puntos pendientes que frenan el score:
 - NA-V01 (HIGH): claimEarnings callable por cualquier address
 - NG-V02 (MEDIUM): withdraw sin idempotencia de txHash
-- NG-103/NG-104/NA-302 (MEDIUM): hallazgos abiertos de v3
+- NG-103/NG-104/NA-302 (MEDIUM): hallazgos abiertos previos
 
 ---
 
@@ -412,7 +412,7 @@ Ambos paths son bien auditados con rate limiting, SSRF protection, circuit break
 2. **ALTA (NG-V02):** Registrar txHash procesados en tabla de withdrawals para idempotencia
 3. **ALTA (NG-V01):** Registrar vouchers emitidos en Supabase para audit trail
 4. **MEDIA (NG-V03):** Agregar rate limiting al endpoint de voucher
-5. **MEDIA (NG-103/NG-104/NA-302):** Resolver hallazgos abiertos de v3
+5. **MEDIA (NG-103/NG-104/NA-302):** Resolver hallazgos abiertos previos
 
 ---
 
