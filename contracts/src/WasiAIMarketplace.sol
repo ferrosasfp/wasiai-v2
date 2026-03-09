@@ -270,10 +270,8 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         // NA-301b: Charge fee only after free registrations exhausted
         uint256 userCount = userRegistrationCount[msg.sender];
         if (registrationFee > 0 && userCount >= freeRegistrationsPerUser) {
-            require(
-                usdc.transferFrom(msg.sender, address(this), registrationFee),
-                "Fee transfer failed"
-            );
+            // NA-R01: use SafeERC20 — reverts on false return value
+            usdc.safeTransferFrom(msg.sender, address(this), registrationFee);
         }
         userRegistrationCount[msg.sender] = userCount + 1;
 
@@ -886,7 +884,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         string[] calldata slugs,
         uint16[] calldata avgRatings,
         uint32[] calldata voteCounts
-    ) external onlyOperator {
+    ) external onlyOperator whenNotPaused {
         lastOperatorActivity = block.timestamp;
         uint256 len = slugs.length;
         require(len > 0,                      "WasiAI: empty batch");
