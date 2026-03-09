@@ -11,9 +11,9 @@ import { createClient, createServiceClient }     from '@/lib/supabase/server'
 import { validateCsrf }                          from '@/lib/security/csrf'
 import { logger }                               from '@/lib/logger'
 import { z }                                    from 'zod'
-import { createPublicClient, http }             from 'viem'
-import { avalancheFuji, avalanche }             from 'viem/chains'
-import { getPendingEarnings }                   from '@/lib/contracts/marketplaceClient'
+import { createPublicClient, http } from 'viem'
+import { avalancheFuji, avalanche } from 'viem/chains'
+import { getPendingEarnings }       from '@/lib/contracts/marketplaceClient'
 
 // topic0 = keccak256("EarningsClaimed(address,uint256,uint256,uint256,bytes32)")
 const EARNINGS_CLAIMED_TOPIC = '0x7c1baf99431f82a970a4a3490e0d9ba64bffbe05e26ccc6e03ec6646aed8d667'
@@ -53,13 +53,31 @@ export async function POST(req: NextRequest) {
 
   const walletAddress = profile.wallet_address
 
-  // 4. Public client
+  // 4. Public client — NG-V04: use env vars for RPC (consistent with marketplaceClient.ts)
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+  const rpcUrl  = (chainId === 43114
+    ? process.env.NEXT_PUBLIC_RPC_MAINNET
+    : process.env.NEXT_PUBLIC_RPC_TESTNET
+  )?.trim() || undefined
+
+  // NG-V02: Check idempotencia BEFORE any RPC call
+  const serviceClient = createServiceClient()
+  const { data: existingWithdrawal } = await serviceClient
+    .from('creator_withdrawals')
+    .select('id')
+    .eq('tx_hash', parsed.data.txHash)
+    .maybeSingle()
+
+  if (existingWithdrawal) {
+    return NextResponse.json(
+      { error: 'This transaction has already been processed', txHash: parsed.data.txHash },
+      { status: 409 },
+    )
+  }
+
   const pub = createPublicClient({
     chain:     chainId === 43114 ? avalanche : avalancheFuji,
-    transport: http(chainId === 43114
-      ? 'https://api.avax.network/ext/bc/C/rpc'
-      : 'https://api.avax-test.network/ext/bc/C/rpc'),
+    transport: http(rpcUrl),
   })
 
   // 5. Leer receipt con retry 3×
@@ -109,11 +127,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Receipt creator does not match authenticated wallet' }, { status: 403 })
   }
 
-  // 8. Extraer monto real del evento: topics[2] = grossAmount (indexed uint256)
-  const realAmount = Number(BigInt(log.topics[2] ?? '0x0')) / 1_000_000
+  // 8. Decodificar monto real del evento desde log.data (grossAmount no es indexed)
+  // EarningsClaimed(address indexed creator, uint256 grossAmount, uint256 creatorShare, uint256 platformShare, bytes32 nonce)
+  // data = abi.encode(grossAmount, creatorShare, platformShare, nonce)
+  // B-1 fix: grossAmount is NOT indexed — lives in log.data, not topics.
+  // data layout (ABI-encoded): [grossAmount uint256 32B][creatorShare uint256 32B][platformShare uint256 32B][nonce bytes32 32B]
+  let realAmount = 0
+  try {
+    // Each ABI word is 32 bytes = 64 hex chars. grossAmount is the first word in data.
+    const dataHex  = log.data.startsWith('0x') ? log.data.slice(2) : log.data
+    const grossHex = dataHex.slice(0, 64)
+    realAmount = Number(BigInt('0x' + grossHex)) / 1_000_000
+  } catch (decodeErr) {
+    logger.warn('[creator/withdraw] realAmount decode failed, using 0', { decodeErr })
+  }
 
   // 9. Poner pending_earnings_usdc = 0 en Supabase
-  const serviceClient = createServiceClient()
   const { error: updateError } = await serviceClient
     .from('creator_profiles')
     .update({ pending_earnings_usdc: 0 })
@@ -129,6 +158,14 @@ export async function POST(req: NextRequest) {
       warning:   'DB sync failed — contact support if balance shows incorrectly.',
     })
   }
+
+  // NG-V02: Register txHash to prevent double-processing
+  serviceClient
+    .from('creator_withdrawals')
+    .insert({ creator_id: user.id, tx_hash: parsed.data.txHash, amount_usdc: realAmount })
+    .then(({ error }) => {
+      if (error) logger.warn('[creator/withdraw] txHash log insert failed (non-fatal)', { error })
+    })
 
   logger.info('[creator/withdraw] EarningsClaimed verified', {
     txHash: parsed.data.txHash, realAmount, walletAddress,

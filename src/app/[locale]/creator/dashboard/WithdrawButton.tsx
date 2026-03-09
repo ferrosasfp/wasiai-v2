@@ -3,6 +3,7 @@
 import { useState, useEffect }      from 'react'
 import { useTranslations }          from 'next-intl'
 import { useUnifiedWalletClient }   from '@/features/wallet/hooks/useUnifiedWalletClient'
+import { useWallet }               from '@/features/wallet/hooks/useWallet'
 import { createPublicClient, http } from 'viem'
 import { avalancheFuji, avalanche } from 'viem/chains'
 import { CLAIM_EARNINGS_ABI }       from '@/lib/contracts/abis'
@@ -22,6 +23,7 @@ interface Props {
 export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
   const t = useTranslations('dashboard')
   const { writeContract, isReady } = useUnifiedWalletClient()
+  const { address: connectedAddress } = useWallet()
 
   // Avoid hydration mismatch — wallet state only known client-side
   const [mounted, setMounted] = useState(false)
@@ -47,6 +49,18 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
   async function handleWithdraw() {
     setErrorMsg('')
     try {
+      // B-2: Guard — connected wallet must match registered withdrawal wallet
+      if (!connectedAddress) {
+        setErrorMsg('No wallet connected. Please connect your wallet first.')
+        setStatus('error')
+        return
+      }
+      if (connectedAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+        setErrorMsg('Connected wallet does not match your registered withdrawal wallet. Please switch to the correct wallet.')
+        setStatus('error')
+        return
+      }
+
       // Step 1: Request voucher from backend
       setStatus('requesting')
       const voucherRes = await fetch('/api/creator/earnings/voucher', {

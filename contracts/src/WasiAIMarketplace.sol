@@ -469,6 +469,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         bytes calldata sig
     ) external nonReentrant whenNotPaused {
         require(creator != address(0),             "WasiAI: zero creator");
+        require(msg.sender == creator,             "WasiAI: caller must be creator"); // NA-V01
         // 1. Expiry guard
         require(block.timestamp <= deadline,       "WasiAI: voucher expired");
 

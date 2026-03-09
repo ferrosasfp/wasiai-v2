@@ -14,6 +14,7 @@ import { createWalletClient, http }       from 'viem'
 import { privateKeyToAccount }            from 'viem/accounts'
 import { avalancheFuji, avalanche }       from 'viem/chains'
 import { randomBytes }                    from 'crypto'
+import { getKeysLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrf(req)
@@ -23,6 +24,11 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // NG-V03: Rate limiting — max 10 vouchers/hour per user
+  const rlId  = getIdentifier(req, user.id)
+  const rlHit = await checkRateLimit(getKeysLimit(), rlId)
+  if (rlHit) return rlHit
 
   // 2. Get creator profile
   const { data: profile } = await supabase
@@ -96,6 +102,21 @@ export async function POST(req: NextRequest) {
   }
 
   logger.info('[voucher] signed', { walletAddress: profile.wallet_address, grossAmountAtomics })
+
+  // NG-V01: Audit trail — register voucher in DB (non-fatal)
+  supabase
+    .from('creator_withdrawal_vouchers')
+    .insert({
+      creator_id:        user.id,
+      wallet_address:    profile.wallet_address,
+      gross_amount_usdc: pendingUsdc,
+      nonce,
+      deadline:          Number(deadline),
+      status:            'pending',
+    })
+    .then(({ error }) => {
+      if (error) logger.warn('[voucher] DB audit trail insert failed (non-fatal)', { error })
+    })
 
   return NextResponse.json({
     grossAmountAtomics,
