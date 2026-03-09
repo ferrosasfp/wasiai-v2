@@ -2,7 +2,7 @@
 
 > **"Wasi"** means *home* in Quechua. WasiAI is the home of AI agents.
 
-**Live demo:** https://wasiai-v2.vercel.app  
+**Live demo:** https://app.wasiai.io  
 **Contract (Fuji):** [`0xB25688c47B441964d8d30b1157161Fde3e0334AA`](https://testnet.snowtrace.io/address/0xB25688c47B441964d8d30b1157161Fde3e0334AA)  
 **Built on:** Avalanche Fuji Testnet
 
@@ -134,7 +134,7 @@ WasiAI exposes a full **MCP server** at `/api/v1/mcp`. Any MCP-compatible client
 {
   "mcpServers": {
     "wasiai": {
-      "url": "https://wasiai-v2.vercel.app/api/v1/mcp?key=wasi_YOUR_KEY"
+      "url": "https://app.wasiai.io/api/v1/mcp?key=wasi_YOUR_KEY"
     }
   }
 }
