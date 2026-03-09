@@ -16,14 +16,7 @@ const depositSchemaEOA = z.object({
   s:            z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid s value'),
 })
 
-// Route C: Embedded wallet — USDC.transfer directo + tx hash
-const depositSchemaRouteC = z.object({
-  ownerAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid Ethereum address'),
-  amount:       z.number().min(0.01).max(1000),
-  txHash:       z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid tx hash'),
-})
-
-const depositSchema = z.union([depositSchemaRouteC, depositSchemaEOA])
+const depositSchema = depositSchemaEOA
 
 /**
  * POST /api/agent-keys/[id]/deposit
@@ -88,27 +81,11 @@ export async function POST(
     const ownerDiffers     = !!registeredWallet && registeredWallet !== incomingWallet
     // ownerDiffers → depósito se permite, warning en response (RN-3)
 
-    // 4. Submit deposit on-chain — Route C (txHash) or Route B (EIP-3009)
+    // 4. Submit deposit on-chain — EIP-3009 TransferWithAuthorization (EOA)
     let txHash: string
 
-    if ('txHash' in body) {
-      // ── Route C: Embedded wallet — BLOQUEADO (HU-058) ────────────────────
-      // Route C (USDC.transfer directo) no llama depositKey on-chain.
-      // Los fondos llegan al contrato pero no se registran al key — irrecuperables.
-      // Para fondear Agent Keys se requiere wallet EOA (MetaMask, Core Wallet, etc.)
-      logger.warn('[deposit] Route C rejected — embedded wallet deposit not supported', {
-        owner: body.ownerAddress,
-      })
-      return NextResponse.json(
-        {
-          error:  'Embedded wallets (Google/email) cannot fund Agent Keys directly.',
-          detail: 'Please connect an EOA wallet (MetaMask, Core Wallet, etc.) to deposit USDC. Your Thirdweb session remains active for other features.',
-          code:   'EMBEDDED_WALLET_NOT_SUPPORTED',
-        },
-        { status: 403 },
-      )
-    } else {
-      // ── Route B: EOA — EIP-3009 TransferWithAuthorization (existente) ────
+    {
+      // ── EOA — EIP-3009 TransferWithAuthorization ──────────────────────────
       logger.info('[deposit] Route B — initiating depositForKey', {
         keyId:       keyRow.key_hash.slice(0, 8),
         amount:      body.amount,

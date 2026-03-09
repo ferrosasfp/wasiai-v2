@@ -60,7 +60,6 @@ export function useUnifiedWalletClient() {
 
   return {
     isReady:      !!wagmiWalletClient,
-    isThirdweb:   false, // always false — kept for transition safety, remove in future cleanup
     writeContract,
     signTypedData,
     signMessage,
