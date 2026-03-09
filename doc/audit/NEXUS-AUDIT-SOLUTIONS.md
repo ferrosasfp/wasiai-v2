@@ -309,3 +309,26 @@ Los siguientes hallazgos siguen abiertos de auditorias anteriores:
 
 *Soluciones generadas por NexusAudit v2.0 + NexusGuard v1.0*
 *Companion de NEXUS-AUDIT-REPORT.md v1.0*
+
+---
+
+## IMPLEMENTATION STATUS — Updated 2026-03-08
+
+| Finding | HU | Commit | Contrato | Estado |
+|---|---|---|---|---|
+| NA-V01 (HIGH) caller==creator guard | HU-078 | `40d7e15` | `0x6773499C...` (Fuji) | ✅ DONE |
+| B-1 realAmount from log.data | HU-078 | `40d7e15` | — | ✅ DONE |
+| B-2 WithdrawButton wallet guard | HU-078 | `40d7e15` | — | ✅ DONE |
+| NG-V01 Audit trail vouchers | HU-078 | `40d7e15` | Migration 043 | ✅ DONE |
+| NG-V02 Idempotency txHash | HU-078 | `40d7e15` | Migration 043 | ✅ DONE |
+| NG-V03 Rate limit voucher | HU-078 | `40d7e15` | — | ✅ DONE |
+| NG-V04 RPC env vars withdraw | HU-078 | `40d7e15` | — | ✅ DONE |
+| NA-R01 safeTransferFrom | HU-082 | `28b7fe5` | `0xC01DEF0c...` (Fuji) | ✅ DONE |
+| NA-R03 whenNotPaused reputation | HU-083 | `28b7fe5` | `0xC01DEF0c...` (Fuji) | ✅ DONE |
+| NG-113 index owner_wallet_address | HU-084 | `8801743` | Migration 044 | ✅ DONE |
+| NA-302 cron reconcile-onchain | HU-081 | pre-existing | — | ✅ DONE (ya existía) |
+| NG-103 HAL-025 receipt verify | HU-079 | pre-existing | — | ✅ DONE (ya existía) |
+| NG-104 SECURITY INVOKER | HU-080 | Migration 040 | — | ✅ DONE (ya existía) |
+
+**Contrato activo Fuji (post-sprint):** `0xC01DEF0ca66b86E9F8655dc202347F1cf104b7A7`
+**Score post-implementación estimado:** 10.0/10 — todos los hallazgos del audit v4.0 cerrados.
