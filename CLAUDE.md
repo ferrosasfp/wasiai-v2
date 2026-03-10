@@ -1,8 +1,40 @@
 # WasiAI — CLAUDE.md
 
 Marketplace on-chain de agentes IA en Avalanche.
-URL prod: https://wasiai-v2.vercel.app
-Contrato activo (Fuji v1.3): `0x3583fb96bAB5DbBDd85CCeA1C4fCE3EfF3249F08`
+
+## ⚠️ AMBIENTES — LEER ANTES DE DEPLOY
+
+| Ambiente | Vercel | URL | Supabase | Contrato | Chain |
+|----------|--------|-----|----------|----------|-------|
+| **Staging** | `wasiai-v2` | wasiai-v2.vercel.app | `bdwvrwzvsldeprfibmuu` | `0x3583fb...` | Fuji (43113) |
+| **Producción** | `wasiai-prod` | wasiai-prod.vercel.app | `caldzjhjgctpgodldqav` | `0x24be31...` | Mainnet (43114) |
+
+### 🚨 Checklist Pre-Deploy
+
+**Antes de push a `main`:**
+- [ ] ¿En qué ambiente quiero deployar? (staging vs prod)
+- [ ] ¿Hay migraciones de DB? → Aplicar primero en staging, probar, luego prod
+- [ ] ¿Hay cambios de contrato? → Fuji y Mainnet son contratos DIFERENTES
+- [ ] ¿Variables de entorno nuevas? → Agregar en AMBOS proyectos Vercel
+
+**Para deployar a PRODUCCIÓN:**
+1. Probar cambios en staging primero (wasiai-v2.vercel.app)
+2. Ir a Vercel → `wasiai-prod` → Deployments → Redeploy manual
+3. NO hacer auto-deploy a prod desde push
+
+**Migraciones de DB:**
+```bash
+# Staging
+npx supabase db push --db-url "postgresql://postgres:[pwd]@db.bdwvrwzvsldeprfibmuu.supabase.co:5432/postgres"
+
+# Producción (⚠️ CUIDADO)
+npx supabase db push --db-url "postgresql://postgres:[pwd]@db.caldzjhjgctpgodldqav.supabase.co:5432/postgres"
+```
+
+---
+
+**Contrato activo Staging (Fuji v1.3):** `0x3583fb96bAB5DbBDd85CCeA1C4fCE3EfF3249F08`
+**Contrato activo Producción (Mainnet):** `0x24be31D0F538C5551c536b09C85907C43c24d062`
 
 ---
 
