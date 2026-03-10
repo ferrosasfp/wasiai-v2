@@ -68,11 +68,6 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
             hasWallet={!!profile?.wallet_address}
             walletAddress={profile?.wallet_address ?? ''}
           />
-          {profile?.wallet_address && (
-            <p className="text-xs text-gray-400 font-mono truncate max-w-[260px]">
-              {profile.wallet_address}
-            </p>
-          )}
         </div>
       </div>
     </section>
