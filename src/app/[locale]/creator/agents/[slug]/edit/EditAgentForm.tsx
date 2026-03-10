@@ -146,7 +146,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
           }
         } catch (err) {
           // Non-fatal: DB already updated. Log but don't block.
-          console.warn('[WAS-161] On-chain price sync failed:', err)
+          if (process.env.NODE_ENV !== 'production') console.warn('[WAS-161] On-chain price sync failed:', (err as Error).message)
         }
       }
 

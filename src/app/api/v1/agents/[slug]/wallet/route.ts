@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 import {
   generateAgentWallet,
   getAgentWalletAddress,
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { address } = await generateAgentWallet(agent!.id)
     return NextResponse.json({ address })
   } catch (err) {
-    console.error('[POST /wallet] Error:', (err as Error).message)  // solo message, no stack con key
+    logger.error('[POST /wallet] Error', { message: (err as Error).message })  // solo message, no stack con key
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

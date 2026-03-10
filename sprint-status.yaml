@@ -1,56 +1,105 @@
-sprint: 17
-periodo: "2026-03-02 → TBD"
-estado: planning
-goal: "Blindar el stack de pagos on-chain: tests ERC-3009 reales, arquitectura dual-flow consolidada, settlement automático vía listener, CLI para developers, escrow para tareas largas y primer plugin de ecosistema LlamaIndex."
-goal_cumplido: false
+sprint: 22
+periodo: "2026-02-17 → 2026-03-10"
+estado: completado
+goal: "Consolidar el stack de seguridad on-chain: NexusAudit v4.0, SDK NexusGuard, retiro parcial de keys, indices de BD, y eliminación de Thirdweb del stack."
+goal_cumplido: true
 
-seleccionadas:
-  - id: WAS-89
-    hu: "[L-03] Tests MockUSDC firma ERC-3009"
-    prioridad: P0-seguridad
-    modo: QUALITY
-    estado: Todo
-    sp: 5
+completadas:
+  - id: WAS-181
+    hu: "HU-084: index on agent_keys.owner_wallet_address"
+    estado: Done
 
-  - id: WAS-103
-    hu: "[OZ-A1] Arquitectura dual-flow en un contrato"
-    prioridad: P1-arch
-    modo: QUALITY
-    estado: Todo
-    sp: 3
+  - id: WAS-180
+    hu: "HU-083: submitReputationBatch whenNotPaused modifier"
+    estado: Done
 
-  - id: WAS-82
-    hu: "Listener UpkeepPerformed → settlement automático"
+  - id: WAS-179
+    hu: "HU-082: selfRegisterAgent safeTransferFrom fix"
+    estado: Done
+
+  - id: WAS-178
+    hu: "HU-078: NexusAudit v4.0 — contract guard, realAmount fix, guards"
+    estado: Done
+
+  - id: WAS-177
+    hu: "HU-077: @wasiai/sdk DX & Safety — 1MB limit, --input-file, --quiet"
+    estado: Done
+
+  - id: WAS-176
+    hu: "HU-076: @wasiai/sdk NexusGuard v1.0 — SSRF, HTTP warn, path traversal"
+    estado: Done
+
+  - id: WAS-173
+    hu: "HU-073: Model page — precio de invocación correcto"
+    estado: Done
+
+  - id: WAS-172
+    hu: "HU-072: Agent Keys — balance on-chain correcto"
+    estado: Done
+
+  - id: WAS-171
+    hu: "HU-071: Retirar Thirdweb del stack de wallets"
+    estado: Done
+
+  - id: WAS-167
+    hu: "HU-057: withdrawKey para retiros parciales"
+    estado: Done
+
+# ─── CONTRATOS ────────────────────────────────────────────────────────────────
+contratos:
+  activo:
+    red: Fuji (43113)
+    address: "0x3583fb96bAB5DbBDd85CCeA1C4fCE3EfF3249F08"
+    version: v1.3
+    features: "withdrawKey, registration fee, free tier, NexusAudit guards"
+  usdc_fuji: "0x5425890298aed601595a70AB815c96711a31Bc65"
+  operator: "0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba"
+  deprecados:
+    - "0x71CddCdF8a40951a1d8C22C8774448FbcA089b53 (v1.2)"
+    - "0x2aC90D148563CFe325220bbCB0Dec394B9292C2e (v1.1)"
+
+# ─── BACKLOG ACTIVO ───────────────────────────────────────────────────────────
+backlog:
+  - id: WAS-155
+    titulo: "[EPIC] Skills Marketplace"
     prioridad: P1
-    modo: QUALITY
-    estado: Todo
-    sp: 8
+    estado: Backlog
 
-  - id: WAS-13
-    hu: "CLI wasiai invoke <agent> '<input>'"
+  - id: WAS-156
+    titulo: "[EPIC] Bounties — Recompensas USDC para tareas de agentes"
     prioridad: P2
-    modo: QUALITY
-    estado: Todo
-    sp: 5
+    estado: Backlog
+    nota: "Pospuesto — requiere tracción en marketplace primero"
 
-  - id: WAS-72
-    hu: "HU-6.6 — Escrow para tareas largas"
-    prioridad: P2-stretch
-    modo: QUALITY
-    estado: Todo
-    sp: 13
+  - id: WAS-142
+    titulo: "[EPIC] RAG / Knowledge Base"
+    prioridad: P2
+    estado: Backlog
 
-  - id: WAS-41
-    hu: "HU-7.2: Plugin LlamaIndex para WasiAI"
-    prioridad: P3-stretch
-    modo: QUALITY
-    estado: Todo
-    sp: 8
+  - id: WAS-130
+    titulo: "Safe multisig 2-de-3 (pre-mainnet)"
+    prioridad: P2
+    estado: Backlog
 
-sp_comprometidos: 29
-sp_stretch: 21
-sp_total: 42
+  - id: WAS-22
+    titulo: "Deploy a mainnet (Avalanche C-Chain)"
+    prioridad: P3
+    estado: Backlog
 
-duplicados:
-  - id: WAS-114
-    razon: "Duplicado de WAS-13. Won't Do."
+# ─── CANCELADAS HOY ───────────────────────────────────────────────────────────
+canceladas_2026_03_10:
+  - id: WAS-170
+    razon: "Ya no va — 2FA para wallet de retiro"
+  - id: WAS-160
+    razon: "Ya no va — Dual Registration EPIC"
+  - id: WAS-158
+    razon: "Ya no va — Migrar Pinata → Supabase Storage"
+  - id: WAS-159
+    razon: "Ya no va — Eliminar registerAgent on-chain"
+
+# ─── ESTABILIZACIÓN HOY (no en Linear) ───────────────────────────────────────
+estabilizacion_2026_03_10:
+  - fix: "tests trial.test.ts — 2 tests desincronizados con comportamiento anónimo"
+  - fix: "CLAUDE.md + fuji.ts — dirección contrato deprecada corregida a 0x3583..."
+  - fix: "console.log en producción — reemplazados por logger estructurado (8 archivos)"
+  - fix: "thirdweb eliminado de package.json (dependencia muerta post HU-071)"

@@ -1,4 +1,5 @@
 import type { StorageProvider, UploadResult } from '../types/storage.types'
+import { logger } from '@/lib/logger'
 
 /**
  * Pinata IPFS storage provider (default).
@@ -13,7 +14,7 @@ export class PinataProvider implements StorageProvider {
     this.gateway = process.env.NEXT_PUBLIC_STORAGE_GATEWAY ?? 'https://gateway.pinata.cloud/ipfs'
 
     if (!this.jwt) {
-      console.warn('PINATA_JWT not set. Storage uploads will fail.')
+      logger.warn('PINATA_JWT not set. Storage uploads will fail.')
     }
   }
 

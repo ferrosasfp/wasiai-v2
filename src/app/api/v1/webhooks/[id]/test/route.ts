@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { deliverWebhook } from '@/lib/webhooks/deliverWebhook'
+import { logger } from '@/lib/logger'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
@@ -32,7 +33,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       status_code: result.statusCode ?? null,
       success: result.success,
     })
-  }).catch(console.error)
+  }).catch((err: unknown) => logger.error('[webhook/test] delivery failed', { message: (err as Error).message }))
 
   return NextResponse.json({ ok: true, message: 'Test event dispatched' })
 }

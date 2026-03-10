@@ -5,13 +5,13 @@ export const USDC_FUJI_ADDRESS = '0x5425890298aed601595a70AB815c96711a31Bc65' as
 const _rawOperator = process.env.NEXT_PUBLIC_WASIAI_OPERATOR
 if (!_rawOperator || !/^0x[0-9a-fA-F]{40}$/.test(_rawOperator)) {
   // En runtime (browser o server) lanzar advertencia; en build time puede ser undefined
-  if (typeof window !== 'undefined') {
-    console.error('[WasiAI] NEXT_PUBLIC_WASIAI_OPERATOR no configurado o inválido. Los pagos fallarán.')
+  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+    console.warn('[WasiAI] NEXT_PUBLIC_WASIAI_OPERATOR no configurado o inválido. Los pagos fallarán.')
   }
 }
 export const WASIAI_OPERATOR_ADDRESS = (_rawOperator ?? '0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba') as `0x${string}`
 
-export const WASIAI_MARKETPLACE_ADDRESS = '0x71CddCdF8a40951a1d8C22C8774448FbcA089b53' as `0x${string}`
+export const WASIAI_MARKETPLACE_ADDRESS = '0x3583fb96bAB5DbBDd85CCeA1C4fCE3EfF3249F08' as `0x${string}`
 
 export const USDC_EIP712_CONFIG = {
   name: 'USD Coin',

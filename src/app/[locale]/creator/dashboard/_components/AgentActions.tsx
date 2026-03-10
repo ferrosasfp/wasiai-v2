@@ -32,7 +32,7 @@ export function AgentActions({ slug, locale, currentStatus, agentName }: AgentAc
       if (!res.ok) {
         // Revert on failure
         setStatus(status)
-        console.error('Failed to update status', await res.text())
+        if (process.env.NODE_ENV !== 'production') console.warn('Failed to update status', res.status)
       } else {
         router.refresh()
       }
@@ -55,12 +55,12 @@ export function AgentActions({ slug, locale, currentStatus, agentName }: AgentAc
         method: 'DELETE',
       })
       if (!res.ok) {
-        console.error('Failed to delete agent', await res.text())
+        if (process.env.NODE_ENV !== 'production') console.warn('Failed to delete agent', res.status)
       } else {
         router.refresh()
       }
     } catch {
-      console.error('Delete request failed')
+      if (process.env.NODE_ENV !== 'production') console.warn('Delete request failed')
     } finally {
       setLoadingDelete(false)
     }

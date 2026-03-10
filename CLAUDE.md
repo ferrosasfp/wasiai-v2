@@ -2,7 +2,7 @@
 
 Marketplace on-chain de agentes IA en Avalanche.
 URL prod: https://wasiai-v2.vercel.app
-Contrato activo (Fuji v3): `0x71CddCdF8a40951a1d8C22C8774448FbcA089b53`
+Contrato activo (Fuji v1.3): `0x3583fb96bAB5DbBDd85CCeA1C4fCE3EfF3249F08`
 
 ---
 

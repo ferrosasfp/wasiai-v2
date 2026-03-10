@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   limitFn:             vi.fn(),
   fetchFn:             vi.fn(),
   rpc:                 vi.fn(),
+  checkIpLimit:        vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,10 @@ vi.mock('@upstash/ratelimit', () => ({
 
 vi.mock('@upstash/redis', () => ({
   Redis: vi.fn().mockImplementation(() => ({})),
+}))
+
+vi.mock('@/lib/rate-limit-ip', () => ({
+  checkIpLimit: (...args: unknown[]) => mocks.checkIpLimit(...args),
 }))
 
 vi.stubGlobal('fetch', mocks.fetchFn)
@@ -134,6 +139,9 @@ beforeEach(() => {
   // validateEndpointUrl no lanza (URL válida) por defecto
   mocks.validateEndpointUrl.mockReturnValue(undefined)
 
+  // checkIpLimit OK por defecto
+  mocks.checkIpLimit.mockResolvedValue({ success: true, remaining: 2 })
+
   // fetch OK por defecto
   mocks.fetchFn.mockResolvedValue({
     status: 200,
@@ -147,14 +155,14 @@ beforeEach(() => {
 // ===========================================================================
 
 describe('GET /api/v1/agents/[slug]/trial', () => {
-  it('retorna 401 si no hay sesión', async () => {
+  it('retorna 200 con anonymous:true cuando no hay sesión', async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
 
     const res = await GET(makeGetRequest('test-agent'), makeParams('test-agent'))
 
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toMatchObject({ error: 'unauthorized' })
+    expect(body).toMatchObject({ anonymous: true, used: false, trialsRemaining: 3 })
   })
 
   it('retorna 404 si el agente no existe', async () => {
@@ -204,14 +212,17 @@ describe('POST /api/v1/agents/[slug]/trial', () => {
   // =========================================================================
   // Auth
   // =========================================================================
-  it('retorna 401 si no hay sesión', async () => {
+  it('permite POST anónimo con rate limit por IP (no requiere sesión)', async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mockSvcFrom
+      .mockReturnValueOnce(makeChain({ data: AGENT, error: null }))    // agents
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))     // agent_calls insert
 
     const res = await POST(makePostRequest('test-agent', { input: 'hola' }), makeParams('test-agent'))
 
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toMatchObject({ error: 'unauthorized' })
+    expect(body).toHaveProperty('output')
   })
 
   // =========================================================================

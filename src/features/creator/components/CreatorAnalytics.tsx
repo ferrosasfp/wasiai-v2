@@ -69,7 +69,7 @@ export function CreatorAnalytics({ agents }: Props) {
         const data = await r.json() as AnalyticsData
         if (!cancelled) setState({ status: 'success', data })
       } catch (err) {
-        console.error('[CreatorAnalytics] fetch error:', err)
+        if (process.env.NODE_ENV !== 'production') console.warn('[CreatorAnalytics] fetch error:', (err as Error).message)
         if (!cancelled) setState({ status: 'error', data: null })
       }
     }
