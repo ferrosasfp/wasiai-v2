@@ -17,6 +17,9 @@ export async function setOnboardingStep(step: number): Promise<void> {
     .from('creator_profiles')
     .update({ onboarding_step: step })
     .eq('id', user.id)
+
+  const locale = await getLocale()
+  redirect(`/${locale}/onboarding`)
 }
 
 /**

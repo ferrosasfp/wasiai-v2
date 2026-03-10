@@ -1,7 +1,6 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { WalletSetup } from '@/components/WalletSetup'
 import { completeOnboarding } from '@/app/[locale]/onboarding/actions'
 
 interface Props {
@@ -10,10 +9,6 @@ interface Props {
 
 export function OnboardingStep3({ initialWallet }: Props) {
   const t = useTranslations('onboarding.step3')
-
-  // Called by WalletSetup after successful wallet save via router.refresh()
-  // We also need to handle completeOnboarding when wallet is saved.
-  // WalletSetup calls router.refresh() — we intercept via form action below.
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
@@ -28,14 +23,25 @@ export function OnboardingStep3({ initialWallet }: Props) {
         <p className="mt-1 text-sm text-gray-500">{t('subtitle')}</p>
       </div>
 
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-5 mb-6">
-        <WalletSetup initialWallet={initialWallet} />
+      <div className="rounded-xl border border-gray-100 bg-gray-50 p-5 mb-6 text-center">
+        {initialWallet ? (
+          <p className="text-sm text-gray-600 font-mono">{initialWallet}</p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-500">
+              Connect your wallet from the navigation bar to receive earnings.
+            </p>
+            <p className="text-xs text-gray-400">
+              You can do this later from your Dashboard.
+            </p>
+          </div>
+        )}
       </div>
 
       <form action={completeOnboarding}>
         <button
           type="submit"
-          className="w-full rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
+          className="w-full rounded-xl bg-avax-500 py-3 font-semibold text-white hover:bg-avax-600 transition"
         >
           {t('skip')}
         </button>
