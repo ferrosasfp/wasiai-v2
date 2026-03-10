@@ -40,6 +40,17 @@ export default async function ModelDetailPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   const isAuthenticated = !!user
 
+  // HU-069: Fetch creator wallet for on-chain registration validation
+  let registeredWallet: string | null = null
+  if (user) {
+    const { data: cp } = await supabase
+      .from('creator_profiles')
+      .select('wallet_address')
+      .eq('id', user.id)
+      .maybeSingle()
+    registeredWallet = cp?.wallet_address ?? null
+  }
+
   const invokeUrl = `${APP_URL}/api/v1/models/${model.slug}/invoke`
 
   return (
@@ -104,6 +115,7 @@ export default async function ModelDetailPage({ params }: Props) {
                 pricePerCall={model.price_per_call}
                 registrationType={model.registration_type ?? 'off_chain'}
                 isOwner={user?.id === model.creator_id}
+                registeredWallet={registeredWallet}
               />
             </div>
 

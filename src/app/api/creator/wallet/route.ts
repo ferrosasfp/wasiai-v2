@@ -23,6 +23,24 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // HU-069: Block wallet change if pending earnings > 0
+  const { data: current } = await supabase
+    .from('creator_profiles')
+    .select('wallet_address, pending_earnings_usdc')
+    .eq('id', user.id)
+    .single()
+
+  if (current?.wallet_address &&
+      current.wallet_address.toLowerCase() !== wallet_address.toLowerCase()) {
+    const pending = Number(current.pending_earnings_usdc ?? 0)
+    if (pending > 0) {
+      return NextResponse.json(
+        { error: 'Withdraw your pending earnings before changing your withdrawal wallet.' },
+        { status: 409 },
+      )
+    }
+  }
+
   const { error } = await supabase
     .from('creator_profiles')
     .update({ wallet_address })

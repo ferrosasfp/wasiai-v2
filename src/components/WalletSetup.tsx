@@ -6,9 +6,10 @@ import { useTranslations } from 'next-intl'
 
 interface Props {
   initialWallet: string | null
+  pendingEarnings?: number  // HU-069: block edit if > 0
 }
 
-export function WalletSetup({ initialWallet }: Props) {
+export function WalletSetup({ initialWallet, pendingEarnings = 0 }: Props) {
   const router = useRouter()
   const t = useTranslations('common')
   const [wallet, setWallet]   = useState(initialWallet ?? '')
@@ -50,12 +51,18 @@ export function WalletSetup({ initialWallet }: Props) {
         <p className="text-xs text-gray-400 font-mono truncate max-w-[260px]">
           {wallet || initialWallet}
         </p>
-        <button
-          onClick={() => { setEditing(true); setSaved(false) }}
-          className="text-xs text-avax-400 hover:text-avax-600 hover:underline"
-        >
-          Editar
-        </button>
+        {pendingEarnings > 0 && initialWallet ? (
+          <span className="text-xs text-amber-500" title="Withdraw earnings before changing wallet">
+            🔒 Locked
+          </span>
+        ) : (
+          <button
+            onClick={() => { setEditing(true); setSaved(false) }}
+            className="text-xs text-avax-400 hover:text-avax-600 hover:underline"
+          >
+            Editar
+          </button>
+        )}
       </div>
     )
   }

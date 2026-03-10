@@ -71,7 +71,10 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
           />
         </div>
         <div className="mt-4 border-t pt-4">
-          <WalletSetup initialWallet={profile?.wallet_address ?? null} />
+          <WalletSetup
+            initialWallet={profile?.wallet_address ?? null}
+            pendingEarnings={Number(profile?.pending_earnings_usdc ?? 0)}
+          />
         </div>
       </div>
     </section>

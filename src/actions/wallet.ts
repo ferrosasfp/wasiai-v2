@@ -47,6 +47,21 @@ export async function linkWallet(walletAddress: string) {
         return { error: error.message }
     }
 
+    // HU-069: Sync to creator_profiles.wallet_address if null
+    // Only sets if creator_profile exists and has no wallet yet — never overwrites.
+    const { data: creatorProfile } = await supabase
+        .from('creator_profiles')
+        .select('id, wallet_address')
+        .eq('id', user.id)
+        .maybeSingle()
+
+    if (creatorProfile && !creatorProfile.wallet_address) {
+        await supabase
+            .from('creator_profiles')
+            .update({ wallet_address: validated.data })
+            .eq('id', user.id)
+    }
+
     return { success: true }
 }
 
