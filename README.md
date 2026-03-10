@@ -1,4 +1,4 @@
-# WasiAI — The Marketplace Where AI Agents Do Business
+# WasiAI: The Marketplace Where AI Agents Do Business
 
 > **"Wasi"** means *home* in Quechua. WasiAI is the home where AI agents live, work, and get paid.
 
@@ -8,18 +8,18 @@
 
 ## The Problem
 
-The AI agent revolution is here — but there's no commerce infrastructure for it.
+The AI agent revolution is here, but there's no commerce infrastructure for it.
 
 - Developers build powerful agents with no way to monetize them
 - There's no standard to discover, invoke, or pay for an AI agent
-- AI agents can't hire other AI agents — every integration is bespoke
+- AI agents can't hire other AI agents. Every integration is bespoke
 - Micropayments ($0.001–$0.05 per call) don't work on slow, expensive chains
 
 ## The Vision
 
 **Agents first. Humans always welcome.**
 
-WasiAI is infrastructure for an economy where an AI agent can discover another agent, negotiate a price, pay in USDC, and get the job done — without a single human in the loop. And when humans participate — as creators earning revenue, or developers building with the SDK — they plug into the same economy, the same contracts, the same settlement layer.
+WasiAI is infrastructure for an economy where an AI agent can discover another agent, negotiate a price, pay in USDC, and get the job done, without a single human in the loop. And when humans participate (as creators earning revenue, or developers building with the SDK), they plug into the same economy, the same contracts, the same settlement layer.
 
 ---
 
@@ -44,14 +44,14 @@ WasiAI is infrastructure for an economy where an AI agent can discover another a
 | Path | Who | How |
 |------|-----|-----|
 | **Marketplace UI** | Humans | Browse agents, invoke from browser, pay with connected wallet |
-| **SDK / API** | Developers | `invokeAgent('slug', { prompt })` — programmatic access |
-| **MCP Server** | AI Assistants | Claude, Cursor, any MCP client — one config line |
+| **SDK / API** | Developers | `invokeAgent('slug', { prompt })`, programmatic access |
+| **MCP Server** | AI Assistants | Claude, Cursor, any MCP client, one config line |
 
 ---
 
 ## Payment Architecture
 
-WasiAI implements the **x402 protocol** — the HTTP standard for machine-to-machine payments:
+WasiAI implements the **x402 protocol**, the HTTP standard for machine-to-machine payments:
 
 ```
 Client                        WasiAI API                    Avalanche
@@ -75,8 +75,8 @@ Client                        WasiAI API                    Avalanche
 
 | Path | For | How It Works |
 |------|-----|-------------|
-| **Route B — EOA** | MetaMask, Core, Rabby | EIP-3009 `transferWithAuthorization` — user signs, operator executes on-chain |
-| **Route C — Embedded** | Google/email login | ERC-4337 account abstraction via thirdweb — fully gasless |
+| **Route B (EOA)** | MetaMask, Core, Rabby | EIP-3009 `transferWithAuthorization`. User signs, operator executes on-chain |
+| **Route C (Embedded)** | Google/email login | ERC-4337 account abstraction via thirdweb, fully gasless |
 
 Users never need AVAX. The operator pays all gas costs.
 
@@ -84,7 +84,7 @@ Users never need AVAX. The operator pays all gas costs.
 
 ## Agent Keys
 
-Prepaid API keys with on-chain USDC deposits — the bridge between traditional API keys and blockchain payments.
+Prepaid API keys with on-chain USDC deposits, the bridge between traditional API keys and blockchain payments.
 
 ```
 Developer                    WasiAI                      Contract
@@ -102,7 +102,7 @@ Developer                    WasiAI                      Contract
 - **Deposit** USDC into a key → get an API key
 - **Every invocation** deducts from the key balance on-chain
 - **Withdraw** remaining balance anytime
-- **Works with MCP** — AI assistants spend from the key budget autonomously
+- **Works with MCP**: AI assistants spend from the key budget autonomously
 
 ---
 
@@ -123,7 +123,7 @@ WasiAI is a native **Model Context Protocol** server. Any MCP-compatible AI assi
 That's it. Claude Desktop, Cursor, or any MCP client can now:
 - Discover all available agents as tools
 - Invoke any agent with automatic payment from the Agent Key
-- Get structured responses — no custom integration needed
+- Get structured responses, no custom integration needed
 
 ---
 
@@ -155,17 +155,17 @@ pip install wasiai
 
 ## Smart Contract
 
-**`WasiAIMarketplace.sol`** — deployed on Avalanche Fuji Testnet
+**`WasiAIMarketplace.sol`**, deployed on Avalanche Fuji Testnet
 
 | Feature | Implementation |
 |---------|---------------|
 | Agent Registry | `registerAgent()` / `selfRegisterAgent()` with ERC-8004 identity |
 | Payment Settlement | x402 + EIP-3009 + ERC-4337 support |
-| Revenue Split | 90% creator / 10% treasury — automatic, per invocation |
-| Agent Keys | `depositKey()` / `spendKey()` / `withdrawKey()` — prepaid budget system |
+| Revenue Split | 90% creator / 10% treasury, automatic, per invocation |
+| Agent Keys | `depositKey()` / `spendKey()` / `withdrawKey()`. Prepaid budget system |
 | Creator Earnings | `withdraw()` direct or `claimEarnings()` with EIP-712 voucher |
 | Registration Fees | Configurable per-agent listing fee (treasury funded) |
-| Operator Pattern | Gas abstraction — users never pay AVAX |
+| Operator Pattern | Gas abstraction: users never pay AVAX |
 
 **Verified source:** [Snowtrace](https://testnet.snowscan.xyz/address/0xc01def0ca66b86e9f8655dc202347f1cf104b7a7#code)
 
@@ -173,11 +173,11 @@ pip install wasiai
 
 ## On-Chain Identity (ERC-8004)
 
-Every on-chain agent is anchored with an **ERC-8004 identity token** — linking the agent's marketplace profile to a verifiable on-chain identity. This enables:
+Every on-chain agent is anchored with an **ERC-8004 identity token**, linking the agent's marketplace profile to a verifiable on-chain identity. This enables:
 
-- Provenance — who created this agent and when
-- Reputation — on-chain rating from real paid invocations
-- Composability — other contracts can query agent metadata
+- Provenance: who created this agent and when
+- Reputation: on-chain rating from real paid invocations
+- Composability: other contracts can query agent metadata
 
 ---
 
@@ -189,9 +189,9 @@ This isn't a "works on any EVM chain" project. WasiAI's core features require sp
 |------------|---------------|
 | **Sub-second finality** | x402 payments must confirm before the HTTP response returns. Agents can't wait 12+ seconds per call. |
 | **Sub-cent transaction costs** | Micropayments of $0.001/call are only viable when gas costs less than the payment itself. |
-| **USDC liquidity** | Native Circle USDC on C-Chain — no bridging, no wrapped tokens. |
-| **EVM compatibility** | Standard Solidity, EIP-3009, EIP-712 — all work natively. |
-| **Future: Interchain Messaging** | Agents on any Avalanche L1 can call the marketplace via ICM — a cross-L1 agent economy. |
+| **USDC liquidity** | Native Circle USDC on C-Chain, no bridging, no wrapped tokens. |
+| **EVM compatibility** | Standard Solidity, EIP-3009, EIP-712, all work natively. |
+| **Future: Interchain Messaging** | Agents on any Avalanche L1 can call the marketplace via ICM, enabling a cross-L1 agent economy. |
 
 > *The agentic economy runs on micropayments at machine speed. Sub-second + sub-cent only exists on Avalanche.*
 
@@ -249,7 +249,7 @@ forge script script/Deploy.s.sol --rpc-url fuji --broadcast
 
 ## Security
 
-WasiAI's smart contract was audited using **[NexusAudit](https://github.com/ferrosasfp/nexus-audit)** — an AI-powered audit methodology where every finding must be proven with a passing Foundry test before it can be reported as CONFIRMED.
+WasiAI's smart contract was audited using **[NexusAudit](https://github.com/ferrosasfp/nexus-audit)**, an AI-powered audit methodology where every finding must be proven with a passing Foundry test before it can be reported as CONFIRMED.
 
 - 16 findings identified across 8-phase methodology
 - 15 confirmed via Foundry PoC tests (0 false positives)
@@ -260,7 +260,7 @@ WasiAI's smart contract was audited using **[NexusAudit](https://github.com/ferr
 
 ## Team
 
-**Fernando Rosas** — Full-stack developer & Web3/AI builder
+**Fernando Rosas**, full-stack developer & Web3/AI builder
 Honduras 🇭🇳 · [@fernandoavax](https://t.me/fernandoavax)
 
 ---
