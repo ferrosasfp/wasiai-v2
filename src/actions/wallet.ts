@@ -47,19 +47,28 @@ export async function linkWallet(walletAddress: string) {
         return { error: error.message }
     }
 
-    // HU-069: Sync to creator_profiles.wallet_address if null
-    // Only sets if creator_profile exists and has no wallet yet — never overwrites.
+    // HU-069: Always sync connected wallet → creator_profiles.wallet_address
+    // Block if creator has pending earnings on a different wallet.
     const { data: creatorProfile } = await supabase
         .from('creator_profiles')
-        .select('id, wallet_address')
+        .select('id, wallet_address, pending_earnings_usdc')
         .eq('id', user.id)
         .maybeSingle()
 
-    if (creatorProfile && !creatorProfile.wallet_address) {
-        await supabase
-            .from('creator_profiles')
-            .update({ wallet_address: validated.data })
-            .eq('id', user.id)
+    if (creatorProfile) {
+        const isNewWallet = creatorProfile.wallet_address &&
+            creatorProfile.wallet_address.toLowerCase() !== validated.data.toLowerCase()
+        const hasPending = Number(creatorProfile.pending_earnings_usdc ?? 0) > 0
+
+        if (isNewWallet && hasPending) {
+            // Don't block the profile link — just skip creator_profiles sync
+            // Creator must withdraw first, then reconnect to update
+        } else {
+            await supabase
+                .from('creator_profiles')
+                .update({ wallet_address: validated.data })
+                .eq('id', user.id)
+        }
     }
 
     return { success: true }
