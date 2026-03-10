@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { validateCsrf } from '@/lib/security/csrf'
+import { ensureCreatorProfile } from '@/lib/ensureCreatorProfile'
 // A-07: Use shared schema to keep client/server validation in sync
 import { createModelSchema } from '@/lib/schemas/model.schema'
 
@@ -47,6 +48,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: String(err) }, { status: 422 })
     }
   }
+
+  // HU-069: Ensure creator_profile exists (fallback for missing DB trigger)
+  await ensureCreatorProfile(supabase, user)
 
   const { data, error } = await supabase
     .from('agents')

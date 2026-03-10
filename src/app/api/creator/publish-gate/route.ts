@@ -6,6 +6,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { ensureCreatorProfile } from '@/lib/ensureCreatorProfile'
 
 export async function GET() {
   const supabase = await createClient()
@@ -13,6 +14,9 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const serviceClient = createServiceClient()
+
+  // HU-069: Ensure creator_profile exists
+  await ensureCreatorProfile(serviceClient, user)
 
   // Obtener perfil del creator
   const { data: profile } = await serviceClient

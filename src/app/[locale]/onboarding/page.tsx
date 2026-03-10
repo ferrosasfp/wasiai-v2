@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { ensureCreatorProfile } from '@/lib/ensureCreatorProfile'
 import { setOnboardingStep } from './actions'
 import { OnboardingStep1 } from '@/components/onboarding/OnboardingStep1'
 import { OnboardingStep2 } from '@/components/onboarding/OnboardingStep2'
@@ -17,6 +18,9 @@ export default async function OnboardingPage({ params, searchParams }: Props) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale}/login`)
+
+  // HU-069: Ensure creator_profile exists (fallback for missing DB trigger)
+  await ensureCreatorProfile(supabase, user)
 
   const { data: profile } = await supabase
     .from('creator_profiles')

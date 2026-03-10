@@ -12,6 +12,7 @@
  */
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { ensureCreatorProfile } from '@/lib/ensureCreatorProfile'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { WalletConnectButton } from '@/features/payments/components/WalletConnectButton'
 import { ProfileSignOut } from './_components/ProfileSignOut'
@@ -29,6 +30,9 @@ export default async function ProfilePage({
 
   // Para usuarios no autenticados mostramos la página igual
   // (con opciones de login en vez de logout)
+
+  // HU-069: Ensure creator_profile exists
+  if (user) await ensureCreatorProfile(supabase, user)
 
   // Obtener perfil del creator si existe
   let creatorProfile: { wallet_address: string | null; username: string | null } | null = null

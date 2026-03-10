@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
+import { ensureCreatorProfile } from '@/lib/ensureCreatorProfile'
 import { Package, CheckCircle2, Zap, DollarSign, Inbox, Activity } from 'lucide-react'
 import type { ReactNode } from 'react'
 // WithdrawButton and WalletSetup are used inside EarningsSection sub-component
@@ -57,6 +58,9 @@ export default async function CreatorDashboardPage({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale ?? 'en'}/login`)
+
+  // HU-069: Ensure creator_profile exists (fallback for missing DB trigger)
+  await ensureCreatorProfile(supabase, user)
 
   // HU-1.1: Check onboarding status and pending earnings
   const { data: creatorProfile } = await supabase
