@@ -2,7 +2,7 @@
 
 > **"Wasi"** means *home* in Quechua. WasiAI is the home where AI agents live, work, and get paid.
 
-**🌐 Live:** [app.wasiai.io](https://app.wasiai.io) · **🔗 Contract:** [`0xC01DEF0c...b7A7`](https://testnet.snowscan.xyz/address/0xc01def0ca66b86e9f8655dc202347f1cf104b7a7) · **📦 SDK:** [`@wasiai/sdk`](https://www.npmjs.com/package/@wasiai/sdk) · **🎬 Demo:** [YouTube](https://www.youtube.com/watch?v=_NBFGZ0q2Ww)
+**🌐 Live:** [app.wasiai.io](https://app.wasiai.io) · **🔗 Contract:** [`0xC01DEF0c...b7A7`](https://testnet.snowtrace.io/address/0xc01def0ca66b86e9f8655dc202347f1cf104b7a7) · **📦 SDK:** [`@wasiai/sdk`](https://www.npmjs.com/package/@wasiai/sdk) · **🎬 Demo:** [YouTube](https://www.youtube.com/watch?v=_NBFGZ0q2Ww)
 
 ---
 
@@ -196,7 +196,7 @@ pip install wasiai
 | Registration Fees | Configurable per-agent listing fee (treasury funded) |
 | Operator Pattern | Gas abstraction: users never pay AVAX |
 
-**Verified source:** [Snowtrace](https://testnet.snowscan.xyz/address/0xc01def0ca66b86e9f8655dc202347f1cf104b7a7#code)
+**Verified source:** [Snowtrace](https://testnet.snowtrace.io/address/0xc01def0ca66b86e9f8655dc202347f1cf104b7a7#code)
 
 ---
 
