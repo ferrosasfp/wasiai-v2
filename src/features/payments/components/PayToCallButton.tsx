@@ -158,7 +158,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
           <div className="flex items-center gap-2 text-xs text-gray-400">
             <span>Ej:</span>
             <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-gray-600 truncate max-w-[200px]">
-              {String(model.metadata.input_example)}
+              {String(model.metadata?.input_example ?? '')}
             </code>
             <button
               type="button"
