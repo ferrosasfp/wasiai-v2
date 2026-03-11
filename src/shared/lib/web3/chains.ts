@@ -22,7 +22,9 @@ export const supportedChains: readonly [Chain, ...Chain[]] = [
   // sepolia,
 ]
 
-export const defaultChain = avalancheFuji
+// Default chain based on NEXT_PUBLIC_CHAIN_ID (43114 = mainnet, 43113 = fuji)
+const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? '43113')
+export const defaultChain = chainId === 43114 ? avalanche : avalancheFuji
 
 export function getChainById(chainId: number): Chain | undefined {
   return supportedChains.find((chain) => chain.id === chainId)

@@ -1,4 +1,7 @@
 -- WAS-163 / NG-104: Fix discover_agents_v2 — SECURITY INVOKER + limited columns
+-- Drop first because return type changes (SETOF agents → TABLE)
+DROP FUNCTION IF EXISTS discover_agents_v2(TEXT, NUMERIC, INT);
+
 CREATE OR REPLACE FUNCTION discover_agents_v2(
   p_category TEXT DEFAULT NULL,
   p_max_price NUMERIC DEFAULT NULL,
