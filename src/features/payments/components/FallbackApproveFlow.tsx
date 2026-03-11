@@ -1,4 +1,5 @@
 'use client'
+import { explorerTx } from '@/lib/chain'
 
 interface FallbackApproveFlowProps {
   amountUsdc:   number
@@ -60,7 +61,7 @@ export function FallbackApproveFlow({
           <p>✓ Aprobación confirmada. Reintentando pago automáticamente...</p>
           {txHash && (
             <a
-              href={`https://testnet.snowtrace.io/tx/${txHash}`}
+              href={explorerTx(txHash)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-avax-500 hover:underline"

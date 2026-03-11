@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useAccount, useConnect, useDisconnect, useConnectors, useBalance } from 'wagmi'
-import { CHAIN_ID } from '@/lib/chain'
+import { CHAIN_ID, explorerAddr, explorerTx } from '@/lib/chain'
 
 interface WalletConnectButtonProps { locale: string }
 
@@ -26,7 +26,7 @@ function WalletDetailsPill() {
 
   const shortAddr   = `${address.slice(0, 6)}...${address.slice(-4)}`
   const avaxBal     = balance ? `${(Number(balance.value) / 1e18).toFixed(4)} AVAX` : '...'
-  const explorerUrl = `https://testnet.snowtrace.io/address/${address}`
+  const explorerUrl = `${explorerAddr(address)}`
 
   return (
     <div ref={ref} className="relative">

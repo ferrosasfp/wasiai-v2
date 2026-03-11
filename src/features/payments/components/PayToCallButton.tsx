@@ -8,6 +8,7 @@ import type { Model } from '@/features/models/types/models.types'
 import { useWalletPayment }    from '../hooks/useWalletPayment'
 import { WalletStatusBar }     from './WalletStatusBar'
 import { FallbackApproveFlow } from './FallbackApproveFlow'
+import { explorerTx } from '@/lib/chain'
 
 interface PayToCallButtonProps {
   model:      Model
@@ -199,7 +200,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
             </p>
             {ctx.txHash && (
               <a
-                href={`https://testnet.snowtrace.io/tx/${ctx.txHash}`}
+                href={explorerTx(ctx.txHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-avax-500 hover:underline"
