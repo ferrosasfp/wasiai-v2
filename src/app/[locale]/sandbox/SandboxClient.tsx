@@ -121,6 +121,8 @@ export function SandboxClient({ userId }: { userId: string | null }) {
           setErrorMsg(t('errorAgentFailed'))
         } else if (res.status === 401) {
           setErrorMsg(t('errorLogin'))
+        } else if (res.status === 403 && errData.error === 'sandbox_disabled') {
+          setErrorMsg('sandbox_disabled')
         } else if (res.status === 404) {
           setErrorMsg(t('errorNotFound'))
         } else {
@@ -262,9 +264,21 @@ export function SandboxClient({ userId }: { userId: string | null }) {
         )}
 
         {/* Error */}
-        {errorMsg && (
+        {errorMsg && errorMsg !== 'sandbox_disabled' && (
           <section className="rounded-2xl border border-red-100 bg-red-50 p-4">
             <p className="text-sm text-red-600">⚠️ {errorMsg}</p>
+          </section>
+        )}
+
+        {/* WAS-196: Sandbox disabled by creator */}
+        {errorMsg === 'sandbox_disabled' && (
+          <section className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4">
+            <p className="text-sm text-yellow-800 font-medium">
+              ⚠️ This agent does not allow free sandbox testing.
+            </p>
+            <p className="text-sm text-yellow-700 mt-1">
+              Use an Agent Key or pay per call to invoke it.
+            </p>
           </section>
         )}
 

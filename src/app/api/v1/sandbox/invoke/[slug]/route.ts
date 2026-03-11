@@ -60,6 +60,7 @@ interface AgentRow {
   endpoint_url: string
   price_per_call: number
   status: string
+  sandbox_enabled: boolean
 }
 
 interface SandboxCreditsRow {
@@ -111,12 +112,20 @@ export async function POST(
   // 3. Obtener agente por slug
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('id, endpoint_url, price_per_call, status')
+    .select('id, endpoint_url, price_per_call, status, sandbox_enabled')
     .eq('slug', slug)
     .single<AgentRow>()
 
   if (agentError || !agent || agent.status !== 'active') {
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+  }
+
+  // WAS-196: verificar que el agente permite sandbox
+  if (agent.sandbox_enabled === false) {
+    return NextResponse.json(
+      { error: 'sandbox_disabled', message: 'This agent does not allow sandbox invocations.' },
+      { status: 403 }
+    )
   }
 
   // 4-6. Balance check & deduction (authenticated only)

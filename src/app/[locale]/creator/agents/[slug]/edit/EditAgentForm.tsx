@@ -68,6 +68,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
     free_trial_limit: agent.free_trial_limit ?? 1,
     max_rpm: agent.max_rpm ?? 60,
     max_rpd: agent.max_rpd ?? 1000,
+    sandbox_enabled: (agent.sandbox_enabled as boolean | undefined) ?? true,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
@@ -105,7 +106,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
       const res = await fetch(`/api/creator/agents/${agent.slug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result.data),
+        body: JSON.stringify({ ...result.data, sandbox_enabled: form.sandbox_enabled }),
       })
 
       if (!res.ok) {
@@ -352,6 +353,24 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
                 />
               </div>
             )}
+          </div>
+
+          {/* WAS-196: Sandbox opt-in/out */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Allow Sandbox invocations</label>
+              <p className="text-xs text-gray-400">
+                Users can test your agent with free sandbox credits.<br />
+                Note: you won&apos;t earn USDC from sandbox calls, but your infrastructure costs still apply.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleChange('sandbox_enabled', !form.sandbox_enabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${form.sandbox_enabled ? 'bg-avax-500' : 'bg-gray-200'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${form.sandbox_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
           </div>
 
           {/* Rate limits */}

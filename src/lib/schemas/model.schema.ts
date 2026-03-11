@@ -65,6 +65,9 @@ export const createModelSchema = z.object({
   // HU-8.4: Creator-configurable rate limits
   max_rpm: z.number().int().min(1).max(600).optional().default(60),
   max_rpd: z.number().int().min(1).max(100000).optional().default(1000),
+
+  // WAS-196: Sandbox opt-in/out control
+  sandbox_enabled: z.boolean().optional().default(true),
 })
 
 export type CreateModelInput = z.infer<typeof createModelSchema>

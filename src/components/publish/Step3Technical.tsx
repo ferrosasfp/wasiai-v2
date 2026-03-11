@@ -174,6 +174,24 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         </p>
       </div>
 
+      {/* WAS-196: Sandbox opt-in/out */}
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="text-sm font-medium text-gray-700">Allow Sandbox invocations</label>
+          <p className="text-xs text-gray-400">
+            Users can test your agent with free sandbox credits.<br />
+            Note: you won&apos;t earn USDC from sandbox calls, but your infrastructure costs still apply.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange('sandbox_enabled', !(data.sandbox_enabled ?? true))}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${(data.sandbox_enabled ?? true) ? 'bg-avax-500' : 'bg-gray-200'}`}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${(data.sandbox_enabled ?? true) ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+      </div>
+
       {/* Info box */}
       <div className="rounded-xl bg-avax-50 p-4 text-sm text-avax-700">
         <span className="inline-flex items-center gap-1"><DollarSign size={12} />{t('step3EarningsNote')}</span>
