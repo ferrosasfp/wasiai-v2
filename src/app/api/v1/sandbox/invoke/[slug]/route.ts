@@ -202,7 +202,10 @@ export async function POST(
   try {
     const agentResponse = await fetch(agent.endpoint_url, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.INTERNAL_API_SECRET ? { 'x-internal-secret': process.env.INTERNAL_API_SECRET } : {}),
+      },
       body:    JSON.stringify({ input }),
       signal:  AbortSignal.timeout(8000),
     })
