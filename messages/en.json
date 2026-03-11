@@ -609,8 +609,10 @@
     "connectToContinue": "Connect your wallet to continue",
     "connect": "Connect wallet",
     "yourWalletIsOn": "Your wallet is on",
-    "switchToFuji": "Switch to Fuji",
-    "switching": "Switching to Fuji..."
+    "switchToFuji": "Switch to Avalanche",
+    "switching": "Switching network...",
+    "switchNetwork": "Switch network",
+    "errorSwitchedFuji": "Please switch to the correct Avalanche network in your wallet."
   },
   "emptySearch": {
     "noResults": "No agents found for '{search}'",

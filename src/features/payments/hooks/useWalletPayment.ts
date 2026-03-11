@@ -7,11 +7,10 @@ import { useUnifiedWalletClient } from '@/features/wallet/hooks/useUnifiedWallet
 import { useChainGuard } from './useChainGuard'
 import { useUsdcBalance } from './useUsdcBalance'
 import {
-  FUJI_CHAIN_ID,
-  USDC_FUJI_ADDRESS,
   WASIAI_OPERATOR_ADDRESS,
   USDC_EIP712_CONFIG,
 } from '@/shared/lib/web3/fuji'
+import { CHAIN_ID, USDC_ADDRESS } from '@/lib/chain'
 import type {
   PaymentFlowState,
   PaymentFlowContext,
@@ -50,7 +49,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
 
   const { address }   = useWallet()
   const { isReady, writeContract: unifiedWriteContract, signTypedData } = useUnifiedWalletClient()
-  const { isConnected, isCorrectChain, currentChainName, switchToFuji } = useChainGuard()
+  const { isConnected, isCorrectChain, currentChainName, switchToChain } = useChainGuard()
   const { usdcBalance, hasEnoughBalance, isLoading: balanceLoading } = useUsdcBalance(priceUsdc)
   const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTx })
 
@@ -120,7 +119,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
         domain: {
           name:              USDC_EIP712_CONFIG.name,
           version:           USDC_EIP712_CONFIG.version,
-          chainId:           FUJI_CHAIN_ID,
+          chainId:           CHAIN_ID,
           verifyingContract: requirements.asset,
         },
         types: {
@@ -213,11 +212,11 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     setFlowState('approving')
     try {
       const hash = await unifiedWriteContract({
-        address:      USDC_FUJI_ADDRESS,
+        address:      USDC_ADDRESS,
         abi:          USDC_ABI_APPROVE as unknown as import('viem').Abi,
         functionName: 'approve',
         args:         [WASIAI_OPERATOR_ADDRESS, amountWei],
-        chainId:      FUJI_CHAIN_ID,
+        chainId:      CHAIN_ID,
       })
       setApproveTx(hash)
       setTxHash(hash)
@@ -251,7 +250,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
     ctx,
     balanceLoading,
     approveConfirmed,
-    switchToFuji,
+    switchToChain,
     pay,
     executeApprove,
     reset: () => { setFlowState('idle'); setErrorMsg(undefined) },

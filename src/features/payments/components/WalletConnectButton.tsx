@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useAccount, useConnect, useDisconnect, useConnectors, useBalance } from 'wagmi'
-import { avalancheFuji } from 'viem/chains'
+import { CHAIN_ID } from '@/lib/chain'
 
 interface WalletConnectButtonProps { locale: string }
 
@@ -10,7 +10,7 @@ interface WalletConnectButtonProps { locale: string }
 function WalletDetailsPill() {
   const { address }    = useAccount()
   const { disconnect } = useDisconnect()
-  const { data: balance } = useBalance({ address, chainId: avalancheFuji.id })
+  const { data: balance } = useBalance({ address, chainId: CHAIN_ID })
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 

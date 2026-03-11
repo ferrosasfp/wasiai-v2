@@ -609,8 +609,10 @@
     "connectToContinue": "Conecta tu wallet para continuar",
     "connect": "Conectar wallet",
     "yourWalletIsOn": "Tu wallet esta en",
-    "switchToFuji": "Cambiar a Fuji",
-    "switching": "Cambiando a Fuji..."
+    "switchToFuji": "Cambiar a Avalanche",
+    "switching": "Cambiando de red...",
+    "switchNetwork": "Cambiar red",
+    "errorSwitchedFuji": "Cambia tu wallet a la red Avalanche correcta e intenta de nuevo."
   },
   "emptySearch": {
     "noResults": "No encontramos agentes para '{search}'",

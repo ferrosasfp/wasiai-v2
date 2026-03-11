@@ -1,3 +1,5 @@
+import { avalanche, avalancheFuji } from 'viem/chains'
+
 /**
  * chain.ts — Single source of truth for all chain-related constants.
  *
@@ -53,3 +55,15 @@ export const snowscanAddr = (addr: string) => `${SNOWSCAN_URL}/address/${addr}`
  * T-08: Using readonly string[] instead of any[] for type safety.
  */
 export const CHAIN_NETWORKS = ['avalanche'] as const
+
+/** viem Chain object — use for wagmi/viem config */
+export const CHAIN = IS_MAINNET ? avalanche : avalancheFuji
+
+/** EIP-3085 wallet_addEthereumChain params */
+export const CHAIN_PARAMS = {
+  chainId:           IS_MAINNET ? '0xA86A' : '0xA869',
+  chainName:         IS_MAINNET ? 'Avalanche C-Chain' : 'Avalanche Fuji Testnet',
+  nativeCurrency:    { name: 'AVAX', symbol: 'AVAX', decimals: 18 as number },
+  rpcUrls:           [IS_MAINNET ? 'https://api.avax.network/ext/bc/C/rpc' : 'https://api.avax-test.network/ext/bc/C/rpc'] as string[],
+  blockExplorerUrls: [IS_MAINNET ? 'https://snowtrace.io/' : 'https://testnet.snowtrace.io/'] as string[],
+}

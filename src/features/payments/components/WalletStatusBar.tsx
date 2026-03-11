@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer } from 'react'
 import { useTranslations } from 'next-intl'
+import { CHAIN_LABEL } from '@/lib/chain'
 import type { PaymentFlowState } from '../types/payment-flow.types'
 
 interface WalletStatusBarProps {
@@ -62,7 +63,7 @@ export function WalletStatusBar({
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <p className="text-sm text-amber-800">
-            {t('yourWalletIsOn')} <strong>{chainName}</strong>. WasiAI requiere Avalanche Fuji Testnet.
+            {t('yourWalletIsOn')} <strong>{chainName}</strong>. WasiAI requiere {CHAIN_LABEL}.
           </p>
           <button
             onClick={onSwitchChain}

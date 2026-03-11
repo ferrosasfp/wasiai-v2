@@ -25,7 +25,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const {
     ctx,
     approveConfirmed,
-    switchToFuji,
+    switchToChain,
     pay,
     executeApprove,
     reset,
@@ -139,7 +139,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
         chainName={ctx.chainName}
         usdcBalance={ctx.usdcBalance}
         priceUsdc={model.price_per_call}
-        onSwitchChain={switchToFuji}
+        onSwitchChain={switchToChain}
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
       />
