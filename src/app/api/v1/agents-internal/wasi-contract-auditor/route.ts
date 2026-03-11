@@ -22,8 +22,6 @@ export async function POST(request: NextRequest) {
   }
 
   let tokenAddress: string = ''
-  let contractSource: string | undefined
-
   // Unwrap gateway input wrapper
   let params: Record<string, unknown> = body
   if (typeof body.input === 'string') {
@@ -34,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  contractSource = typeof params.contract_source === 'string' ? params.contract_source : undefined
+  const contractSource: string | undefined = typeof params.contract_source === 'string' ? params.contract_source : undefined
 
   // ── New: resolve by `token` field ─────────────────────────────────────────
   const tokenInput = String(params.token ?? '').trim()
