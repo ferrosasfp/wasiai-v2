@@ -68,3 +68,4 @@
 | 064 | 2026-03-08 | HU-064 | Withdraw earnings directo desde wallet del creator | improvement | QUALITY | DONE | main |
 | 067 | 2026-03-08 | HU-067 | Earnings Voucher Architecture — x402 earnings funcionales | feature | QUALITY | DONE | main |
 | 068 | 2026-03-08 | Hotfix #068 | claimEarnings explicit creator — fix invalid operator signature | hotfix | mini | DONE | main |
+| 069 | 2026-03-10 | HU-069 | Payment flow mainnet — reemplaza hardcodes Fuji por CHAIN_ID dinámico | bugfix | full | DONE | main |

@@ -3,7 +3,8 @@
  * Orchestrates Agents 1-4 via shared lib (in-process, no HTTP calls)
  *
  * POST /api/v1/agents-internal/wasi-risk-report
- * Body: {
+ * Body (new):    { token: "AVAX", description? }
+ * Body (legacy): {
  *   token_address: string          (required)
  *   feed_address?:  string         (Chainlink feed; defaults to AVAX/USD)
  *   token_name?:    string         (fallback: read from on-chain)
@@ -19,6 +20,7 @@ import { auditContract }      from '@/lib/defi-risk/auditor'
 import { analyzeSentiment }   from '@/lib/defi-risk/sentiment'
 import { computeRiskScore, generateSummary } from '@/lib/defi-risk/riskScorer'
 import type { RiskReport }    from '@/lib/defi-risk/types'
+import { resolveToken, resolveTokenAddress, getTokenList } from '@/lib/defi-risk/tokenRegistry'
 
 const DEFAULT_FEED = (process.env.CHAINLINK_AVAX_USD_FEED ?? '').trim()
 
@@ -34,24 +36,57 @@ export async function POST(request: NextRequest) {
   // Parse input (gateway wraps in { input: "..." } or direct object)
   let params: Record<string, string | undefined>
   if (typeof body.input === 'string') {
-    try { params = JSON.parse(body.input) } catch { params = { token_address: body.input } }
+    try { params = JSON.parse(body.input) } catch { params = { token: body.input } }
   } else {
     params = body as Record<string, string | undefined>
   }
 
-  const tokenAddress = String(params.token_address ?? '').trim()
-  if (!tokenAddress || !/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) {
-    return NextResponse.json({ error: 'Valid token_address required' }, { status: 400 })
+  let tokenAddress: string = ''
+  let feedAddress:  string = ''
+  let inputName:    string = ''
+  let inputSymbol:  string = ''
+  const description = String(params.description ?? '').trim() || undefined
+
+  // ── New: resolve by `token` field ─────────────────────────────────────────
+  const tokenInput = String(params.token ?? '').trim()
+  if (tokenInput) {
+    const info = resolveToken(tokenInput)
+    if (info) {
+      tokenAddress = info.address
+      feedAddress  = info.chainlinkFeed ?? ''
+      inputName    = info.name
+      inputSymbol  = info.symbol
+    } else {
+      const resolved = resolveTokenAddress(tokenInput)
+      if (resolved) {
+        tokenAddress = resolved
+      } else {
+        return NextResponse.json({
+          error: `Cannot resolve "${tokenInput}" to a token address`,
+          tip: 'Use a symbol like "AVAX", "USDC", or a raw 0x address',
+          supported_tokens: getTokenList().map(t => t.symbol),
+        }, { status: 400 })
+      }
+    }
   }
 
-  const feedAddress  = String(params.feed_address  ?? DEFAULT_FEED ?? '').trim()
-  const inputName    = String(params.token_name    ?? '').trim()
-  const inputSymbol  = String(params.token_symbol  ?? '').trim()
-  const description  = String(params.description   ?? '').trim() || undefined
+  // ── Legacy fields (override/supplement) ──────────────────────────────────
+  if (!tokenAddress) {
+    tokenAddress = String(params.token_address ?? '').trim()
+  }
+  if (!feedAddress) {
+    feedAddress = String(params.feed_address ?? DEFAULT_FEED ?? '').trim()
+  }
+  if (!inputName)   inputName   = String(params.token_name   ?? '').trim()
+  if (!inputSymbol) inputSymbol = String(params.token_symbol ?? '').trim()
+
+  if (!tokenAddress || !/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) {
+    return NextResponse.json({ error: 'Provide token (e.g. "AVAX") or valid token_address (0x...)' }, { status: 400 })
+  }
 
   const startMs = Date.now()
 
-  // ── Run Agents 1 + 2 in parallel (both are on-chain reads, independent) ──
+  // ── Run Agents 1 + 2 in parallel ─────────────────────────────────────────
   const [chainlinkResult, onchainResult] = await Promise.all([
     feedAddress
       ? readChainlinkFeed(feedAddress, inputSymbol || 'TOKEN')
@@ -63,7 +98,7 @@ export async function POST(request: NextRequest) {
   const tokenName   = inputName   || onchainResult.name   || tokenAddress.slice(0, 10) + '...'
   const tokenSymbol = inputSymbol || onchainResult.symbol || '???'
 
-  // ── Run Agents 3 + 4 in parallel (both use Groq, independent) ────────────
+  // ── Run Agents 3 + 4 in parallel ─────────────────────────────────────────
   const [auditResult, sentimentResult] = await Promise.all([
     auditContract(tokenAddress),
     analyzeSentiment(tokenName, tokenSymbol, description),
@@ -98,17 +133,21 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const supported = getTokenList().map(t => ({ symbol: t.symbol, name: t.name, address: t.address }))
+
   return NextResponse.json({
     schema: 'wasiai/agent-spec/v1',
     slug:   'wasi-risk-report',
     name:   'DeFi Risk Report Generator',
     input: {
-      example: {
+      example: { token: 'AVAX' },
+      example_legacy: {
         token_address: '0x5425890298aed601595a70AB815c96711a31BC65',
         feed_address:  '0x5498BB86BC934c8D34FDA08E81D444153d0D06aD',
         token_name:    'USD Coin',
         token_symbol:  'USDC',
       },
     },
+    supported_tokens: supported,
   })
 }

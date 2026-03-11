@@ -2,11 +2,13 @@
  * Agent 4 — DeFi Sentiment Analyzer
  *
  * POST /api/v1/agents-internal/wasi-defi-sentiment
- * Body: { token_name, token_symbol, description? } or { input: string (JSON) }
+ * Body (new):    { token: "AVAX", description? }
+ * Body (legacy): { token_name, token_symbol, description? } or { input: string (JSON) }
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyInternalSecret } from '@/lib/admin/verifyInternalSecret'
 import { analyzeSentiment } from '@/lib/defi-risk/sentiment'
+import { resolveToken, getTokenList } from '@/lib/defi-risk/tokenRegistry'
 
 export async function POST(request: NextRequest) {
   const authError = verifyInternalSecret(request)
@@ -17,28 +19,45 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  let tokenName: string
-  let tokenSymbol: string
-  let description: string | undefined
-
+  let tokenName: string   = ''
+  let tokenSymbol: string = ''
+  // Unwrap gateway input wrapper
+  let params: Record<string, unknown> = body
   if (typeof body.input === 'string') {
     try {
-      const parsed = JSON.parse(body.input) as Record<string, string>
-      tokenName   = parsed.token_name?.trim()   ?? ''
-      tokenSymbol = parsed.token_symbol?.trim() ?? ''
-      description = parsed.description
+      params = JSON.parse(body.input) as Record<string, unknown>
     } catch {
-      tokenName   = body.input.trim()
-      tokenSymbol = ''
+      params = { token: body.input }
     }
-  } else {
-    tokenName   = String(body.token_name   ?? body.tokenName   ?? '').trim()
-    tokenSymbol = String(body.token_symbol ?? body.tokenSymbol ?? '').trim()
-    description = typeof body.description === 'string' ? body.description : undefined
+  }
+
+  const description: string | undefined = typeof params.description === 'string' ? params.description : undefined
+
+  // ── New: resolve by `token` field (auto-fills name + symbol) ─────────────
+  const tokenInput = String(params.token ?? '').trim()
+  if (tokenInput) {
+    const info = resolveToken(tokenInput)
+    if (info) {
+      tokenName   = info.name
+      tokenSymbol = info.symbol
+    } else {
+      // Unknown token: use the input as name/symbol
+      tokenName   = tokenInput
+      tokenSymbol = tokenInput.toUpperCase().split(/\s+/)[0]
+    }
+  }
+
+  // ── Legacy fields (override if provided) ─────────────────────────────────
+  if (!tokenName) {
+    tokenName   = String(params.token_name   ?? params.tokenName   ?? '').trim()
+    tokenSymbol = String(params.token_symbol ?? params.tokenSymbol ?? '').trim()
   }
 
   if (!tokenName) {
-    return NextResponse.json({ error: 'token_name required' }, { status: 400 })
+    return NextResponse.json({
+      error: 'Provide token (e.g. "AVAX") or token_name',
+      supported_tokens: getTokenList().map(t => t.symbol),
+    }, { status: 400 })
   }
 
   const startMs = Date.now()
@@ -51,11 +70,16 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const supported = getTokenList().map(t => ({ symbol: t.symbol, name: t.name }))
+
   return NextResponse.json({
     schema: 'wasiai/agent-spec/v1',
     slug:   'wasi-defi-sentiment',
     input: {
-      example: { token_name: 'SafeMoonElonGem', token_symbol: 'SMEG', description: '100x guaranteed returns!' },
+      example: { token: 'AVAX' },
+      example_custom: { token: 'SafeMoonElonGem', description: '100x guaranteed returns!' },
+      example_legacy: { token_name: 'USD Coin', token_symbol: 'USDC' },
     },
+    supported_tokens: supported,
   })
 }
