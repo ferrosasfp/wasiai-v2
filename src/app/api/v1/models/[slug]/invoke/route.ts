@@ -501,7 +501,10 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
         const res = await retryWithBackoff(
           () => fetch(model.endpoint_url as string, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(process.env.INTERNAL_API_SECRET ? { 'x-internal-secret': process.env.INTERNAL_API_SECRET } : {}),
+            },
             body: JSON.stringify(body),
             signal: AbortSignal.timeout(10_000), // PERF-02: 10s max, no infinite hangs
           })
