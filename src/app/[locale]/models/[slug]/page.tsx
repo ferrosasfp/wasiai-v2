@@ -174,7 +174,7 @@ export default async function ModelDetailPage({ params }: Props) {
             <CodeExamples
               slug={model.slug}
               priceUsdc={model.price_per_call > 0 ? model.price_per_call.toString() : null}
-              inputExample={model.capabilities?.[0]?.example?.input ?? null}
+              inputExample={(model.metadata?.input_example as string | null | undefined) ?? model.capabilities?.[0]?.example?.input ?? null}
               locale={locale}
             />
 
