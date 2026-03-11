@@ -146,13 +146,30 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
       />
 
       {/* Input */}
-      <textarea
-        value={input}
-        onChange={e => setInput(e.target.value)}
-        placeholder={t('inputPlaceholder')}
-        rows={3}
-        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-avax-400 focus:outline-none resize-none"
-      />
+      <div className="space-y-1">
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder={(model.metadata?.input_hint as string | undefined) ?? t('inputPlaceholder')}
+          rows={3}
+          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-avax-400 focus:outline-none resize-none"
+        />
+        {model.metadata?.input_example && !input && (
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <span>Ej:</span>
+            <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-gray-600 truncate max-w-[200px]">
+              {String(model.metadata.input_example)}
+            </code>
+            <button
+              type="button"
+              onClick={() => setInput(model.metadata!.input_example as string)}
+              className="text-avax-500 hover:text-avax-600 hover:underline shrink-0"
+            >
+              Usar ejemplo
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* CTA */}
       <button
