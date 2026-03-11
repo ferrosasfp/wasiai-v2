@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useAccount, useConnect, useDisconnect, useConnectors, useBalance } from 'wagmi'
-import { CHAIN_ID, explorerAddr, explorerTx } from '@/lib/chain'
+import { CHAIN_ID, explorerAddr } from '@/lib/chain'
 
 interface WalletConnectButtonProps { locale: string }
 
