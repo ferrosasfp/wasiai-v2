@@ -52,9 +52,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          // Must update BOTH request and response so token refresh propagates
-          // through subsequent server reads in the same request cycle
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          // NG-013: Fallback workaround for middleware. Solo mutar response.
           cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
         },
       },
@@ -66,13 +64,15 @@ export async function middleware(request: NextRequest) {
   const routePathname = request.nextUrl.pathname
   const locale = extractLocaleFromPath(routePathname) ?? routing.defaultLocale
   const pathWithoutLocale = stripLocale(routePathname, locale)
+  console.log('[Middleware Run] Path:', routePathname, 'strip:', pathWithoutLocale, 'hasUser:', !!user)
 
   // WAS-139: /creator/[username] es público — solo proteger rutas de gestión
   const isProtectedRoute =
-    pathWithoutLocale.startsWith('/creator/dashboard') ||
-    pathWithoutLocale.startsWith('/creator/agents') ||
-    pathWithoutLocale.startsWith('/publish') ||
-    pathWithoutLocale.startsWith('/agent-keys')
+    routePathname.includes('/creator/dashboard') ||
+    routePathname.includes('/creator/agents') ||
+    routePathname.includes('/publish') ||
+    routePathname.includes('/agent-keys') ||
+    routePathname.includes('/pipelines')
 
   const isAuthRoute = pathWithoutLocale.startsWith('/login') ||
     pathWithoutLocale.startsWith('/signup')

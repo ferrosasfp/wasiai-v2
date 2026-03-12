@@ -6,6 +6,7 @@
 
 import { createClient }        from '@/lib/supabase/server'
 import { getTranslations }     from 'next-intl/server'
+import { redirect }            from 'next/navigation'
 // createServiceClient removido — NG-013
 import { PipelinePageClient }  from './_components/PipelinePageClient'
 
@@ -27,6 +28,11 @@ export default async function PipelinesPage({ params }: Props) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    const p = await params
+    const locale = p.locale || 'en'
+    redirect(`/${locale}/login?next=/${locale}/pipelines`)
+  }
 
   // Cargar agentes activos
   const { data: agentsData } = await supabase
