@@ -52,11 +52,13 @@ Para cada wave:
 - [ ] Ejecutar tests
 - [ ] Si tests FALLAN → corregir el código (no el test, a menos que el test tenga bug)
 
-### Paso 5 — Commit
+### Paso 5 — Commit local (NO push)
 
 - [ ] `git add` solo los archivos del scope del SDD
 - [ ] Commit con mensaje del formato especificado en el SDD
-- [ ] Push
+- [ ] ⚠️ **NO hacer `git push`** — el push lo hace el PO después de revisar
+
+**IMPORTANTE:** El Builder entrega con commit local. El PO decide cuándo hace push.
 
 ## Reglas inquebrantables
 
@@ -66,6 +68,8 @@ Para cada wave:
 4. **NO cambiar imports/exports** fuera del scope del SDD.
 5. **NO ignorar build failures.** Si no compila, no continúas.
 6. **Si hay ambigüedad → STOP y reportar.** Nunca adivinar.
+7. **NO hacer git push.** Solo commit local.
+8. **Consultar `doc/DB_SCHEMA.md`** antes de escribir cualquier SQL o query a la DB — nombres canónicos de columnas están ahí.
 
 ## Formato de output
 

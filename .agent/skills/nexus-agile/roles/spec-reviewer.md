@@ -33,7 +33,14 @@
 - [ ] Para eventos de smart contracts: ¿los parámetros indexed retornan keccak256?
 - [ ] Para structs: ¿el packing es correcto?
 - [ ] Para APIs: ¿los tipos de request/response coinciden con el schema?
-- [ ] Para DB: ¿las columnas referenciadas existen con el tipo correcto?
+- [ ] Para DB: ¿las columnas referenciadas existen con el tipo correcto? **Consultar `doc/DB_SCHEMA.md` para nombres canónicos** (ej: `agent_calls` usa `called_at` no `created_at`)
+
+#### 0.3d — DB Security Checklist (OBLIGATORIO si el SDD crea funciones SQL)
+- [ ] **SECURITY DEFINER vs INVOKER:** ¿La elección está documentada con justificación? DEFINER bypasea RLS — ¿es intencional?
+- [ ] **GRANTs:** ¿Las funciones SECURITY DEFINER tienen `REVOKE FROM PUBLIC` y GRANT solo a roles necesarios (`service_role`)? ¿Se evita GRANT a `anon` en funciones DEFINER con acceso a datos sensibles?
+- [ ] **Ownership en RPCs de escritura:** ¿Las funciones que modifican datos (UPDATE/DELETE) validan que el registro pertenece al usuario correcto? No confiar solo en que `service_role` pase el ID correcto.
+- [ ] **SQL injection:** ¿Todas las queries usan parámetros tipados? ¿No hay concatenación de strings con input del usuario?
+- [ ] **RLS bypass:** ¿La función SECURITY DEFINER necesita acceso a tablas con RLS? Si sí, ¿está justificado y acotado?
 
 #### 0.3c — Para smart contracts: ¿hay riesgos no documentados?
 - [ ] ¿Overflow/underflow posible? (¿se usa unchecked?)
