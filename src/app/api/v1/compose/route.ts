@@ -323,7 +323,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       res = await fetch(agent.endpoint_url, {
         method:   'POST',
-        headers:  { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Pipeline-Id': pipelineId, 'X-Pipeline-Step': String(stepIndex) },
+        headers:  {
+          'Content-Type':   'application/json',
+          'Cache-Control':  'no-store',
+          'X-Pipeline-Id':  pipelineId,
+          'X-Pipeline-Step': String(stepIndex),
+          ...(process.env.INTERNAL_API_SECRET ? { 'x-internal-secret': process.env.INTERNAL_API_SECRET } : {}),
+        },
         body:     JSON.stringify({ input: stepInput, ...pipelineCtx }),
         signal:   AbortSignal.timeout(STEP_TIMEOUT_MS),
         redirect: 'error',
