@@ -1,219 +1,144 @@
 # Sprint Cadence — NexusAgil
 
-> SM (Scrum Master) facilita tres ceremonias semanales.
-> Activar con: "sprint planning", "status meeting", "retro", "ceremonia de [dia]".
-
-## Gates de Ceremonia
-
-| Ceremonia | Gate | Texto exacto | Efecto |
-|-----------|------|-------------|--------|
-| Planning | `SPRINT_APPROVED` | El humano escribe exactamente esto | SM commitea artefactos, Architect arranca F0 de la primera HU |
-| Status | `REVIEW_APPROVED` | El humano escribe exactamente esto | SM commitea status, pipeline continua |
-| Retrospectiva | `RETRO_APPROVED` | El humano escribe exactamente esto | SM ejecuta Checklist de Cierre y declara sprint CERRADO |
-
-> **Regla:** "sí", "ok", "dale", "bien" **NO** activan ningún gate. El humano debe escribir el texto exacto.
-> **`HU_APPROVED` y `SPEC_APPROVED` son exclusivos del pipeline de HUs — nunca de ceremonias.**
+> Un sprint no tiene duración fija. Puede durar una hora o una semana.
+> Lo que importa es que las 3 ceremonias ocurran en orden: Planning → Review → Retro.
 
 ---
 
-## Calendario Semanal
+## Las 3 Ceremonias
 
-| Dia | Ceremonia | Duracion estimada | Objetivo |
-|-----|-----------|-------------------|----------|
-| **Lunes** | Sprint Planning | 15-30 min | Seleccionar y planificar HUs del sprint |
-| **Miercoles** | Status | 10-15 min | Revisar progreso y desbloquear |
-| **Viernes** | Retrospectiva | 15-20 min | Mejorar el proceso + Auto-Blindaje |
+| Ceremonia | Cuándo | Duración | Objetivo |
+|-----------|--------|----------|----------|
+| **Planning** | Al abrir el sprint | 5-30 min | Seleccionar HUs, clasificar, estimar |
+| **Review** | Al completar la ejecución | 5-15 min | Demo de entregables → REVIEW_APPROVED |
+| **Retro** | Después del Review | 5-15 min | Lecciones + acciones → RETRO_APPROVED |
+
+**No hay Status Meeting fijo.** Si el sprint dura 1 hora, no tiene sentido. Si dura 1 semana, el SM puede hacer un checkpoint informal cuando lo necesite.
 
 ---
 
-## Lunes: Sprint Planning
+## Planning
 
 ### Script de SM
 
-1. **Revisar backlog**: Leer las HUs pendientes del humano
-2. **Revisar _INDEX.md**: Ver velocidad del sprint anterior (HUs completadas)
-3. **Presentar capacidad**:
+1. **Revisar backlog**: Leer HUs pendientes del PO
+2. **Revisar `_INDEX.md`**: Ver velocidad del sprint anterior
+3. **Presentar propuesta**:
 
 ```markdown
-## Sprint Planning — Semana [YYYY-MM-DD]
+## Sprint Planning — Sprint N
 
 ### Sprint anterior
-| HUs completadas | HUs en progreso | HUs abortadas |
-|-----------------|-----------------|---------------|
-| N | N | N |
+| HUs completadas | Carry-over | Abortadas |
+|-----------------|------------|-----------|
+| N               | N          | N         |
 
 ### Backlog priorizado
-| Prioridad | HU | Tipo | Estimacion | SDD_MODE |
-|-----------|-----|------|-----------|----------|
-| P1 | [titulo] | [tipo] | [S/M/L] | [mode] |
-| P2 | [titulo] | [tipo] | [S/M/L] | [mode] |
-| P3 | [titulo] | [tipo] | [S/M/L] | [mode] |
+| # | HU | Clasificación | Estimación | Sub-agentes |
+|---|-----|--------------|-----------|-------------|
+| 1 | [título] | QUALITY | L | 6 |
+| 2 | [título] | HU-MAJOR | M | 5 |
+| 3 | [título] | FAST-FIX | S | 1 |
 
-### Capacidad del sprint
-- Sprint duration: [N dias]
-- Estimacion: [N HUs basado en velocidad]
-
-### Seleccion propuesta
-- [ ] HU: [titulo] — [tipo] — [estimacion]
-- [ ] HU: [titulo] — [tipo] — [estimacion]
+### Selección propuesta
+- [ ] HU: [título] — [clasificación] — [estimación]
+- [ ] HU: [título] — [clasificación] — [estimación]
 ```
 
-4. **Esperar `SPRINT_APPROVED`** del humano — texto exacto, sin excepciones
-5. **Al recibir `SPRINT_APPROVED`**: commitear `sprint-status.yaml` + `roadmap-sprints.md`, actualizar issue tracker, notificar al Architect para arrancar F0+F1 de todas las HUs del sprint
-6. **Si hay dudas sobre una HU**: Analyst puede intervenir para clarificar requisitos
+4. **Esperar SPRINT_APPROVED del PO**
+5. **Ejecutar pipeline** según clasificación
 
-> **Nota:** El análisis de dependencias y propuesta de paralelismo es responsabilidad del **Architect en F1** — no del SM. El SM solo coordina la selección; el Architect decide qué puede ir en paralelo basándose en el codebase real.
+### Estimación de Sizing
 
-### Estimacion de Sizing
-
-| Tamano | Senales | SDD_MODE esperado |
-|--------|---------|-------------------|
-| **S** (Small) | 1-3 archivos, sin BD, sin logica compleja | mini/patch |
-| **M** (Medium) | 3-8 archivos, posible BD, logica moderada | full/bugfix |
-| **L** (Large) | 8+ archivos, BD, logica compleja, multiples waves | full |
+| Tamaño | Señales | Clasificación esperada |
+|--------|---------|----------------------|
+| **S** | 1-3 archivos, sin BD, fix puntual | FAST-FIX |
+| **M** | 3-8 archivos, posible BD, lógica moderada | HU-MINOR / HU-MAJOR |
+| **L** | 8+ archivos, BD, contratos, múltiples waves | HU-MAJOR / QUALITY |
 
 ---
 
-## Miercoles: Status
+## Review
 
 ### Script de SM
 
-1. **Revisar HUs en progreso**: Leer artefactos en `doc/sdd/` para HUs activas
-2. **Identificar bloqueos**: HUs paradas en un gate, missing inputs, errores no resueltos
-3. **Presentar status**:
+1. **Compilar reportes**: build-report, logic-audit, security-review, qa-report de cada HU
+2. **Presentar resultados**:
 
 ```markdown
-## Status — Semana [YYYY-MM-DD] (Miercoles)
+## Sprint Review — Sprint N
 
-### HUs en progreso
-| # | HU | Fase actual | Bloqueado? | Notas |
-|---|-----|-------------|-----------|-------|
-| NNN | [titulo] | F2 (esperando GATE 2) | Si — [razon] | [detalle] |
-| NNN | [titulo] | F3 (Wave 2) | No | En progreso |
+### Entregables
+| # | HU | Estado | Commits | Tests | ACs |
+|---|-----|--------|---------|-------|-----|
+| NNN | [título] | ✅ DONE | `abc1234` | 173/173 | 5/5 |
+| NNN | [título] | ✅ DONE | `def5678` | 173/173 | 3/3 |
 
-### Bloqueos
-| HU | Bloqueo | Accion requerida | Responsable |
-|----|---------|-----------------|-------------|
-| NNN | [descripcion] | [accion] | Humano/Agente |
+### Hallazgos de sub-agentes
+| HU | Agente | Hallazgo | Severidad | Acción |
+|----|--------|----------|-----------|--------|
+| NNN | Logic Auditor | [hallazgo] | MENOR | Documentado |
+| NNN | Security Reviewer | [hallazgo] | BLOQUEANTE | Corregido |
 
-### Ajustes al plan del sprint
-- [Cambio propuesto, si hay]
-
-### Metricas
-- HUs completadas esta semana: N
-- HUs en progreso: N
-- HUs bloqueadas: N
+### Demo
+[Descripción breve de lo que se puede verificar]
 ```
 
-4. **Esperar `REVIEW_APPROVED`** del humano — texto exacto, sin excepciones
-5. **Al recibir `REVIEW_APPROVED`**: commitear status actualizado, pipeline continua
-6. **Si hay bloqueos**: Proponer soluciones o escalar al humano
-7. **Ajustar plan si es necesario**: Repriorizar, mover HUs al siguiente sprint
+3. **Esperar REVIEW_APPROVED del PO**
 
 ---
 
-## Viernes: Retrospectiva
+## Retro
 
 ### Script de SM
 
-1. **Compilar resultados del sprint**: Leer _INDEX.md y reportes de la semana
-2. **Recopilar Auto-Blindaje acumulado** de todos los reportes de la semana
+1. **Compilar resultados**: Leer `_INDEX.md` y reportes del sprint
+2. **Recopilar Auto-Blindaje** de todos los reportes
 3. **Presentar retro**:
 
 ```markdown
-## Retrospectiva — Semana [YYYY-MM-DD] (Viernes)
+## Retrospectiva — Sprint N
 
-### Resumen del sprint
-| Metrica | Valor |
+### Resumen
+| Métrica | Valor |
 |---------|-------|
 | HUs completadas | N |
-| HUs en progreso (carry-over) | N |
-| HUs abortadas | N |
-| Errores encontrados (Auto-Blindaje) | N |
-| Hallazgos AR (BLOQUEANTE) | N |
-| Hallazgos AR (MENOR) | N |
+| Carry-over | N |
+| Errores atrapados por sub-agentes | N |
+| Desviaciones de proceso | N |
 
-### Que funciono bien
-- [Aspecto positivo 1]
-- [Aspecto positivo 2]
+### Qué funcionó
+- [Aspecto positivo]
 
-### Que no funciono
-- [Problema 1 y por que]
-- [Problema 2 y por que]
+### Qué no funcionó
+- [Problema y por qué]
 
 ### Auto-Blindaje consolidado
-| Fecha | Error | Fix | Aplicar en | Documentado en |
-|-------|-------|-----|-----------|---------------|
-| [fecha] | [error] | [fix] | [donde aplica] | [archivo de reglas] |
+| Error | Fix | Aplicar en |
+|-------|-----|-----------|
+| [error] | [fix] | [dónde] |
 
 ### Acciones de mejora
-| # | Accion | Responsable | Plazo |
-|---|--------|-------------|-------|
-| 1 | [accion concreta] | [quien] | [cuando] |
-| 2 | [accion concreta] | [quien] | [cuando] |
+| # | Acción | Responsable |
+|---|--------|-------------|
+| 1 | [acción concreta] | [quién] |
 
 ### Velocidad
 - Sprint anterior: N HUs
 - Este sprint: N HUs
-- Tendencia: [mejorando/estable/empeorando]
 ```
 
-4. **Auto-Blindaje a reglas del proyecto**: Si un error se repitio en multiples HUs, SM propone agregarlo a `project-context.md` o reglas del proyecto
-5. **Esperar `RETRO_APPROVED`** del humano — texto exacto, sin excepciones
-6. **Al recibir `RETRO_APPROVED`**: SM ejecuta el Checklist de Cierre de Sprint y declara sprint CERRADO
-7. **Celebracion**: Si el sprint fue limpio (sin BLOQUEANTE, sin drift grave), Party Mode breve
-
----
-
-## Checklist de Cierre de Sprint (SM)
-
-> Ejecutar al finalizar la Retrospectiva. El sprint no es CERRADO hasta que todo este marcado.
-
-```
-[ ] _INDEX.md — todos los NNN del sprint tienen status DONE/CARRY-OVER/CANCELLED/ABORTED
-[ ] sprint-status.yaml — estado: CERRADO, completadas, carry_over y deuda_tecnica_nueva documentados
-[ ] Issue tracker — todos los issues del sprint en Done/Closed en Linear/GitHub/Jira
-[ ] project-context.md — actualizado con ADRs nuevos y reglas de proceso del Auto-Blindaje
-[ ] git commit + push — todos los artefactos de cierre commiteados
-```
-
-### sprint-status.yaml — Formato
-
-```yaml
-sprint: N
-periodo: "YYYY-MM-DD → YYYY-MM-DD"
-estado: CERRADO
-goal: "descripcion del goal"
-goal_cumplido: true/false/parcial
-
-completadas:
-  - id: WAS-XX
-    hu: Titulo de la HU
-    modo: FAST/QUALITY
-    estado: DONE
-    commit: abc1234
-
-carry_over:
-  - id: WAS-XX
-    hu: Titulo
-    razon: Motivo del carry-over
-
-deuda_tecnica_nueva:
-  - descripcion: Descripcion de la deuda
-    severidad: MENOR/MAYOR
-    sprint_objetivo: N
-
-proxima_ceremonia: "Descripcion"
-```
+4. **Si un error se repitió**: SM propone agregarlo a `project-context.md`
+5. **Esperar RETRO_APPROVED del PO** → Sprint cerrado
 
 ---
 
 ## Reglas de Cadencia
 
-1. **Las ceremonias son opcionales pero recomendadas**. El humano puede saltarlas.
-2. **SM no bloquea el pipeline**. Las ceremonias son informativas y de coordinacion.
-3. **Auto-Blindaje se consolida en retro**. Los errores individuales se documentan al momento, la retro los agrupa.
-4. **Velocidad se mide en HUs, no en lineas de codigo**.
-5. **Sprint = 1 semana** por default. El humano puede ajustar.
-6. **SM puede proponer pero no decidir**. Priorizacion final es del humano.
-7. **Carry-over no es fracaso**. Si una HU se lleva al siguiente sprint, SM documenta por que.
+1. **Sprint = lo que el PO decida.** 1 hora, 1 día, 1 semana. Sin default fijo.
+2. **Las 3 ceremonias son obligatorias** (Planning, Review, Retro) pero pueden ser de 5 minutos.
+3. **SM no bloquea el pipeline.** Ceremonias son de coordinación, no burocracia.
+4. **Velocidad se mide en HUs, no en tiempo.** Un sprint de 2 horas con 6 HUs > un sprint de 1 semana con 2.
+5. **Carry-over no es fracaso.** SM documenta por qué.
+6. **SM propone, PO decide.** Priorización final siempre del PO.
+7. **Checkpoints informales** solo si el sprint dura más de 1 día.

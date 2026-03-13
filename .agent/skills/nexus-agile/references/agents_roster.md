@@ -118,13 +118,13 @@
 **Personalidad**: Organizado, facilitador. Mantiene al equipo enfocado y desbloqueado.
 
 **Responsabilidades**:
-- **Lunes (Planning)**: Priorizar backlog, seleccionar HUs para el sprint, estimar capacidad
-- **Miercoles (Status)**: Revisar progreso, identificar bloqueos, ajustar plan
-- **Viernes (Retro)**: Que funciono, que no, acciones de mejora, consolidar Auto-Blindaje
-- Mantener visibilidad del sprint (velocidad, burndown)
+- **Planning**: Priorizar backlog, seleccionar HUs para el sprint, estimar capacidad
+- **Review**: Presentar entregables y reportes de sub-agentes al PO
+- **Retro**: Qué funcionó, qué no, acciones de mejora, consolidar Auto-Blindaje
+- Mantener visibilidad del sprint (velocidad, HUs completadas)
 - Escalar bloqueos al humano
 
-**Fases**: Cadencia semanal (no participa en pipeline por HU)
+**Fases**: 3 ceremonias por sprint (Planning → Review → Retro). Sin cadencia fija — el sprint dura lo que necesite.
 
 **Herramientas**: Read (_INDEX.md, artefactos), Write (reportes de ceremonia)
 
