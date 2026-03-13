@@ -62,7 +62,10 @@ interface ComposeStep {
 }
 
 interface ComposeRequest {
-  steps: ComposeStep[]
+  steps:           ComposeStep[]
+  start_from_step?: number
+  pipeline_id?:    string
+  initial_input?:  string
 }
 
 interface StepReceipt {
@@ -74,13 +77,14 @@ interface StepReceipt {
 }
 
 interface ComposeResponse {
-  pipeline_id:      string
-  steps_executed:   number
-  groups_executed:  number  // HU-5.2: número de grupos (1 group = N parallel steps)
-  total_cost_usdc:  string
-  result:           unknown
-  receipts:         StepReceipt[]
-  refund_failures?: string[]  // AC-11: presente solo si hay fallos de refund
+  pipeline_id:        string
+  steps_executed:     number
+  groups_executed:    number  // HU-5.2: número de grupos (1 group = N parallel steps)
+  total_cost_usdc:    string
+  result:             unknown
+  receipts:           StepReceipt[]
+  refund_failures?:   string[]  // AC-11: presente solo si hay fallos de refund
+  resumed_from_step?: number    // WAS-204: presente solo en retry mode
 }
 
 interface PipelineFailedResponse {
@@ -252,6 +256,56 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
   }
 
+  // ── RETRY MODE (WAS-204) ─────────────────────────────────────────────────
+  let resumedFromStep: number | undefined
+  let retryLastOutput: string | null = null
+
+  if (body.pipeline_id && body.start_from_step !== undefined) {
+    const startFrom = body.start_from_step
+
+    const { data: existingPipeline, error: pipelineErr } = await supabase
+      .rpc('get_pipeline_for_retry', {
+        p_pipeline_id: body.pipeline_id,
+        p_key_hash:    keyHash,
+      })
+
+    const pipeline = Array.isArray(existingPipeline) ? existingPipeline[0] : existingPipeline
+
+    if (pipelineErr || !pipeline) {
+      return NextResponse.json(
+        { error: 'Pipeline not found or not resumable', code: 'pipeline_not_resumable' },
+        { status: 404 }
+      )
+    }
+
+    if (pipeline.status === 'success') {
+      return NextResponse.json(
+        { error: 'Pipeline already completed', code: 'pipeline_not_resumable' },
+        { status: 409 }
+      )
+    }
+
+    if (!pipeline.owned_by_key) {
+      return NextResponse.json(
+        { error: 'Pipeline access denied', code: 'pipeline_access_denied' },
+        { status: 403 }
+      )
+    }
+
+    // Cargar output previo para encadenamiento
+    if (body.initial_input !== undefined) {
+      retryLastOutput = body.initial_input
+    } else {
+      const prevOutputs: Array<{step: number; output: string}> = pipeline.step_outputs ?? []
+      const lastStored = prevOutputs
+        .filter(o => o.step < startFrom)
+        .sort((a, b) => b.step - a.step)[0]
+      retryLastOutput = lastStored?.output ?? null
+    }
+
+    resumedFromStep = startFrom
+  }
+
   // ── [5] SSRF PREFLIGHT (todos los endpoints antes de ejecutar) ────────────
   for (let i = 0; i < steps.length; i++) {
     const agent = agentMap.get(steps[i].agent_slug)!
@@ -275,7 +329,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // ── [6] LOOP POR GRUPOS (secuencial + paralelo) ──────────────────────────
   const pipelineId = randomUUID()
   const receipts: StepReceipt[] = []
-  let lastOutput: string | null = null
+  let lastOutput: string | null = resumedFromStep !== undefined ? retryLastOutput : null
   // Contexto propagado entre steps (token_address, token_symbol, etc.)
   const pipelineCtx: Record<string, string> = {}
   const groups = groupSteps(steps)
@@ -432,6 +486,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (group.length === 1) {
         // ── Step secuencial ─────────────────────────────────────────────────
         const step = group[0]
+
+        // WAS-204: skip steps before resumedFromStep (no execute, no charge)
+        if (resumedFromStep !== undefined && globalStepIndex < resumedFromStep) {
+          globalStepIndex++
+          continue
+        }
+
         const stepInput = globalStepIndex === 0 ? (step.input ?? '') : (step.pass_output ? (lastOutput ?? '') : (step.input ?? ''))
         const result = await executeStep(step, globalStepIndex, stepInput)
 
@@ -467,6 +528,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         receipts.push(result.receipt!)
         lastOutput = result.output
+        // Best-effort: no await, no bloquea el pipeline
+        supabase.rpc('append_step_output', {
+          p_pipeline_id: pipelineId,
+          p_step:        globalStepIndex,
+          p_output:      typeof result.output === 'string' ? result.output : JSON.stringify(result.output),
+          p_agent_slug:  step.agent_slug,
+        }).then(undefined, () => undefined)
         globalStepIndex++
 
       } else {
@@ -559,6 +627,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       result:          parseOutputSafe(lastOutput),
       receipts,
       ...(refundFailures.length > 0 && { refund_failures: refundFailures }),
+      ...(resumedFromStep !== undefined && { resumed_from_step: resumedFromStep }),
     } satisfies ComposeResponse,
     { status: 200 },
   )
