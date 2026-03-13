@@ -153,6 +153,29 @@ export async function POST(
     )
   }
 
+  // WAS-200: Parsear body y validar input_schema ANTES de cobrar (fix L10)
+  let input: Record<string, unknown> | string = {}
+  let body: SandboxInvokeRequest | null = null
+  try {
+    body = await req.json() as SandboxInvokeRequest
+    input = body.input ?? {}
+  } catch {
+    // body vacío — usar input vacío
+  }
+
+  if (agent.input_schema && body?.input) {
+    const inputVal = typeof body.input === 'string'
+      ? (() => { try { return JSON.parse(body.input) } catch { return body.input } })()
+      : body.input
+    const validErr = validateInput(agent.input_schema, inputVal)
+    if (validErr) {
+      return NextResponse.json(
+        { error: validErr, code: 'input_validation_failed' },
+        { status: 422 }
+      )
+    }
+  }
+
   // 4-6. Balance check & deduction (authenticated only)
   if (!isAnonymous) {
     // 4. Obtener/crear fila sandbox_credits (ignorar duplicados)
@@ -218,30 +241,6 @@ export async function POST(
       })
     }
     return NextResponse.json({ error: 'invalid_endpoint' }, { status: 422 })
-  }
-
-  // 8. Parsear body de la request
-  let input: Record<string, unknown> | string = {}
-  let body: SandboxInvokeRequest | null = null
-  try {
-    body = await req.json() as SandboxInvokeRequest
-    input = body.input ?? {}
-  } catch {
-    // body vacío — usar input vacío
-  }
-
-  // WAS-200: Validar input contra schema ANTES de llamar al agente
-  if (agent.input_schema && body?.input) {
-    const inputVal = typeof body.input === 'string'
-      ? (() => { try { return JSON.parse(body.input) } catch { return body.input } })()
-      : body.input
-    const validErr = validateInput(agent.input_schema, inputVal)
-    if (validErr) {
-      return NextResponse.json(
-        { error: validErr, code: 'input_validation_failed' },
-        { status: 422 }
-      )
-    }
   }
 
   // 9. Llamar agente externo (timeout 8s)
