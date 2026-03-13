@@ -146,7 +146,7 @@ export async function POST(
   // WAS-196: verificar que el agente permite sandbox
   if (agent.sandbox_enabled === false) {
     return NextResponse.json(
-      { error: 'sandbox_disabled', message: 'This agent does not allow sandbox invocations.' },
+      { error: 'Sandbox disabled by creator', code: 'sandbox_disabled' },
       { status: 403 }
     )
   }

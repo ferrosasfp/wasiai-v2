@@ -358,10 +358,9 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
           {/* WAS-196: Sandbox opt-in/out */}
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-700">Allow Sandbox invocations</label>
+              <label className="text-sm font-medium text-gray-700">Permitir invocaciones en Sandbox</label>
               <p className="text-xs text-gray-400">
-                Users can test your agent with free sandbox credits.<br />
-                Note: you won&apos;t earn USDC from sandbox calls, but your infrastructure costs still apply.
+                No recibirás USDC por estas llamadas, pero tu infraestructura sí incurrirá costos.
               </p>
             </div>
             <button
