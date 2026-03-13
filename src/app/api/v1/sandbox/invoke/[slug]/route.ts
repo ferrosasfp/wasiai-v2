@@ -8,7 +8,8 @@
  * Reembolso automático si el agente externo falla
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
+import { getClientIp } from '@/lib/get-client-ip'
 import { createClient } from '@/lib/supabase/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
@@ -79,17 +80,27 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser()
   const isAnonymous = !user
 
-  // 1b. IP rate limit for anonymous users — 5 calls/day
+  // 1b. IP rate limit for anonymous users — doble check
   if (isAnonymous) {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1'
-    const { success, reset } = await checkIpLimit(ip, 'sandbox-anon', 5)
-    if (!success) {
+    const ip     = getClientIp(req)
+    const ua     = req.headers.get('user-agent') ?? ''
+    // Node runtime only — do not use in Edge routes
+    const uaHash = createHash('sha256').update(ua).digest('hex').slice(0, 8)
+    const identifier = `${ip}:${uaHash}`
+
+    const [perAgent, perUa] = await Promise.all([
+      checkIpLimit(identifier, `sandbox-anon:${slug}`, 5),  // 5/día por agente
+      checkIpLimit(uaHash,     'sandbox-anon-ua',      30), // 30/día global
+    ])
+
+    if (!perAgent.success || !perUa.success) {
+      const limitedByUa = !perUa.success
       return NextResponse.json({
         error: 'Anonymous rate limit exceeded',
         code: 'anon_rate_limited',
-        limit: 5,
+        limit: limitedByUa ? 30 : 5,
         remaining: 0,
-        reset_at: new Date(reset).toISOString(),
+        reset_at: new Date(limitedByUa ? perUa.reset : perAgent.reset).toISOString(),
         message: 'Crea una cuenta gratuita para seguir probando',
       }, { status: 429 })
     }

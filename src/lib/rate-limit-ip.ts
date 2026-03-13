@@ -17,7 +17,7 @@ export function getIpLimiter(prefix: string, maxCalls: number): Ratelimit {
   if (!limiters.has(key)) {
     limiters.set(key, new Ratelimit({
       redis,
-      limiter: Ratelimit.slidingWindow(maxCalls, '1 d'),
+      limiter: Ratelimit.fixedWindow(maxCalls, '1 d'),
       prefix: `rl:${prefix}`,
     }))
   }
