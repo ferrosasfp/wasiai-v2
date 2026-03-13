@@ -17,6 +17,7 @@ import { signReceipt }               from '@/lib/receipts/signReceipt'
 import { keyHashToBytes32 }          from '@/lib/contracts/marketplaceClient'
 import { logger }                    from '@/lib/logger'
 import { isAgentInScope }            from '@/lib/scope-check'
+import { discoverAgent }             from '@/lib/agent-discovery'
 import { validateInput }             from '@/lib/schema-validator'
 
 // ── Constantes (env-driven, no hardcodes) ────────────────────────────────────
@@ -56,10 +57,17 @@ function getChargeDecision(
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 interface ComposeStep {
-  agent_slug:   string
-  input?:       string
-  pass_output?: boolean
-  parallel?:    boolean  // HU-5.2: si true, agrupa con steps consecutivos parallel
+  agent_slug?:   string          // Ahora opcional (mutuamente excluyente con capability)
+  capability?:   string          // nombre de la capability buscada
+  constraints?:  {
+    max_price_usdc?: number
+    min_reputation?: number
+    category?:       string
+  }
+  fallback_slug?: string
+  input?:         string
+  pass_output?:   boolean
+  parallel?:      boolean  // HU-5.2: si true, agrupa con steps consecutivos parallel
 }
 
 interface ComposeRequest {
@@ -72,6 +80,7 @@ interface ComposeRequest {
 interface StepReceipt {
   step:              number
   agent_slug:        string
+  resolved_slug?:    string      // presente cuando se usó discovery dinámico
   cost_usdc:         string
   receipt_signature: string
   call_id:           string
@@ -211,37 +220,84 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const steps = body.steps
 
-  // ── [3] RESOLVER AGENTES (1 query batch) ─────────────────────────────────
-  const slugs = [...new Set(steps.map(s => s.agent_slug))]
-  const { data: agentsData } = await supabase
-    .from('agents')
-    .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema')
-    .in('slug', slugs)
-    .eq('status', 'active')
+  // ── [3] RESOLVER AGENTES ─────────────────────────────────────────────────
+  const agentMap = new Map<string, AgentRow>()
 
-  const agentMap = new Map<string, AgentRow>(
-    (agentsData ?? []).map((a: AgentRow) => [a.slug, a]),
-  )
+  // Separar slugs estáticos de steps con capability
+  const staticSlugs = [...new Set(
+    steps.filter((s: ComposeStep) => s.agent_slug).map((s: ComposeStep) => s.agent_slug!)
+  )]
+
+  // Cargar agentes estáticos en batch
+  if (staticSlugs.length > 0) {
+    const { data: agentsData } = await supabase
+      .from('agents')
+      .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema')
+      .in('slug', staticSlugs)
+      .eq('status', 'active')
+
+    for (const a of agentsData ?? []) {
+      agentMap.set(a.slug, a as AgentRow)
+    }
+  }
+
+  // Resolver steps con capability (discovery dinámico) + scope check estático
+  const resolvedSlugs = new Map<number, string>() // stepIndex → resolved slug
 
   for (let i = 0; i < steps.length; i++) {
-    if (!agentMap.has(steps[i].agent_slug)) {
-      return NextResponse.json(
-        { error: 'Agent not found', code: 'agent_not_found', step: i, slug: steps[i].agent_slug },
-        { status: 404 },
+    const step = steps[i]
+
+    if (step.agent_slug) {
+      // Scope check estático (WAS-186)
+      const agent = agentMap.get(step.agent_slug)
+      if (!agent) {
+        return NextResponse.json(
+          { error: `Agent not found: ${step.agent_slug}`, code: 'agent_not_found' },
+          { status: 404 }
+        )
+      }
+      if (!isAgentInScope(agent.slug, agent.category, keyRow.allowed_slugs, keyRow.allowed_categories)) {
+        return NextResponse.json(
+          { error: 'Agent not in key scope', code: 'scope_violation', slug: agent.slug },
+          { status: 403 }
+        )
+      }
+    } else if (step.capability) {
+      // Dynamic discovery
+      const discovered = await discoverAgent(
+        supabase,
+        step.capability,
+        step.constraints ?? {},
+        keyRow.allowed_slugs,
+        keyRow.allowed_categories,
       )
-    }
-    const agent = agentMap.get(steps[i].agent_slug)!
-    if (!isAgentInScope(agent.slug, agent.category, keyRow.allowed_slugs, keyRow.allowed_categories)) {
-      return NextResponse.json(
-        { error: 'Agent not in key scope', code: 'scope_violation', slug: agent.slug },
-        { status: 403 },
-      )
+
+      if (!discovered) {
+        // Intentar fallback_slug
+        if (step.fallback_slug) {
+          const fbAgent = agentMap.get(step.fallback_slug)
+          if (fbAgent) {
+            steps[i] = { ...step, agent_slug: step.fallback_slug }
+            resolvedSlugs.set(i, step.fallback_slug)
+            continue
+          }
+        }
+        // AC-4: sin match → 422
+        return NextResponse.json(
+          { error: `No agent found for capability: ${step.capability}`, code: 'no_agent_match', step: i },
+          { status: 422 }
+        )
+      }
+
+      agentMap.set(discovered.slug, discovered as AgentRow)
+      steps[i] = { ...step, agent_slug: discovered.slug }
+      resolvedSlugs.set(i, discovered.slug)
     }
   }
 
   // ── [4] PREFLIGHT DE SALDO ────────────────────────────────────────────────
   const totalRequired = steps.reduce(
-    (acc, s) => acc + (agentMap.get(s.agent_slug)?.price_per_call ?? 0),
+    (acc, s) => acc + (agentMap.get(s.agent_slug ?? '')?.price_per_call ?? 0),
     0,
   )
   const available = keyRow.budget_usdc - keyRow.spent_usdc
@@ -310,7 +366,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // ── [5] SSRF PREFLIGHT (todos los endpoints antes de ejecutar) ────────────
   for (let i = 0; i < steps.length; i++) {
-    const agent = agentMap.get(steps[i].agent_slug)!
+    const agent = agentMap.get(steps[i].agent_slug ?? '')!
     try {
       validateEndpointUrl(agent.endpoint_url)
     } catch {
@@ -360,12 +416,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   async function executeStep(step: ComposeStep, stepIndex: number, stepInput: string): Promise<StepResult> {
-    const agent = agentMap.get(step.agent_slug)!
+    const agent = agentMap.get(step.agent_slug ?? '')!
 
     // Rate limit check pre-step (fail-open via checkCreatorRateLimits)
-    const consumerRlId = `${step.agent_slug}:${rawKey.substring(0, 24)}`
-    const rlRes = await checkCreatorRateLimits(step.agent_slug, agent.max_rpm ?? 60, agent.max_rpd ?? 1000, consumerRlId)
-    if (rlRes) return { receipt: null, output: null, status: 'error', reason: `rate_limited:${step.agent_slug}`, chargeDecision: 'refund', refundFailure: null }
+    const consumerRlId = `${step.agent_slug ?? ''}:${rawKey.substring(0, 24)}`
+    const rlRes = await checkCreatorRateLimits(step.agent_slug ?? '', agent.max_rpm ?? 60, agent.max_rpd ?? 1000, consumerRlId)
+    if (rlRes) return { receipt: null, output: null, status: 'error', reason: `rate_limited:${step.agent_slug ?? ''}`, chargeDecision: 'refund', refundFailure: null }
 
     // Deducir saldo
     const { data: deductOk, error: deductError } = await supabase.rpc(
@@ -498,7 +554,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const stepInput = globalStepIndex === 0 ? (step.input ?? '') : (step.pass_output ? (lastOutput ?? '') : (step.input ?? ''))
 
         // AC-6: Validar input contra schema ANTES de cobrar (WAS-200)
-        const agentForStep = agentMap.get(step.agent_slug)!
+        const agentForStep = agentMap.get(step.agent_slug ?? '')!
         if (agentForStep.input_schema) {
           const inputToValidate = typeof stepInput === 'string'
             ? (() => { try { return JSON.parse(stepInput) } catch { return stepInput } })()
@@ -544,21 +600,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           } satisfies PipelineFailedResponse, { status: 422 })
         }
 
-        receipts.push(result.receipt!)
+        const pushedReceipt = result.receipt!
+        if (resolvedSlugs.has(globalStepIndex)) {
+          pushedReceipt.resolved_slug = resolvedSlugs.get(globalStepIndex)
+        }
+        receipts.push(pushedReceipt)
         lastOutput = result.output
         // Best-effort: no await, no bloquea el pipeline
         supabase.rpc('append_step_output', {
           p_pipeline_id: pipelineId,
           p_step:        globalStepIndex,
           p_output:      typeof result.output === 'string' ? result.output : JSON.stringify(result.output),
-          p_agent_slug:  step.agent_slug,
+          p_agent_slug:  step.agent_slug ?? '',
         }).then(undefined, () => undefined)
         globalStepIndex++
 
       } else {
         // ── Grupo paralelo ──────────────────────────────────────────────────
         // AR20-1: preflight de saldo para el grupo completo antes del allSettled
-        const groupCost = group.reduce((acc, s) => acc + (agentMap.get(s.agent_slug)?.price_per_call ?? 0), 0)
+        const groupCost = group.reduce((acc, s) => acc + (agentMap.get(s.agent_slug ?? '')?.price_per_call ?? 0), 0)
         const { data: freshKey } = await supabase
           .from('agent_keys')
           .select('budget_usdc, spent_usdc')
@@ -589,7 +649,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           } else {
             const reason = gr.status === 'rejected' ? String(gr.reason) : gr.value.reason
             if (gr.status === 'fulfilled' && gr.value.refundFailure) refundFailures.push(gr.value.refundFailure)
-            receipts.push({ step: stepIdx, agent_slug: group[i].agent_slug, cost_usdc: '0.000000', receipt_signature: '', call_id: '' })
+            receipts.push({ step: stepIdx, agent_slug: group[i].agent_slug ?? '', cost_usdc: '0.000000', receipt_signature: '', call_id: '' })
             logger.warn('[compose] parallel step failed', { stepIdx, reason })
           }
         }
@@ -661,17 +721,24 @@ export function validateSteps(steps: unknown): string | null {
 
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i] as ComposeStep
-    if (!s.agent_slug || typeof s.agent_slug !== 'string') {
-      return `Step ${i}: agent_slug is required`
+
+    // AC-3: capability + agent_slug juntos → error
+    if (s.capability && s.agent_slug) {
+      return `Step ${i}: capability and agent_slug are mutually exclusive`
     }
+
+    // Debe tener uno u otro
+    if (!s.capability && (!s.agent_slug || typeof s.agent_slug !== 'string')) {
+      return `Step ${i}: agent_slug or capability is required`
+    }
+
     if (s.input !== undefined && s.pass_output === true) {
       return `Step ${i}: input and pass_output are mutually exclusive`
     }
     if (i === 0 && s.pass_output === true) {
       return 'Step 0 cannot use pass_output (no previous output exists)'
     }
-    // Step sin pass_output debe tener input no vacío
-    if (!s.pass_output && (s.input === undefined || s.input.trim() === '')) {
+    if (!s.pass_output && (s.input === undefined || (typeof s.input === 'string' && s.input.trim() === ''))) {
       return `Step ${i}: input is required when pass_output is false`
     }
   }
