@@ -1,8 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createPublicClient, http } from 'viem'
-import { avalanche, avalancheFuji } from 'viem/chains'
-import { WASIAI_MARKETPLACE_ABI, fromUSDCAtomics } from '@/lib/contracts/WasiAIMarketplace'
-import { getContractAddress } from '@/lib/contracts/config'
+import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getIdentifier, getSharedRedis } from '@/lib/ratelimit'
 import { Ratelimit } from '@upstash/ratelimit'
 
@@ -24,24 +21,34 @@ export async function GET(request: NextRequest) {
   if (rlHit) return rlHit
 
   try {
-    const contractAddress = getContractAddress()
-    const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-    const chain = chainId === 43114 ? avalanche : avalancheFuji
+    // WAS-132: recordInvocationOnChain() fue eliminado — el contrato siempre retorna 0.
+    // Fuente de verdad: agent_keys.spent_usdc (volume) y pipeline_executions (invocations).
+    const supabase = createServiceClient()
 
-    const client = createPublicClient({ chain, transport: http() })
+    const [volumeRes, invocationsRes] = await Promise.all([
+      // Volume = suma de spent_usdc en todas las keys activas
+      supabase
+        .from('agent_keys')
+        .select('spent_usdc')
+        .eq('is_active', true),
 
-    const result = await client.readContract({
-      address: contractAddress,
-      abi: WASIAI_MARKETPLACE_ABI,
-      functionName: 'getStats',
-    })
+      // Invocations = total de pipelines ejecutados
+      supabase
+        .from('pipeline_executions')
+        .select('id', { count: 'exact', head: true }),
+    ])
 
-    const [totalVolume, totalInvocations, feeBps] = result as [bigint, bigint, number]
+    const totalVolume = (volumeRes.data ?? []).reduce(
+      (acc, row) => acc + (row.spent_usdc ?? 0),
+      0,
+    )
+
+    const totalInvocations = invocationsRes.count ?? 0
 
     return NextResponse.json({
-      volume: fromUSDCAtomics(totalVolume),
-      invocations: Number(totalInvocations),
-      feePercent: Number(feeBps) / 100,
+      volume:      parseFloat(totalVolume.toFixed(6)),
+      invocations: totalInvocations,
+      feePercent:  10,  // 10% platform fee (hardcoded — no cambia sin governance)
     })
   } catch {
     return NextResponse.json({ volume: null, invocations: null, feePercent: null })
