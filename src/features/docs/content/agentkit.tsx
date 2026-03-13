@@ -49,7 +49,7 @@ async function main() {
   const payment = await signERC3009Payment({
     walletClient,
     from:      agentAddress,
-    to:        '0x9d8Eb04Df6Bd271491Bcdbb96b81Ab3103C0CD8E', // Marketplace Mainnet
+    to:        '0x24be31D0F538C5551c536b09C85907C43c24d062', // Marketplace Mainnet
     priceUsdc: agent.price_usdc,
   })
 
