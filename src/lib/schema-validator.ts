@@ -61,10 +61,11 @@ function findExternalRefs(obj: unknown, path = ''): string | null {
 
   const record = obj as Record<string, unknown>
   for (const key of Object.keys(record)) {
-    if (key === '$ref' && typeof record[key] === 'string') {
+    // SSRF-001: bloquear $ref Y $schema con URLs externas
+    if ((key === '$ref' || key === '$schema') && typeof record[key] === 'string') {
       const ref = record[key] as string
       if (ref.startsWith('http://') || ref.startsWith('https://')) {
-        return `External $ref blocked at ${path}.$ref: ${ref}`
+        return `External ${key} blocked at ${path}.${key}: ${ref}`
       }
     }
     const r = findExternalRefs(record[key], `${path}.${key}`)
