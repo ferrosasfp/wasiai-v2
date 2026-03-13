@@ -16,6 +16,7 @@ import { getComposeLimit, checkCreatorRateLimits } from '@/lib/ratelimit'
 import { signReceipt }               from '@/lib/receipts/signReceipt'
 import { keyHashToBytes32 }          from '@/lib/contracts/marketplaceClient'
 import { logger }                    from '@/lib/logger'
+import { isAgentInScope }            from '@/lib/scope-check'
 
 // ── Constantes (env-driven, no hardcodes) ────────────────────────────────────
 const MAX_STEPS       = 5
@@ -100,16 +101,19 @@ interface AgentRow {
   price_per_call: number
   endpoint_url:   string
   status:         string
+  category:       string
   max_rpm:        number
   max_rpd:        number
 }
 
 interface KeyRow {
-  id:          string
-  key_hash:    string
-  is_active:   boolean
-  budget_usdc: number
-  spent_usdc:  number
+  id:                 string
+  key_hash:           string
+  is_active:          boolean
+  budget_usdc:        number
+  spent_usdc:         number
+  allowed_slugs:      string[] | null
+  allowed_categories: string[] | null
 }
 
 // ── HU-5.2: Agrupador de steps ───────────────────────────────────────────────
@@ -168,7 +172,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { data: keyRow, error: keyError } = await supabase
     .from('agent_keys')
-    .select('id, key_hash, is_active, budget_usdc, spent_usdc')
+    .select('id, key_hash, is_active, budget_usdc, spent_usdc, allowed_slugs, allowed_categories')
     .eq('key_hash', keyHash)
     .eq('is_active', true)
     .single<KeyRow>()
@@ -205,7 +209,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const slugs = [...new Set(steps.map(s => s.agent_slug))]
   const { data: agentsData } = await supabase
     .from('agents')
-    .select('id, slug, name, price_per_call, endpoint_url, status, max_rpm, max_rpd')
+    .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd')
     .in('slug', slugs)
     .eq('status', 'active')
 
@@ -218,6 +222,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         { error: 'Agent not found', code: 'agent_not_found', step: i, slug: steps[i].agent_slug },
         { status: 404 },
+      )
+    }
+    const agent = agentMap.get(steps[i].agent_slug)!
+    if (!isAgentInScope(agent.slug, agent.category, keyRow.allowed_slugs, keyRow.allowed_categories)) {
+      return NextResponse.json(
+        { error: 'Agent not in key scope', code: 'scope_violation', slug: agent.slug },
+        { status: 403 },
       )
     }
   }

@@ -21,6 +21,8 @@ interface AgentKey {
   raw_key?: string
   key_hash?: string                      // WAS-141: exposed to owner for on-chain withdrawKey call
   owner_wallet_address?: string | null   // HU-058: first depositor's wallet
+  allowed_slugs: string[] | null
+  allowed_categories: string[] | null
 }
 
 // USDC contract addresses by chain
@@ -786,6 +788,21 @@ export default function AgentKeysPage() {
                             />
                           </div>
                         )}
+                        {/* Scope (WAS-186) */}
+                        <div className="mt-2 flex flex-wrap gap-1 text-xs">
+                          {!key.allowed_slugs && !key.allowed_categories ? (
+                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 font-medium">Acceso total</span>
+                          ) : (
+                            <>
+                              {key.allowed_slugs && key.allowed_slugs.map(slug => (
+                                <span key={slug} className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700 font-mono">{slug}</span>
+                              ))}
+                              {key.allowed_categories && key.allowed_categories.map(cat => (
+                                <span key={cat} className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-700">{cat}</span>
+                              ))}
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {key.is_active && address && (

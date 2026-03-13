@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   const { data: keyRow } = await supabase
     .from('agent_keys')
-    .select('id, name, budget_usdc, spent_usdc, is_active, last_used_at, created_at, erc8004_identity')
+    .select('id, name, budget_usdc, spent_usdc, is_active, last_used_at, created_at, erc8004_identity, allowed_slugs, allowed_categories')
     .eq('key_hash', hash)
     .single()
 
