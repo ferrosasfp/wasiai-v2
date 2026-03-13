@@ -48,6 +48,17 @@ export async function GET(
     )
   }
 
+  // WAS-183: fetch p50/p95/error_rate metrics via RPC (no N+1)
+  interface AgentPercentileMetrics {
+    p50_latency_ms:    number | null
+    p95_latency_ms:    number | null
+    error_rate_7d:     number | null
+    error_rate_sample: number | null
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const metricsQuery = supabase.rpc('get_agent_percentile_metrics', { p_agent_id: agent.id }) as any
+  const { data: metrics }: { data: AgentPercentileMetrics | null } = await metricsQuery.single()
+
   const contractAddress = getMarketplaceAddress(CHAIN_ID)
 
   const body = {
@@ -84,6 +95,10 @@ export async function GET(
     },
     creator: agent.creator ?? null,
     created_at: agent.created_at,
+    p50_latency_ms:         metrics?.p50_latency_ms ?? null,
+    p95_latency_ms:         metrics?.p95_latency_ms ?? null,
+    error_rate_7d:          metrics?.error_rate_7d ?? null,
+    error_rate_sample_size: metrics?.error_rate_sample ?? null,
   }
 
   return NextResponse.json(body, { status: 200, headers: CORS })
