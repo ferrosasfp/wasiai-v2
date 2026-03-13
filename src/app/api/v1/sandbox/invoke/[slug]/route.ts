@@ -82,10 +82,14 @@ export async function POST(
 
   // 1b. IP rate limit for anonymous users — doble check
   if (isAnonymous) {
-    const ip     = getClientIp(req)
-    const ua     = req.headers.get('user-agent') ?? ''
-    // Node runtime only — do not use in Edge routes
-    const uaHash = createHash('sha256').update(ua).digest('hex').slice(0, 8)
+    const ip = getClientIp(req)
+    const ua = req.headers.get('user-agent') ?? ''
+    // Node runtime only — do not use in Edge routes.
+    // BUG-03 fix: empty UA gets a per-IP key to avoid shared bucket across all no-UA clients.
+    // BUG-04/F-02 fix: 16 hex chars (64 bits) to reduce birthday collision probability.
+    const uaHash = ua
+      ? createHash('sha256').update(ua).digest('hex').slice(0, 16)
+      : `no-ua:${ip}`
     const identifier = `${ip}:${uaHash}`
 
     const [perAgent, perUa] = await Promise.all([
@@ -94,13 +98,16 @@ export async function POST(
     ])
 
     if (!perAgent.success || !perUa.success) {
-      const limitedByUa = !perUa.success
+      // BUG-02 fix: report the reset time of whichever limit resets latest (most conservative).
+      const resetMs = Math.max(
+        perAgent.success ? 0 : perAgent.reset,
+        perUa.success    ? 0 : perUa.reset,
+      )
       return NextResponse.json({
         error: 'Anonymous rate limit exceeded',
         code: 'anon_rate_limited',
-        limit: limitedByUa ? 30 : 5,
         remaining: 0,
-        reset_at: new Date(limitedByUa ? perUa.reset : perAgent.reset).toISOString(),
+        reset_at: new Date(resetMs).toISOString(),
         message: 'Crea una cuenta gratuita para seguir probando',
       }, { status: 429 })
     }
