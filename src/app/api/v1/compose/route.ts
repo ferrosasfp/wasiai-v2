@@ -21,6 +21,37 @@ import { logger }                    from '@/lib/logger'
 const MAX_STEPS       = 5
 const STEP_TIMEOUT_MS = parseInt(process.env.COMPOSE_STEP_TIMEOUT_MS?.trim() ?? '8000', 10)
 
+// ── Wave 2: Clasificador de errores ──────────────────────────────────────────
+/**
+ * Determina si un step debe cobrarse basado en el tipo de error.
+ * Regla: cobrar solo si el agente procesó la request (respondió con body).
+ * AC-4..AC-10
+ */
+type ChargeDecision = 'charge' | 'refund'
+
+function getChargeDecision(
+  err: unknown,
+  httpStatus: number | null,
+  hasJsonBody: boolean,
+): ChargeDecision {
+  // Timeout o AbortError → no cobrar (AC-4)
+  if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+    return 'refund'
+  }
+  // Sin respuesta HTTP (connection error) → no cobrar (AC-5)
+  if (httpStatus === null) return 'refund'
+  // 402, 429, 503, 504 → no cobrar (AC-6, AC-10)
+  if ([402, 429, 503, 504].includes(httpStatus)) return 'refund'
+  // 500 sin body JSON → no cobrar (AC-7)
+  if (httpStatus === 500 && !hasJsonBody) return 'refund'
+  // 500 con body JSON → cobrar (AC-8)
+  if (httpStatus === 500 && hasJsonBody) return 'charge'
+  // 200 → cobrar (AC-9)
+  if (httpStatus === 200) return 'charge'
+  // Default: refund para cualquier otro status no exitoso
+  return httpStatus >= 200 && httpStatus < 300 ? 'charge' : 'refund'
+}
+
 // ── Tipos ────────────────────────────────────────────────────────────────────
 interface ComposeStep {
   agent_slug:   string
@@ -42,21 +73,24 @@ interface StepReceipt {
 }
 
 interface ComposeResponse {
-  pipeline_id:     string
-  steps_executed:  number
-  groups_executed: number  // HU-5.2: número de grupos (1 group = N parallel steps)
-  total_cost_usdc: string
-  result:          unknown
-  receipts:        StepReceipt[]
+  pipeline_id:      string
+  steps_executed:   number
+  groups_executed:  number  // HU-5.2: número de grupos (1 group = N parallel steps)
+  total_cost_usdc:  string
+  result:           unknown
+  receipts:         StepReceipt[]
+  refund_failures?: string[]  // AC-11: presente solo si hay fallos de refund
 }
 
 interface PipelineFailedResponse {
   error:            string
-  code:             'step_failed'
+  code:             'step_failed' | 'all_failed'
   failed_step:      number
   reason:           string
   steps_executed:   number
   partial_receipts: StepReceipt[]
+  refund_failures?: string[]
+  status?:          'all_failed'  // AC-12
 }
 
 interface AgentRow {
@@ -248,18 +282,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // ── Helper: ejecutar un step individual ──────────────────────────────────
   const safeKeyRow = keyRow! // guard ya verificado arriba (línea 141)
-  async function executeStep(step: ComposeStep, stepIndex: number, stepInput: string): Promise<{
-    receipt: StepReceipt | null
-    output: string | null
-    status: 'success' | 'error'
-    reason: string
-  }> {
+  // Wave 3a: retorno extendido con chargeDecision + refundFailure
+  interface StepResult {
+    receipt:        StepReceipt | null
+    output:         string | null
+    status:         'success' | 'error'
+    reason:         string
+    chargeDecision: ChargeDecision
+    refundFailure:  string | null
+  }
+
+  async function executeStep(step: ComposeStep, stepIndex: number, stepInput: string): Promise<StepResult> {
     const agent = agentMap.get(step.agent_slug)!
 
     // Rate limit check pre-step (fail-open via checkCreatorRateLimits)
     const consumerRlId = `${step.agent_slug}:${rawKey.substring(0, 24)}`
     const rlRes = await checkCreatorRateLimits(step.agent_slug, agent.max_rpm ?? 60, agent.max_rpd ?? 1000, consumerRlId)
-    if (rlRes) return { receipt: null, output: null, status: 'error', reason: `rate_limited:${step.agent_slug}` }
+    if (rlRes) return { receipt: null, output: null, status: 'error', reason: `rate_limited:${step.agent_slug}`, chargeDecision: 'refund', refundFailure: null }
 
     // Deducir saldo
     const { data: deductOk, error: deductError } = await supabase.rpc(
@@ -267,17 +306,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { p_key_id: safeKeyRow.id, p_amount: agent.price_per_call },
     )
     if (deductError || deductOk === false) {
-      return { receipt: null, output: null, status: 'error', reason: 'insufficient_balance' }
+      return { receipt: null, output: null, status: 'error', reason: 'insufficient_balance', chargeDecision: 'refund', refundFailure: null }
     }
 
     // Llamar al agente externo
     const startMs = Date.now()
+
+    // Wave 3b: hoist de variables para que getChargeDecision pueda acceder a ambos casos
+    let res: Response | undefined
+    let caughtErr: unknown = null
+    let hasJsonBody = false
     let stepOutput: unknown
     let stepStatus: 'success' | 'error' = 'success'
     let stepErrorReason = ''
 
     try {
-      const res = await fetch(agent.endpoint_url, {
+      res = await fetch(agent.endpoint_url, {
         method:   'POST',
         headers:  { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Pipeline-Id': pipelineId, 'X-Pipeline-Step': String(stepIndex) },
         body:     JSON.stringify({ input: stepInput, ...pipelineCtx }),
@@ -286,19 +330,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       })
       if (res.ok) {
         const ct = res.headers.get('content-type') ?? ''
-        stepOutput = ct.includes('application/json') ? await res.json() : await res.text()
+        hasJsonBody = ct.includes('application/json')
+        stepOutput  = hasJsonBody ? await res.json() : await res.text()
       } else {
+        const ct = res.headers.get('content-type') ?? ''
+        hasJsonBody = ct.includes('application/json')
+        if (hasJsonBody) { try { stepOutput = await res.json() } catch { stepOutput = null; hasJsonBody = false } }
         stepStatus      = 'error'
-        stepErrorReason = `El agente "${agent.slug}" respondió con error ${res.status}. Verifica que su endpoint esté activo y acepte { "input": "..." }.`
-        stepOutput      = { error: stepErrorReason }
+        stepErrorReason = res.status === 402
+          ? 'payment_rejected'
+          : `El agente "${agent.slug}" respondió con error ${res.status}.`
       }
     } catch (err) {
+      caughtErr       = err
       stepStatus      = 'error'
       stepErrorReason = err instanceof Error && err.name === 'TimeoutError' ? 'step_timeout' : `Upstream unreachable: ${String(err)}`
-      stepOutput      = { error: stepErrorReason }
     }
 
+    // Wave 3b: ahora res, caughtErr y hasJsonBody están en scope
+    const chargeDecision = getChargeDecision(caughtErr, res?.status ?? null, hasJsonBody)
+
     const latencyMs = Date.now() - startMs
+
+    // Wave 3c: refund sync si el step falló y no debe cobrarse
+    let refundFailure: string | null = null
+    if (stepStatus === 'error' && chargeDecision === 'refund') {
+      const { data: refundOk, error: refundErr } = await supabase.rpc(
+        'refund_key_balance',
+        { p_key_id: safeKeyRow.id, p_amount: agent.price_per_call },
+      )
+      if (refundErr || !refundOk) {
+        logger.error('[compose] refund failed', { stepIndex, keyId: safeKeyRow.id, amount: agent.price_per_call, error: refundErr })
+        refundFailure = `step_${stepIndex}`
+      }
+    }
 
     // Log en agent_calls
     let callId = ''
@@ -318,7 +383,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       supabase.from('agent_calls').update({ receipt_signature: signature }).eq('id', callId).then(undefined, () => {})
     } catch { /* best-effort */ }
 
-    if (stepStatus === 'error') return { receipt: null, output: null, status: 'error', reason: stepErrorReason }
+    if (stepStatus === 'error') return { receipt: null, output: null, status: 'error', reason: stepErrorReason, chargeDecision, refundFailure }
 
     const output = typeof stepOutput === 'string' ? stepOutput : JSON.stringify(stepOutput)
 
@@ -334,9 +399,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       status: 'success',
       output,
       reason: '',
+      chargeDecision: 'charge' as ChargeDecision,
+      refundFailure: null,
       receipt: { step: stepIndex, agent_slug: agent.slug, cost_usdc: agent.price_per_call.toFixed(6), receipt_signature: signature, call_id: callId },
     }
   }
+
+  // Wave 3d: acumular refund_failures del pipeline
+  const refundFailures: string[] = []
 
   try {
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
@@ -348,9 +418,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const stepInput = globalStepIndex === 0 ? (step.input ?? '') : (step.pass_output ? (lastOutput ?? '') : (step.input ?? ''))
         const result = await executeStep(step, globalStepIndex, stepInput)
 
+        if (result.refundFailure) refundFailures.push(result.refundFailure)
+
         if (result.status === 'error') {
           supabase.from('pipeline_executions').update({ status: receipts.length === 0 ? 'failed' : 'partial', steps_completed: globalStepIndex, total_cost_usdc: receipts.reduce((a, r) => a + parseFloat(r.cost_usdc), 0), failed_at_step: globalStepIndex + 1, error_detail: result.reason, completed_at: new Date().toISOString() }).eq('id', pipelineId).then(undefined, () => {})
-          return NextResponse.json({ error: `Pipeline failed at step ${globalStepIndex}`, code: 'step_failed', failed_step: globalStepIndex, reason: result.reason, steps_executed: globalStepIndex, partial_receipts: receipts } satisfies PipelineFailedResponse, { status: 422 })
+
+          // AC-12: si todos los steps fallaron (ningún receipt exitoso) → HTTP 200 all_failed
+          const allFailed = receipts.length === 0
+          if (allFailed) {
+            return NextResponse.json({
+              error:            'All pipeline steps failed',
+              code:             'all_failed' as const,
+              status:           'all_failed' as const,
+              failed_step:      globalStepIndex,
+              reason:           result.reason,
+              steps_executed:   0,
+              partial_receipts: receipts,
+              ...(refundFailures.length > 0 && { refund_failures: refundFailures }),
+            } satisfies PipelineFailedResponse, { status: 200 })
+          }
+          return NextResponse.json({
+            error:            `Pipeline failed at step ${globalStepIndex}`,
+            code:             'step_failed' as const,
+            failed_step:      globalStepIndex,
+            reason:           result.reason,
+            steps_executed:   globalStepIndex,
+            partial_receipts: receipts,
+            ...(refundFailures.length > 0 && { refund_failures: refundFailures }),
+          } satisfies PipelineFailedResponse, { status: 422 })
         }
 
         receipts.push(result.receipt!)
@@ -390,6 +485,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             successResults.push(gr.value.output ?? '')
           } else {
             const reason = gr.status === 'rejected' ? String(gr.reason) : gr.value.reason
+            if (gr.status === 'fulfilled' && gr.value.refundFailure) refundFailures.push(gr.value.refundFailure)
             receipts.push({ step: stepIdx, agent_slug: group[i].agent_slug, cost_usdc: '0.000000', receipt_signature: '', call_id: '' })
             logger.warn('[compose] parallel step failed', { stepIdx, reason })
           }
@@ -400,7 +496,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // Si todos fallaron → abort
         if (successResults.length === 0) {
           supabase.from('pipeline_executions').update({ status: 'failed', steps_completed: globalStepIndex - group.length, total_cost_usdc: receipts.reduce((a, r) => a + parseFloat(r.cost_usdc), 0), completed_at: new Date().toISOString() }).eq('id', pipelineId).then(undefined, () => {})
-          return NextResponse.json({ error: `Pipeline failed — all parallel steps in group ${groupIndex} failed`, code: 'step_failed', failed_step: globalStepIndex - group.length, reason: 'all_parallel_failed', steps_executed: globalStepIndex - group.length, partial_receipts: receipts } satisfies PipelineFailedResponse, { status: 422 })
+          return NextResponse.json({
+            error:            `Pipeline failed — all parallel steps in group ${groupIndex} failed`,
+            code:             'step_failed' as const,
+            failed_step:      globalStepIndex - group.length,
+            reason:           'all_parallel_failed',
+            steps_executed:   globalStepIndex - group.length,
+            partial_receipts: receipts,
+            ...(refundFailures.length > 0 && { refund_failures: refundFailures }),
+          } satisfies PipelineFailedResponse, { status: 422 })
         }
 
         // pass_output del último step del grupo
@@ -437,6 +541,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       total_cost_usdc: totalCost.toFixed(6),
       result:          parseOutputSafe(lastOutput),
       receipts,
+      ...(refundFailures.length > 0 && { refund_failures: refundFailures }),
     } satisfies ComposeResponse,
     { status: 200 },
   )
