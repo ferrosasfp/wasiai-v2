@@ -66,6 +66,7 @@ export function PublishPreview({
     free_trial_enabled: false,
     free_trial_limit: 0,
     long_running: false,
+    input_schema: null, // WAS-200
   }
 
   return (

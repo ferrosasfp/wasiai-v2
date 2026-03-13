@@ -35,6 +35,7 @@ import { createHash } from 'crypto'
 import { logger } from '@/lib/logger'
 
 import { SITE_URL } from '@/lib/constants'
+import { metaValidateSchema } from '@/lib/schema-validator'
 
 const RegisterAgentSchema = z.object({
   // Required
@@ -68,6 +69,9 @@ const RegisterAgentSchema = z.object({
 
   // WAS-160b: Optional on-chain registration preference (default: true if creator_wallet present)
   register_on_chain: z.boolean().optional(),
+
+  // WAS-200: JSON Schema draft-07 para validar inputs
+  input_schema: z.unknown().optional().nullable(),
 })
 
 export async function POST(request: NextRequest) {
@@ -152,6 +156,21 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data
 
+  // WAS-200: Validar input_schema si existe
+  if (data.input_schema !== undefined && data.input_schema !== null) {
+    const schemaResult = metaValidateSchema(data.input_schema)
+    if (!schemaResult.valid) {
+      const isSSRF = schemaResult.error?.includes('External $ref blocked')
+      return NextResponse.json(
+        {
+          error: schemaResult.error,
+          code:  isSSRF ? 'schema_ssrf_blocked' : 'invalid_json_schema',
+        },
+        { status: 422 }
+      )
+    }
+  }
+
   // SEC-01 + NG-005: Block SSRF via endpoint_url (async version includes DNS probe)
   try {
     await validateEndpointUrlAsync(data.endpoint_url)
@@ -201,6 +220,7 @@ export async function POST(request: NextRequest) {
       // For open registration, use WasiAI's system account
       process.env.WASIAI_SYSTEM_CREATOR_ID ?? null
     ),
+    input_schema: data.input_schema ?? null,
     metadata: {
       registered_via: authMethod,
       framework:      data.framework,

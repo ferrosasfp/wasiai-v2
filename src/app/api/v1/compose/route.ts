@@ -17,6 +17,7 @@ import { signReceipt }               from '@/lib/receipts/signReceipt'
 import { keyHashToBytes32 }          from '@/lib/contracts/marketplaceClient'
 import { logger }                    from '@/lib/logger'
 import { isAgentInScope }            from '@/lib/scope-check'
+import { validateInput }             from '@/lib/schema-validator'
 
 // ── Constantes (env-driven, no hardcodes) ────────────────────────────────────
 const MAX_STEPS       = 5
@@ -108,6 +109,7 @@ interface AgentRow {
   category:       string
   max_rpm:        number
   max_rpd:        number
+  input_schema:   unknown | null
 }
 
 interface KeyRow {
@@ -213,7 +215,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const slugs = [...new Set(steps.map(s => s.agent_slug))]
   const { data: agentsData } = await supabase
     .from('agents')
-    .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd')
+    .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema')
     .in('slug', slugs)
     .eq('status', 'active')
 
@@ -494,6 +496,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         const stepInput = globalStepIndex === 0 ? (step.input ?? '') : (step.pass_output ? (lastOutput ?? '') : (step.input ?? ''))
+
+        // AC-6: Validar input contra schema ANTES de cobrar (WAS-200)
+        const agentForStep = agentMap.get(step.agent_slug)!
+        if (agentForStep.input_schema) {
+          const inputToValidate = typeof stepInput === 'string'
+            ? (() => { try { return JSON.parse(stepInput) } catch { return stepInput } })()
+            : stepInput
+          const validErr = validateInput(agentForStep.input_schema, inputToValidate)
+          if (validErr) {
+            return NextResponse.json(
+              { error: validErr, code: 'input_validation_failed', step: globalStepIndex },
+              { status: 422 }
+            )
+          }
+        }
+
         const result = await executeStep(step, globalStepIndex, stepInput)
 
         if (result.refundFailure) refundFailures.push(result.refundFailure)

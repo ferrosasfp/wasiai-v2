@@ -16,6 +16,7 @@ import { Redis } from '@upstash/redis'
 import { logger } from '@/lib/logger'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 import { checkIpLimit } from '@/lib/rate-limit-ip'
+import { validateInput } from '@/lib/schema-validator'
 
 // ── Rate limiter sandbox (lazy singleton) ────────────────────────────────────
 let _sandboxLimit: Ratelimit | null = null
@@ -62,6 +63,7 @@ interface AgentRow {
   price_per_call: number
   status: string
   sandbox_enabled: boolean
+  input_schema: unknown | null
 }
 
 interface SandboxCreditsRow {
@@ -135,7 +137,7 @@ export async function POST(
   // 3. Obtener agente por slug
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('id, endpoint_url, price_per_call, status, sandbox_enabled')
+    .select('id, endpoint_url, price_per_call, status, sandbox_enabled, input_schema')
     .eq('slug', slug)
     .single<AgentRow>()
 
@@ -220,11 +222,26 @@ export async function POST(
 
   // 8. Parsear body de la request
   let input: Record<string, unknown> | string = {}
+  let body: SandboxInvokeRequest | null = null
   try {
-    const rawBody = await req.json() as SandboxInvokeRequest
-    input = rawBody.input ?? {}
+    body = await req.json() as SandboxInvokeRequest
+    input = body.input ?? {}
   } catch {
     // body vacío — usar input vacío
+  }
+
+  // WAS-200: Validar input contra schema ANTES de llamar al agente
+  if (agent.input_schema && body?.input) {
+    const inputVal = typeof body.input === 'string'
+      ? (() => { try { return JSON.parse(body.input) } catch { return body.input } })()
+      : body.input
+    const validErr = validateInput(agent.input_schema, inputVal)
+    if (validErr) {
+      return NextResponse.json(
+        { error: validErr, code: 'input_validation_failed' },
+        { status: 422 }
+      )
+    }
   }
 
   // 9. Llamar agente externo (timeout 8s)

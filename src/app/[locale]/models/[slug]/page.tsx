@@ -162,6 +162,19 @@ export default async function ModelDetailPage({ params }: Props) {
               )}
             </div>
 
+            {/* WAS-200: Input Schema — visible solo si el agente define un JSON Schema */}
+            {model.input_schema && (
+              <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
+                <h2 className="mb-4 font-semibold text-gray-900">Input Schema</h2>
+                <p className="mb-3 text-sm text-gray-500">
+                  This agent validates inputs against the following JSON Schema (draft-07).
+                </p>
+                <pre className="overflow-x-auto rounded-xl bg-gray-50 border border-gray-200 p-4 text-xs font-mono text-gray-700 whitespace-pre-wrap">
+                  {JSON.stringify(model.input_schema, null, 2)}
+                </pre>
+              </div>
+            )}
+
             {/* HU-4.3: Ejemplos Input/Output — invisible si no hay ejemplos (retorna null) */}
             <AgentExamplesDisplay agentId={model.id} />
 

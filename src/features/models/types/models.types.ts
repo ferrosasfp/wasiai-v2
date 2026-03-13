@@ -59,6 +59,9 @@ export interface Model {
   // WAS-72: Escrow para tareas largas
   long_running: boolean
 
+  // WAS-200: JSON Schema draft-07 para validar inputs
+  input_schema: Record<string, unknown> | null
+
   // joined
   creator?: CreatorProfile
 }

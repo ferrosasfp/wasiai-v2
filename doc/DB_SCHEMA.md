@@ -103,3 +103,37 @@
 | Timestamp de actualización | `updated_at` |
 | Soft delete | `status = 'inactive'` (no DELETE) |
 | Booleanos | prefijo `is_` (is_active, is_verified, is_featured) |
+
+---
+
+## Actualización 2026-03-13 (post sprint-1 retro)
+
+### `pipeline_executions` — columnas completas (migration 017)
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| id | UUID PK | gen_random_uuid() |
+| key_id | UUID FK | → agent_keys.id |
+| steps_requested | SMALLINT | 1-5 |
+| steps_completed | SMALLINT | default 0 |
+| total_cost_usdc | NUMERIC(18,6) | default 0 |
+| status | TEXT | 'success' / 'partial' / 'failed' |
+| failed_at_step | SMALLINT | NULL si success |
+| error_detail | TEXT | nullable |
+| receipt_signature | TEXT | ECDSA hex, nullable |
+| created_at | TIMESTAMPTZ | |
+| completed_at | TIMESTAMPTZ | nullable |
+
+⚠️ Sprint 2 (WAS-204) agregará: `step_outputs JSONB`, `key_hash TEXT`
+
+### `agent_keys` — columna correcta es `owner_id` (NO `user_id`)
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| id | UUID PK | |
+| key_hash | TEXT | SHA256 del raw key |
+| is_active | BOOLEAN | |
+| budget_usdc | NUMERIC | |
+| spent_usdc | NUMERIC | |
+| owner_id | UUID FK | → auth.users.id ⚠️ NO es user_id |
+| created_at | TIMESTAMPTZ | |
+
+⚠️ Sprint 2 (WAS-186) agregará: `allowed_slugs TEXT[]`, `allowed_categories TEXT[]`
