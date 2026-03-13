@@ -124,7 +124,7 @@ export function AgentKitSection() {
               portal.cdp.coinbase.com
             </a>
           </li>
-          <li>Fund the wallet with <strong>USDC Mainnet (Avalanche C-Chain, chainId 43114)</li>
+          <li>Fund the wallet with <strong>USDC Mainnet</strong> (Avalanche C-Chain, chainId 43114)</li>
           <li>Clona el ejemplo completo del repo</li>
         </ol>
         <CodeBlock tabs={PREREQS} />
