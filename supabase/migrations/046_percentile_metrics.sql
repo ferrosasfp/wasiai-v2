@@ -14,17 +14,17 @@ STABLE
 SECURITY DEFINER
 AS $$
   WITH calls_30d AS (
-    SELECT latency_ms, status, created_at
+    SELECT latency_ms, status, called_at
     FROM agent_calls
     WHERE agent_id = p_agent_id
-      AND created_at >= NOW() - INTERVAL '30 days'
+      AND called_at >= NOW() - INTERVAL '30 days'
       AND latency_ms IS NOT NULL
   ),
   calls_7d AS (
     SELECT status
     FROM agent_calls
     WHERE agent_id = p_agent_id
-      AND created_at >= NOW() - INTERVAL '7 days'
+      AND called_at >= NOW() - INTERVAL '7 days'
   ),
   metrics_30d AS (
     SELECT
@@ -60,7 +60,7 @@ GRANT EXECUTE ON FUNCTION get_agent_percentile_metrics(UUID) TO service_role, an
 
 -- Índice para acelerar las queries de métricas
 CREATE INDEX IF NOT EXISTS idx_agent_calls_agent_created
-  ON agent_calls(agent_id, created_at DESC)
+  ON agent_calls(agent_id, called_at DESC)
   WHERE latency_ms IS NOT NULL;
 
 -- Drop primero porque cambia el RETURNS TABLE (agrega 4 columnas)
