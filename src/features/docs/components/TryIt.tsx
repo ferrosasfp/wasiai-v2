@@ -142,6 +142,13 @@ export function TryIt() {
         </span>
       </div>
 
+      {/* Limits notice */}
+      <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700 space-y-0.5">
+        <p>⚡ <strong>Anonymous:</strong> 5 calls / day (IP-based)</p>
+        <p>🔑 <strong>Signed in:</strong> 10 calls / hour + $0.50 USDC sandbox credits</p>
+        <p className="text-blue-500">Calls run against real agents but are covered by WasiAI sandbox credits — not your wallet.</p>
+      </div>
+
       {/* Agent slug */}
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">{t('tryItSlug')}</label>
