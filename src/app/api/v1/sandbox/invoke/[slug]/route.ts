@@ -92,25 +92,30 @@ export async function POST(
       : `no-ua:${ip}`
     const identifier = `${ip}:${uaHash}`
 
-    const [perAgent, perUa] = await Promise.all([
-      checkIpLimit(identifier, `sandbox-anon:${slug}`, 5),  // 5/día por agente
-      checkIpLimit(uaHash,     'sandbox-anon-ua',      30), // 30/día global
-    ])
-
-    if (!perAgent.success || !perUa.success) {
-      // BUG-02 fix: report the reset time of whichever limit resets latest (most conservative).
-      const resetMs = Math.max(
-        perAgent.success ? 0 : perAgent.reset,
-        perUa.success    ? 0 : perUa.reset,
-      )
+    // F-05 fix: sequential checks — perAgent first, perUa only if perAgent passes.
+    // Avoids double-decrement when one limit is already exceeded.
+    const perAgent = await checkIpLimit(identifier, `sandbox-anon:${slug}`, 5)  // 5/día por agente
+    if (!perAgent.success) {
       return NextResponse.json({
         error: 'Anonymous rate limit exceeded',
         code: 'anon_rate_limited',
         remaining: 0,
-        reset_at: new Date(resetMs).toISOString(),
+        reset_at: new Date(perAgent.reset).toISOString(),
         message: 'Crea una cuenta gratuita para seguir probando',
       }, { status: 429 })
     }
+
+    const perUa = await checkIpLimit(uaHash, 'sandbox-anon-ua', 30)            // 30/día global
+    if (!perUa.success) {
+      return NextResponse.json({
+        error: 'Anonymous rate limit exceeded',
+        code: 'anon_rate_limited',
+        remaining: 0,
+        reset_at: new Date(perUa.reset).toISOString(),
+        message: 'Crea una cuenta gratuita para seguir probando',
+      }, { status: 429 })
+    }
+
   }
 
   // 2. Rate limit — sliding window 10 calls / 1 hora (authenticated only)
