@@ -24,23 +24,16 @@ function getExamplePayload(slug: string): string {
 export function TryIt() {
   const t = useTranslations('docs')
 
-  const [apiKey, setApiKey] = useState('')
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [slug, setSlug] = useState('')
-  const [payload, setPayload] = useState(EXAMPLE_PAYLOADS['default'])
+  const [agents, setAgents]     = useState<Agent[]>([])
+  const [slug, setSlug]         = useState('')
+  const [payload, setPayload]   = useState(EXAMPLE_PAYLOADS['default'])
   const [response, setResponse] = useState<string | null>(null)
   const [statusCode, setStatusCode] = useState<number | null>(null)
-  const [latency, setLatency] = useState<number | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [latency, setLatency]   = useState<number | null>(null)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState<string | null>(null)
 
-  // Load API key from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('wasiai_api_key')
-    if (stored) setApiKey(stored)
-  }, [])
-
-  // Fetch agents list — with AbortController + 30s timeout (BLOQUEANTE 3)
+  // Fetch agents list
   useEffect(() => {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 30_000)
@@ -65,14 +58,8 @@ export function TryIt() {
     }
   }, [])
 
-  function handleApiKeyChange(val: string) {
-    setApiKey(val)
-    localStorage.setItem('wasiai_api_key', val)
-  }
-
   function handleSlugChange(newSlug: string) {
     setSlug(newSlug)
-    // Pre-fill example payload when agent changes
     setPayload(getExamplePayload(newSlug))
   }
 
@@ -92,33 +79,51 @@ export function TryIt() {
       return
     }
 
-    // BLOQUEANTE 3: AbortController with 30s timeout
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 30_000)
 
     const start = performance.now()
     try {
-      // BLOQUEANTE 2: encodeURIComponent(slug)
-      const res = await fetch(`/api/v1/agents/${encodeURIComponent(slug)}/invoke`, {
+      // Sandbox — no API key needed, uses session auth or anonymous IP limit
+      const res = await fetch(`/api/v1/sandbox/invoke/${encodeURIComponent(slug)}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': apiKey,
-        },
-        body: JSON.stringify(parsedPayload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: parsedPayload }),
         signal: controller.signal,
       })
       const elapsed = Math.round(performance.now() - start)
       setLatency(elapsed)
       setStatusCode(res.status)
       const text = await res.text()
-      let pretty: string
+
+      // Friendly sandbox-specific error messages
       try {
-        pretty = JSON.stringify(JSON.parse(text), null, 2)
+        const json = JSON.parse(text)
+        if (json.code === 'insufficient_sandbox_credits') {
+          setError(`Sandbox credits exhausted (balance: $${json.balance_usdc} USDC). Create a free account to get more, or use your own API key.`)
+          setLoading(false)
+          return
+        }
+        if (json.code === 'sandbox_rate_limited') {
+          const reset = new Date(json.reset_at).toLocaleTimeString()
+          setError(`Rate limit reached (${json.limit} calls/hour). Resets at ${reset}.`)
+          setLoading(false)
+          return
+        }
+        if (json.code === 'anon_rate_limited') {
+          setError(`Anonymous limit reached (5 calls/day). ${json.message ?? 'Create a free account to continue.'}`)
+          setLoading(false)
+          return
+        }
+        if (json.error === 'sandbox_disabled') {
+          setError('This agent is not available in sandbox mode.')
+          setLoading(false)
+          return
+        }
+        setResponse(JSON.stringify(json, null, 2))
       } catch {
-        pretty = text
+        setResponse(text)
       }
-      setResponse(pretty)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed')
     } finally {
@@ -129,19 +134,12 @@ export function TryIt() {
 
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{t('tryIt')}</h3>
-
-      {/* API Key */}
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">{t('tryItApiKey')}</label>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => handleApiKeyChange(e.target.value)}
-          placeholder="wai_..."
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-avax-500"
-        />
-        <p className="mt-1 text-xs text-gray-400">Stored only in your browser&apos;s localStorage</p>
+      {/* Header + sandbox badge */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{t('tryIt')}</h3>
+        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+          🧪 Sandbox — free, no real USDC
+        </span>
       </div>
 
       {/* Agent slug */}
@@ -182,7 +180,7 @@ export function TryIt() {
       {/* Run button */}
       <button
         onClick={handleRun}
-        disabled={loading || !apiKey || !slug}
+        disabled={loading || !slug}
         className="rounded-lg bg-avax-500 px-5 py-2 text-sm font-semibold text-white hover:bg-avax-600 disabled:opacity-50 transition"
       >
         {loading ? '…' : `${t('tryItRun')} ▶`}
