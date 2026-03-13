@@ -26,11 +26,11 @@ const SIGN: Parameters<typeof CodeBlock>[0]['tabs'] = [
     label: 'pay.ts',
     language: 'javascript',
     code: `import { createWalletClient, http, parseUnits } from 'viem'
-import { avalancheFuji } from 'viem/chains'
+import { avalanche } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 
 const MARKETPLACE = '0x9d8Eb04Df6Bd271491Bcdbb96b81Ab3103C0CD8E'
-const USDC_FUJI   = '0x5425890298aed601595a70AB815c96711a31Bc65'
+const USDC_MAINNET = '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
 
 export async function signERC3009Payment({
   walletClient,
@@ -47,8 +47,8 @@ export async function signERC3009Payment({
     domain: {
       name: 'USD Coin',
       version: '2',
-      chainId: 43113, // Avalanche Fuji
-      verifyingContract: USDC_FUJI,
+      chainId: 43114, // Avalanche C-Chain
+      verifyingContract: USDC_MAINNET,
     },
     types: {
       TransferWithAuthorization: [
@@ -81,11 +81,11 @@ export async function signERC3009Payment({
 
 const CONTRACTS: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
-    label: 'Contratos Fuji',
+    label: 'Contratos Mainnet',
     language: 'bash',
-    code: `# Avalanche Fuji Testnet (chainId: 43113)
+    code: `# Avalanche C-Chain (chainId: 43114)
 Marketplace: 0x9d8Eb04Df6Bd271491Bcdbb96b81Ab3103C0CD8E
-USDC Fuji:   0x5425890298aed601595a70AB815c96711a31Bc65`,
+USDC:        0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E`,
   },
 ]
 
@@ -137,7 +137,7 @@ export function X402Section() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Fuji Testnet Contracts</h3>
+        <h3 className="text-base font-semibold text-gray-800">Mainnet Contracts</h3>
         <CodeBlock tabs={CONTRACTS} />
       </div>
     </section>

@@ -26,7 +26,7 @@ const provider = await CdpWalletProvider.configureWithWallet({
 
 const agentAddress = provider.getAddress()
 console.log('Agent wallet:', agentAddress)
-// Asegúrate de tener USDC Fuji en esta dirección`,
+// Asegúrate de tener USDC en esta dirección`,
   },
 ]
 
@@ -49,7 +49,7 @@ async function main() {
   const payment = await signERC3009Payment({
     walletClient,
     from:      agentAddress,
-    to:        '0x9d8Eb04Df6Bd271491Bcdbb96b81Ab3103C0CD8E', // Marketplace Fuji
+    to:        '0x9d8Eb04Df6Bd271491Bcdbb96b81Ab3103C0CD8E', // Marketplace Mainnet
     priceUsdc: agent.price_usdc,
   })
 
@@ -81,8 +81,8 @@ const PREREQS: Parameters<typeof CodeBlock>[0]['tabs'] = [
 CDP_API_KEY_ID=your_cdp_key_id
 CDP_API_KEY_SECRET=your_cdp_key_secret
 
-# La wallet CDP necesita USDC en Avalanche Fuji Testnet
-# Faucet: faucet.avax.network (seleccionar Fuji + ERC-20 USDC)`,
+# La wallet CDP necesita USDC en Avalanche C-Chain
+# Red: Avalanche C-Chain (chainId 43114)`,
   },
 ]
 
@@ -124,7 +124,7 @@ export function AgentKitSection() {
               portal.cdp.coinbase.com
             </a>
           </li>
-          <li>Fund the wallet with <strong>USDC Fuji Testnet</strong> (Avalanche Fuji, chainId 43113)</li>
+          <li>Fund the wallet with <strong>USDC Mainnet (Avalanche C-Chain, chainId 43114)</li>
           <li>Clona el ejemplo completo del repo</li>
         </ol>
         <CodeBlock tabs={PREREQS} />
