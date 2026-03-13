@@ -212,8 +212,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const validationError = validateSteps(body?.steps)
   if (validationError) {
+    // AC-3 WAS-187: capability+agent_slug juntos → ambiguous_step
+    const code = validationError.includes('mutually exclusive') ? 'ambiguous_step' : 'validation_error'
     return NextResponse.json(
-      { error: validationError, code: 'validation_error' },
+      { error: validationError, code },
       { status: 400 },
     )
   }
@@ -273,10 +275,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       )
 
       if (!discovered) {
-        // Intentar fallback_slug
+        // Intentar fallback_slug (WAS-187 AC-6: cargar de DB si no está en mapa)
         if (step.fallback_slug) {
-          const fbAgent = agentMap.get(step.fallback_slug)
-          if (fbAgent) {
+          let fbAgent = agentMap.get(step.fallback_slug)
+          if (!fbAgent) {
+            const { data: fbData } = await supabase
+              .from('agents')
+              .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema')
+              .eq('slug', step.fallback_slug)
+              .eq('status', 'active')
+              .single<AgentRow>()
+            if (fbData) {
+              agentMap.set(fbData.slug, fbData)
+              fbAgent = fbData
+            }
+          }
+          if (fbAgent && isAgentInScope(fbAgent.slug, fbAgent.category, keyRow.allowed_slugs, keyRow.allowed_categories)) {
             steps[i] = { ...step, agent_slug: step.fallback_slug }
             resolvedSlugs.set(i, step.fallback_slug)
             continue
@@ -293,25 +307,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       steps[i] = { ...step, agent_slug: discovered.slug }
       resolvedSlugs.set(i, discovered.slug)
     }
-  }
-
-  // ── [4] PREFLIGHT DE SALDO ────────────────────────────────────────────────
-  const totalRequired = steps.reduce(
-    (acc, s) => acc + (agentMap.get(s.agent_slug ?? '')?.price_per_call ?? 0),
-    0,
-  )
-  const available = keyRow.budget_usdc - keyRow.spent_usdc
-
-  if (available < totalRequired) {
-    return NextResponse.json(
-      {
-        error:          'Insufficient balance',
-        code:           'insufficient_balance',
-        required_usdc:  totalRequired.toFixed(6),
-        available_usdc: available.toFixed(6),
-      },
-      { status: 402 },
-    )
   }
 
   // ── RETRY MODE (WAS-204) ─────────────────────────────────────────────────
@@ -362,6 +357,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     resumedFromStep = startFrom
+  }
+
+  // ── [4] PREFLIGHT DE SALDO ────────────────────────────────────────────────
+  // WAS-204: en retry, solo contar steps desde start_from_step en adelante
+  const pendingSteps = resumedFromStep !== undefined
+    ? steps.slice(resumedFromStep)
+    : steps
+  const totalRequired = pendingSteps.reduce(
+    (acc, s) => acc + (agentMap.get(s.agent_slug ?? '')?.price_per_call ?? 0),
+    0,
+  )
+  const available = keyRow.budget_usdc - keyRow.spent_usdc
+
+  if (available < totalRequired) {
+    return NextResponse.json(
+      {
+        error:          'Insufficient balance',
+        code:           'insufficient_balance',
+        required_usdc:  totalRequired.toFixed(6),
+        available_usdc: available.toFixed(6),
+      },
+      { status: 402 },
+    )
   }
 
   // ── [5] SSRF PREFLIGHT (todos los endpoints antes de ejecutar) ────────────

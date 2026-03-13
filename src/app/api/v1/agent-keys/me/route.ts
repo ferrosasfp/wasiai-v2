@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
     last_used_at: keyRow.last_used_at,
     created_at: keyRow.created_at,
     identity: keyRow.erc8004_identity ?? null, // ERC-8004 on-chain identity
+    allowed_slugs:      keyRow.allowed_slugs ?? null,      // WAS-186 AC-7
+    allowed_categories: keyRow.allowed_categories ?? null, // WAS-186 AC-7
     status: !keyRow.is_active
       ? 'inactive'
       : remaining === 0
