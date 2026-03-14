@@ -570,7 +570,8 @@
     "scopeAllowedCategoriesPh": "e.g. nlp, defi",
     "scopeFullAccess": "Full access",
     "keyShareWarning": "Never share this key. Anyone who has it can spend your balance.",
-    "closeWithdrawBtn": "Withdraw & close key"
+    "closeWithdrawBtn": "Withdraw & close key",
+    "closeKeyRequiresWallet": "Only the depositor wallet can close this key: {wallet}"
   },
   "editAgent": {
     "backToDashboard": "← Back to Dashboard",

@@ -570,7 +570,8 @@
     "scopeAllowedCategoriesPh": "ej: nlp, defi",
     "scopeFullAccess": "Acceso total",
     "keyShareWarning": "Nunca compartas esta key. Quien la tenga puede gastar tu balance.",
-    "closeWithdrawBtn": "Retirar y cerrar key"
+    "closeWithdrawBtn": "Retirar y cerrar key",
+    "closeKeyRequiresWallet": "Solo la wallet depositante puede cerrar esta key: {wallet}"
   },
   "editAgent": {
     "backToDashboard": "← Volver al Dashboard",

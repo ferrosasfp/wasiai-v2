@@ -860,7 +860,7 @@ export default function AgentKeysPage() {
                           {/* Withdraw + Close Key — solo la wallet owner */}
                           {(() => {
                             const isOwnerWallet = !key.owner_wallet_address ||
-                              key.owner_wallet_address.toLowerCase() === address.toLowerCase()
+                              (!!address && key.owner_wallet_address.toLowerCase() === address.toLowerCase())
                             const ownerShort = key.owner_wallet_address
                               ? `${key.owner_wallet_address.slice(0,6)}…${key.owner_wallet_address.slice(-4)}`
                               : ''
@@ -883,7 +883,7 @@ export default function AgentKeysPage() {
                                     </div>
                                   )
                                 )}
-                                {isOwnerWallet ? (
+                                {(available === 0 || isOwnerWallet) ? (
                                   <button
                                     onClick={() => setCloseKey({ id: key.id, name: key.name, balance: available, keyHash: key.key_hash ?? '' })}
                                     className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
@@ -893,7 +893,7 @@ export default function AgentKeysPage() {
                                 ) : (
                                   <div
                                     className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-400 cursor-not-allowed"
-                                    title={`Solo puede cerrar ${ownerShort}`}
+                                    title={t('closeKeyRequiresWallet', { wallet: ownerShort })}
                                   >
                                     🔒 {t('closeKey')}
                                   </div>
