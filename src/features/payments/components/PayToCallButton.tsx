@@ -5,7 +5,9 @@ import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { CopyableOutput } from '@/components/ui/CopyableOutput'
 
 function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
-  if (!schema || schema.type !== 'object') return ''
+  if (!schema) return ''
+  if (schema.type === 'string') return schema.description ? `e.g. ${schema.description}` : 'Write your input here...'
+  if (schema.type !== 'object') return ''
   const props = schema.properties as Record<string, Record<string, unknown>> | undefined
   if (!props) return ''
   const example: Record<string, unknown> = {}
