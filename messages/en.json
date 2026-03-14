@@ -591,7 +591,8 @@
     "inputSchemaDesc": "JSON Schema draft-07 to validate inputs. Users will see it on the agent page.",
     "outputSchemaLabel": "Output Schema",
     "outputSchemaOptional": "(optional)",
-    "outputSchemaDesc": "JSON Schema draft-07 to validate agent outputs. If the agent returns invalid output, the call is refunded."
+    "outputSchemaDesc": "JSON Schema draft-07 to validate agent outputs. If the agent returns invalid output, the call is refunded.",
+    "invalidJsonSchema": "Invalid JSON — check the syntax"
   },
   "payToCall": {
     "connectWallet": "Connect Wallet to Call",

@@ -103,13 +103,12 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
     // Validar JSON raw de schemas antes de enviar
     if (inputSchemaRaw.trim()) {
       try { JSON.parse(inputSchemaRaw) }
-      catch { setErrors({ input_schema: 'JSON inválido — revisa la sintaxis' }); return }
+      catch { setErrors({ input_schema: t('invalidJsonSchema') }); return }
     }
     if (outputSchemaRaw.trim()) {
       try { JSON.parse(outputSchemaRaw) }
-      catch { setErrors({ output_schema: 'JSON inválido — revisa la sintaxis' }); return }
+      catch { setErrors({ output_schema: t('invalidJsonSchema') }); return }
     }
-    // Sincronizar raw → form antes del safeParse
     if (inputSchemaRaw.trim()) {
       try { form.input_schema = JSON.parse(inputSchemaRaw) } catch { /* handled above */ }
     }
