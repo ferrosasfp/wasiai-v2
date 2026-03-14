@@ -446,6 +446,9 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
   const [errorMsg, setErrorMsg] = useState('')
   const [result, setResult]     = useState<{ txHash: string | null; refundedUsdc: number } | null>(null)
 
+  const { isReady }        = useUnifiedWalletClient()
+  const { address, chain } = useWallet()
+
   async function handleClose() {
     setErrorMsg('')
     try {
@@ -453,6 +456,14 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
 
       // Si hay fondos: retirar on-chain primero (usuario firma withdrawKey)
       if (balance > 0) {
+        if (!isReady || !address) {
+          setErrorMsg(t('errorWalletNotConnected'))
+          return
+        }
+        if (chain?.id !== CHAIN_ID) {
+          setErrorMsg(t('errorWrongNetwork', { network: CHAIN_ID === 43114 ? 'Avalanche C-Chain' : 'Avalanche Fuji Testnet' }))
+          return
+        }
         setStatus('signing')
         const bytes32KeyId = keyHashToBytes32(keyHash)
         const atomicAmount = BigInt(Math.round(balance * 1_000_000))
@@ -507,7 +518,7 @@ function CloseKeyModal({ keyId, keyName, balance, keyHash, onClose, onSuccess }:
   const statusLabel = status === 'signing' ? t('closeSigningLabel')
     : status === 'withdrawing' ? t('closeWithdrawingLabel')
     : status === 'closing' ? t('closeClosingLabel')
-    : balance > 0 ? 'Retirar y cerrar key' : t('close.confirmBtn')
+    : balance > 0 ? t('closeWithdrawBtn') : t('close.confirmBtn')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">

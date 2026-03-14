@@ -569,7 +569,8 @@
     "scopeAllowedCategories": "Categorías permitidas (separadas por coma)",
     "scopeAllowedCategoriesPh": "ej: nlp, defi",
     "scopeFullAccess": "Acceso total",
-    "keyShareWarning": "Nunca compartas esta key. Quien la tenga puede gastar tu balance."
+    "keyShareWarning": "Nunca compartas esta key. Quien la tenga puede gastar tu balance.",
+    "closeWithdrawBtn": "Retirar y cerrar key"
   },
   "editAgent": {
     "backToDashboard": "← Volver al Dashboard",
