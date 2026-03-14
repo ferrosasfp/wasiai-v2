@@ -48,6 +48,14 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         errs.input_schema = t('step3SchemaRequiredError')
       }
     }
+    if (inputSchemaRaw.trim()) {
+      try { JSON.parse(inputSchemaRaw) }
+      catch { errs.input_schema = t('invalidJsonSchema') }
+    }
+    if (outputSchemaRaw.trim()) {
+      try { JSON.parse(outputSchemaRaw) }
+      catch { errs.output_schema = t('invalidJsonSchema') }
+    }
     if (Object.keys(errs).length > 0) {
       setLocalErrors(errs)
       return

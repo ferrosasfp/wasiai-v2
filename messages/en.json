@@ -293,7 +293,8 @@
     "step3TestNote": "Production timeout may vary depending on server load.",
     "step3HttpMethod": "HTTP Method",
     "step3AuthLabel": "Authorization header",
-    "step3AuthPlaceholder": "Bearer sk-..."
+    "step3AuthPlaceholder": "Bearer sk-...",
+    "invalidJsonSchema": "Invalid JSON — check the syntax"
   },
   "dashboard": {
     "title": "Creator Dashboard",
