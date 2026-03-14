@@ -21,7 +21,9 @@ interface AgentOption {
 
 /** Genera un ejemplo de input a partir del JSON Schema del agente */
 function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
-  if (!schema || schema.type !== 'object') return '{"prompt": "Hola, agente!"}'
+  if (!schema) return 'Hello, agent!'
+  if (schema.type === 'string') return schema.description ? `<${schema.description}>` : 'Write your input here...'
+  if (schema.type !== 'object') return 'Hello, agent!'
   const props = schema.properties as Record<string, Record<string, unknown>> | undefined
   if (!props) return '{"prompt": "Hola, agente!"}'
 
@@ -76,6 +78,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
   const [totalCalls, setTotalCalls]       = useState<number>(0)
   const [loading, setLoading]             = useState(false)
   const [result, setResult]               = useState<SandboxInvokeResponse | null>(null)
+  const [copied, setCopied]               = useState(false)
   const [errorMsg, setErrorMsg]           = useState<string | null>(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
   const [anonLimitHit, setAnonLimitHit]   = useState(false)
@@ -315,9 +318,21 @@ export function SandboxClient({ userId }: { userId: string | null }) {
                 <span>{t('resultRemaining')} <span className="text-[#E84142] font-medium">{formatUsdc(result.balance_remaining)}</span></span>
               </div>
             </div>
-            <pre className="text-xs text-gray-800 bg-gray-50 border border-gray-100 rounded-xl p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono">
-              {JSON.stringify(result.result, null, 2)}
-            </pre>
+            <div className="relative">
+              <pre className="text-xs text-gray-800 bg-gray-50 border border-gray-100 rounded-xl p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono">
+                {JSON.stringify(result.result, null, 2)}
+              </pre>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(result.result, null, 2))
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+                className="absolute top-2 right-2 text-xs text-gray-400 hover:text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1 transition-colors"
+              >
+                {copied ? '✓ Copied' : 'Copy'}
+              </button>
+            </div>
             <p className="text-xs text-gray-400 font-mono">
               ID: {result.call_id.slice(0, 8)}…
             </p>
