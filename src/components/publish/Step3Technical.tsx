@@ -17,6 +17,12 @@ interface Props {
 export function Step3Technical({ data, onChange, errors, onPublish, onBack, publishing }: Props) {
   const t = useTranslations('publish')
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({})
+  const [inputSchemaRaw, setInputSchemaRaw] = useState(
+    data.input_schema && typeof data.input_schema === 'object' ? JSON.stringify(data.input_schema, null, 2) : ''
+  )
+  const [outputSchemaRaw, setOutputSchemaRaw] = useState(
+    data.output_schema && typeof data.output_schema === 'object' ? JSON.stringify(data.output_schema, null, 2) : ''
+  )
   const [testResult, setTestResult] = useState<{
     ok: boolean
     status?: number
@@ -213,12 +219,13 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
             <p className="mb-2 text-xs text-gray-400">{t('step3SchemaDesc')}</p>
             <textarea
               rows={5}
-              value={typeof data.input_schema === 'object' && data.input_schema !== null ? JSON.stringify(data.input_schema, null, 2) : ''}
+              value={inputSchemaRaw}
               onChange={e => {
-                const val = e.target.value.trim()
-                if (!val) { onChange('input_schema', null); return }
+                const val = e.target.value
+                setInputSchemaRaw(val)
+                if (!val.trim()) { onChange('input_schema', null); return }
                 try { onChange('input_schema', JSON.parse(val)) }
-                catch { onChange('input_schema', val) }
+                catch { /* esperar JSON válido */ }
               }}
               placeholder={'{\n  "type": "object",\n  "required": ["query"],\n  "properties": {\n    "query": { "type": "string" }\n  }\n}'}
               className={`w-full rounded-xl border px-4 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-avax-100 ${
@@ -245,12 +252,13 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         <p className="mb-2 text-xs text-gray-400">{t('outputSchemaDesc')}</p>
         <textarea
           rows={5}
-          value={typeof data.output_schema === 'object' && data.output_schema !== null ? JSON.stringify(data.output_schema, null, 2) : ''}
+          value={outputSchemaRaw}
           onChange={e => {
-            const val = e.target.value.trim()
-            if (!val) { onChange('output_schema', null); return }
+            const val = e.target.value
+            setOutputSchemaRaw(val)
+            if (!val.trim()) { onChange('output_schema', null); return }
             try { onChange('output_schema', JSON.parse(val)) }
-            catch { onChange('output_schema', val) }
+            catch { /* esperar JSON válido */ }
           }}
           placeholder={'{\n  "type": "object",\n  "required": ["result"],\n  "properties": {\n    "result": { "type": "string" }\n  }\n}'}
           className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-avax-100 focus:border-avax-400"

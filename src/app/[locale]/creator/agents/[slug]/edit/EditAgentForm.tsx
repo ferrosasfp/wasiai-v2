@@ -74,6 +74,12 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [outputSchemaRaw, setOutputSchemaRaw] = useState(
+    form.output_schema ? JSON.stringify(form.output_schema, null, 2) : ''
+  )
+  const [inputSchemaRaw, setInputSchemaRaw] = useState(
+    form.input_schema ? JSON.stringify(form.input_schema, null, 2) : ''
+  )
   const [success, setSuccess] = useState(false)
   const { address: walletAddress, isConnected: walletConnected } = useWallet()
 
@@ -380,12 +386,13 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
             <p className="mb-2 text-xs text-gray-400">{t('inputSchemaDesc')}</p>
             <textarea
               rows={6}
-              value={form.input_schema ? JSON.stringify(form.input_schema, null, 2) : ''}
+              value={inputSchemaRaw}
               onChange={e => {
-                const val = e.target.value.trim()
-                if (!val) { handleChange('input_schema', null); return }
+                const val = e.target.value
+                setInputSchemaRaw(val)
+                if (!val.trim()) { handleChange('input_schema', null); return }
                 try { handleChange('input_schema', JSON.parse(val)) }
-                catch { /* JSON inválido — no actualizar hasta que sea válido */ }
+                catch { /* JSON inválido — esperar hasta que sea válido */ }
               }}
               placeholder={'{\n  "type": "object",\n  "required": ["text"],\n  "properties": {\n    "text": { "type": "string" }\n  }\n}'}
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
@@ -400,12 +407,13 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
             <p className="mb-2 text-xs text-gray-400">{t('outputSchemaDesc')}</p>
             <textarea
               rows={6}
-              value={form.output_schema ? JSON.stringify(form.output_schema, null, 2) : ''}
+              value={outputSchemaRaw}
               onChange={e => {
-                const val = e.target.value.trim()
-                if (!val) { handleChange('output_schema', null); return }
+                const val = e.target.value
+                setOutputSchemaRaw(val)
+                if (!val.trim()) { handleChange('output_schema', null); return }
                 try { handleChange('output_schema', JSON.parse(val)) }
-                catch { /* JSON inválido — no actualizar hasta que sea válido */ }
+                catch { /* JSON inválido — esperar hasta que sea válido */ }
               }}
               placeholder={'{\n  "type": "object",\n  "required": ["result"],\n  "properties": {\n    "result": { "type": "string" }\n  }\n}'}
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
