@@ -24,6 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { probeEndpoint } from '@/lib/agents/health-probe'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
@@ -319,8 +320,29 @@ export async function POST(request: NextRequest) {
       .catch(err => logger.error('[register] on-chain failed, agent stays off_chain', { err }))
   }
 
+  // WAS-215: Async health check — only for non-JWT auth (agent_key / open)
+  // JWT creators are trusted → status stays 'active' as set in agentPayload
+  if (authMethod !== 'jwt') {
+    if (agent.endpoint_url) {
+      await serviceClient.from('agents')
+        .update({ health_check: { pending: true } })
+        .eq('id', agent.id)
+      // Fire-and-forget — never awaited
+      probeEndpoint(agent.endpoint_url, agent.id).catch(err =>
+        console.error('[register] probe failed silently', { agentId: agent.id, err: String(err) })
+      )
+    } else {
+      // AC8: no endpoint_url → draft
+      await serviceClient.from('agents')
+        .update({ status: 'draft' })
+        .eq('id', agent.id)
+    }
+  }
+
   return NextResponse.json({
-    message:    'Agent registered successfully',
+    message: authMethod !== 'jwt' && agent.endpoint_url
+      ? 'Agent registered. Verifying your endpoint... Check status_url in a few seconds.'
+      : 'Agent registered successfully',
     verified:   false,  // verified after WasiAI review
     agent: {
       id:             agent.id,
@@ -341,6 +363,12 @@ export async function POST(request: NextRequest) {
       status:  'pending',
       message: 'Your agent is live. WasiAI will verify the endpoint within 24h for the Verified badge.',
     },
+    health_check: authMethod !== 'jwt'
+      ? (agent.endpoint_url ? { pending: true } : null)
+      : undefined,
+    status_url: authMethod !== 'jwt'
+      ? `GET /api/v1/agents/${agent.slug}/status`
+      : undefined,
     docs: 'https://wasiai.io/docs/agents/register',
   }, { status: 201 })
 }

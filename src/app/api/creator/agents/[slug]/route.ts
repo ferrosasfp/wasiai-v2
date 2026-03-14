@@ -6,6 +6,7 @@
  * Soft-delete: marks status = 'deleted' to preserve call history.
  */
 import { type NextRequest, NextResponse } from 'next/server'
+import { probeEndpoint } from '@/lib/agents/health-probe'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
 import { createModelSchema } from '@/lib/schemas/model.schema'
@@ -73,6 +74,16 @@ export async function PATCH(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // WAS-215: Re-verify endpoint when endpoint_url changes
+  if (result.data.endpoint_url) {
+    await serviceClient.from('agents')
+      .update({ health_check: { pending: true }, status: 'reviewing' })
+      .eq('id', existing.id)
+    probeEndpoint(result.data.endpoint_url, existing.id).catch(err =>
+      console.error('[patch-agent] re-probe failed silently', { agentId: existing.id, err: String(err) })
+    )
+  }
 
   // WAS-161: Return registration_type so client knows if on-chain sync is needed
   return NextResponse.json({ agent })
