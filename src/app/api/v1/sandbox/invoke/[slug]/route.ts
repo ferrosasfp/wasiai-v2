@@ -163,10 +163,11 @@ export async function POST(
     // body vacío — usar input vacío
   }
 
-  if (agent.input_schema && body?.input) {
-    const inputVal = typeof body.input === 'string'
-      ? (() => { try { return JSON.parse(body.input) } catch { return body.input } })()
-      : body.input
+  if (agent.input_schema) {
+    const rawInput = body?.input ?? {}
+    const inputVal = typeof rawInput === 'string'
+      ? (() => { try { return JSON.parse(rawInput) } catch { return rawInput } })()
+      : rawInput
     const validErr = validateInput(agent.input_schema, inputVal)
     if (validErr) {
       return NextResponse.json(

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/v1/agent-keys/me
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const hash = createHash('sha256').update(rawKey).digest('hex')
 
   const { data: keyRow } = await supabase

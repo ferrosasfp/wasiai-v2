@@ -210,17 +210,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
   }
 
-  const validationError = validateSteps(body?.steps)
-  if (validationError) {
-    // AC-3 WAS-187: capability+agent_slug juntos → ambiguous_step
-    const code = validationError.includes('mutually exclusive') ? 'ambiguous_step' : 'validation_error'
-    return NextResponse.json(
-      { error: validationError, code },
-      { status: 400 },
-    )
+  // WAS-204: en retry mode, steps[] es opcional — se recuperan del pipeline original
+  const isRetryMode = !!(body.pipeline_id && body.start_from_step !== undefined)
+
+  if (!isRetryMode) {
+    const validationError = validateSteps(body?.steps)
+    if (validationError) {
+      // AC-3 WAS-187: capability+agent_slug juntos → ambiguous_step
+      const code = validationError.includes('mutually exclusive') ? 'ambiguous_step' : 'validation_error'
+      return NextResponse.json(
+        { error: validationError, code },
+        { status: 400 },
+      )
+    }
   }
 
-  const steps = body.steps
+  const steps = body.steps ?? []
 
   // ── [3] RESOLVER AGENTES ─────────────────────────────────────────────────
   const agentMap = new Map<string, AgentRow>()
