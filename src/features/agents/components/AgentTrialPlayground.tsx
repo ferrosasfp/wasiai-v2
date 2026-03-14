@@ -7,11 +7,35 @@ import { useTranslations } from 'next-intl'
 interface Props {
   slug: string
   isAuthenticated: boolean
+  inputSchema?: Record<string, unknown> | null
+}
+
+function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
+  if (!schema || schema.type !== 'object') return ''
+  const props = schema.properties as Record<string, Record<string, unknown>> | undefined
+  if (!props) return ''
+  const example: Record<string, unknown> = {}
+  for (const [key, def] of Object.entries(props)) {
+    if (def.type === 'string') {
+      example[key] = def.enum && Array.isArray(def.enum)
+        ? (def.default ?? def.enum[0])
+        : (def.description ? `<${def.description}>` : `<${key}>`)
+    } else if (def.type === 'number' || def.type === 'integer') {
+      example[key] = 0
+    } else if (def.type === 'boolean') {
+      example[key] = true
+    } else if (def.type === 'array') {
+      example[key] = []
+    } else {
+      example[key] = {}
+    }
+  }
+  return JSON.stringify(example, null, 2)
 }
 
 type TrialState = 'checking' | 'idle' | 'loading' | 'success' | 'error' | 'timeout' | 'used'
 
-export function AgentTrialPlayground({ slug, isAuthenticated }: Props) {
+export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema }: Props) {
   const t = useTranslations('trial')
   const [input, setInput] = useState('')
   const [anonLimitHit, setAnonLimitHit] = useState(false)
@@ -113,7 +137,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated }: Props) {
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder={t('placeholder')}
+                placeholder={buildExampleFromSchema(inputSchema) || t('placeholder')}
                 maxLength={2000}
                 rows={3}
                 disabled={state === 'loading'}

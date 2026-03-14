@@ -2,6 +2,27 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
+
+function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
+  if (!schema || schema.type !== 'object') return ''
+  const props = schema.properties as Record<string, Record<string, unknown>> | undefined
+  if (!props) return ''
+  const example: Record<string, unknown> = {}
+  for (const [key, def] of Object.entries(props)) {
+    if (def.type === 'string') {
+      example[key] = def.enum && Array.isArray(def.enum)
+        ? (def.default ?? def.enum[0])
+        : (def.description ? `<${def.description}>` : `<${key}>`)
+    } else if (def.type === 'number' || def.type === 'integer') {
+      example[key] = 0
+    } else if (def.type === 'boolean') {
+      example[key] = true
+    } else {
+      example[key] = {}
+    }
+  }
+  return JSON.stringify(example, null, 2)
+}
 import { WalletConnectModal } from './WalletConnectModal'
 import { useTranslations } from 'next-intl'
 import type { Model } from '@/features/models/types/models.types'
@@ -164,7 +185,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
         <textarea
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder={(model.metadata?.input_hint as string | undefined) ?? t('inputPlaceholder')}
+          placeholder={buildExampleFromSchema(model.input_schema) || (model.metadata?.input_hint as string | undefined) || t('inputPlaceholder')}
           rows={3}
           className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-avax-400 focus:outline-none resize-none"
         />

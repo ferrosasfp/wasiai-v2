@@ -124,6 +124,7 @@ export async function GET(request: NextRequest) {
       agent_type, dependencies,
       price_per_call, currency, chain,
       capabilities, mcp_tool_name, mcp_description,
+      input_schema,
       total_calls, total_revenue,
       on_chain_registered, erc8004_id,
       reputation_score, reputation_count,
@@ -221,6 +222,10 @@ export async function GET(request: NextRequest) {
         score: agent.reputation_score ?? null,
         count: agent.reputation_count ?? 0,
       },
+
+      // Input validation (WAS-200)
+      input_schema: agent.input_schema ?? null,
+      capabilities: agent.capabilities ?? [],
 
       // Stats
       stats: {
