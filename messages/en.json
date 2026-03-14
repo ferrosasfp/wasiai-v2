@@ -266,7 +266,17 @@
     "categoryAudioDesc": "Speech, music, sound processing",
     "categoryCodeDesc": "Code generation, review, automation",
     "categoryMultimodalDesc": "Text + image + audio combined",
-    "categoryDataDesc": "Data analysis, charts, insights"
+    "categoryDataDesc": "Data analysis, charts, insights",
+    "step3SandboxLabel": "Allow Sandbox invocations",
+    "step3SandboxDesc": "Users can test your agent with free sandbox credits.",
+    "step3SandboxNote": "Note: you won't earn USDC from sandbox calls, but your infrastructure costs still apply.",
+    "step3AuthOptional": "(optional)",
+    "step3SchemaLabel": "Input Schema",
+    "step3SchemaOptional": "(optional)",
+    "step3SchemaDesc": "JSON Schema draft-07 to validate inputs. Users will see this schema on the agent page.",
+    "step3SchemaRequired": "⛔ Required — define the schema before publishing.",
+    "step3SchemaWarning": "⚠️ Without Input Schema, inputs won't be validated before charging. Recommended.",
+    "step3SchemaRequiredError": "⛔ Input Schema is required. Define it before publishing."
   },
   "dashboard": {
     "title": "Creator Dashboard",

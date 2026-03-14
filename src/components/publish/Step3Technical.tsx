@@ -39,7 +39,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
     // WAS-200: bloquear si REQUIRE_INPUT_SCHEMA=true y no hay schema
     if (process.env.NEXT_PUBLIC_REQUIRE_INPUT_SCHEMA === 'true') {
       if (!data.input_schema) {
-        errs.input_schema = '⛔ Input Schema es obligatorio. Defínelo antes de publicar.'
+        errs.input_schema = t('step3SchemaRequiredError')
       }
     }
     if (Object.keys(errs).length > 0) {
@@ -165,7 +165,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
       {/* Auth header */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Authorization header <span className="font-normal text-gray-400">(opcional)</span>
+          Authorization header <span className="font-normal text-gray-400">{t('step3AuthOptional')}</span>
         </label>
         <input
           type="password"
@@ -183,10 +183,10 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
       {/* WAS-196: Sandbox opt-in/out */}
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-gray-700">Allow Sandbox invocations</label>
+          <label className="text-sm font-medium text-gray-700">{t('step3SandboxLabel')}</label>
           <p className="text-xs text-gray-400">
-            Users can test your agent with free sandbox credits.<br />
-            Note: you won&apos;t earn USDC from sandbox calls, but your infrastructure costs still apply.
+            {t('step3SandboxDesc')}<br />
+            {t('step3SandboxNote')}
           </p>
         </div>
         <button
@@ -205,12 +205,12 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         return (
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Input Schema{' '}
+              {t('step3SchemaLabel')}{' '}
               {required
                 ? <span className="text-red-500">*</span>
-                : <span className="text-gray-400 font-normal">(opcional)</span>}
+                : <span className="text-gray-400 font-normal">{t('step3SchemaOptional')}</span>}
             </label>
-            <p className="mb-2 text-xs text-gray-400">JSON Schema draft-07 para validar inputs. Los usuarios verán este schema en la ficha del agente.</p>
+            <p className="mb-2 text-xs text-gray-400">{t('step3SchemaDesc')}</p>
             <textarea
               rows={5}
               value={typeof data.input_schema === 'object' && data.input_schema !== null ? JSON.stringify(data.input_schema, null, 2) : ''}
@@ -228,8 +228,8 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
             {!hasSchema && (
               <p className={`mt-1.5 text-xs ${required ? 'text-red-500' : 'text-amber-600'}`}>
                 {required
-                  ? '⛔ Requerido — define el schema antes de publicar.'
-                  : '⚠️ Sin Input Schema los inputs no se validan antes de cobrar. Se recomienda definirlo.'}
+                  ? t('step3SchemaRequired')
+                  : t('step3SchemaWarning')}
               </p>
             )}
           </div>
