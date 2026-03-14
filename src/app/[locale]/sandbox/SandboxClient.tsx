@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { Copy, Check } from 'lucide-react'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface AgentOption {
@@ -328,9 +329,10 @@ export function SandboxClient({ userId }: { userId: string | null }) {
                   setCopied(true)
                   setTimeout(() => setCopied(false), 2000)
                 }}
-                className="absolute top-2 right-2 text-xs text-gray-400 hover:text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1 transition-colors"
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 bg-white border border-gray-200 rounded-lg p-1.5 transition-colors"
+                title="Copy"
               >
-                {copied ? '✓ Copied' : 'Copy'}
+                {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
               </button>
             </div>
             <p className="text-xs text-gray-400 font-mono">
