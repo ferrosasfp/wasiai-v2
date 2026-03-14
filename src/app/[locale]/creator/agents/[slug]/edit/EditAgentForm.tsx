@@ -75,6 +75,11 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [tagsRaw, setTagsRaw] = useState(
+    Array.isArray((agent as Record<string, unknown>).tags)
+      ? ((agent as Record<string, unknown>).tags as string[]).join(', ')
+      : ''
+  )
   const [outputSchemaRaw, setOutputSchemaRaw] = useState(
     form.output_schema ? JSON.stringify(form.output_schema, null, 2) : ''
   )
@@ -452,7 +457,8 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
               type="text"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               placeholder="oracle, defi, price-feed"
-              defaultValue={Array.isArray(form.tags) ? form.tags.join(', ') : ''}
+              value={tagsRaw}
+              onChange={e => setTagsRaw(e.target.value)}
               onBlur={e => {
                 const arr = e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
                 setForm(prev => ({ ...prev, tags: arr }))
