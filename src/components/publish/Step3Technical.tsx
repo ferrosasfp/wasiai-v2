@@ -23,6 +23,9 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
   const [outputSchemaRaw, setOutputSchemaRaw] = useState(
     data.output_schema && typeof data.output_schema === 'object' ? JSON.stringify(data.output_schema, null, 2) : ''
   )
+  const [tagsRaw, setTagsRaw] = useState(
+    Array.isArray(data.tags) ? data.tags.join(', ') : ''
+  )
   const [testResult, setTestResult] = useState<{
     ok: boolean
     status?: number
@@ -298,7 +301,8 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
           type="text"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           placeholder="oracle, defi, price-feed"
-          defaultValue={Array.isArray(data.tags) ? data.tags.join(', ') : ''}
+          value={tagsRaw}
+          onChange={e => setTagsRaw(e.target.value)}
           onBlur={e => {
             const arr = e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
             onChange('tags', arr)
