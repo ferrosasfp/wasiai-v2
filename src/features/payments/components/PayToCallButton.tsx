@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, startTransition } from 'react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { CopyableOutput } from '@/components/ui/CopyableOutput'
 
@@ -58,7 +58,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const [input, setInput] = useState('')
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => { startTransition(() => setMounted(true)) }, [])
 
 
   const {

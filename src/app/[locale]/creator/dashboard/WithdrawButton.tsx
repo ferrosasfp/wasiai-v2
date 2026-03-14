@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect }      from 'react'
+import { useState, useEffect, startTransition } from 'react'
 import { useTranslations }          from 'next-intl'
 import { useUnifiedWalletClient }   from '@/features/wallet/hooks/useUnifiedWalletClient'
 import { useWallet }               from '@/features/wallet/hooks/useWallet'
@@ -27,7 +27,7 @@ export function WithdrawButton({ pending, hasWallet, walletAddress }: Props) {
 
   // Avoid hydration mismatch — wallet state only known client-side
   const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  useEffect(() => { startTransition(() => setMounted(true)) }, [])
 
   const [status, setStatus]   = useState<'idle' | 'requesting' | 'signing' | 'confirming' | 'success' | 'error'>('idle')
   const [txHash, setTxHash]   = useState('')

@@ -28,7 +28,7 @@ export function UpgradeOnChainButton({ slug, pricePerCall, registrationType, isO
   const [walletError, setWalletError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  React.useEffect(() => { setMounted(true) }, [])
+  React.useEffect(() => { React.startTransition(() => setMounted(true)) }, [])
 
   // AC9: Only show if off-chain AND owner AND wallet connected
   if (!mounted || registrationType !== 'off_chain' || !isOwner || !isConnected || !address) {
