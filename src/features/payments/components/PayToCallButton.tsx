@@ -211,7 +211,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
       </button>
 
       {/* Gasless note */}
-      {ctx.state === 'idle' && ctx.address && (
+      {mounted && ctx.state === 'idle' && ctx.address && (
         <p className="text-center text-xs text-gray-400">{t('gaslessNote')}</p>
       )}
 
