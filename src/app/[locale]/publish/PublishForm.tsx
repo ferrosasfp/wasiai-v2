@@ -179,7 +179,20 @@ export default function PublishForm({ initialDraft, from }: Props) {
       })
       if (!patchRes.ok) {
         const json = await patchRes.json() as Record<string, unknown>
-        setErrors((json.fields as Record<string, string>) ?? { endpoint_url: (json.error as string) ?? t('form.errorSaving') })
+        if (json.fields) {
+          setErrors(json.fields as Record<string, string>)
+        } else {
+          const code = json.code as string | undefined
+          const errMsg = (json.error as string) ?? t('form.errorSaving')
+          if (code === 'invalid_input_schema' || code === 'schema_ssrf_blocked') {
+            setErrors({ input_schema: errMsg })
+          } else if (code === 'invalid_output_schema') {
+            setErrors({ output_schema: errMsg })
+          } else {
+            setErrors({ endpoint_url: errMsg })
+          }
+        }
+        setPublishing(false)
         return
       }
 

@@ -269,6 +269,9 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
       {allErrors.input_schema && (
         <p className="text-sm text-red-500">{allErrors.input_schema}</p>
       )}
+      {allErrors.output_schema && (
+        <p className="text-sm text-red-500">{allErrors.output_schema}</p>
+      )}
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">
