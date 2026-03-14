@@ -139,7 +139,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema }: Pro
                 onChange={e => setInput(e.target.value)}
                 placeholder={buildExampleFromSchema(inputSchema) || t('placeholder')}
                 maxLength={2000}
-                rows={3}
+                rows={6}
                 disabled={state === 'loading'}
                 className="w-full border border-gray-200 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 disabled:opacity-50"
               />

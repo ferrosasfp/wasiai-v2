@@ -251,7 +251,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
             </label>
             <textarea
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142] font-mono resize-none"
-              rows={4}
+              rows={6}
               placeholder={buildExampleFromSchema(selectedAgent?.input_schema)}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
