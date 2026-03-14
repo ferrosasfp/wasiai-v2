@@ -634,8 +634,8 @@ export default function AgentKeysPage() {
   const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
   const [withdrawKey, setWithdrawKey] = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
 
-  const loadKeys = useCallback(() => {
-    fetch('/api/agent-keys')
+  const loadKeys = useCallback((bustCache = false) => {
+    fetch('/api/agent-keys', bustCache ? { headers: { 'Cache-Control': 'no-cache' } } : undefined)
       .then(res => res.ok ? res.json() : [])
       .then(data => { setKeys(data); setLoading(false) })
       .catch(() => setLoading(false))
@@ -660,7 +660,7 @@ export default function AgentKeysPage() {
       const created = await res.json()
       setNewKey(created)
       setShowForm(false)
-      loadKeys()
+      loadKeys(true)
     }
     setCreating(false)
   }
@@ -945,7 +945,7 @@ Content-Type: application/json
           balance={withdrawKey.balance}
           keyHash={withdrawKey.keyHash}
           onClose={() => setWithdrawKey(null)}
-          onSuccess={() => { setWithdrawKey(null); setTimeout(loadKeys, 1500) }}
+          onSuccess={() => { setWithdrawKey(null); setTimeout(() => loadKeys(true), 1500) }}
         />
       )}
 
@@ -957,7 +957,7 @@ Content-Type: application/json
           onClose={() => setDepositKey(null)}
           onSuccess={() => {
             setDepositKey(null)
-            setTimeout(loadKeys, 1500)
+            setTimeout(() => loadKeys(true), 1500)
           }}
         />
       )}
@@ -972,7 +972,7 @@ Content-Type: application/json
           onClose={() => setCloseKey(null)}
           onSuccess={() => {
             setCloseKey(null)
-            loadKeys()
+            loadKeys(true)
           }}
         />
       )}
