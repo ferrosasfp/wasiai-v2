@@ -37,6 +37,7 @@ const NAV_GROUPS = [
   {
     groupKey: 'forCreators',
     items: [
+      { id: 'agent-registration', key: 'agentRegistration' },
       { id: 'creator-guide', key: 'creatorGuide'},
       { id: 'agentkit',      key: 'agentkit'    },
       { id: 'creator-cli',   key: 'creatorCli'  },

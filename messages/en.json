@@ -430,7 +430,8 @@
     "subtitle": "Everything you need to build with WasiAI.",
     "discovery": "Agent Discovery",
     "collections": "Collections",
-    "creatorCli": "Creator CLI"
+    "creatorCli": "Creator CLI",
+    "agentRegistration": "Agent Registration (A2A)"
   },
   "codeExamples": {
     "title": "How to use",

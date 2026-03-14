@@ -8,6 +8,7 @@ import { ErrorsSection } from '@/features/docs/content/errors'
 import { X402Section }        from '@/features/docs/content/x402'
 import { ComposeSection }     from '@/features/docs/content/compose'
 import { AgentKeysSection }   from '@/features/docs/content/agent-keys'
+import { AgentRegistrationSection } from '@/features/docs/content/agent-registration'
 import { CreatorGuideSection } from '@/features/docs/content/creator-guide'
 import { AgentKitSection }    from '@/features/docs/content/agentkit'
 import { PricingSection }     from '@/features/docs/content/pricing'
@@ -63,6 +64,9 @@ export default function DocsPage() {
       </div>
       <div className="border-t border-gray-100 pt-8">
         <AgentKeysSection />
+      </div>
+      <div className="border-t border-gray-100 pt-8">
+        <AgentRegistrationSection />
       </div>
       <div className="border-t border-gray-100 pt-8">
         <CreatorGuideSection />
