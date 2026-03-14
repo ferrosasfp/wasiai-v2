@@ -281,6 +281,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       if (!discovered) {
         // Intentar fallback_slug (WAS-187 AC-6: cargar de DB si no está en mapa)
+        let fallbackOutOfScope = false // declarar DENTRO del bloque del step, no fuera del loop
         if (step.fallback_slug) {
           let fbAgent = agentMap.get(step.fallback_slug)
           if (!fbAgent) {
@@ -295,15 +296,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               fbAgent = fbData
             }
           }
-          if (fbAgent && isAgentInScope(fbAgent.slug, fbAgent.category, keyRow.allowed_slugs, keyRow.allowed_categories)) {
-            steps[i] = { ...step, agent_slug: step.fallback_slug }
-            resolvedSlugs.set(i, step.fallback_slug)
-            continue
+          if (fbAgent) {
+            if (isAgentInScope(fbAgent.slug, fbAgent.category, keyRow.allowed_slugs, keyRow.allowed_categories)) {
+              steps[i] = { ...step, agent_slug: step.fallback_slug }
+              resolvedSlugs.set(i, step.fallback_slug)
+              continue
+            } else {
+              fallbackOutOfScope = true
+            }
           }
         }
         // AC-4: sin match → 422
         return NextResponse.json(
-          { error: `No agent found for capability: ${step.capability}`, code: 'no_agent_match', step: i },
+          { error: `No agent found for capability: ${step.capability}`, code: fallbackOutOfScope ? 'scope_violation' : 'no_agent_match', step: i },
           { status: 422 }
         )
       }
