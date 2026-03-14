@@ -298,10 +298,9 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
           type="text"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           placeholder="oracle, defi, price-feed"
-          value={Array.isArray(data.tags) ? data.tags.join(', ') : (data.tags ?? '')}
-          onChange={e => {
-            const raw = e.target.value
-            const arr = raw.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
+          defaultValue={Array.isArray(data.tags) ? data.tags.join(', ') : ''}
+          onBlur={e => {
+            const arr = e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
             onChange('tags', arr)
           }}
         />

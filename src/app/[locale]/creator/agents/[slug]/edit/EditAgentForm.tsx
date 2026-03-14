@@ -452,8 +452,8 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
               type="text"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               placeholder="oracle, defi, price-feed"
-              value={Array.isArray(form.tags) ? form.tags.join(', ') : ''}
-              onChange={e => {
+              defaultValue={Array.isArray(form.tags) ? form.tags.join(', ') : ''}
+              onBlur={e => {
                 const arr = e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
                 setForm(prev => ({ ...prev, tags: arr }))
               }}
