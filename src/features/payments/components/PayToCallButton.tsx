@@ -33,6 +33,8 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const pendingPayRef = useRef(false)
   const [input, setInput] = useState('')
   const [showWalletModal, setShowWalletModal] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
 
   const {
@@ -174,14 +176,14 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
       {/* CTA */}
       <button
         onClick={handlePayClick}
-        disabled={isDisabled}
+        disabled={!mounted || isDisabled}
         className={`w-full rounded-xl py-3 font-semibold text-white transition disabled:opacity-60 ${
           ctx.state === 'success' ? 'bg-green-600 hover:bg-green-700' :
           ctx.state === 'error'   ? 'bg-red-600 hover:bg-red-700'    :
                                     'bg-avax-500 hover:bg-avax-600'
         }`}
       >
-        {buttonLabel}
+        {mounted ? buttonLabel : t('pay', { price: model.price_per_call })}
       </button>
 
       {/* Gasless note */}
