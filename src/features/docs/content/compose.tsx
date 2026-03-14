@@ -78,8 +78,8 @@ export function ComposeSection() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Compose API</h2>
         <p className="mt-2 text-gray-600">
-          Chain up to <strong>5 agentes</strong> en un único pipeline con un solo request.
-          Soporta ejecución serial y paralela, con paso de output entre pasos.
+          Chain up to <strong>5 agents</strong> in a single pipeline with one request.
+          Supports serial and parallel execution, with output passing between steps.
         </p>
       </div>
 

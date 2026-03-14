@@ -1,23 +1,25 @@
+'use client'
+import { useTranslations } from 'next-intl'
 import { CodeBlock } from '../components/CodeBlock'
 
 const FLOW: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
-    label: 'Flujo x402',
+    label: 'x402 flow',
     language: 'bash',
-    code: `# 1. POST sin header de pago → 402 Payment Required
+    code: `# 1. POST without payment header → 402 Payment Required
 curl -X POST https://app.wasiai.io/api/v1/models/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
   -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'
 # → HTTP 402 + { amount, recipient, chain }
 
-# 2. Firmar ERC-3009 con viem (ver código abajo)
+# 2. Sign ERC-3009 with viem (see code below)
 
-# 3. Re-enviar con X-402-Payment header
+# 3. Retry with X-402-Payment header
 curl -X POST https://app.wasiai.io/api/v1/models/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
   -H "X-402-Payment: <base64_payload>" \\
   -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'
-# → 200 OK + resultado + receipt_signature`,
+# → 200 OK + result + receipt_signature`,
   },
 ]
 
@@ -81,7 +83,7 @@ export async function signERC3009Payment({
 
 const CONTRACTS: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
-    label: 'Contratos Mainnet',
+    label: 'Mainnet Contracts',
     language: 'bash',
     code: `# Avalanche C-Chain (chainId: 43114)
 Marketplace: 0x24be31D0F538C5551c536b09C85907C43c24d062
@@ -90,54 +92,54 @@ USDC:        0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E`,
 ]
 
 export function X402Section() {
+  const t = useTranslations('docs.x402Content')
   return (
     <section id="x402" className="scroll-mt-20 space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">x402 Payments</h2>
         <p className="mt-2 text-gray-600">
-          x402 es un protocolo de micropagos HTTP nativo basado en el código de estado{' '}
-          <code className="bg-gray-100 px-1 rounded text-xs">402 Payment Required</code>.
-          WasiAI lo implementa sobre <strong>Avalanche C-Chain</strong> con <strong>USDC</strong>{' '}
-          usando firmas ERC-3009 (transferWithAuthorization).
+          {t.rich('intro', {
+            code: (c) => <code className="bg-gray-100 px-1 rounded text-xs">{c}</code>,
+            strong: (c) => <strong>{c}</strong>,
+          })}
         </p>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">¿Cuándo se usa?</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('whenTitle')}</h3>
         <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
-          <li>When you invoke an agent <strong>without an Agent Key</strong> — pago on-demand por llamada.</li>
-          <li>For autonomous agents that discover and pay other agents without human intervention.</li>
-          <li>For builds where you prefer not to manage a pre-funded budget.</li>
+          <li>{t.rich('when1', { strong: (c) => <strong>{c}</strong> })}</li>
+          <li>{t('when2')}</li>
+          <li>{t('when3')}</li>
         </ul>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Complete flow</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('flowTitle')}</h3>
         <CodeBlock tabs={FLOW} />
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Firmar ERC-3009 con viem</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('signTitle')}</h3>
         <p className="text-sm text-gray-600">
-          El header <code className="bg-gray-100 px-1 rounded text-xs">X-402-Payment</code> es un JSON Base64
-          con la firma ERC-3009. WasiAI verifica la firma y ejecuta{' '}
-          <code className="bg-gray-100 px-1 rounded text-xs">transferWithAuthorization</code> on-chain.
+          {t.rich('signDesc', {
+            code: (c) => <code className="bg-gray-100 px-1 rounded text-xs">{c}</code>,
+          })}
         </p>
         <CodeBlock tabs={SIGN} />
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Verify the receipt</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('receiptTitle')}</h3>
         <p className="text-sm text-gray-600">
-          Cada respuesta exitosa incluye un{' '}
-          <code className="bg-gray-100 px-1 rounded text-xs">receipt_signature</code>: firma ECDSA del
-          operador WasiAI que confirma la ejecución. Puedes verificarla on-chain contra la dirección del
-          contrato Marketplace.
+          {t.rich('receiptDesc', {
+            code: (c) => <code className="bg-gray-100 px-1 rounded text-xs">{c}</code>,
+          })}
         </p>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Mainnet Contracts</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('contractsTitle')}</h3>
         <CodeBlock tabs={CONTRACTS} />
       </div>
     </section>
