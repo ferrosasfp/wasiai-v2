@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
+import { checkRateLimit, getStatusCheckLimit } from '@/lib/ratelimit'
 
 export async function GET(
   request: NextRequest,
@@ -26,6 +27,13 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid or inactive agent key' }, { status: 401 })
   }
 
+  // Rate limit: prevent scraping/brute-force via x-agent-key
+  const identifier = agentKey.substring(0, 16) // use key prefix as identifier (no full key)
+  const rateLimitResult = await checkRateLimit(getStatusCheckLimit(), identifier)
+  if (rateLimitResult) {
+    return rateLimitResult
+  }
+
   const { slug } = await params
 
   // Lookup agent by slug
@@ -35,13 +43,10 @@ export async function GET(
     .eq('slug', slug)
     .single()
 
-  if (!agent) {
+  // IDOR fix: always 404 when agent not found OR not owned by this key
+  // This prevents revealing existence of agents the caller doesn't own
+  if (!agent || keyRecord.owner_id !== agent.creator_id) {
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
-  }
-
-  // Ownership check
-  if (keyRecord.owner_id !== agent.creator_id) {
-    return NextResponse.json({ error: 'Unauthorized: key does not own this agent' }, { status: 401 })
   }
 
   const response: Record<string, unknown> = {

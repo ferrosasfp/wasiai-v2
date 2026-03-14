@@ -44,8 +44,7 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
     })
     const latency_ms = Date.now() - start
 
-    if (res.ok || res.status < 500) {
-      // 2xx or 3xx/4xx — endpoint is alive
+    if (res.ok) {  // AC2: only 2xx counts as alive
       await updateAgentHealth(serviceClient, agentId, 'active', {
         passed: true,
         latency_ms,
@@ -60,8 +59,7 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
       })
     }
   } catch (err) {
-    const latency_ms = Date.now() - start
-    const isTimeout = latency_ms >= 4_900
+    const isTimeout = err instanceof DOMException && err.name === 'TimeoutError'
     await updateAgentHealth(serviceClient, agentId, 'reviewing', {
       passed: false,
       reason: isTimeout ? 'timeout' : 'connection_error',

@@ -128,6 +128,11 @@ export async function checkRateLimit(
   }
 }
 
+let _statusCheck: Ratelimit | null = null
+export function getStatusCheckLimit() {
+  return _statusCheck ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(60, '1 m'), prefix: 'rl:status-check' })
+}
+
 let _agentSignup: Ratelimit | null = null
 export function getAgentSignupLimit() {
   return _agentSignup ??= new Ratelimit({

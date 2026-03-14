@@ -363,6 +363,9 @@ export async function POST(request: NextRequest) {
       status:  'pending',
       message: 'Your agent is live. WasiAI will verify the endpoint within 24h for the Verified badge.',
     },
+    ...(authMethod !== 'jwt' && {
+      status: agent.endpoint_url ? 'reviewing' : 'draft',
+    }),
     health_check: authMethod !== 'jwt'
       ? (agent.endpoint_url ? { pending: true } : null)
       : undefined,

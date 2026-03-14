@@ -55,7 +55,7 @@ export async function PATCH(
   const serviceClient = createServiceClient()
   const { data: existing } = await serviceClient
     .from('agents')
-    .select('id, creator_id')
+    .select('id, creator_id, last_checked_at')
     .eq('slug', slug)
     .single()
 
@@ -77,12 +77,19 @@ export async function PATCH(
 
   // WAS-215: Re-verify endpoint when endpoint_url changes
   if (result.data.endpoint_url) {
-    await serviceClient.from('agents')
-      .update({ health_check: { pending: true }, status: 'reviewing' })
-      .eq('id', existing.id)
-    probeEndpoint(result.data.endpoint_url, existing.id).catch(err =>
-      console.error('[patch-agent] re-probe failed silently', { agentId: existing.id, err: String(err) })
-    )
+    // Cooldown: max 1 probe per agent per 60s (anti DoS amplifier)
+    const lastChecked = existing.last_checked_at
+      ? new Date(existing.last_checked_at).getTime()
+      : 0
+    const cooldownMs = 60_000
+    if (Date.now() - lastChecked >= cooldownMs) {
+      await serviceClient.from('agents')
+        .update({ health_check: { pending: true }, status: 'reviewing' })
+        .eq('id', existing.id)
+      probeEndpoint(result.data.endpoint_url, existing.id).catch(err =>
+        console.error('[patch-agent] re-probe failed silently', { agentId: existing.id, err: String(err) })
+      )
+    }
   }
 
   // WAS-161: Return registration_type so client knows if on-chain sync is needed
