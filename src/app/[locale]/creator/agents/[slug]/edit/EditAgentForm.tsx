@@ -100,6 +100,23 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
     const capsValid = capabilitiesEditorRef.current?.validate() ?? true
     if (!capsValid) return
 
+    // Validar JSON raw de schemas antes de enviar
+    if (inputSchemaRaw.trim()) {
+      try { JSON.parse(inputSchemaRaw) }
+      catch { setErrors({ input_schema: 'JSON inválido — revisa la sintaxis' }); return }
+    }
+    if (outputSchemaRaw.trim()) {
+      try { JSON.parse(outputSchemaRaw) }
+      catch { setErrors({ output_schema: 'JSON inválido — revisa la sintaxis' }); return }
+    }
+    // Sincronizar raw → form antes del safeParse
+    if (inputSchemaRaw.trim()) {
+      try { form.input_schema = JSON.parse(inputSchemaRaw) } catch { /* handled above */ }
+    }
+    if (outputSchemaRaw.trim()) {
+      try { form.output_schema = JSON.parse(outputSchemaRaw) } catch { /* handled above */ }
+    }
+
     // A-07: Validate with partial schema before sending
     const result = updateSchema.safeParse(form)
     if (!result.success) {
