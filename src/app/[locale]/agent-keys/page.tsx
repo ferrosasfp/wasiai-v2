@@ -722,24 +722,24 @@ export default function AgentKeysPage() {
               </div>
               {/* WAS-186: Scope opcional */}
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
-                <p className="text-xs font-medium text-gray-500">Scope (opcional) — deja vacío para acceso total</p>
+                <p className="text-xs font-medium text-gray-500">{t('scopeOptional')}</p>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Agentes permitidos (slugs, separados por coma)</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">{t('scopeAllowedSlugs')}</label>
                   <input
                     type="text"
                     value={form.allowed_slugs}
                     onChange={e => setForm(p => ({ ...p, allowed_slugs: e.target.value }))}
-                    placeholder="ej: gpt-summarizer, price-checker"
+                    placeholder={t('scopeAllowedSlugsPh')}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:border-avax-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Categorías permitidas (separadas por coma)</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">{t('scopeAllowedCategories')}</label>
                   <input
                     type="text"
                     value={form.allowed_categories}
                     onChange={e => setForm(p => ({ ...p, allowed_categories: e.target.value }))}
-                    placeholder="ej: nlp, defi"
+                    placeholder={t('scopeAllowedCategoriesPh')}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:border-avax-400 focus:outline-none"
                   />
                 </div>
@@ -820,7 +820,7 @@ export default function AgentKeysPage() {
                         {/* Scope (WAS-186) */}
                         <div className="mt-2 flex flex-wrap gap-1 text-xs">
                           {!key.allowed_slugs && !key.allowed_categories ? (
-                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 font-medium">Acceso total</span>
+                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 font-medium">{t('scopeFullAccess')}</span>
                           ) : (
                             <>
                               {key.allowed_slugs && key.allowed_slugs.map(slug => (

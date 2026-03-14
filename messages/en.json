@@ -534,7 +534,13 @@
     "closeFundsReceived": "${amount} USDC sent to your wallet ✓",
     "closeWithFundsBanner": "Before closing, your {amount} USDC will be sent to your wallet automatically.",
     "closeWithFundsGasNote": "You'll need to sign the transaction in your wallet and pay a small network fee in AVAX.",
-    "closeAndReceiveBtn": "Close and receive funds →"
+    "closeAndReceiveBtn": "Close and receive funds →",
+    "scopeOptional": "Scope (optional) — leave empty for full access",
+    "scopeAllowedSlugs": "Allowed agents (slugs, comma-separated)",
+    "scopeAllowedSlugsPh": "e.g. gpt-summarizer, price-checker",
+    "scopeAllowedCategories": "Allowed categories (comma-separated)",
+    "scopeAllowedCategoriesPh": "e.g. nlp, defi",
+    "scopeFullAccess": "Full access"
   },
   "editAgent": {
     "backToDashboard": "← Back to Dashboard",
