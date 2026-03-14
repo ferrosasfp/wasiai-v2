@@ -568,7 +568,8 @@
     "scopeAllowedSlugsPh": "e.g. gpt-summarizer, price-checker",
     "scopeAllowedCategories": "Allowed categories (comma-separated)",
     "scopeAllowedCategoriesPh": "e.g. nlp, defi",
-    "scopeFullAccess": "Full access"
+    "scopeFullAccess": "Full access",
+    "keyShareWarning": "Never share this key. Anyone who has it can spend your balance."
   },
   "editAgent": {
     "backToDashboard": "← Back to Dashboard",

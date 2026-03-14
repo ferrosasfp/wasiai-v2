@@ -684,6 +684,7 @@ export default function AgentKeysPage() {
               <div className="flex-1">
                 <p className="font-semibold text-green-800">{t('keyCreated')}</p>
                 <p className="text-sm text-green-600">{t('keyOnce')}</p>
+                <p className="mt-1 text-xs text-amber-700 font-medium">⚠️ {t('keyShareWarning')}</p>
                 <div className="mt-3 flex items-center gap-2">
                   <code className="flex-1 rounded-lg bg-white border border-green-200 px-3 py-2 text-sm font-mono text-gray-800 break-all">
                     {newKey.raw_key}

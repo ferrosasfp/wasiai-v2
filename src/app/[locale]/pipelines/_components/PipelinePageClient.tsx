@@ -45,6 +45,7 @@ interface AvailableAgent {
   slug:           string
   name:           string
   price_per_call: number
+  input_schema?:  Record<string, unknown> | null
 }
 
 interface PipelinePageClientProps {

@@ -18,6 +18,7 @@ interface AgentRow {
   slug:           string
   name:           string
   price_per_call: number
+  input_schema?:  Record<string, unknown> | null
 }
 
 export default async function PipelinesPage({ params }: Props) {
@@ -37,7 +38,7 @@ export default async function PipelinesPage({ params }: Props) {
   // Cargar agentes activos
   const { data: agentsData } = await supabase
     .from('agents')
-    .select('slug, name, price_per_call')
+    .select('slug, name, price_per_call, input_schema')
     .eq('status', 'active')
     .order('name', { ascending: true })
 
