@@ -36,6 +36,12 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         errs.endpoint_url = 'Debe ser una URL válida (https://...)'
       }
     }
+    // WAS-200: bloquear si REQUIRE_INPUT_SCHEMA=true y no hay schema
+    if (process.env.NEXT_PUBLIC_REQUIRE_INPUT_SCHEMA === 'true') {
+      if (!data.input_schema) {
+        errs.input_schema = '⛔ Input Schema es obligatorio. Defínelo antes de publicar.'
+      }
+    }
     if (Object.keys(errs).length > 0) {
       setLocalErrors(errs)
       return
@@ -192,23 +198,43 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         </button>
       </div>
 
-      {/* WAS-200: Input Schema opcional */}
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Input Schema <span className="text-gray-400 font-normal">(opcional)</span></label>
-        <p className="mb-2 text-xs text-gray-400">JSON Schema draft-07 para validar inputs. Los usuarios verán este schema en la ficha del agente.</p>
-        <textarea
-          rows={5}
-          value={typeof data.input_schema === 'object' && data.input_schema !== null ? JSON.stringify(data.input_schema, null, 2) : ''}
-          onChange={e => {
-            const val = e.target.value.trim()
-            if (!val) { onChange('input_schema', null); return }
-            try { onChange('input_schema', JSON.parse(val)) }
-            catch { onChange('input_schema', val) } // mantener string si no es JSON válido aún
-          }}
-          placeholder={'{\n  "type": "object",\n  "required": ["query"],\n  "properties": {\n    "query": { "type": "string" }\n  }\n}'}
-          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
-        />
-      </div>
+      {/* WAS-200: Input Schema — obligatorio/opcional según env var */}
+      {(() => {
+        const required = process.env.NEXT_PUBLIC_REQUIRE_INPUT_SCHEMA === 'true'
+        const hasSchema = data.input_schema !== null && data.input_schema !== undefined
+        return (
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Input Schema{' '}
+              {required
+                ? <span className="text-red-500">*</span>
+                : <span className="text-gray-400 font-normal">(opcional)</span>}
+            </label>
+            <p className="mb-2 text-xs text-gray-400">JSON Schema draft-07 para validar inputs. Los usuarios verán este schema en la ficha del agente.</p>
+            <textarea
+              rows={5}
+              value={typeof data.input_schema === 'object' && data.input_schema !== null ? JSON.stringify(data.input_schema, null, 2) : ''}
+              onChange={e => {
+                const val = e.target.value.trim()
+                if (!val) { onChange('input_schema', null); return }
+                try { onChange('input_schema', JSON.parse(val)) }
+                catch { onChange('input_schema', val) }
+              }}
+              placeholder={'{\n  "type": "object",\n  "required": ["query"],\n  "properties": {\n    "query": { "type": "string" }\n  }\n}'}
+              className={`w-full rounded-xl border px-4 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-avax-100 ${
+                required && !hasSchema ? 'border-amber-300 focus:border-amber-400' : 'border-gray-200 focus:border-avax-400'
+              }`}
+            />
+            {!hasSchema && (
+              <p className={`mt-1.5 text-xs ${required ? 'text-red-500' : 'text-amber-600'}`}>
+                {required
+                  ? '⛔ Requerido — define el schema antes de publicar.'
+                  : '⚠️ Sin Input Schema los inputs no se validan antes de cobrar. Se recomienda definirlo.'}
+              </p>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Info box */}
       <div className="rounded-xl bg-avax-50 p-4 text-sm text-avax-700">
@@ -218,6 +244,9 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
       {/* General error */}
       {allErrors.general && (
         <p className="text-sm text-red-500">{allErrors.general}</p>
+      )}
+      {allErrors.input_schema && (
+        <p className="text-sm text-red-500">{allErrors.input_schema}</p>
       )}
 
       {/* Actions */}
