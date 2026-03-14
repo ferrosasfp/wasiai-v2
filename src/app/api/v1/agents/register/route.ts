@@ -249,7 +249,10 @@ export async function POST(request: NextRequest) {
     },
   }
 
-  const { data: agent, error: insertError } = await supabase
+  // Use serviceClient for agent insert when no JWT session (agent_key / open auth)
+  // RLS blocks anon client inserts without an active session
+  const insertClient = authMethod === 'jwt' ? supabase : serviceClient
+  const { data: agent, error: insertError } = await insertClient
     .from('agents')
     .insert(agentPayload)
     .select()
