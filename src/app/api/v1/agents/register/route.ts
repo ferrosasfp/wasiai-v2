@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
     authMethod = 'agent_key'
 
     // The owner of the key is the creator of the new agent
+    // WAS-214: creator_profiles PK is `id`, not `user_id`
     const { data: ownerProfile } = await serviceClient
       .from('creator_profiles')
       .select('id, wallet_address')
