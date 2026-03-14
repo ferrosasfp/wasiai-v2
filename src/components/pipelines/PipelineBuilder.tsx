@@ -264,7 +264,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
               {!step.pass_output && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">
-                    Input{index === 0 ? ' (requerido)' : ' (requerido si no encadenas)'}
+                    {index === 0 ? t('stepInputLabel') : t('stepInputLabelOptional')}
                   </label>
                   <textarea
                     value={step.input ?? ''}

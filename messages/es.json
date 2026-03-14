@@ -891,7 +891,9 @@
     "stepUseParallel": "Ejecutar en paralelo con el step anterior",
     "runBtn": "Ejecutar pipeline",
     "chainedNote": "Encadenado — el output del step anterior se pasa como input automáticamente.",
-    "parallelNote": "Paralelo — steps consecutivos marcados así se ejecutan al mismo tiempo."
+    "parallelNote": "Paralelo — steps consecutivos marcados así se ejecutan al mismo tiempo.",
+    "stepInputLabel": "Input (requerido)",
+    "stepInputLabelOptional": "Input (requerido si no encadenas)"
   },
   "sandbox": {
     "title": "Sandbox",
