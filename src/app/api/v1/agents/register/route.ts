@@ -73,6 +73,9 @@ const RegisterAgentSchema = z.object({
   // WAS-200: JSON Schema draft-07 para validar inputs
   input_schema: z.unknown().optional().nullable(),
   output_schema: z.unknown().optional().nullable(),
+
+  // WAS-212: Tags semánticos para discovery
+  tags: z.array(z.string()).optional().default([]),
 })
 
 export async function POST(request: NextRequest) {
@@ -235,6 +238,7 @@ export async function POST(request: NextRequest) {
     ),
     input_schema:  data.input_schema ?? null,
     output_schema: data.output_schema ?? null,
+    tags:          data.tags ?? [],
     metadata: {
       registered_via: authMethod,
       framework:      data.framework,

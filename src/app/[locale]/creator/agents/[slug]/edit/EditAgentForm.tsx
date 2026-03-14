@@ -71,6 +71,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
     sandbox_enabled: (agent.sandbox_enabled as boolean | undefined) ?? true,
     input_schema: (agent as Record<string, unknown>).input_schema as Record<string, unknown> | null ?? null,
     output_schema: (agent as Record<string, unknown>).output_schema as Record<string, unknown> | null ?? null,
+    tags: (agent as Record<string, unknown>).tags as string[] ?? [],
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
@@ -130,7 +131,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
       const res = await fetch(`/api/creator/agents/${agent.slug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...result.data, sandbox_enabled: form.sandbox_enabled, input_schema: form.input_schema, output_schema: form.output_schema }),
+        body: JSON.stringify({ ...result.data, sandbox_enabled: form.sandbox_enabled, input_schema: form.input_schema, output_schema: form.output_schema, tags: form.tags ?? [] }),
       })
 
       if (!res.ok) {
@@ -440,6 +441,23 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
             {errors.output_schema && (
               <p className="mt-1 text-xs text-red-500">{errors.output_schema}</p>
             )}
+          </div>
+
+          {/* WAS-212: Tags */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Tags <span className="text-gray-400 font-normal">(separados por coma)</span>
+            </label>
+            <input
+              type="text"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              placeholder="oracle, defi, price-feed"
+              value={Array.isArray(form.tags) ? form.tags.join(', ') : ''}
+              onChange={e => {
+                const arr = e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
+                setForm(prev => ({ ...prev, tags: arr }))
+              }}
+            />
           </div>
 
           {/* Rate limits */}

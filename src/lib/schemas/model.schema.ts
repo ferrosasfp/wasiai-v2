@@ -74,6 +74,9 @@ export const createModelSchema = z.object({
 
   // WAS-202: Output JSON Schema opcional
   output_schema: z.record(z.string(), z.unknown()).optional().nullable(),
+
+  // WAS-212: Tags semánticos para discovery
+  tags: z.array(z.string().transform(t => t.toLowerCase().trim())).optional().default([]),
 })
 
 export type CreateModelInput = z.infer<typeof createModelSchema>
