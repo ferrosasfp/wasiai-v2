@@ -12,10 +12,8 @@ const AgentSignupSchema = z.object({
 
 export async function POST(request: NextRequest) {
   // 1. Auth check (BEFORE rate limit — don't consume slots for unauthenticated requests)
+  // If AGENT_SIGNUP_KEY is not set, the endpoint is fully open (Option A)
   const signupKey = env.AGENT_SIGNUP_KEY
-  if (process.env.NODE_ENV === 'production' && (!signupKey || signupKey === '')) {
-    return NextResponse.json({ error: 'Endpoint not configured' }, { status: 503 })
-  }
   if (signupKey && signupKey !== '') {
     const providedKey = request.headers.get('x-signup-key') ?? ''
     let keysMatch = false
