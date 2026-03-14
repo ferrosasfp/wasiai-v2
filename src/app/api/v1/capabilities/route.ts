@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
   if (maxPrice !== null) query = query.lte('price_per_call', maxPrice)
   // AC-4: min_reputation stored 0-100 in DB
   if (minReputation !== null) query = query.gte('reputation_score', minReputation * 100)
-  // AC-2: tag filter — ilike sobre cast TEXT para case-insensitive match en arrays TEXT[]
-  if (tag) query = query.ilike('tags', `%${tag}%`)
+  // AC-2: tag filter — contains con tag lowercased (tags se almacenan en lowercase por convención)
+  if (tag) query = query.contains('tags', [tag])
 
   // AC-7: cursor pagination
   if (cursor) {
