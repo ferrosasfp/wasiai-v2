@@ -28,12 +28,12 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
   function handlePublish() {
     const errs: Record<string, string> = {}
     if (!data.endpoint_url || !data.endpoint_url.trim()) {
-      errs.endpoint_url = 'La URL del endpoint es obligatoria'
+      errs.endpoint_url = t('step3EndpointRequired')
     } else {
       try {
         new URL(data.endpoint_url)
       } catch {
-        errs.endpoint_url = 'Debe ser una URL válida (https://...)'
+        errs.endpoint_url = t('step3EndpointInvalid')
       }
     }
     // WAS-200: bloquear si REQUIRE_INPUT_SCHEMA=true y no hay schema
@@ -83,14 +83,14 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
   return (
     <div className="space-y-6 rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Configuración técnica</h2>
-        <p className="mt-1 text-sm text-gray-500">Endpoint de tu API y autenticación</p>
+        <h2 className="text-xl font-bold text-gray-900">{t('step3Title')}</h2>
+        <p className="mt-1 text-sm text-gray-500">{t('step3Subtitle')}</p>
       </div>
 
       {/* Endpoint URL */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          URL del endpoint <span className="text-red-400">*</span>
+          {t('step3EndpointLabel')} <span className="text-red-400">*</span>
         </label>
         <input
           type="url"
@@ -99,7 +99,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
             onChange('endpoint_url', e.target.value)
             if (localErrors.endpoint_url) setLocalErrors(prev => { const e = { ...prev }; delete e.endpoint_url; return e })
           }}
-          placeholder="https://tu-api.com/predict"
+          placeholder={t('step3EndpointPlaceholder')}
           className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
         />
         {allErrors.endpoint_url && (
@@ -133,15 +133,15 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
               : 'bg-red-50 text-red-700 border border-red-200'
           }`}>
             {testResult.ok
-              ? `✅ OK · ${testResult.latencyMs}ms`
+              ? t('step3TestOk', { ms: testResult.latencyMs ?? 0 })
               : testResult.error === 'timeout'
-                ? '❌ No alcanzable (timeout > 5s)'
+                ? t('step3TestTimeout')
                 : testResult.error === 'rate_limit'
-                  ? '⏳ Demasiadas pruebas — espera un momento'
-                  : `⚠️ Error ${testResult.status ?? ''} — ${testResult.error ?? 'verifica tu endpoint'}`
+                  ? t('step3TestRateLimit')
+                  : t('step3TestError', { status: testResult.status ?? '', error: testResult.error ?? '' })
             }
             <p className="mt-1 text-xs opacity-60">
-              El timeout de producción puede variar según la carga del servidor.
+              {t('step3TestNote')}
             </p>
           </div>
         )}
@@ -150,7 +150,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
       {/* HTTP Method */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Método HTTP
+          {t('step3HttpMethod')}
         </label>
         <select
           value={(data as Record<string, unknown>).http_method as string ?? 'POST'}
@@ -165,13 +165,13 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
       {/* Auth header */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Authorization header <span className="font-normal text-gray-400">{t('step3AuthOptional')}</span>
+          {t('step3AuthLabel')} <span className="font-normal text-gray-400">{t('step3AuthOptional')}</span>
         </label>
         <input
           type="password"
           value={(data as Record<string, unknown>).auth_header as string ?? ''}
           onChange={e => onChange('auth_header', e.target.value)}
-          placeholder="Bearer sk-..."
+          placeholder={t('step3AuthPlaceholder')}
           autoComplete="off"
           className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
         />

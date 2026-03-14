@@ -276,7 +276,21 @@
     "step3SchemaDesc": "JSON Schema draft-07 para validar inputs. Los usuarios verán este schema en la ficha del agente.",
     "step3SchemaRequired": "⛔ Requerido — define el schema antes de publicar.",
     "step3SchemaWarning": "⚠️ Sin Input Schema los inputs no se validan antes de cobrar. Se recomienda definirlo.",
-    "step3SchemaRequiredError": "⛔ Input Schema es obligatorio. Defínelo antes de publicar."
+    "step3SchemaRequiredError": "⛔ Input Schema es obligatorio. Defínelo antes de publicar.",
+    "step3Title": "Configuración técnica",
+    "step3Subtitle": "Endpoint de tu API y autenticación",
+    "step3EndpointLabel": "URL del endpoint",
+    "step3EndpointPlaceholder": "https://tu-api.com/predict",
+    "step3EndpointRequired": "La URL del endpoint es obligatoria",
+    "step3EndpointInvalid": "Debe ser una URL válida (https://...)",
+    "step3TestOk": "✅ OK · {ms}ms",
+    "step3TestTimeout": "❌ No alcanzable (timeout > 5s)",
+    "step3TestRateLimit": "⏳ Demasiadas pruebas — espera un momento",
+    "step3TestError": "⚠️ Error {status} — {error}",
+    "step3TestNote": "El timeout de producción puede variar según la carga del servidor.",
+    "step3HttpMethod": "Método HTTP",
+    "step3AuthLabel": "Authorization header",
+    "step3AuthPlaceholder": "Bearer sk-..."
   },
   "dashboard": {
     "title": "Panel del Creator",

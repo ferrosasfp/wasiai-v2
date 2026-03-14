@@ -276,7 +276,21 @@
     "step3SchemaDesc": "JSON Schema draft-07 to validate inputs. Users will see this schema on the agent page.",
     "step3SchemaRequired": "⛔ Required — define the schema before publishing.",
     "step3SchemaWarning": "⚠️ Without Input Schema, inputs won't be validated before charging. Recommended.",
-    "step3SchemaRequiredError": "⛔ Input Schema is required. Define it before publishing."
+    "step3SchemaRequiredError": "⛔ Input Schema is required. Define it before publishing.",
+    "step3Title": "Technical configuration",
+    "step3Subtitle": "Your API endpoint and authentication",
+    "step3EndpointLabel": "Endpoint URL",
+    "step3EndpointPlaceholder": "https://your-api.com/predict",
+    "step3EndpointRequired": "Endpoint URL is required",
+    "step3EndpointInvalid": "Must be a valid URL (https://...)",
+    "step3TestOk": "✅ OK · {ms}ms",
+    "step3TestTimeout": "❌ Not reachable (timeout > 5s)",
+    "step3TestRateLimit": "⏳ Too many tests — wait a moment",
+    "step3TestError": "⚠️ Error {status} — {error}",
+    "step3TestNote": "Production timeout may vary depending on server load.",
+    "step3HttpMethod": "HTTP Method",
+    "step3AuthLabel": "Authorization header",
+    "step3AuthPlaceholder": "Bearer sk-..."
   },
   "dashboard": {
     "title": "Creator Dashboard",
