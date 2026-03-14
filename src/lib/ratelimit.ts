@@ -128,6 +128,15 @@ export async function checkRateLimit(
   }
 }
 
+let _agentSignup: Ratelimit | null = null
+export function getAgentSignupLimit() {
+  return _agentSignup ??= new Ratelimit({
+    redis: getRedis(),
+    limiter: Ratelimit.slidingWindow(5, '1 h'),
+    prefix: 'rl:agent-signup',
+  })
+}
+
 /**
  * Verifica RPM + RPD del creator para un slug+consumer dado.
  * Retorna NextResponse 429 si excede algún límite, null si OK.

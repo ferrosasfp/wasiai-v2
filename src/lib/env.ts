@@ -49,6 +49,7 @@ const envSchema = z.object({
 
   // Auth
   OPEN_REGISTRATION_KEY: z.string().optional(),
+  AGENT_SIGNUP_KEY: z.string().optional(),
   WASIAI_SYSTEM_CREATOR_ID: z.string().optional(), // UUID-like but not strictly validated
 
   // Runtime
