@@ -64,7 +64,8 @@ function findExternalRefs(obj: unknown, path = ''): string | null {
     // SSRF-001: bloquear $ref Y $schema con URLs externas
     if ((key === '$ref' || key === '$schema') && typeof record[key] === 'string') {
       const ref = record[key] as string
-      if (ref.startsWith('http://') || ref.startsWith('https://')) {
+      // SSRF-001+002: bloquear cualquier protocolo externo en $ref/$schema
+      if (ref.includes('://') || ref.startsWith('data:')) {
         return `External ${key} blocked at ${path}.${key}: ${ref}`
       }
     }
