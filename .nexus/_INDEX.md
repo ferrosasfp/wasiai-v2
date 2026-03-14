@@ -52,3 +52,5 @@
 | 047 | 2026-03-05 | WAS-160 | EPIC: Dual Registration Off-chain + On-chain (ERC-8004) con Upgrade Path | EPIC | QUALITY | DONE | master |
 | 048 | 2026-03-05 | WAS-161 | Sync precio on-chain al editar agente (creator paga gas, active removido) | feature | QUALITY | DONE | master |
 | 049 | 2026-03-05 | WAS-162 | Transparency Dashboard — on-chain economics en footer + /transparency | feature | QUALITY | DONE | master |
+| 050 | 2026-03-14 | WAS-214 | Registro programático de agentes sin browser — POST /api/v1/auth/agent-signup | feature | QUALITY | DONE | b370c1d |
+| 051 | 2026-03-14 | WAS-215 | Health check async al registrar agente — activación automática sin cron | feature | QUALITY | DONE | defb237 |
