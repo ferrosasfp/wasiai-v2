@@ -16,6 +16,31 @@ interface AgentOption {
   name: string
   price_per_call: number
   status: string
+  input_schema?: Record<string, unknown> | null
+}
+
+/** Genera un ejemplo de input a partir del JSON Schema del agente */
+function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
+  if (!schema || schema.type !== 'object') return '{"prompt": "Hola, agente!"}'
+  const props = schema.properties as Record<string, Record<string, unknown>> | undefined
+  if (!props) return '{"prompt": "Hola, agente!"}'
+
+  const example: Record<string, unknown> = {}
+  for (const [key, def] of Object.entries(props)) {
+    if (def.type === 'string') {
+      if (def.enum && Array.isArray(def.enum)) example[key] = def.default ?? def.enum[0]
+      else example[key] = def.description ? `<${def.description}>` : `<${key}>`
+    } else if (def.type === 'number' || def.type === 'integer') {
+      example[key] = 0
+    } else if (def.type === 'boolean') {
+      example[key] = true
+    } else if (def.type === 'array') {
+      example[key] = []
+    } else {
+      example[key] = {}
+    }
+  }
+  return JSON.stringify(example, null, 2)
 }
 
 interface SandboxInvokeResponse {
@@ -57,7 +82,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
 
   const fetchAgents = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/agents?status=active&limit=50&sandbox=true')
+      const res = await fetch('/api/v1/agents?status=active&limit=50&sandbox=true&slim=false')
       if (res.ok) {
         const data = await res.json() as { agents?: AgentOption[]; data?: AgentOption[] }
         const list: AgentOption[] = data.agents ?? data.data ?? []
@@ -227,7 +252,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
             <textarea
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142] font-mono resize-none"
               rows={4}
-              placeholder='{"prompt": "Hola, agente!"}'
+              placeholder={buildExampleFromSchema(selectedAgent?.input_schema)}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
             />
