@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
+import { CopyableOutput } from '@/components/ui/CopyableOutput'
 
 interface Agent {
   slug: string
@@ -214,9 +215,7 @@ export function TryIt() {
               )}
             </div>
           </div>
-          <pre className="overflow-x-auto rounded-lg bg-[#0d1117] p-4 text-xs text-green-400 font-mono leading-relaxed">
-            {response}
-          </pre>
+          <CopyableOutput content={response} className="bg-[#0d1117] text-green-400" maxHeightClass="max-h-80" />
         </div>
       )}
     </div>

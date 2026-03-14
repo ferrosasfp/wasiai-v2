@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { CopyableOutput } from '@/components/ui/CopyableOutput'
 
 interface Props {
   slug: string
@@ -154,9 +155,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema }: Pro
 
               {state === 'success' && output !== null && (
                 <div className="space-y-2">
-                  <pre className="bg-gray-900 text-gray-100 text-xs p-4 rounded-lg overflow-auto max-h-72 whitespace-pre-wrap">
-                    {output}
-                  </pre>
+                  <CopyableOutput content={output} className="bg-gray-900 text-gray-100" maxHeightClass="max-h-72" />
                   <p className="text-sm text-gray-500">
                     {t('success_cta')}{' '}
                     <Link href="/keys" className="text-[#E84142] underline">{t('cta')}</Link>

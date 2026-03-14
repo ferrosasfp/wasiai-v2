@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
+import { CopyableOutput } from '@/components/ui/CopyableOutput'
 
 function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
   if (!schema || schema.type !== 'object') return ''
@@ -249,9 +250,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
               </a>
             )}
           </div>
-          <pre className="whitespace-pre-wrap font-mono text-xs text-gray-700 overflow-auto max-h-64">
-            {ctx.result}
-          </pre>
+          <CopyableOutput content={typeof ctx.result === 'string' ? ctx.result : JSON.stringify(ctx.result, null, 2)} />
         </div>
       )}
     </div>
