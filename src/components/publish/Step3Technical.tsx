@@ -192,6 +192,24 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         </button>
       </div>
 
+      {/* WAS-200: Input Schema opcional */}
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">Input Schema <span className="text-gray-400 font-normal">(opcional)</span></label>
+        <p className="mb-2 text-xs text-gray-400">JSON Schema draft-07 para validar inputs. Los usuarios verán este schema en la ficha del agente.</p>
+        <textarea
+          rows={5}
+          value={typeof data.input_schema === 'object' && data.input_schema !== null ? JSON.stringify(data.input_schema, null, 2) : ''}
+          onChange={e => {
+            const val = e.target.value.trim()
+            if (!val) { onChange('input_schema', null); return }
+            try { onChange('input_schema', JSON.parse(val)) }
+            catch { onChange('input_schema', val) } // mantener string si no es JSON válido aún
+          }}
+          placeholder={'{\n  "type": "object",\n  "required": ["query"],\n  "properties": {\n    "query": { "type": "string" }\n  }\n}'}
+          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
+        />
+      </div>
+
       {/* Info box */}
       <div className="rounded-xl bg-avax-50 p-4 text-sm text-avax-700">
         <span className="inline-flex items-center gap-1"><DollarSign size={12} />{t('step3EarningsNote')}</span>

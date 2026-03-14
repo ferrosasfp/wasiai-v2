@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
   const limit      = Math.min(Number(searchParams.get('limit')  ?? 20), 100)
   const offset     = Number(searchParams.get('offset') ?? 0)
   const slim       = searchParams.get('slim') === 'true' // PERF-05: lightweight mode
+  const sandboxOnly = searchParams.get('sandbox') === 'true' // WAS-196: solo agentes con sandbox habilitado
 
   const supabase = await createClient()
 
@@ -90,9 +91,10 @@ export async function GET(request: NextRequest) {
       .order('total_calls', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (category)  slimQuery = slimQuery.eq('category', category)
-    if (agentType) slimQuery = slimQuery.eq('agent_type', agentType)
-    if (maxPrice)  slimQuery = slimQuery.lte('price_per_call', parseFloat(maxPrice))
+    if (category)    slimQuery = slimQuery.eq('category', category)
+    if (agentType)   slimQuery = slimQuery.eq('agent_type', agentType)
+    if (maxPrice)    slimQuery = slimQuery.lte('price_per_call', parseFloat(maxPrice))
+    if (sandboxOnly) slimQuery = slimQuery.eq('sandbox_enabled', true) // WAS-196
 
     const { data: slimData, count: slimCount } = await slimQuery
 
@@ -135,9 +137,10 @@ export async function GET(request: NextRequest) {
     .order('total_calls',  { ascending: false })
     .range(offset, offset + limit - 1)
 
-  if (category)  query = query.eq('category',   category)
-  if (agentType) query = query.eq('agent_type', agentType)
-  if (maxPrice)  query = query.lte('price_per_call', parseFloat(maxPrice))
+  if (category)    query = query.eq('category',   category)
+  if (agentType)   query = query.eq('agent_type', agentType)
+  if (maxPrice)    query = query.lte('price_per_call', parseFloat(maxPrice))
+  if (sandboxOnly) query = query.eq('sandbox_enabled', true) // WAS-196
 
   const { data, error, count } = await query
 

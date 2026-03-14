@@ -57,7 +57,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
 
   const fetchAgents = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/agents?status=active&limit=50')
+      const res = await fetch('/api/v1/agents?status=active&limit=50&sandbox=true')
       if (res.ok) {
         const data = await res.json() as { agents?: AgentOption[]; data?: AgentOption[] }
         const list: AgentOption[] = data.agents ?? data.data ?? []

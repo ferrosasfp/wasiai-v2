@@ -68,6 +68,9 @@ export const createModelSchema = z.object({
 
   // WAS-196: Sandbox opt-in/out control
   sandbox_enabled: z.boolean().optional().default(true),
+
+  // WAS-200: Input JSON Schema opcional
+  input_schema: z.record(z.string(), z.unknown()).optional().nullable(),
 })
 
 export type CreateModelInput = z.infer<typeof createModelSchema>

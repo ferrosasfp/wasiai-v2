@@ -614,7 +614,7 @@ export default function AgentKeysPage() {
   const [loading, setLoading]   = useState(true)
   const [creating, setCreating] = useState(false)
   const [newKey, setNewKey]     = useState<AgentKey | null>(null)
-  const [form, setForm]         = useState({ name: '' })
+  const [form, setForm]         = useState({ name: '', allowed_slugs: '', allowed_categories: '' })
   const [showForm, setShowForm] = useState(false)
   const [copied, setCopied]     = useState(false)
 
@@ -638,7 +638,12 @@ export default function AgentKeysPage() {
     const res = await fetch('/api/agent-keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: form.name, budget_usdc: 0 }),
+      body: JSON.stringify({
+        name: form.name,
+        budget_usdc: 0,
+        allowed_slugs: form.allowed_slugs ? form.allowed_slugs.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+        allowed_categories: form.allowed_categories ? form.allowed_categories.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      }),
     })
     if (res.ok) {
       const created = await res.json()
@@ -714,6 +719,30 @@ export default function AgentKeysPage() {
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-avax-400 focus:outline-none"
                   required
                 />
+              </div>
+              {/* WAS-186: Scope opcional */}
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+                <p className="text-xs font-medium text-gray-500">Scope (opcional) — deja vacío para acceso total</p>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Agentes permitidos (slugs, separados por coma)</label>
+                  <input
+                    type="text"
+                    value={form.allowed_slugs}
+                    onChange={e => setForm(p => ({ ...p, allowed_slugs: e.target.value }))}
+                    placeholder="ej: gpt-summarizer, price-checker"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:border-avax-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Categorías permitidas (separadas por coma)</label>
+                  <input
+                    type="text"
+                    value={form.allowed_categories}
+                    onChange={e => setForm(p => ({ ...p, allowed_categories: e.target.value }))}
+                    placeholder="ej: nlp, defi"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:border-avax-400 focus:outline-none"
+                  />
+                </div>
               </div>
               <div className="flex gap-3">
                 <button
