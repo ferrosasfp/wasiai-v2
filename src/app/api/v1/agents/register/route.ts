@@ -259,8 +259,15 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (insertError || !agent) {
+    // Slug duplicate — Postgres unique constraint
+    if (insertError?.message?.includes('unique constraint') || insertError?.code === '23505') {
+      return NextResponse.json(
+        { error: `Slug '${data.slug}' is already taken. Choose a different slug.` },
+        { status: 409 },
+      )
+    }
     return NextResponse.json(
-      { error: insertError?.message ?? 'Failed to create agent' },
+      { error: 'Failed to create agent' },
       { status: 500 },
     )
   }

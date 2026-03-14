@@ -59,7 +59,12 @@ export async function POST(request: NextRequest) {
   })
 
   if (createError) {
-    if (createError.message?.includes('User already registered')) {
+    if (
+      createError.message?.includes('User already registered') ||
+      createError.message?.includes('already been registered') ||
+      createError.message?.toLowerCase().includes('already exists') ||
+      createError.status === 422
+    ) {
       return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
     }
     console.error('[agent-signup] createUser failed', { message: createError.message })
