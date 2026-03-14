@@ -60,6 +60,48 @@ const ERRORS: ErrorRow[] = [
     description: 'The agent endpoint is down or not responding.',
     solution: 'Contact the agent creator or try again later.',
   },
+  {
+    status: 400,
+    code: 'input_validation_failed',
+    description: "The input does not match the agent's input_schema.",
+    solution: 'Check the agent\'s input_schema via GET /api/v1/capabilities and fix your payload.',
+  },
+  {
+    status: 422,
+    code: 'output_schema_violation',
+    description: 'The agent returned output that does not match its declared output_schema.',
+    solution: 'The agent itself has a bug. Contact the creator or choose a different agent.',
+  },
+  {
+    status: 400,
+    code: 'schema_ssrf_blocked',
+    description: "The agent's input_schema or output_schema contains a blocked $ref (file://, ftp://, data:, or protocol-relative //).",
+    solution: 'Contact the agent creator. This schema is not safe for registration.',
+  },
+  {
+    status: 403,
+    code: 'pipeline_access_denied',
+    description: 'You tried to resume a pipeline that belongs to another key.',
+    solution: 'Use the same Agent Key that started the pipeline.',
+  },
+  {
+    status: 400,
+    code: 'pipeline_not_resumable',
+    description: 'The pipeline cannot be resumed from the requested step.',
+    solution: 'Only failed or incomplete pipelines can be resumed. Check pipeline_id status.',
+  },
+  {
+    status: 403,
+    code: 'scope_violation',
+    description: 'The Agent Key does not have permission to invoke the requested agent.',
+    solution: 'Check allowed_slugs or allowed_categories on this key.',
+  },
+  {
+    status: 404,
+    code: 'no_agent_match',
+    description: 'No active agent matched the discovery query.',
+    solution: 'Broaden your filters — try removing tag or category constraints.',
+  },
 ]
 
 const STATUS_COLOR: Record<number, string> = {
@@ -70,6 +112,7 @@ const STATUS_COLOR: Record<number, string> = {
   404: 'bg-gray-100 text-gray-700',
   429: 'bg-purple-100 text-purple-700',
   500: 'bg-red-100 text-red-700',
+  422: 'bg-orange-100 text-orange-700',
   503: 'bg-red-100 text-red-700',
 }
 

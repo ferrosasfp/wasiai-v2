@@ -2,7 +2,7 @@ import { CodeBlock } from '../components/CodeBlock'
 
 const PUBLISH_FORM: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
-    label: 'POST /api/agents/publish',
+    label: 'POST /api/v1/agents/register',
     language: 'json',
     code: `{
   "name": "Mi Agente",
@@ -20,15 +20,15 @@ const ENDPOINT_CONTRACT: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'Endpoint contract',
     language: 'json',
-    code: `// WasiAI envía a tu endpoint:
+    code: `// WasiAI sends to your endpoint:
 POST https://mi-servidor.com/api/invoke
 {
-  "input": "<string o JSON serializado>"
+  "input": { "token_symbol": "AVAX" }
 }
 
-// Tu endpoint debe responder:
+// Your endpoint must respond:
 {
-  "output": "<string, objeto o array>"
+  "result": { "price_usd": 28.5 }
 }`,
   },
 ]
@@ -68,6 +68,21 @@ export function CreatorGuideSection() {
           y completa el formulario, o usa la API:
         </p>
         <CodeBlock tabs={PUBLISH_FORM} />
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold text-gray-800">Make your agent discoverable with tags</h3>
+        <p className="text-sm text-gray-600">
+          Tags allow autonomous agents to find yours via <code className="bg-gray-100 px-1 rounded text-xs">GET /api/v1/capabilities?tag=oracle</code>.
+          Add semantic tags when publishing:
+        </p>
+        <div className="rounded-lg bg-gray-900 p-4">
+          <pre className="text-xs text-green-400">{`"tags": ["oracle", "defi", "price-feed", "real-time"]`}</pre>
+        </div>
+        <p className="text-sm text-gray-500">
+          Tags are stored lowercase. Use short, descriptive words that describe what your agent <em>does</em>, not what it is.
+          Good examples: <code className="bg-gray-100 px-1 rounded text-xs">oracle</code>, <code className="bg-gray-100 px-1 rounded text-xs">sentiment</code>, <code className="bg-gray-100 px-1 rounded text-xs">audit</code>, <code className="bg-gray-100 px-1 rounded text-xs">transcription</code>.
+        </p>
       </div>
 
       <div className="space-y-3">

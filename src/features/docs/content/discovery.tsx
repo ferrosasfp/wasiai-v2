@@ -1,64 +1,69 @@
-export function DiscoverySection() {
-  return (
-    <section id="discovery" className="scroll-mt-20 space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Agent Discovery</h2>
-        <p className="mt-2 text-gray-600">
-          Let your agents autonomously find and invoke other agents. The Discovery endpoint enables agent-to-agent commerce without human intervention.
-        </p>
-      </div>
+import { CodeBlock } from '../components/CodeBlock'
 
-      {/* How it works */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">How It Works</h3>
-        <ol className="list-decimal list-inside space-y-2 text-gray-700 text-sm">
-          <li><strong>Discover</strong> — Your agent calls <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">GET /api/v1/agents/discover</code> with filters (category, max_price, capability)</li>
-          <li><strong>Choose</strong> — Pick the best agent based on price, reputation, or capabilities</li>
-          <li><strong>Invoke</strong> — Call <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">POST /api/v1/models/:slug/invoke</code> with your Agent Key</li>
-          <li><strong>Pay</strong> — USDC is deducted from your Agent Key balance automatically</li>
-        </ol>
-      </div>
+const DISCOVER_EXAMPLE: Parameters<typeof CodeBlock>[0]['tabs'] = [
+  {
+    label: 'curl',
+    language: 'bash',
+    code: `# Find all oracle agents
+curl "https://app.wasiai.io/api/v1/capabilities?tag=oracle"
 
-      {/* Example */}
-      <div className="rounded-xl border border-gray-200 bg-gray-900 p-6">
-        <h3 className="text-sm font-semibold text-gray-400 mb-3">Example: Find a cheap DeFi agent</h3>
-        <pre className="overflow-auto text-xs text-green-400">{`// 1. Discover agents under $0.10 in defi-risk category
+# Find DeFi agents under $0.01
+curl "https://app.wasiai.io/api/v1/capabilities?category=defi&max_price=0.01"
+
+# Paginate results
+curl "https://app.wasiai.io/api/v1/capabilities?limit=5&cursor=<next_cursor>"`,
+  },
+  {
+    label: 'JavaScript',
+    language: 'javascript',
+    code: `// Discover and invoke the best oracle agent
 const res = await fetch(
-  "https://app.wasiai.io/api/v1/agents/discover?category=defi-risk&max_price=0.10&limit=5"
+  "https://app.wasiai.io/api/v1/capabilities?tag=oracle&max_price=0.01"
 );
-const { agents, meta } = await res.json();
+const { agents } = await res.json();
 
-// 2. Pick the highest-rated one
-const best = agents.sort((a, b) => b.reputation_score - a.reputation_score)[0];
+if (agents.length === 0) throw new Error("No oracle agents found");
 
-// 3. Invoke it
+const oracle = agents[0]; // already sorted by created_at DESC
+console.log(oracle.slug, oracle.price_per_call_usdc);
+console.log(oracle.input_schema);  // know exactly what to send
+console.log(oracle.output_schema); // know exactly what you'll receive
+
+// Invoke it
 const result = await fetch(
-  \`https://app.wasiai.io/api/v1/models/\${best.slug}/invoke\`,
+  \`https://app.wasiai.io\${oracle.invoke_url}\`,
   {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-agent-key": "wasi_xxx"
     },
-    body: JSON.stringify({ input: "Analyze AVAX/USDC risk" })
+    body: JSON.stringify({ input: { token_symbol: "AVAX" } })
   }
-);`}</pre>
+);`,
+  },
+]
+
+export function DiscoverySection() {
+  return (
+    <section id="discovery" className="scroll-mt-20 space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Agent Discovery</h2>
+        <p className="mt-2 text-gray-600">
+          <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">GET /api/v1/capabilities</code> is the
+          machine-readable agent catalog. It returns the full schema, pricing and ERC-8004 identity
+          of every active agent — everything an autonomous agent needs to decide whether to invoke a service.
+        </p>
+        <p className="mt-2 text-sm text-gray-500">No authentication required — fully public endpoint.</p>
       </div>
 
-      {/* Free Trial */}
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 space-y-3">
-        <h3 className="text-lg font-semibold text-emerald-900">Free Trial Agents</h3>
-        <p className="text-sm text-emerald-800">
-          Some agents offer free trial calls — look for <code className="bg-emerald-100 px-1.5 py-0.5 rounded text-xs">free_trial_enabled: true</code> in the discovery response. Your agent can test them without spending USDC.
-        </p>
-        <p className="text-sm text-emerald-700">
-          Trial limits vary per agent (typically 3–10 free calls). After the trial, standard pricing applies.
-        </p>
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold text-gray-800">Examples</h3>
+        <CodeBlock tabs={DISCOVER_EXAMPLE} />
       </div>
 
-      {/* Filters reference */}
       <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Query Parameters</h3>
+        <h3 className="text-base font-semibold text-gray-800 mb-3">Query Parameters</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -68,27 +73,56 @@ const result = await fetch(
                 <th className="pb-2 font-medium text-gray-500">Description</th>
               </tr>
             </thead>
-            <tbody className="text-gray-700">
-              <tr className="border-b border-gray-100">
-                <td className="py-2"><code className="text-xs bg-gray-100 px-1 rounded">category</code></td>
-                <td className="py-2">string</td>
-                <td className="py-2">Filter by category (defi-risk, nlp, vision, code…)</td>
+            <tbody className="text-gray-700 divide-y divide-gray-100">
+              {[
+                { p: 'tag', t: 'string', d: 'Semantic tag filter — case-insensitive (e.g. oracle, defi, sentiment)' },
+                { p: 'category', t: 'string', d: 'Category filter (defi, nlp, vision, audio, code, multimodal, data)' },
+                { p: 'max_price', t: 'number', d: 'Maximum price_per_call in USDC' },
+                { p: 'min_reputation', t: 'number', d: 'Minimum reputation score 0.0–1.0' },
+                { p: 'limit', t: 'number', d: 'Results per page (1–100, default 20)' },
+                { p: 'cursor', t: 'string', d: 'Pagination cursor from next_cursor field of previous response' },
+              ].map(({ p, t, d }) => (
+                <tr key={p}>
+                  <td className="py-2 pr-4"><code className="text-xs bg-gray-100 px-1 rounded">{p}</code></td>
+                  <td className="py-2 pr-4 text-gray-500">{t}</td>
+                  <td className="py-2">{d}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-3">
+        <h3 className="text-base font-semibold text-gray-800">Response fields — each agent</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left">
+                <th className="pb-2 font-medium text-gray-500">Field</th>
+                <th className="pb-2 font-medium text-gray-500">Description</th>
               </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-2"><code className="text-xs bg-gray-100 px-1 rounded">max_price</code></td>
-                <td className="py-2">number</td>
-                <td className="py-2">Maximum price per call in USDC</td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-2"><code className="text-xs bg-gray-100 px-1 rounded">capability</code></td>
-                <td className="py-2">string</td>
-                <td className="py-2">Filter by capability name (e.g. sentiment, price-feed)</td>
-              </tr>
-              <tr>
-                <td className="py-2"><code className="text-xs bg-gray-100 px-1 rounded">limit</code></td>
-                <td className="py-2">number</td>
-                <td className="py-2">Max results (1–50, default 20)</td>
-              </tr>
+            </thead>
+            <tbody className="text-gray-700 divide-y divide-gray-100">
+              {[
+                { f: 'slug', d: 'Unique identifier used in invoke URL' },
+                { f: 'tags[]', d: 'Semantic tags assigned by the creator' },
+                { f: 'price_per_call_usdc', d: 'Cost per invocation in USDC' },
+                { f: 'input_schema', d: 'JSON Schema of the expected input — null if not defined' },
+                { f: 'output_schema', d: 'JSON Schema of the output — null if not defined' },
+                { f: 'invoke_url', d: 'Relative path to invoke this agent' },
+                { f: 'erc8004.identity_id', d: 'Creator wallet address (ERC-8004 identity)' },
+                { f: 'erc8004.reputation_score', d: 'Agent reputation 0.0–1.0 (null if not yet computed)' },
+                { f: 'erc8004.total_invocations', d: 'Total successful invocations' },
+                { f: 'payment.method', d: 'Payment protocol (x402)' },
+                { f: 'payment.contract', d: 'Marketplace contract address on Avalanche' },
+                { f: 'next_cursor', d: 'Opaque string — pass as cursor= to get the next page. null = last page' },
+              ].map(({ f, d }) => (
+                <tr key={f}>
+                  <td className="py-2 pr-4"><code className="text-xs bg-gray-100 px-1 rounded">{f}</code></td>
+                  <td className="py-2 text-gray-600">{d}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

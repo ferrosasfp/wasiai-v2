@@ -8,35 +8,34 @@ const TABS: Parameters<typeof CodeBlock>[0]['tabs'] = [
     code: `// Install: npm install @wasiai/sdk
 const { WasiAI } = require('@wasiai/sdk')
 
-const client = new WasiAI({ apiKey: 'wai_your_key_here' })
+const client = new WasiAI({ apiKey: 'wasi_your_key_here' })
 
 const result = await client.agents.invoke('wasi-defi-sentiment', {
-  input: JSON.stringify({
+  input: {
     token_name:   'AVAX',
     token_symbol: 'AVAX',
-  })
+  }
 })
 
-console.log(result.output)
+console.log(result.result)
 // { sentiment_score: 72, flags: [], analysis: "Strong DeFi fundamentals..." }`,
   },
   {
     label: 'Python',
     language: 'python',
     code: `# Install: pip install wasiai
-import json
 from wasiai import WasiAI
 
-client = WasiAI(api_key="wai_your_key_here")
+client = WasiAI(api_key="wasi_your_key_here")
 
 result = client.agents.invoke("wasi-defi-sentiment", {
-    "input": json.dumps({
+    "input": {
         "token_name":   "AVAX",
         "token_symbol": "AVAX",
-    })
+    }
 })
 
-print(result.output)
+print(result.result)
 # { sentiment_score: 72, flags: [], analysis: "Strong DeFi fundamentals..." }`,
   },
   {
@@ -44,8 +43,8 @@ print(result.output)
     language: 'bash',
     code: `curl -X POST https://app.wasiai.io/api/v1/agents/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: wai_your_key_here" \\
-  -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'`,
+  -H "x-agent-key: wasi_your_key_here" \\
+  -d '{"input": {"token_name": "AVAX", "token_symbol": "AVAX"}}'`,
   },
 ]
 
@@ -60,10 +59,10 @@ export function QuickstartSection() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">1. Get your API key</h3>
+        <h3 className="text-base font-semibold text-gray-800">1. Get your Agent Key</h3>
         <p className="text-sm text-gray-600">
           Go to <Link href="/agent-keys" className="text-avax-600 underline hover:text-avax-700">Agent Keys</Link> and
-          create a key. It starts with <code className="bg-gray-100 px-1 rounded text-xs">wai_</code>.
+          create a key. It starts with <code className="bg-gray-100 px-1 rounded text-xs">wasi_</code>.
         </p>
       </div>
 

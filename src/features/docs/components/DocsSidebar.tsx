@@ -3,23 +3,55 @@
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 
-const SECTION_KEYS = [
-  { id: 'quickstart',    key: 'quickstart'  },
-  { id: 'sdk-node',      key: 'sdkNode'     },
-  { id: 'sdk-python',    key: 'sdkPython'   },
-  { id: 'api-reference',   key: 'apiRef'         },
-  { id: 'mcp-integration', key: 'mcpIntegration' },
-  { id: 'errors',          key: 'errors'         },
-  { id: 'x402',          key: 'x402'         },
-  { id: 'compose',       key: 'compose'      },
-  { id: 'discovery',     key: 'discovery'     },
-  { id: 'agent-keys',    key: 'agentKeys'    },
-  { id: 'creator-guide', key: 'creatorGuide' },
-  { id: 'agentkit',      key: 'agentkit'     },
-  { id: 'collections',   key: 'collections'   },
-  { id: 'creator-cli',   key: 'creatorCli'   },
-  { id: 'pricing',       key: 'pricing'      },
-] as const
+const NAV_GROUPS = [
+  {
+    groupKey: 'gettingStarted',
+    items: [
+      { id: 'quickstart',    key: 'quickstart'  },
+      { id: 'agent-keys',    key: 'agentKeys'   },
+      { id: 'pricing',       key: 'pricing'     },
+    ],
+  },
+  {
+    groupKey: 'invoking',
+    items: [
+      { id: 'api-reference',    key: 'apiRef'        },
+      { id: 'sdk-node',         key: 'sdkNode'       },
+      { id: 'sdk-python',       key: 'sdkPython'     },
+      { id: 'mcp-integration',  key: 'mcpIntegration'},
+    ],
+  },
+  {
+    groupKey: 'advanced',
+    items: [
+      { id: 'compose',       key: 'compose'     },
+      { id: 'x402',          key: 'x402'        },
+    ],
+  },
+  {
+    groupKey: 'discovery',
+    items: [
+      { id: 'discovery',     key: 'discovery'   },
+    ],
+  },
+  {
+    groupKey: 'forCreators',
+    items: [
+      { id: 'creator-guide', key: 'creatorGuide'},
+      { id: 'agentkit',      key: 'agentkit'    },
+      { id: 'creator-cli',   key: 'creatorCli'  },
+    ],
+  },
+  {
+    groupKey: 'reference',
+    items: [
+      { id: 'errors',        key: 'errors'      },
+      { id: 'collections',   key: 'collections' },
+    ],
+  },
+]
+
+const SECTION_KEYS = NAV_GROUPS.flatMap(g => g.items)
 
 interface NavListProps {
   active: string
@@ -29,22 +61,28 @@ interface NavListProps {
 function NavList({ active, onNav }: NavListProps) {
   const t = useTranslations('docs')
   return (
-    <nav className="space-y-1">
-      <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
-        {t('contents')}
-      </p>
-      {SECTION_KEYS.map(({ id, key }) => (
-        <button
-          key={id}
-          onClick={() => onNav(id)}
-          className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-colors ${
-            active === id
-              ? 'bg-avax-50 text-avax-600 font-semibold'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-          }`}
-        >
-          {t(key)}
-        </button>
+    <nav className="space-y-4">
+      {NAV_GROUPS.map(group => (
+        <div key={group.groupKey}>
+          <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
+            {t(group.groupKey)}
+          </p>
+          <div className="space-y-0.5">
+            {group.items.map(({ id, key }) => (
+              <button
+                key={id}
+                onClick={() => onNav(id)}
+                className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-colors ${
+                  active === id
+                    ? 'bg-avax-50 text-avax-600 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                {t(key)}
+              </button>
+            ))}
+          </div>
+        </div>
       ))}
     </nav>
   )

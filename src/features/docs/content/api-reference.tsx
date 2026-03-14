@@ -1,5 +1,4 @@
 import { EndpointCard } from '../components/EndpointCard'
-import { TryIt } from '../components/TryIt'
 
 export function ApiReferenceSection() {
   return (
@@ -9,66 +8,82 @@ export function ApiReferenceSection() {
         <p className="mt-2 text-gray-600">
           Base URL: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">https://app.wasiai.io/api/v1</code>
           <br />
-          Auth: send your API key as <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">X-API-Key: wai_...</code> header.
+          Auth: include your Agent Key as <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">x-agent-key: wasi_...</code> header.
         </p>
       </div>
 
       <EndpointCard
         method="POST"
-        path="/models/:slug/invoke"
+        path="/agents/:slug/invoke"
         description="Invoke an agent with a JSON payload. Returns the agent's output synchronously."
         auth={true}
         params={[
           { name: ':slug', type: 'string', required: true, description: 'Agent slug identifier (e.g. wasi-defi-sentiment)' },
         ]}
         bodyParams={[
-          { name: 'input', type: 'string', required: true, description: 'JSON-serialized input string for the agent' },
+          { name: 'input', type: 'object', required: true, description: "Input object for the agent — structure depends on the agent's input_schema" },
         ]}
         responseExample={`{
-  "output": {
+  "result": {
     "sentiment_score": 87,
     "flags": ["FOMO naming"],
     "analysis": "High-risk token with speculative characteristics."
   },
   "latency_ms": 1240,
   "agent_slug": "wasi-defi-sentiment",
-  "tx_hash": "0xabc...",
   "receipt_signature": "0xdef..."
 }`}
       />
 
       <EndpointCard
         method="GET"
-        path="/agents"
-        description="List all available agents. Supports filtering by category and pagination."
+        path="/capabilities"
+        description="Machine-readable agent catalog. Returns active agents with full schema, pricing and ERC-8004 identity. Designed for autonomous agent discovery."
         auth={false}
         bodyParams={[
-          { name: 'category', type: 'string', description: 'Filter by category (defi-risk, nlp, vision…)' },
-          { name: 'limit', type: 'number', description: 'Max results (default: 20, max: 100)' },
-          { name: 'offset', type: 'number', description: 'Pagination offset (default: 0)' },
+          { name: 'tag', type: 'string', description: 'Filter by semantic tag (e.g. oracle, defi, sentiment)' },
+          { name: 'category', type: 'string', description: 'Filter by category (defi, nlp, vision, code…)' },
+          { name: 'max_price', type: 'number', description: 'Maximum price per call in USDC' },
+          { name: 'min_reputation', type: 'number', description: 'Minimum reputation score (0.0–1.0)' },
+          { name: 'limit', type: 'number', description: 'Results per page (1–100, default 20)' },
+          { name: 'cursor', type: 'string', description: 'Pagination cursor from previous response' },
         ]}
-        responseExample={`[
-  {
-    "id": "uuid",
-    "slug": "wasi-defi-sentiment",
-    "name": "DeFi Sentiment Analyzer",
-    "category": "defi-risk",
-    "price_per_call": 0.05,
-    "currency": "USDC",
-    "status": "active",
-    "creator": { "username": "wasiai" }
-  }
-]`}
+        responseExample={`{
+  "agents": [
+    {
+      "slug": "wasi-chainlink-price",
+      "name": "Chainlink Price Feed",
+      "category": "defi",
+      "tags": ["oracle", "price-feed", "defi", "real-time"],
+      "price_per_call_usdc": 0.001,
+      "input_schema": { "type": "object", "properties": { "token_symbol": { "type": "string" } } },
+      "output_schema": { "type": "object", "properties": { "price_usd": { "type": "number" } } },
+      "invoke_url": "/api/v1/agents/wasi-chainlink-price/invoke",
+      "erc8004": {
+        "identity_id": "0xBF95...",
+        "reputation_score": null,
+        "total_invocations": 10
+      },
+      "payment": {
+        "method": "x402",
+        "asset": "USDC",
+        "chain": "avalanche",
+        "contract": "0x24be31D0F538C5551c536b09C85907C43c24d062"
+      }
+    }
+  ],
+  "total": 5,
+  "next_cursor": null
+}`}
       />
 
       <EndpointCard
         method="POST"
         path="/compose"
-        description="Execute a pipeline of up to 5 agents in a single request. Supports serial and parallel execution."
+        description="Execute a pipeline of up to 5 agents in a single request. Supports serial and parallel execution with output passing between steps."
         auth={true}
         bodyParams={[
           { name: 'steps', type: 'ComposeStep[]', required: true, description: 'Array of pipeline steps (max 5). Each step: { agent_slug, input?, pass_output?, parallel? }' },
-          { name: 'api_key', type: 'string', required: true, description: 'Your Agent Key (wai_...)' },
         ]}
         responseExample={`{
   "pipeline_id": "uuid",
@@ -85,7 +100,7 @@ export function ApiReferenceSection() {
       <EndpointCard
         method="GET"
         path="/agent-keys/me"
-        description="Get the balance and metadata for the current API key."
+        description="Get balance and metadata for the current Agent Key."
         auth={true}
         responseExample={`{
   "key_id": "uuid",
@@ -98,43 +113,28 @@ export function ApiReferenceSection() {
       />
 
       <EndpointCard
-        method="GET"
-        path="/agents/discover"
-        description="Agent-to-Agent Discovery — find agents programmatically by category, price, or capability. Designed for autonomous agent-to-agent interaction."
-        auth={false}
+        method="POST"
+        path="/agents/register"
+        description="Register a new agent on WasiAI. Requires a WasiAI account (JWT) or an Agent Key with creator permissions."
+        auth={true}
         bodyParams={[
-          { name: 'category', type: 'string', description: 'Filter by category (defi-risk, nlp, vision…)' },
-          { name: 'max_price', type: 'number', description: 'Maximum price per call in USDC' },
-          { name: 'capability', type: 'string', description: 'Filter by capability name (e.g. sentiment, price-feed)' },
-          { name: 'limit', type: 'number', description: 'Max results (default: 20, max: 50)' },
+          { name: 'name', type: 'string', required: true, description: 'Agent display name (3–64 chars)' },
+          { name: 'slug', type: 'string', required: true, description: 'URL-safe identifier (lowercase, hyphens only)' },
+          { name: 'description', type: 'string', required: true, description: 'What the agent does (10–1000 chars)' },
+          { name: 'category', type: 'string', required: true, description: 'One of: nlp, vision, audio, code, multimodal, data' },
+          { name: 'price_per_call', type: 'number', required: true, description: 'Price in USDC per invocation (0.01–100)' },
+          { name: 'endpoint_url', type: 'string', required: true, description: 'HTTPS URL of your agent endpoint' },
+          { name: 'tags', type: 'string[]', description: 'Semantic tags for discovery (e.g. ["oracle", "defi"])' },
+          { name: 'input_schema', type: 'object', description: 'JSON Schema describing accepted input' },
+          { name: 'output_schema', type: 'object', description: 'JSON Schema describing the output format' },
         ]}
         responseExample={`{
-  "agents": [
-    {
-      "slug": "wasi-defi-sentiment",
-      "name": "DeFi Sentiment Analyzer",
-      "price_per_call": 0.05,
-      "category": "defi-risk",
-      "total_calls": 1240,
-      "reputation_score": 92,
-      "free_trial_enabled": true,
-      "free_trial_limit": 3
-    }
-  ],
-  "total": 1,
-  "meta": {
-    "invoke_endpoint": "/api/v1/models/{slug}/invoke",
-    "auth_methods": ["x-agent-key", "x402"],
-    "docs_url": "https://app.wasiai.io/docs",
-    "sdk": "npm install @wasiai/sdk"
-  }
+  "id": "uuid",
+  "slug": "my-defi-agent",
+  "status": "active",
+  "management_key": "wasi_mgmt_..."
 }`}
       />
-
-      {/* TryIt widget */}
-      <div className="mt-8">
-        <TryIt />
-      </div>
     </section>
   )
 }
