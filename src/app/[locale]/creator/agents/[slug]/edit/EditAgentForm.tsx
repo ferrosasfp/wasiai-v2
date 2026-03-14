@@ -414,6 +414,9 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
               placeholder={'{\n  "type": "object",\n  "required": ["text"],\n  "properties": {\n    "text": { "type": "string" }\n  }\n}'}
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
             />
+            {errors.input_schema && (
+              <p className="mt-1 text-xs text-red-500">{errors.input_schema}</p>
+            )}
           </div>
 
           {/* WAS-202: Output Schema */}
@@ -435,6 +438,9 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
               placeholder={'{\n  "type": "object",\n  "required": ["result"],\n  "properties": {\n    "result": { "type": "string" }\n  }\n}'}
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
             />
+            {errors.output_schema && (
+              <p className="mt-1 text-xs text-red-500">{errors.output_schema}</p>
+            )}
           </div>
 
           {/* Rate limits */}
