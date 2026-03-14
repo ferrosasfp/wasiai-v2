@@ -42,7 +42,7 @@ const RegisterAgentSchema = z.object({
   // Required
   name:           z.string().min(3).max(100),
   slug:           z.string().min(3).max(80).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, numbers, and hyphens'),
-  endpoint_url:   z.string().url('Must be a valid HTTPS URL'),
+  endpoint_url:   z.string().url('Must be a valid HTTPS URL').optional(),  // AC8: optional → draft if absent
   category:       z.enum(['nlp', 'vision', 'audio', 'code', 'multimodal', 'data']),
   price_per_call: z.number().min(0.001).max(100),
 
@@ -189,11 +189,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // SEC-01 + NG-005: Block SSRF via endpoint_url (async version includes DNS probe)
-  try {
-    await validateEndpointUrlAsync(data.endpoint_url)
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 422 })
+  // SEC-01 + NG-005: Block SSRF via endpoint_url (only if provided)
+  if (data.endpoint_url) {
+    try {
+      await validateEndpointUrlAsync(data.endpoint_url)
+    } catch (err) {
+      return NextResponse.json({ error: String(err) }, { status: 422 })
+    }
   }
 
   // ── Check slug availability ───────────────────────────────────────────────
