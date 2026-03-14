@@ -14,9 +14,16 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')
   .trim()
   .replace(/\/$/, '')
 
+// Orígenes extra separados por coma: ALLOWED_ORIGINS_EXTRA="https://wasiai-v2.vercel.app,https://staging.wasiai.io"
+const extraOrigins = (process.env.ALLOWED_ORIGINS_EXTRA ?? '')
+  .split(',')
+  .map(o => o.trim().replace(/\/$/, ''))
+  .filter(Boolean)
+
 // Build list of allowed origins (add staging/preview URLs here if needed)
 const ALLOWED_ORIGINS = new Set([
   SITE_URL,
+  ...extraOrigins,
   // Allow localhost during development (any port 3000–3009)
   ...(process.env.NODE_ENV === 'development'
     ? [
