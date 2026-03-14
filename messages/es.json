@@ -580,7 +580,12 @@
     "redirecting": "Redirigiendo al dashboard…",
     "cancel": "Cancelar",
     "errorUpdate": "Error al actualizar el agente",
-    "errorNetwork": "Error de red — intenta de nuevo"
+    "errorNetwork": "Error de red — intenta de nuevo",
+    "sandboxLabel": "Permitir invocaciones en Sandbox",
+    "sandboxDesc": "No recibirás USDC por estas llamadas, pero tu infraestructura sí incurrirá costos.",
+    "inputSchemaLabel": "Input Schema",
+    "inputSchemaOptional": "(opcional)",
+    "inputSchemaDesc": "JSON Schema draft-07 para validar inputs. Los usuarios lo verán en la ficha del agente."
   },
   "payToCall": {
     "connectWallet": "Conectar Wallet para Llamar",
@@ -628,7 +633,9 @@
     "optionB": "Opción B — Pago Directo x402 (Avalanche USDC)",
     "pricingHeader": "Precio estimado por invocación (x402)",
     "freeTrial": "🎁 Prueba gratuita",
-    "agent": "agente"
+    "agent": "agente",
+    "inputSchemaTitle": "Input Schema",
+    "inputSchemaDesc": "Este agente valida los inputs contra el siguiente JSON Schema (draft-07)."
   },
   "wallet": {
     "connectWallet": "Conectar Wallet",

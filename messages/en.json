@@ -580,7 +580,12 @@
     "redirecting": "Redirecting to dashboard…",
     "cancel": "Cancel",
     "errorUpdate": "Failed to update agent",
-    "errorNetwork": "Network error — please try again"
+    "errorNetwork": "Network error — please try again",
+    "sandboxLabel": "Allow Sandbox invocations",
+    "sandboxDesc": "You won't earn USDC from sandbox calls, but your infrastructure costs still apply.",
+    "inputSchemaLabel": "Input Schema",
+    "inputSchemaOptional": "(optional)",
+    "inputSchemaDesc": "JSON Schema draft-07 to validate inputs. Users will see it on the agent page."
   },
   "payToCall": {
     "connectWallet": "Connect Wallet to Call",
@@ -628,7 +633,9 @@
     "optionB": "Option B — x402 Direct Payment (Avalanche USDC)",
     "pricingHeader": "Estimated price per invocation (x402)",
     "freeTrial": "🎁 Free Trial",
-    "agent": "agent"
+    "agent": "agent",
+    "inputSchemaTitle": "Input Schema",
+    "inputSchemaDesc": "This agent validates inputs against the following JSON Schema (draft-07)."
   },
   "wallet": {
     "connectWallet": "Connect Wallet",

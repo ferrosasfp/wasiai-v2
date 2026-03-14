@@ -69,6 +69,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
     max_rpm: agent.max_rpm ?? 60,
     max_rpd: agent.max_rpd ?? 1000,
     sandbox_enabled: (agent.sandbox_enabled as boolean | undefined) ?? true,
+    input_schema: (agent as Record<string, unknown>).input_schema as Record<string, unknown> | null ?? null,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
@@ -106,7 +107,7 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
       const res = await fetch(`/api/creator/agents/${agent.slug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...result.data, sandbox_enabled: form.sandbox_enabled }),
+        body: JSON.stringify({ ...result.data, sandbox_enabled: form.sandbox_enabled, input_schema: form.input_schema }),
       })
 
       if (!res.ok) {
@@ -358,10 +359,8 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
           {/* WAS-196: Sandbox opt-in/out */}
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-700">Permitir invocaciones en Sandbox</label>
-              <p className="text-xs text-gray-400">
-                No recibirás USDC por estas llamadas, pero tu infraestructura sí incurrirá costos.
-              </p>
+              <label className="text-sm font-medium text-gray-700">{t('sandboxLabel')}</label>
+              <p className="text-xs text-gray-400">{t('sandboxDesc')}</p>
             </div>
             <button
               type="button"
@@ -370,6 +369,26 @@ export function EditAgentForm({ agent, locale }: EditAgentFormProps) {
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${form.sandbox_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
+          </div>
+
+          {/* WAS-200: Input Schema */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              {t('inputSchemaLabel')} <span className="text-gray-400 font-normal text-xs">{t('inputSchemaOptional')}</span>
+            </label>
+            <p className="mb-2 text-xs text-gray-400">{t('inputSchemaDesc')}</p>
+            <textarea
+              rows={6}
+              value={form.input_schema ? JSON.stringify(form.input_schema, null, 2) : ''}
+              onChange={e => {
+                const val = e.target.value.trim()
+                if (!val) { handleChange('input_schema', null); return }
+                try { handleChange('input_schema', JSON.parse(val)) }
+                catch { /* JSON inválido — no actualizar hasta que sea válido */ }
+              }}
+              placeholder={'{\n  "type": "object",\n  "required": ["text"],\n  "properties": {\n    "text": { "type": "string" }\n  }\n}'}
+              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:border-avax-400 focus:outline-none focus:ring-2 focus:ring-avax-100"
+            />
           </div>
 
           {/* Rate limits */}
