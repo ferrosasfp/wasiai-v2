@@ -7,6 +7,7 @@
  */
 
 import { useState } from 'react'
+import React from 'react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { useTranslations } from 'next-intl'
 import { ShieldCheck } from 'lucide-react'
@@ -25,9 +26,12 @@ export function UpgradeOnChainButton({ slug, pricePerCall, registrationType, isO
   const { address, isConnected } = useWallet()
   const [showModal, setShowModal] = useState(false)
   const [walletError, setWalletError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useEffect(() => { setMounted(true) }, [])
 
   // AC9: Only show if off-chain AND owner AND wallet connected
-  if (registrationType !== 'off_chain' || !isOwner || !isConnected || !address) {
+  if (!mounted || registrationType !== 'off_chain' || !isOwner || !isConnected || !address) {
     return null
   }
 
