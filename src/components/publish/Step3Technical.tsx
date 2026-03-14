@@ -236,6 +236,27 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
         )
       })()}
 
+      {/* WAS-202: Output Schema — opcional */}
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          {t('outputSchemaLabel')}{' '}
+          <span className="text-gray-400 font-normal">{t('outputSchemaOptional')}</span>
+        </label>
+        <p className="mb-2 text-xs text-gray-400">{t('outputSchemaDesc')}</p>
+        <textarea
+          rows={5}
+          value={typeof data.output_schema === 'object' && data.output_schema !== null ? JSON.stringify(data.output_schema, null, 2) : ''}
+          onChange={e => {
+            const val = e.target.value.trim()
+            if (!val) { onChange('output_schema', null); return }
+            try { onChange('output_schema', JSON.parse(val)) }
+            catch { onChange('output_schema', val) }
+          }}
+          placeholder={'{\n  "type": "object",\n  "required": ["result"],\n  "properties": {\n    "result": { "type": "string" }\n  }\n}'}
+          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-avax-100 focus:border-avax-400"
+        />
+      </div>
+
       {/* Info box */}
       <div className="rounded-xl bg-avax-50 p-4 text-sm text-avax-700">
         <span className="inline-flex items-center gap-1"><DollarSign size={12} />{t('step3EarningsNote')}</span>

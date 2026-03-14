@@ -585,7 +585,10 @@
     "sandboxDesc": "No recibirás USDC por estas llamadas, pero tu infraestructura sí incurrirá costos.",
     "inputSchemaLabel": "Input Schema",
     "inputSchemaOptional": "(opcional)",
-    "inputSchemaDesc": "JSON Schema draft-07 para validar inputs. Los usuarios lo verán en la ficha del agente."
+    "inputSchemaDesc": "JSON Schema draft-07 para validar inputs. Los usuarios lo verán en la ficha del agente.",
+    "outputSchemaLabel": "Output Schema",
+    "outputSchemaOptional": "(opcional)",
+    "outputSchemaDesc": "JSON Schema draft-07 para validar outputs del agente. Si el agente devuelve un output inválido, la llamada se reembolsa."
   },
   "payToCall": {
     "connectWallet": "Conectar Wallet para Llamar",

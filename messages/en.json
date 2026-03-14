@@ -585,7 +585,10 @@
     "sandboxDesc": "You won't earn USDC from sandbox calls, but your infrastructure costs still apply.",
     "inputSchemaLabel": "Input Schema",
     "inputSchemaOptional": "(optional)",
-    "inputSchemaDesc": "JSON Schema draft-07 to validate inputs. Users will see it on the agent page."
+    "inputSchemaDesc": "JSON Schema draft-07 to validate inputs. Users will see it on the agent page.",
+    "outputSchemaLabel": "Output Schema",
+    "outputSchemaOptional": "(optional)",
+    "outputSchemaDesc": "JSON Schema draft-07 to validate agent outputs. If the agent returns invalid output, the call is refunded."
   },
   "payToCall": {
     "connectWallet": "Connect Wallet to Call",

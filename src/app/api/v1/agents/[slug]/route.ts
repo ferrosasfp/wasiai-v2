@@ -32,7 +32,7 @@ export async function GET(
     .select(`
       id, slug, name, description, category, agent_type, status,
       price_per_call, cover_image, is_featured,
-      endpoint_url, mcp_tool_name, capabilities, input_schema,
+      endpoint_url, mcp_tool_name, capabilities, input_schema, output_schema,
       total_calls, total_revenue, reputation_score, reputation_count,
       created_at,
       creator:creator_profiles(id, username, display_name, avatar_url, verified)
@@ -93,7 +93,8 @@ export async function GET(
       total_calls:   agent.total_calls ?? 0,
       total_revenue: Number(agent.total_revenue ?? 0),
     },
-    input_schema: agent.input_schema ?? null,
+    input_schema:  agent.input_schema ?? null,
+    output_schema: agent.output_schema ?? null,
     creator: agent.creator ?? null,
     created_at: agent.created_at,
     p50_latency_ms:         metrics?.p50_latency_ms ?? null,

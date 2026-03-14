@@ -71,6 +71,9 @@ export const createModelSchema = z.object({
 
   // WAS-200: Input JSON Schema opcional
   input_schema: z.record(z.string(), z.unknown()).optional().nullable(),
+
+  // WAS-202: Output JSON Schema opcional
+  output_schema: z.record(z.string(), z.unknown()).optional().nullable(),
 })
 
 export type CreateModelInput = z.infer<typeof createModelSchema>

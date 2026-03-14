@@ -174,6 +174,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
           endpoint_url:    data.endpoint_url,
           sandbox_enabled: data.sandbox_enabled ?? true,
           input_schema:    data.input_schema ?? null,
+          output_schema:   data.output_schema ?? null,
         }),
       })
       if (!patchRes.ok) {

@@ -119,6 +119,7 @@ interface AgentRow {
   max_rpm:        number
   max_rpd:        number
   input_schema:   unknown | null
+  output_schema:  unknown | null
 }
 
 interface KeyRow {
@@ -239,7 +240,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (staticSlugs.length > 0) {
     const { data: agentsData } = await supabase
       .from('agents')
-      .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema')
+      .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema, output_schema')
       .in('slug', staticSlugs)
       .eq('status', 'active')
 
@@ -287,7 +288,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           if (!fbAgent) {
             const { data: fbData } = await supabase
               .from('agents')
-              .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema')
+              .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema, output_schema')
               .eq('slug', step.fallback_slug)
               .eq('status', 'active')
               .single<AgentRow>()
@@ -522,12 +523,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // WAS-202: validar output_schema ANTES de insertar agent_calls (solo si step exitoso)
+    if (stepStatus === 'success' && agent.output_schema) {
+      const outputErr = validateInput(agent.output_schema, stepOutput)
+      if (outputErr) {
+        // Refund
+        const { data: refundOk, error: refundErr } = await supabase.rpc(
+          'refund_key_balance',
+          { p_key_id: safeKeyRow.id, p_amount: agent.price_per_call },
+        )
+        const schemaRefundFailure = (!refundOk || refundErr) ? `step_${stepIndex}` : null
+        // Insert agent_calls con result_type schema_violation
+        try {
+          await supabase
+            .from('agent_calls')
+            .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: 0, tx_hash: null, status: 'error', result_type: 'schema_violation', latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex, called_at: new Date().toISOString() })
+        } catch { /* best-effort */ }
+        return { receipt: null, output: null, status: 'error', reason: `output_schema_violation: ${outputErr}`, chargeDecision: 'refund', refundFailure: schemaRefundFailure }
+      }
+    }
+
+    // Determinar result_type para el insert de agent_calls
+    const agentCallResultType = stepStatus === 'success' ? 'success' : 'agent_error'
+
     // Log en agent_calls
     let callId = ''
     try {
       const { data: callRecord } = await supabase
         .from('agent_calls')
-        .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: agent.price_per_call, tx_hash: null, status: stepStatus, latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex })
+        .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: agent.price_per_call, tx_hash: null, status: stepStatus, result_type: agentCallResultType, latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex, called_at: new Date().toISOString() })
         .select('id').single()
       callId = callRecord?.id ?? ''
     } catch { /* best-effort */ }

@@ -64,6 +64,7 @@ interface AgentRow {
   status: string
   sandbox_enabled: boolean
   input_schema: unknown | null
+  output_schema: unknown | null
 }
 
 interface SandboxCreditsRow {
@@ -137,7 +138,7 @@ export async function POST(
   // 3. Obtener agente por slug
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('id, endpoint_url, price_per_call, status, sandbox_enabled, input_schema')
+    .select('id, endpoint_url, price_per_call, status, sandbox_enabled, input_schema, output_schema')
     .eq('slug', slug)
     .single<AgentRow>()
 
@@ -280,6 +281,37 @@ export async function POST(
     return NextResponse.json({ error: 'Agent invocation failed' }, { status: 422 })
   }
 
+  // 9c. WAS-202: Validar output_schema ANTES de confirmar payment (post-agente, pre-insert)
+  if (agent.output_schema) {
+    const outputErr = validateInput(agent.output_schema, agentResult)
+    if (outputErr) {
+      // Reembolso
+      if (!isAnonymous) {
+        await supabase.rpc('refund_sandbox_balance', {
+          p_user_id: user!.id,
+          p_amount:  agent.price_per_call,
+        })
+      }
+      // Insertar agent_calls con result_type schema_violation
+      await supabase.from('agent_calls').insert({
+        id:           randomUUID(),
+        agent_id:     agent.id,
+        caller_id:    user?.id ?? null,
+        caller_type:  'human',
+        amount_paid:  0,
+        is_trial:     true,
+        payment_type: 'sandbox',
+        status:       'error',
+        result_type:  'schema_violation',
+        called_at:    new Date().toISOString(),
+      })
+      return NextResponse.json(
+        { error: outputErr, code: 'output_schema_violation' },
+        { status: 422 }
+      )
+    }
+  }
+
   // 10. Registrar en agent_calls
   const callId = randomUUID()
   await supabase.from('agent_calls').insert({
@@ -291,6 +323,7 @@ export async function POST(
     is_trial:     true,
     payment_type: 'sandbox',
     status:       'completed',
+    result_type:  'success',
     called_at:    new Date().toISOString(),
   })
 
