@@ -166,11 +166,15 @@ export default function PublishForm({ initialDraft, from }: Props) {
         }
       }
 
-      // WAS-160b: Save technical fields first
+      // WAS-160b: Save technical fields first (WAS-196 + WAS-200: incluir sandbox_enabled + input_schema)
       const patchRes = await fetch(`/api/creator/agents/${draftSlug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint_url: data.endpoint_url }),
+        body: JSON.stringify({
+          endpoint_url:    data.endpoint_url,
+          sandbox_enabled: data.sandbox_enabled ?? true,
+          input_schema:    data.input_schema ?? null,
+        }),
       })
       if (!patchRes.ok) {
         const json = await patchRes.json() as Record<string, unknown>
