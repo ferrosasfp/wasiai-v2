@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     const { data: ownerProfile } = await serviceClient
       .from('creator_profiles')
       .select('id, wallet_address')
-      .eq('user_id', validKey.owner_id)
+      .eq('id', validKey.owner_id)
       .single()
 
     if (!ownerProfile) {
