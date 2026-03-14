@@ -9,6 +9,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
 import { createModelSchema } from '@/lib/schemas/model.schema'
+import { metaValidateSchema } from '@/lib/schema-validator'
 
 
 // ── PATCH — update agent fields ──────────────────────────────────────────────
@@ -37,6 +38,16 @@ export async function PATCH(
     const fieldErrors: Record<string, string> = {}
     result.error.issues.forEach(i => { fieldErrors[i.path[0] as string] = i.message })
     return NextResponse.json({ error: 'Validation failed', fields: fieldErrors }, { status: 400 })
+  }
+
+  // SEC-01: meta-validar input_schema y output_schema si se proporcionan
+  if (result.data.input_schema) {
+    const v = metaValidateSchema(result.data.input_schema)
+    if (!v.valid) return NextResponse.json({ error: v.error, code: 'invalid_input_schema' }, { status: 422 })
+  }
+  if (result.data.output_schema) {
+    const v = metaValidateSchema(result.data.output_schema)
+    if (!v.valid) return NextResponse.json({ error: v.error, code: 'invalid_output_schema' }, { status: 422 })
   }
 
   // Ownership check — use service client to bypass RLS on read, then update scoped to user

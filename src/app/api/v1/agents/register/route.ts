@@ -72,6 +72,7 @@ const RegisterAgentSchema = z.object({
 
   // WAS-200: JSON Schema draft-07 para validar inputs
   input_schema: z.unknown().optional().nullable(),
+  output_schema: z.unknown().optional().nullable(),
 })
 
 export async function POST(request: NextRequest) {
@@ -171,6 +172,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // WAS-202: Validar output_schema si existe
+  if (data.output_schema !== undefined && data.output_schema !== null) {
+    const schemaResult = metaValidateSchema(data.output_schema as object)
+    if (!schemaResult.valid) {
+      const isSSRF = schemaResult.error?.includes('External $ref blocked')
+      return NextResponse.json(
+        { error: schemaResult.error, code: isSSRF ? 'schema_ssrf_blocked' : 'invalid_json_schema' },
+        { status: 422 }
+      )
+    }
+  }
+
   // SEC-01 + NG-005: Block SSRF via endpoint_url (async version includes DNS probe)
   try {
     await validateEndpointUrlAsync(data.endpoint_url)
@@ -220,7 +233,8 @@ export async function POST(request: NextRequest) {
       // For open registration, use WasiAI's system account
       process.env.WASIAI_SYSTEM_CREATOR_ID ?? null
     ),
-    input_schema: data.input_schema ?? null,
+    input_schema:  data.input_schema ?? null,
+    output_schema: data.output_schema ?? null,
     metadata: {
       registered_via: authMethod,
       framework:      data.framework,
