@@ -684,6 +684,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           )
         }
 
+        const groupStartIndex = globalStepIndex
         const groupResults = await Promise.allSettled(
           group.map((step, i) => {
             const stepInput = step.input ?? ''
@@ -698,6 +699,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           if (gr.status === 'fulfilled' && gr.value.status === 'success') {
             receipts.push(gr.value.receipt!)
             successResults.push(gr.value.output ?? '')
+            // Best-effort: persist output for parallel step (mirrors serial block)
+            supabase.rpc('append_step_output', {
+              p_pipeline_id: pipelineId,
+              p_step:        groupStartIndex + i,
+              p_output:      typeof gr.value.output === 'string' ? gr.value.output : JSON.stringify(gr.value.output),
+              p_agent_slug:  group[i].agent_slug ?? '',
+            }).then(undefined, () => undefined)
           } else {
             const reason = gr.status === 'rejected' ? String(gr.reason) : gr.value.reason
             if (gr.status === 'fulfilled' && gr.value.refundFailure) refundFailures.push(gr.value.refundFailure)
