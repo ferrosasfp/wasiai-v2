@@ -2,21 +2,23 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { isAgentInScope } from '@/lib/scope-check'
 
 interface DiscoveryConstraints {
-  max_price_usdc?: number
-  min_reputation?: number
-  category?:       string
+  max_price_usdc?:  number
+  min_reputation?:  number
+  min_performance?: number  // performance_score 0-100 — NUEVO
+  category?:        string
 }
 
 export interface DiscoveredAgent {
-  id:             string
-  slug:           string
-  name:           string
-  category:       string
-  price_per_call: number
-  endpoint_url:   string
-  status:         string
-  max_rpm:        number | null
-  max_rpd:        number | null
+  id:                string
+  slug:              string
+  name:              string
+  category:          string
+  price_per_call:    number
+  endpoint_url:      string
+  status:            string
+  max_rpm:           number | null
+  max_rpd:           number | null
+  performance_score?: number | null  // NUEVO (WAS-187)
 }
 
 /**
@@ -35,7 +37,7 @@ export async function discoverAgent(
   // Usar contains para buscar agentes con esa capability por nombre
   let query = supabase
     .from('agents')
-    .select('id, slug, name, category, price_per_call, endpoint_url, status, max_rpm, max_rpd, capabilities, reputation_score')
+    .select('id, slug, name, category, price_per_call, endpoint_url, status, max_rpm, max_rpd, capabilities, reputation_score, performance_score')
     .eq('status', 'active')
     .contains('capabilities', JSON.stringify([{ name: capability }]))
 
@@ -45,11 +47,15 @@ export async function discoverAgent(
   if (constraints.min_reputation !== undefined) {
     query = query.gte('reputation_score', constraints.min_reputation)
   }
+  if (constraints.min_performance !== undefined) {
+    query = query.gte('performance_score', constraints.min_performance)
+  }
   if (constraints.category) {
     query = query.eq('category', constraints.category)
   }
 
   const { data: candidates } = await query
+    .order('performance_score', { ascending: false, nullsFirst: false })
     .order('reputation_score', { ascending: false, nullsFirst: false })
     .order('price_per_call', { ascending: true })
     .limit(10)
