@@ -45,5 +45,5 @@ export class WasiAIActionProvider extends ActionProvider {
     return JSON.stringify({ call_id: data.call_id, latency_ms, result: data.result })
   }
 
-  supportsNetwork = (_: Network) => true
+  supportsNetwork = (_network: Network) => true
 }
