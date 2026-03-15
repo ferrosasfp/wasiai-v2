@@ -23,6 +23,7 @@ export async function GET() {
       platformFeeBpsRaw,
       { data: configRow },
       { data: lastSettlement },
+      { count: failuresPending },
     ] = await Promise.all([
       OPERATOR_ADDRESS
         ? client.getBalance({ address: OPERATOR_ADDRESS }).catch(() => 0n)
@@ -45,6 +46,10 @@ export async function GET() {
         .order('called_at', { ascending: false })
         .limit(1)
         .single(),
+      supabase
+        .from('settlement_failures')
+        .select('id', { count: 'exact', head: true })
+        .is('resolved_at', null),
     ])
 
     const avaxBalance = Number(avaxBalanceRaw) / 1e18
@@ -55,6 +60,7 @@ export async function GET() {
       avaxBalanceLow: avaxBalance < 0.5,
       settlementMode: configRow?.value ?? 'vercel',
       lastSettlement: lastSettlement?.called_at ?? null,
+      settlement_failures_pending: failuresPending ?? 0,
     })
   } catch (err) {
     logger.error('[admin/status] error', { err })

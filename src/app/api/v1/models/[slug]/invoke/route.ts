@@ -443,7 +443,25 @@ export async function POST(
 
   // ── 6. Payment valid — call the upstream model ────────────────────────────
   const result = await callUpstream(model, request, slug)
-  await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
+  const { id: callId } = await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
+
+  // S6-01: Fire-and-forget — registrar failure "cobro sin servicio"
+  if (settlement.settled && result.status !== 'success') {
+    void Promise.resolve(
+      supabase.from('settlement_failures').insert({
+        settlement_tx_hash: settlement.transactionHash ?? 'unknown',
+        agent_slug: slug,
+        amount_usdc: model.price_per_call,
+        caller_wallet: null,
+        error_reason: String(result.data ?? 'upstream_error').slice(0, 500),
+        agent_call_id: callId ?? null,
+      })
+    ).then(() => {
+      logger.warn('[invoke] settlement_failure recorded', { slug, txHash: settlement.transactionHash })
+    }).catch((err: unknown) => {
+      logger.error('[invoke] settlement_failure insert failed', { err: String(err).slice(0, 200), txHash: settlement.transactionHash })
+    })
+  }
 
   // WAS-74: Fire-and-forget webhook trigger — never await, never blocks TTFB
   if (model.creator_id) {
