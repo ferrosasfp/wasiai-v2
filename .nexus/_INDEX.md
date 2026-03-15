@@ -74,3 +74,9 @@
 | 064 | 2026-03-15 | S6-01 | Error recovery post-settlement: tabla settlement_failures + admin status | feature | HU-MAJOR | DONE | edb3461 |
 | 065 | 2026-03-15 | S6-02 | Observabilidad x402: logs estructurados + x402_health en admin/status | feature | HU-MAJOR | DONE | b2defe6 |
 | 066 | 2026-03-15 | S6-audit | Fix post-audit: RLS settlement_failures + auth admin/status + Supabase error check | fix | FAST-FIX | DONE | 45b9bdf |
+| 067 | 2026-03-15 | S7-01 | avaxBalance BigInt fix — log errors + avaxBalanceError en admin/status | bugfix | FAST-FIX | DONE | d3fde150 |
+| 068 | 2026-03-15 | S7-02 | min_performance filter aplicado en slim + search paths de GET /agents | bugfix | FAST-FIX | DONE | aa2528ae |
+| 069 | 2026-03-15 | WAS-192 | Non-custodial messaging en landing, onboarding y PayToCallButton | improvement | FAST-FIX | DONE | 5a0c5771 |
+| 070 | 2026-03-15 | S7-03 | Nonce x402 persistido en agent_calls + 402 payment_already_used en replay | improvement | HU-MINOR | DONE | 2189aa6f |
+| 071 | 2026-03-15 | WAS-207 | POST /introspect — COB firmado + pricing por depth + auth dual | feature | HU-MAJOR | DONE | eeeddaa1 |
+| 072 | 2026-03-15 | WAS-188 | Reputación ponderada — votes_weighted component + weightedPaidRatio | improvement | HU-MAJOR | DONE | e6033cf7 |
