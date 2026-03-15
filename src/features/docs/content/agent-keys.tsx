@@ -1,3 +1,6 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
 import { CodeBlock } from '../components/CodeBlock'
 
 const CREATE_KEY: Parameters<typeof CodeBlock>[0]['tabs'] = [
@@ -14,7 +17,7 @@ curl -X POST https://app.wasiai.io/api/agent-keys \\
 
 # Response:
 {
-  "key": "wai_xxxxxxxxxxxx",
+  "key": "wasi_xxxxxxxxxxxx",
   "budget_usdc": 10
 }
 # ⚠️ The key is shown ONCE. Store it in a safe place.`,
@@ -27,7 +30,7 @@ const USE_KEY: Parameters<typeof CodeBlock>[0]['tabs'] = [
     language: 'bash',
     code: `curl -X POST https://app.wasiai.io/api/v1/models/wasi-defi-sentiment/invoke \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: wai_xxxxxxxxxxxx" \\
+  -H "x-agent-key: wasi_xxxxxxxxxxxx" \\
   -d '{"input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}"}'`,
   },
   {
@@ -49,7 +52,7 @@ const BALANCE: Parameters<typeof CodeBlock>[0]['tabs'] = [
     label: 'curl',
     language: 'bash',
     code: `curl https://app.wasiai.io/api/v1/agent-keys/me \\
-  -H "X-API-Key: wai_xxxxxxxxxxxx"
+  -H "x-agent-key: wasi_xxxxxxxxxxxx"
 
 # Response:
 {
@@ -63,55 +66,85 @@ const BALANCE: Parameters<typeof CodeBlock>[0]['tabs'] = [
   },
 ]
 
+const SCOPED_KEY: Parameters<typeof CodeBlock>[0]['tabs'] = [
+  {
+    label: 'curl',
+    language: 'bash',
+    code: `# Create a key scoped to specific agents
+curl -X POST https://app.wasiai.io/api/agent-keys \\
+  -H "Content-Type: application/json" \\
+  -H "Cookie: <session>" \\
+  -d '{
+    "name": "defi-only-bot",
+    "budget_usdc": 10,
+    "allowed_slugs": ["wasi-defi-sentiment", "wasi-chainlink-price"],
+    "allowed_categories": ["defi"]
+  }'
+
+# If this key tries to invoke an agent outside its scope:
+# HTTP 403 { "code": "agent_not_in_scope", "message": "..." }`,
+  },
+]
+
 export function AgentKeysSection() {
+  const t = useTranslations('docs')
+
   return (
     <section id="agent-keys" className="scroll-mt-20 space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Agent Keys</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{t('agentKeysContent.title')}</h2>
         <p className="mt-2 text-gray-600">
-          Agent Keys are authentication credentials with <strong>USDC prepay</strong>.
-          Create a key with a budget, and each call automatically deducts the{' '}
-          <code className="bg-gray-100 px-1 rounded text-xs">price_per_call</code> of the invoked agent.
+          {t('agentKeysContent.description')}
         </p>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Create an Agent Key</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('agentKeysContent.createTitle')}</h3>
         <CodeBlock tabs={CREATE_KEY} />
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Use the key</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('agentKeysContent.useTitle')}</h3>
         <p className="text-sm text-gray-600">
-          Include the header <code className="bg-gray-100 px-1 rounded text-xs">X-API-Key: wai_...</code> in
-          every request to the API.
+          {t('agentKeysContent.useDescription')}
         </p>
         <CodeBlock tabs={USE_KEY} />
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Check balance</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('agentKeysContent.balanceTitle')}</h3>
         <CodeBlock tabs={BALANCE} />
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Fund on-chain</h3>
+        <h3 className="text-base font-semibold text-gray-800">{t('agentKeysContent.scopingTitle')}</h3>
         <p className="text-sm text-gray-600">
-          To deposit USDC into your key, go to the dashboard at{' '}
+          {t('agentKeysContent.scopingDescription')}
+        </p>
+        <CodeBlock tabs={SCOPED_KEY} />
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+          {t('agentKeysContent.scopingNote')}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold text-gray-800">{t('agentKeysContent.fundTitle')}</h3>
+        <p className="text-sm text-gray-600">
+          {t('agentKeysContent.fundDescription')}{' '}
           <a href="https://app.wasiai.io/en/agent-keys" className="text-avax-600 underline hover:text-avax-700">
             app.wasiai.io/en/agent-keys
           </a>
-          . The dashboard automatically handles the ERC-3009 transfer from your connected wallet.
+          {t('agentKeysContent.fundSuffix')}
         </p>
       </div>
 
       <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 text-sm space-y-2">
-        <p className="font-semibold text-gray-800">Limits & lifecycle</p>
+        <p className="font-semibold text-gray-800">{t('agentKeysContent.limitsTitle')}</p>
         <ul className="list-disc list-inside text-gray-600 space-y-0.5">
-          <li>Minimum budget: <strong>1 USDC</strong> / maximum: <strong>1000 USDC</strong> per key</li>
-          <li>State: <strong>active</strong> → low balance warning → <strong>exhausted</strong></li>
-          <li>When exhausted: calls return <code className="bg-gray-100 px-1 rounded text-xs">402 INSUFFICIENT_BALANCE</code></li>
-          <li>Refund available from the dashboard if the key hasn&apos;t been used recently</li>
+          <li>{t('agentKeysContent.limit1')}</li>
+          <li>{t('agentKeysContent.limit2')}</li>
+          <li>{t('agentKeysContent.limit3')}</li>
+          <li>{t('agentKeysContent.limit4')}</li>
         </ul>
       </div>
     </section>

@@ -1,3 +1,5 @@
+'use client'
+
 import { EndpointCard } from '../components/EndpointCard'
 
 export function ApiReferenceSection() {
@@ -15,13 +17,13 @@ export function ApiReferenceSection() {
       <EndpointCard
         method="POST"
         path="/agents/:slug/invoke"
-        description="Invoke an agent with a JSON payload. Returns the agent's output synchronously."
+        description="Invoke an agent with a JSON payload. Returns the agent's output synchronously. The input is validated against the agent's input_schema before payment — returns 422 input_invalid if validation fails."
         auth={true}
         params={[
           { name: ':slug', type: 'string', required: true, description: 'Agent slug identifier (e.g. wasi-defi-sentiment)' },
         ]}
         bodyParams={[
-          { name: 'input', type: 'object', required: true, description: "Input object for the agent — structure depends on the agent's input_schema" },
+          { name: 'input', type: 'object', required: true, description: "Input object for the agent — structure depends on the agent's input_schema. Validated pre-payment; returns 422 input_invalid if it doesn't match." },
         ]}
         responseExample={`{
   "result": {
@@ -94,6 +96,32 @@ export function ApiReferenceSection() {
   "receipts": [
     { "step": 0, "agent_slug": "wasi-chainlink-price", "cost_usdc": "0.05", "receipt_signature": "0x..." }
   ]
+}`}
+      />
+
+      <EndpointCard
+        method="GET"
+        path="/agents/:slug"
+        description="Get full metadata for a single agent by slug. Includes input_schema, output_schema, sandbox status and performance score."
+        auth={false}
+        params={[
+          { name: ':slug', type: 'string', required: true, description: 'Agent slug identifier' },
+        ]}
+        responseExample={`{
+  "slug": "wasi-defi-sentiment",
+  "name": "DeFi Sentiment",
+  "category": "defi",
+  "tags": ["sentiment", "defi"],
+  "price_per_call_usdc": 0.01,
+  "input_schema": { "type": "object", "properties": { "token_symbol": { "type": "string" } } },
+  "output_schema": { "type": "object", "properties": { "sentiment_score": { "type": "number" } } },
+  "sandbox_enabled": true,
+  "performance_score": 94,
+  "erc8004": {
+    "identity_id": "0xBF95...",
+    "reputation_score": 0.87,
+    "total_invocations": 1420
+  }
 }`}
       />
 

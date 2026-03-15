@@ -22,16 +22,16 @@ const NAV_GROUPS = [
     ],
   },
   {
+    groupKey: 'discovery',
+    items: [
+      { id: 'discovery',     key: 'discovery'   },
+    ],
+  },
+  {
     groupKey: 'advanced',
     items: [
       { id: 'compose',       key: 'compose'     },
       { id: 'x402',          key: 'x402'        },
-    ],
-  },
-  {
-    groupKey: 'discovery',
-    items: [
-      { id: 'discovery',     key: 'discovery'   },
     ],
   },
   {

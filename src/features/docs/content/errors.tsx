@@ -1,3 +1,7 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
+
 interface ErrorRow {
   status: number
   code: string
@@ -16,7 +20,7 @@ const ERRORS: ErrorRow[] = [
     status: 401,
     code: 'UNAUTHORIZED',
     description: 'Missing or invalid API key.',
-    solution: 'Add the X-API-Key header with a valid key from your Agent Keys page.',
+    solution: 'Add the x-agent-key header with a valid key from your Agent Keys page.',
   },
   {
     status: 402,
@@ -41,6 +45,12 @@ const ERRORS: ErrorRow[] = [
     code: 'AGENT_NOT_FOUND',
     description: 'No agent found with the provided slug.',
     solution: 'Double-check the slug. Slugs are case-sensitive.',
+  },
+  {
+    status: 422,
+    code: 'input_invalid',
+    description: "Input failed pre-payment validation against the agent's input_schema.",
+    solution: "Fix your payload to match the agent's input_schema. Use GET /api/v1/agents/:slug to inspect it.",
   },
   {
     status: 429,
@@ -117,13 +127,14 @@ const STATUS_COLOR: Record<number, string> = {
 }
 
 export function ErrorsSection() {
+  const t = useTranslations('docs')
+
   return (
     <section id="errors" className="scroll-mt-20 space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Errors</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{t('errorsContent.title')}</h2>
         <p className="mt-2 text-gray-600">
-          All errors return a JSON body with <code className="bg-gray-100 px-1 rounded text-xs">code</code> and{' '}
-          <code className="bg-gray-100 px-1 rounded text-xs">message</code> fields.
+          {t('errorsContent.description')}
         </p>
       </div>
 
@@ -131,10 +142,10 @@ export function ErrorsSection() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Code</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Description</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Solution</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">{t('errorsContent.colStatus')}</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">{t('errorsContent.colCode')}</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">{t('errorsContent.colDescription')}</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">{t('errorsContent.colSolution')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -157,14 +168,14 @@ export function ErrorsSection() {
       </div>
 
       <div className="rounded-lg bg-gray-50 border border-gray-200 p-4">
-        <p className="text-sm font-semibold text-gray-700 mb-2">Example error response</p>
+        <p className="text-sm font-semibold text-gray-700 mb-2">{t('errorsContent.exampleTitle')}</p>
         <pre className="text-xs font-mono text-gray-600">
 {`HTTP/1.1 401 Unauthorized
 Content-Type: application/json
 
 {
   "code": "UNAUTHORIZED",
-  "message": "Invalid or missing X-API-Key header"
+  "message": "Invalid or missing x-agent-key header"
 }`}
         </pre>
       </div>
