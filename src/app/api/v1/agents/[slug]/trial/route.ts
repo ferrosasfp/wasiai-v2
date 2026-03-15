@@ -166,6 +166,9 @@ export async function POST(
 
   try {
     const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (process.env.INTERNAL_API_SECRET) {
+      reqHeaders['x-internal-secret'] = process.env.INTERNAL_API_SECRET
+    }
 
     const agentRes = await fetch(agent.endpoint_url as string, {
       method: 'POST',
