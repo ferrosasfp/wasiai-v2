@@ -467,7 +467,19 @@ export async function POST(
     latency_ms: result.latencyMs,
     charged: result.status === 'success',
   })
-  const { id: callId } = await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
+  // WAS-132: Extract EIP-3009 nonce from payment authorization for idempotency
+  const x402Nonce = (paymentHeader?.payload as X402EVMPayload | undefined)
+    ?.authorization?.nonce ?? null
+
+  const logResult = await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug, x402Nonce)
+  // WAS-132: Unique constraint violation on nonce = replay attack — return 402
+  if (logResult.error?.code === 'payment_already_used') {
+    return NextResponse.json(
+      { error: 'payment_already_used', code: 'payment_already_used' },
+      { status: 402 },
+    )
+  }
+  const callId = logResult.id
 
   // S6-01: Fire-and-forget — registrar failure "cobro sin servicio"
   if (settlement.settled && result.status !== 'success') {
@@ -629,7 +641,8 @@ async function logCall(
   result: { status: string; latencyMs: number },
   keyId?: string | null,
   agentSlug?: string | null,
-): Promise<{ id?: string }> {
+  nonce?: string | null,
+): Promise<{ id?: string; error?: { code: string } }> {
   // PERF-06: supabase is already resolved — no redundant await
   const [insertResult] = await Promise.all([
     supabase.from('agent_calls').insert({
@@ -642,6 +655,7 @@ async function logCall(
       latency_ms:      result.latencyMs,
       key_id:          keyId ?? null,
       agent_slug:      agentSlug ?? null,
+      nonce:           nonce ?? null,
     }).select('id').single(),
     result.status === 'success'
       ? supabase.rpc('increment_agent_stats', {
@@ -650,6 +664,10 @@ async function logCall(
         })
       : Promise.resolve(),
   ])
+  // WAS-132: 23505 = unique_violation on nonce index — replay attack detected
+  if (insertResult.error && (insertResult.error as { code?: string }).code === '23505') {
+    return { error: { code: 'payment_already_used' } }
+  }
   // HAL-021: callId viene directamente del insert (no de búsqueda posterior)
   // Esto previene race conditions donde dos llamadas concurrentes podrían
   // obtener el mismo callId si se buscara por ORDER BY called_at DESC LIMIT 1
