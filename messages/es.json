@@ -749,7 +749,10 @@
     "freeTrial": "🎁 Prueba gratuita",
     "agent": "agente",
     "inputSchemaTitle": "Input Schema",
-    "inputSchemaDesc": "Este agente valida los inputs contra el siguiente JSON Schema (draft-07)."
+    "inputSchemaDesc": "Este agente valida los inputs contra el siguiente JSON Schema (draft-07).",
+    "performanceBadge": {
+      "label": "Rendimiento"
+    }
   },
   "wallet": {
     "connectWallet": "Conectar Wallet",

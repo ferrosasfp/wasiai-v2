@@ -3,6 +3,7 @@ import { setRequestLocale, getTranslations } from 'next-intl/server'
 import { getModelBySlug } from '@/features/models/services/models.service'
 import { ModelCallSection } from '@/features/models/components/ModelCallSection'
 import { AgentRating } from '@/features/reputation/components/AgentRating'
+import { PerformanceBadge } from '@/features/reputation/components/PerformanceBadge'
 import { AgentTrialPlayground } from '@/features/agents/components/AgentTrialPlayground'
 import { CodeExamples } from '@/features/models/components/CodeExamples'
 import { ReputationMetrics } from '@/features/models/components/ReputationMetrics'
@@ -311,7 +312,8 @@ X-PAYMENT: <x402-eip712-signed-payload>
             {/* HU-4.4: Métricas de reputación con datos reales */}
             <ReputationMetrics agentId={model.id} />
 
-            {/* ERC-8004 Reputation */}
+            {/* WAS-191: Performance badge + ERC-8004 Reputation */}
+            <PerformanceBadge score={model.performance_score ?? null} />
             <AgentRating
               slug={model.slug}
               initialScore={model.reputation_score ?? null}

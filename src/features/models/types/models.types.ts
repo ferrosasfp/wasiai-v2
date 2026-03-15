@@ -62,6 +62,9 @@ export interface Model {
   // WAS-200: JSON Schema draft-07 para validar inputs
   input_schema: Record<string, unknown> | null
 
+  // WAS-191: Operational performance score (0-100)
+  performance_score?: number | null
+
   // joined
   creator?: CreatorProfile
 }
