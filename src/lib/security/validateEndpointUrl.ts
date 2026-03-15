@@ -55,7 +55,7 @@ function isBlockedHost(hostname: string): boolean {
  * This prevents DNS rebinding where the initial resolve returns a public IP
  * but a subsequent resolve (at connection time) returns 127.0.0.1.
  */
-async function validateResolvedIPs(hostname: string): Promise<void> {
+async function validateResolvedIPs(hostname: string): Promise<string> {
   try {
     // Dynamic import: only works in Node.js runtime, not Edge
     const dns = await import('node:dns/promises')
@@ -65,6 +65,11 @@ async function validateResolvedIPs(hostname: string): Promise<void> {
         throw new Error(`Resolved IP ${address} is private or internal`)
       }
     }
+    // Return the first resolved IP for use by callers (e.g. DNS rebinding protection via direct IP connect)
+    if (addresses.length > 0) {
+      return addresses[0].address
+    }
+    throw new Error(`No addresses resolved for hostname: ${hostname}`)
   } catch (err) {
     // If import fails (Edge runtime), skip DNS probe — basic blocklist still applies
     if (err instanceof Error && err.message.includes('private or internal')) {
@@ -74,11 +79,13 @@ async function validateResolvedIPs(hostname: string): Promise<void> {
     if (err instanceof Error && (
       err.message.includes('ENOTFOUND') ||
       err.message.includes('ETIMEOUT') ||
-      err.message.includes('EAI_AGAIN')
+      err.message.includes('EAI_AGAIN') ||
+      err.message.includes('No addresses resolved')
     )) {
       throw new Error(`DNS resolution failed for hostname: ${hostname}`)
     }
-    // Module not available (Edge runtime) — skip probe silently
+    // Module not available (Edge runtime) — skip probe silently, return empty string
+    return ''
   }
 }
 
@@ -105,9 +112,9 @@ export function validateEndpointUrl(rawUrl: string): void {
  * Async version with DNS probe — use when in Node.js runtime (API routes).
  * Falls back gracefully if DNS unavailable (Edge runtime).
  */
-export async function validateEndpointUrlAsync(rawUrl: string): Promise<void> {
+export async function validateEndpointUrlAsync(rawUrl: string): Promise<string> {
   validateEndpointUrl(rawUrl) // synchronous basic check first
 
   const url = new URL(rawUrl)
-  await validateResolvedIPs(url.hostname)
+  return validateResolvedIPs(url.hostname)
 }
