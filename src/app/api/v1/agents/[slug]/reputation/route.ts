@@ -166,7 +166,13 @@ export async function GET(
   const totalCalls30d  = callsBreakdown?.length ?? 0
   const paidCount      = callsBreakdown?.filter(c => c.payment_type === 'x402').length ?? 0
   const keyCount       = callsBreakdown?.filter(c => c.payment_type === 'key').length ?? 0
-  const paidRatio      = totalCalls30d > 0 ? (paidCount + keyCount) / totalCalls30d : 0
+  const trialCount     = callsBreakdown?.filter(c => c.is_trial === true).length ?? 0
+  // WAS-188 BUG-02 fix: weighted ratio (x402=3, key=2, trial=1) instead of flat ratio
+  const weightedTotal    = paidCount * 3 + keyCount * 2 + trialCount * 1
+  const weightedPaidRatio = totalCalls30d > 0
+    ? (paidCount * 3 + keyCount * 2) / Math.max(1, weightedTotal)
+    : 0
+  const paidRatio = weightedPaidRatio
 
   // Trend (comparación 7d vs 7d previos)
   const trend = await calcTrend(supabase, agent.id)
