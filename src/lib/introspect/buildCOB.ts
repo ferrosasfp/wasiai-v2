@@ -61,7 +61,6 @@ export function assembleCOB(opts: BuildCOBOptions): Omit<COB, 'operator_signatur
     } else {
       // Incremental: only entries with a "delta" or "diff" key, or first 10
       memoryDiffs = raw
-        .filter((e) => typeof e === 'object' && e !== null && ('delta' in e || 'diff' in e))
         .slice(0, opts.depth === 'mid' ? 20 : 10)
     }
   }
