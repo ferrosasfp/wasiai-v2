@@ -161,6 +161,10 @@ export async function signAgentPayment(
  * @param targetSlug    - Slug del agente destino
  * @param input         - Payload a enviar al agente destino
  */
+function parseAgentInput(raw: string): unknown {
+  try { return JSON.parse(raw) } catch { return raw }
+}
+
 export async function invokeAgentWithPayment(
   callerAgentId: string,
   targetSlug:    string,
@@ -185,7 +189,7 @@ export async function invokeAgentWithPayment(
     probeRes = await fetch(invokeUrl, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ input }),
+      body:    JSON.stringify({ input: parseAgentInput(input) }),
     })
   } catch (err) {
     throw new AgentPayError('probe_failed', `Probe request failed: ${String(err)}`)
@@ -234,7 +238,7 @@ export async function invokeAgentWithPayment(
         'Content-Type': 'application/json',
         'X-PAYMENT':    paymentHeaderB64,
       },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input: parseAgentInput(input) }),
     })
   } catch (err) {
     throw new AgentPayError('payment_failed', `Paid request failed: ${String(err)}`)
