@@ -30,8 +30,9 @@ export async function GET(request: NextRequest) {
   const maxPrice   = searchParams.get('max_price')
   const limit      = Math.min(Number(searchParams.get('limit')  ?? 20), 100)
   const offset     = Number(searchParams.get('offset') ?? 0)
-  const slim       = searchParams.get('slim') === 'true' // PERF-05: lightweight mode
+  const slim        = searchParams.get('slim') === 'true' // PERF-05: lightweight mode
   const sandboxOnly = searchParams.get('sandbox') === 'true' // WAS-196: solo agentes con sandbox habilitado
+  const minReputation = searchParams.get('min_reputation') // WAS-213: filter by performance_score
 
   const supabase = await createClient()
 
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
   if (slim) {
     let slimQuery = supabase
       .from('agents')
-      .select('slug, name, description, category, agent_type, price_per_call, is_featured, mcp_tool_name', { count: 'exact' })
+      .select('slug, name, description, category, agent_type, price_per_call, is_featured, mcp_tool_name, sandbox_enabled', { count: 'exact' })
       .eq('status', 'active')
       .order('is_featured', { ascending: false })
       .order('total_calls', { ascending: false })
@@ -111,6 +112,7 @@ export async function GET(request: NextRequest) {
         invoke_url:     `${SITE_URL}/api/v1/models/${a.slug}/invoke`,
         mcp_tool_name:  a.mcp_tool_name ?? a.slug.replace(/-/g, '_'),
         featured:       a.is_featured,
+        sandbox_enabled: a.sandbox_enabled ?? true,
       })),
     }, { headers: CORS })
   }
@@ -128,6 +130,8 @@ export async function GET(request: NextRequest) {
       total_calls, total_revenue,
       on_chain_registered, erc8004_id,
       reputation_score, reputation_count,
+      sandbox_enabled,
+      performance_score,
       is_featured, created_at,
       creator:creator_profiles(
         id, username, display_name, verified, wallet_address
@@ -138,10 +142,14 @@ export async function GET(request: NextRequest) {
     .order('total_calls',  { ascending: false })
     .range(offset, offset + limit - 1)
 
-  if (category)    query = query.eq('category',   category)
-  if (agentType)   query = query.eq('agent_type', agentType)
-  if (maxPrice)    query = query.lte('price_per_call', parseFloat(maxPrice))
-  if (sandboxOnly) query = query.eq('sandbox_enabled', true) // WAS-196
+  if (category)       query = query.eq('category',   category)
+  if (agentType)      query = query.eq('agent_type', agentType)
+  if (maxPrice)       query = query.lte('price_per_call', parseFloat(maxPrice))
+  if (sandboxOnly)    query = query.eq('sandbox_enabled', true) // WAS-196
+  if (minReputation) { // WAS-213
+    const val = parseFloat(minReputation)
+    if (!isNaN(val)) query = query.gte('performance_score', val)
+  }
 
   const { data, error, count } = await query
 
@@ -223,10 +231,14 @@ export async function GET(request: NextRequest) {
         count: agent.reputation_count ?? 0,
       },
 
+      // Performance (WAS-213)
+      performance_score: agent.performance_score ?? null,
+
       // Input/Output validation (WAS-200/202)
       input_schema:  agent.input_schema ?? null,
       output_schema: agent.output_schema ?? null,
       capabilities:  agent.capabilities ?? [],
+      sandbox_enabled: agent.sandbox_enabled ?? true,
 
       // Stats
       stats: {

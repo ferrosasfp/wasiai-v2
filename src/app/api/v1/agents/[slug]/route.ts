@@ -33,7 +33,8 @@ export async function GET(
       id, slug, name, description, category, agent_type, status,
       price_per_call, cover_image, is_featured,
       endpoint_url, mcp_tool_name, capabilities, input_schema, output_schema,
-      total_calls, total_revenue, reputation_score, reputation_count,
+      total_calls, total_revenue, reputation_score, reputation_count, performance_score,
+      sandbox_enabled,
       created_at,
       creator:creator_profiles(id, username, display_name, avatar_url, verified)
     `)
@@ -89,12 +90,14 @@ export async function GET(
       score: agent.reputation_score,
       count: agent.reputation_count ?? 0,
     },
+    performance_score: agent.performance_score ?? null, // WAS-213
     stats: {
       total_calls:   agent.total_calls ?? 0,
       total_revenue: Number(agent.total_revenue ?? 0),
     },
     input_schema:  agent.input_schema ?? null,
     output_schema: agent.output_schema ?? null,
+    sandbox_enabled: agent.sandbox_enabled ?? true,
     creator: agent.creator ?? null,
     created_at: agent.created_at,
     p50_latency_ms:         metrics?.p50_latency_ms ?? null,
