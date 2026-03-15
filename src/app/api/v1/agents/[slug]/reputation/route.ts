@@ -171,5 +171,6 @@ export async function GET(
     reputation_score:      agent.reputation_score     ?? null,  // votos: 0.0-1.0
     reputation_count:      agent.reputation_count     ?? 0,     // número de votos
     erc8004_score:         agent.reputation_score     ?? null,  // WAS-199: normalizado 0-1 (= reputation_score)
+    format_compliance_pct: null,  // placeholder — WAS-202
   }, { status: 200, headers: CORS })
 }
