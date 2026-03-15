@@ -266,7 +266,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
       if (!isAgentInScope(agent.slug, agent.category, keyRow.allowed_slugs, keyRow.allowed_categories)) {
         return NextResponse.json(
-          { error: 'Agent not in key scope', code: 'scope_violation', slug: agent.slug },
+          { error: 'Agent not in scope', code: 'agent_not_in_scope', slug: agent.slug },
           { status: 403 }
         )
       }
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
         // AC-4: sin match → 422
         return NextResponse.json(
-          { error: `No agent found for capability: ${step.capability}`, code: fallbackOutOfScope ? 'scope_violation' : 'no_agent_match', step: i },
+          { error: `No agent found for capability: ${step.capability}`, code: fallbackOutOfScope ? 'agent_not_in_scope' : 'no_agent_match', step: i },
           { status: 422 }
         )
       }

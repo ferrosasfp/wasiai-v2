@@ -29,6 +29,7 @@ const USDC_ADDR  = CHAIN_ID_NUM === 43114
   : '0x5425890298aed601595a70AB815c96711a31Bc65'   // Avalanche Fuji USDC (Circle test token)
 
 import { SITE_URL } from '@/lib/constants'
+import { isAgentInScope } from '@/lib/scope-check'
 
 /**
  * Build x402 payment requirements manually.
@@ -160,7 +161,7 @@ export async function POST(
     keyHash
       ? supabase
           .from('agent_keys')
-          .select('id, key_hash, is_active, budget_usdc, spent_usdc')
+          .select('id, key_hash, is_active, budget_usdc, spent_usdc, allowed_slugs, allowed_categories')
           .eq('key_hash', keyHash)
           .eq('is_active', true)
           .single()
@@ -230,6 +231,30 @@ export async function POST(
       return NextResponse.json(
         { error: 'Invalid or inactive agent key', code: 'invalid_key' },
         { status: 401 },
+      )
+    }
+
+    // WAS-186: Scope check — BEFORE any payment processing
+    // AC3: empty array [] = no access (explicit early return)
+    const hasSlugScope     = Array.isArray(keyRow.allowed_slugs)      && keyRow.allowed_slugs.length > 0
+    const hasCategoryScope = Array.isArray(keyRow.allowed_categories) && keyRow.allowed_categories.length > 0
+    const isEmptyScope     = (keyRow.allowed_slugs !== null      && !hasSlugScope)
+                          || (keyRow.allowed_categories !== null && !hasCategoryScope)
+
+    if (isEmptyScope) {
+      return NextResponse.json(
+        { error: 'Agent not in scope', code: 'agent_not_in_scope' },
+        { status: 403 },
+      )
+    }
+
+    const slugsForCheck      = hasSlugScope     ? keyRow.allowed_slugs      : null
+    const categoriesForCheck = hasCategoryScope ? keyRow.allowed_categories : null
+
+    if (!isAgentInScope(slug, model.category, slugsForCheck, categoriesForCheck)) {
+      return NextResponse.json(
+        { error: 'Agent not in scope', code: 'agent_not_in_scope' },
+        { status: 403 },
       )
     }
 

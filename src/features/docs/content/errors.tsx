@@ -92,7 +92,7 @@ const ERRORS: ErrorRow[] = [
   },
   {
     status: 403,
-    code: 'scope_violation',
+    code: 'agent_not_in_scope',
     description: 'The Agent Key does not have permission to invoke the requested agent.',
     solution: 'Check allowed_slugs or allowed_categories on this key.',
   },
