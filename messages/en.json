@@ -1107,5 +1107,10 @@
       "success": "Agent upgraded to on-chain!",
       "error": "Upgrade failed: {message}"
     }
+  },
+  "nonCustodial": {
+    "badge": "Non-custodial · Your wallet, your funds",
+    "tooltip": "WasiAI never holds your funds. You sign payments directly with your wallet — we never have access to your USDC.",
+    "onboardingNote": "How payments work: You sign with your wallet → USDC moves directly to the agent creator → WasiAI takes a small fee. Your keys, your money."
   }
 }

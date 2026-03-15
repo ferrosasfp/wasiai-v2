@@ -53,6 +53,7 @@ function InputExample({ example, onUse }: { example: string; onUse: (v: string) 
 
 export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const t = useTranslations('payToCall')
+  const tNC = useTranslations('nonCustodial')
   const { disconnect, address } = useWallet()
   const pendingPayRef = useRef(false)
   const [input, setInput] = useState('')
@@ -213,6 +214,13 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
       {/* Gasless note */}
       {mounted && ctx.state === 'idle' && ctx.address && (
         <p className="text-center text-xs text-gray-400">{t('gaslessNote')}</p>
+      )}
+
+      {/* WAS-192: Non-custodial tooltip */}
+      {mounted && (ctx.state === 'idle' || ctx.state === 'no_wallet') && (
+        <p className="rounded-lg bg-green-50 border border-green-100 px-3 py-2 text-xs text-green-700">
+          🔒 {tNC('tooltip')}
+        </p>
       )}
 
       {/* Fallback approve flow (EIP-3009 not supported by wallet) */}

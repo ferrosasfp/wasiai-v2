@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { setRequestLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
-import { Search, Bot } from 'lucide-react'
+import { Search, Bot, ShieldCheck } from 'lucide-react'
 
 // P-10: ISR — revalidate every 5 minutes (increased from 60s)
 export const revalidate = 300
@@ -36,6 +36,7 @@ export default async function HomePage({ params, searchParams }: Props) {
   setRequestLocale(locale)
   const t  = await getTranslations('home')
   const tc = await getTranslations('common')
+  const tNC = await getTranslations('nonCustodial')
   const tEmptySearch = await getTranslations('emptySearch')
   const tCollections = await getTranslations('collections')
 
@@ -126,6 +127,13 @@ export default async function HomePage({ params, searchParams }: Props) {
           badge={t('badge')}
           tabLabel={t('hero.tab.label')}
         />
+        {/* WAS-192: Non-custodial badge */}
+        <div className="mt-4 flex justify-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+            <ShieldCheck size={12} />
+            {tNC('badge')}
+          </span>
+        </div>
       </section>
 
       {/* ── Stats bar ────────────────────────────────────────────────────── */}

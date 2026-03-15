@@ -1107,5 +1107,10 @@
       "success": "¡Agente escalado a on-chain!",
       "error": "Error al escalar: {message}"
     }
+  },
+  "nonCustodial": {
+    "badge": "No custodial · Tu wallet, tus fondos",
+    "tooltip": "WasiAI nunca custodia tus fondos. Firmas los pagos directamente con tu wallet — nunca tenemos acceso a tu USDC.",
+    "onboardingNote": "Cómo funcionan los pagos: Firmas con tu wallet → el USDC va directo al creador → WasiAI cobra una pequeña comisión. Tus llaves, tu dinero."
   }
 }

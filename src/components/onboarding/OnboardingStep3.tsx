@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { completeOnboarding } from '@/app/[locale]/onboarding/actions'
+import { ShieldCheck } from 'lucide-react'
 
 interface Props {
   initialWallet: string | null
@@ -9,6 +10,7 @@ interface Props {
 
 export function OnboardingStep3({ initialWallet }: Props) {
   const t = useTranslations('onboarding.step3')
+  const tNC = useTranslations('nonCustodial')
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
@@ -36,6 +38,12 @@ export function OnboardingStep3({ initialWallet }: Props) {
             </p>
           </div>
         )}
+      </div>
+
+      {/* WAS-192: Non-custodial onboarding note */}
+      <div className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 mb-4 flex gap-2 text-xs text-green-700">
+        <ShieldCheck size={14} className="shrink-0 mt-0.5" />
+        <span>{tNC('onboardingNote')}</span>
       </div>
 
       <form action={completeOnboarding}>
