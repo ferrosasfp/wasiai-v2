@@ -17,6 +17,10 @@ interface HealthCheckResult {
 }
 
 export async function probeEndpoint(endpointUrl: string, agentId: string): Promise<void> {
+  // SECURITY_NOTE: SERVICE_ROLE key es necesaria aquí porque el probe corre sin
+  // sesión de usuario (fire-and-forget, fuera de cualquier request autenticado).
+  // Necesita escribir en la tabla `agents` para actualizar el health status.
+  // El scope está limitado únicamente a updates en `agents` via `.eq('id', agentId)`.
   const serviceClient = createServiceClient()
 
   // Step 1: SSRF check — validateEndpointUrlAsync antes de cualquier fetch
