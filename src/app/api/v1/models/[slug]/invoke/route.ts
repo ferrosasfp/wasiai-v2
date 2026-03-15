@@ -30,6 +30,7 @@ const USDC_ADDR  = CHAIN_ID_NUM === 43114
 
 import { SITE_URL } from '@/lib/constants'
 import { isAgentInScope } from '@/lib/scope-check'
+import { validateInput } from '@/lib/schema-validator'
 
 /**
  * Build x402 payment requirements manually.
@@ -222,6 +223,28 @@ export async function POST(
   const totalPrice = Math.round((creatorPrice + overhead) * 1_000_000) / 1_000_000
   const priceStr   = totalPrice.toFixed(6)
   const resourceUrl = `${SITE_URL}/api/v1/models/${slug}/invoke`
+
+  // WAS-200: Validate input BEFORE payment — no cobrar input inválido
+  if (model.input_schema) {
+    let inputVal: unknown
+    try {
+      const rawBody = await request.clone().json()
+      inputVal = rawBody.input ?? rawBody
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body', code: 'invalid_body' },
+        { status: 400 },
+      )
+    }
+
+    const validErr = validateInput(model.input_schema, inputVal)
+    if (validErr) {
+      return NextResponse.json(
+        { error: 'Input validation failed', code: 'input_invalid', details: [validErr] },
+        { status: 422 },
+      )
+    }
+  }
 
   // ── 2. Route A: Agent Key (budget-based) ─────────────────────────────────
   if (rawAgentKey) {
