@@ -292,16 +292,27 @@ export async function POST(
         )
       }
 
-      // Call upstream — only if valid payment (agent key with budget)
+      // BUG-02 fix: deduct budget atomically BEFORE calling upstream
+      const deductResult = await supabase.rpc('check_and_deduct_budget', {
+        p_key_id: keyRow.id,
+        p_amount: price,
+      })
+      if (deductResult.error || deductResult.data === false) {
+        logger.warn('[introspect] budget deduct failed or insufficient', { err: deductResult.error })
+        return NextResponse.json({ error: 'insufficient_budget' }, { status: 402, headers: X402_CORS_HEADERS })
+      }
+
+      // Call upstream — budget already deducted
       const upstream = await callUpstreamIntrospect(model, body)
 
+      // BUG-01 fix: truncated only on timeout, not on any error
       const cob = await buildCOB({
         agentSlug:       slug,
         depth:           body.depth,
-        upstreamData:    upstream.data,
+        upstreamData:    upstream.timedOut ? upstream.data : (upstream.status === 'error' ? {} : upstream.data),
         latencyMs:       upstream.latencyMs,
-        truncated:       upstream.timedOut || upstream.status === 'error',
-        truncatedReason: upstream.timedOut ? 'timeout' : upstream.status === 'error' ? 'upstream_error' : undefined,
+        truncated:       upstream.timedOut === true,
+        truncatedReason: upstream.timedOut === true ? 'timeout' : undefined,
         erc8004Identity: (model.on_chain_registered && model.creator_wallet)
           ? String(model.creator_wallet)
           : '',
@@ -309,14 +320,6 @@ export async function POST(
 
       // logCall with nonce=null (SDD §4.5 / S7-03 note)
       await logCall(supabase, model, 'agent', null, { status: upstream.status, latencyMs: upstream.latencyMs }, keyRow.id, slug, null)
-
-      // Deduct budget (best-effort, atomic)
-      void Promise.resolve(
-        supabase.rpc('check_and_deduct_budget', {
-          p_key_id: keyRow.id,
-          p_amount: price,
-        })
-      ).catch((err: unknown) => logger.warn('[introspect] budget deduct failed', { err }))
 
       return NextResponse.json(
         { cob, meta: { depth: body.depth, price: priceStr, currency: 'USDC', agent_slug: slug } },
@@ -355,13 +358,14 @@ export async function POST(
     // Payment valid — call upstream
     const upstream = await callUpstreamIntrospect(model, body)
 
+    // BUG-01 fix: truncated only on timeout, not on any error
     const cob = await buildCOB({
       agentSlug:       slug,
       depth:           body.depth,
-      upstreamData:    upstream.data,
+      upstreamData:    upstream.timedOut ? upstream.data : (upstream.status === 'error' ? {} : upstream.data),
       latencyMs:       upstream.latencyMs,
-      truncated:       upstream.timedOut || upstream.status === 'error',
-      truncatedReason: upstream.timedOut ? 'timeout' : upstream.status === 'error' ? 'upstream_error' : undefined,
+      truncated:       upstream.timedOut === true,
+      truncatedReason: upstream.timedOut === true ? 'timeout' : undefined,
       erc8004Identity: (model.on_chain_registered && model.creator_wallet)
         ? String(model.creator_wallet)
         : '',
