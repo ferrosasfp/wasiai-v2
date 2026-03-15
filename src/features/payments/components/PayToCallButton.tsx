@@ -188,7 +188,7 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
       <div className="space-y-1">
         <textarea
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={e => { setInput(e.target.value); if (ctx.state === 'error') reset() }}
           placeholder={buildExampleFromSchema(model.input_schema) || (model.metadata?.input_hint as string | undefined) || t('inputPlaceholder')}
           rows={6}
           className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-avax-400 focus:outline-none resize-none"
