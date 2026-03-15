@@ -107,7 +107,7 @@ export async function GET(
   // Fetch agent
   const { data: agent, error } = await supabase
     .from('agents')
-    .select('id, total_calls, reputation_score, is_verified, last_health_check_ok, last_health_check_at')
+    .select('id, total_calls, reputation_score, reputation_count, is_verified, last_health_check_ok, last_health_check_at, performance_score')
     .eq('slug', slug)
     .eq('status', 'active')
     .single()
@@ -167,6 +167,9 @@ export async function GET(
     is_verified:           agent.is_verified          ?? false,
     invocation_count:      agent.total_calls          ?? 0,
     dispute_rate:          0,   // placeholder — WAS-189 implementará tabla agent_disputes
-    erc8004_score:         null, // placeholder — WAS-194
+    performance_score:     agent.performance_score    ?? null,  // WAS-213: 0-100, null si <5 calls
+    reputation_score:      agent.reputation_score     ?? null,  // votos: 0.0-1.0
+    reputation_count:      agent.reputation_count     ?? 0,     // número de votos
+    erc8004_score:         agent.reputation_score     ?? null,  // WAS-199: normalizado 0-1 (= reputation_score)
   }, { status: 200, headers: CORS })
 }
