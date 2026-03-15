@@ -107,7 +107,7 @@ export async function GET(
   // Fetch agent
   const { data: agent, error } = await supabase
     .from('agents')
-    .select('id, total_calls, reputation_score, reputation_count, is_verified, last_health_check_ok, last_health_check_at, performance_score')
+    .select('id, total_calls, reputation_score, reputation_count, is_verified, health_check, last_checked_at, performance_score')
     .eq('slug', slug)
     .eq('status', 'active')
     .single()
@@ -143,9 +143,12 @@ export async function GET(
   const trend = await calcTrend(supabase, agent.id)
 
   // is_available
-  const isAvailable = agent.last_health_check_ok === true &&
-    agent.last_health_check_at !== null &&
-    new Date(agent.last_health_check_at).getTime() > Date.now() - 24 * 60 * 60 * 1000
+  // health_check JSONB (migración 057) — legacy columns last_health_check_ok/at no existen en prod
+  const healthCheck = agent.health_check as { passed?: boolean } | null
+  const isAvailable = healthCheck?.passed === true &&
+    agent.last_checked_at !== null &&
+    agent.last_checked_at !== undefined &&
+    new Date(agent.last_checked_at as string).getTime() > Date.now() - 24 * 60 * 60 * 1000
 
   // Score
   const score = calcScore({
