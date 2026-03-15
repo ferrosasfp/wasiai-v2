@@ -85,7 +85,12 @@ async function validateResolvedIPs(hostname: string): Promise<string> {
       throw new Error(`DNS resolution failed for hostname: ${hostname}`)
     }
     // Module not available (Edge runtime) — skip probe silently, return empty string
-    return ''
+    // Only silence import errors (module not found) — all DNS errors are handled above
+    if (err instanceof Error && (err.message.includes('Cannot find module') || err.message.includes('ERR_MODULE_NOT_FOUND'))) {
+      return ''
+    }
+    // Any other unexpected error → fail-closed (safe)
+    throw new Error(`DNS probe failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 

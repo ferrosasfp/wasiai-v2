@@ -39,13 +39,24 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
     return
   }
 
+  // Guard: resolvedIp empty means DNS probe unavailable (Edge runtime) — fail-closed
+  if (!resolvedIp) {
+    await updateAgentHealth(serviceClient, agentId, 'reviewing', {
+      passed: false,
+      reason: 'dns_rebinding_blocked',
+      message: 'DNS probe unavailable — endpoint cannot be verified.',
+      fix: 'Use a publicly accessible HTTPS URL.',
+    })
+    return
+  }
+
   // Step 2: Probe con timeout 5s — formato {"ping":true} compatible con /health existente
   // Conecta directamente a la IP validada (anti DNS rebinding) con SNI explícito
   const start = Date.now()
   await new Promise<void>((resolve) => {
     const urlObj = new URL(endpointUrl)
     const options = {
-      host: resolvedIp,           // IP validada — conexión TCP va aquí
+      host: resolvedIp.includes(':') ? `[${resolvedIp}]` : resolvedIp,  // IPv6 requiere brackets
       port: Number(urlObj.port) || 443,
       path: urlObj.pathname + urlObj.search,
       method: 'POST',
