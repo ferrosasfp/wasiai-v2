@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
   // S6-A3: NaN guard for min_performance
   let minPerformance: number | undefined = undefined
-  if (minPerfRaw !== null) {
+  if (minPerfRaw !== null && minPerfRaw.trim() !== '') {
     const parsed = Number(minPerfRaw)
     if (isNaN(parsed) || parsed < 0 || parsed > 100) {
       return NextResponse.json(

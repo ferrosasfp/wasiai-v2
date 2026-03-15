@@ -21,3 +21,13 @@ CREATE INDEX IF NOT EXISTS idx_settlement_failures_pending
 
 CREATE INDEX IF NOT EXISTS idx_settlement_failures_tx
   ON settlement_failures (settlement_tx_hash);
+
+-- RLS: tabla financiera — acceso solo via service_role (backend)
+ALTER TABLE settlement_failures ENABLE ROW LEVEL SECURITY;
+
+-- Bloquear acceso anon/authenticated vía PostgREST
+CREATE POLICY "settlement_failures_service_only"
+  ON settlement_failures
+  FOR ALL
+  TO authenticated, anon
+  USING (false);

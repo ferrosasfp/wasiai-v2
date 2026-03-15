@@ -480,8 +480,12 @@ export async function POST(
         error_reason: String(result.data ?? 'upstream_error').slice(0, 500),
         agent_call_id: callId ?? null,
       })
-    ).then(() => {
-      logger.warn('[invoke] settlement_failure recorded', { slug, txHash: settlement.transactionHash })
+    ).then((res) => {
+      if (res.error) {
+        logger.error('[invoke] settlement_failure insert DB error', { err: res.error.message, txHash: settlement.transactionHash })
+      } else {
+        logger.warn('[invoke] settlement_failure recorded', { slug, txHash: settlement.transactionHash })
+      }
     }).catch((err: unknown) => {
       logger.error('[invoke] settlement_failure insert failed', { err: String(err).slice(0, 200), txHash: settlement.transactionHash })
     })

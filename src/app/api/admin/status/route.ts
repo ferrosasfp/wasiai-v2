@@ -12,7 +12,13 @@ const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x
  * Sin auth requerida — el panel verifica ownership en cliente con wallet.
  * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement }
  */
-export async function GET() {
+export async function GET(req: Request) {
+  const authHeader = req.headers.get('authorization')
+  const adminSecret = process.env.ADMIN_SECRET
+  if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const supabase = createServiceClient()
     const client   = getPublicClient()
@@ -51,8 +57,9 @@ export async function GET() {
       supabase
         .from('settlement_failures')
         .select('id', { count: 'exact', head: true })
-        .is('resolved_at', null),
-      supabase.from('settlement_failures').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 86400000).toISOString()),
+        .is('resolved_at', null)
+        .then((r) => r.error ? { count: 0 } : r),
+      supabase.from('settlement_failures').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 86400000).toISOString()).then((r) => r.error ? { count: 0 } : r),
       supabase.from('agent_calls').select('id', { count: 'exact', head: true }).eq('payment_type', 'x402').gte('called_at', new Date(Date.now() - 86400000).toISOString()),
     ])
 
