@@ -29,24 +29,27 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS })
 }
 
-/** Calcula score 0-100 a partir de métricas operacionales */
+/** Calcula score 0-100 a partir de métricas operacionales (WAS-188: ponderación diferenciada) */
 function calcScore(params: {
-  errorRate7d:  number | null
-  p95Ms:        number | null
-  disputeRate:  number
-  isVerified:   boolean
-}): number {
-  const { errorRate7d, p95Ms, disputeRate, isVerified } = params
+  errorRate7d:       number | null
+  p95Ms:             number | null
+  disputeRate:       number
+  isVerified:        boolean
+  reputationScore:   number | null  // votos raw 0-1 (NO se modifica)
+  paidRatio:         number         // (x402 + key) / totalCalls
+  totalCalls:        number
+}): { score: number; signalWeights: { paid_ratio: number; votes_boost: number; model: string } } {
+  const { errorRate7d, p95Ms, disputeRate, isVerified, reputationScore, paidRatio, totalCalls } = params
 
-  // Error rate component (40%): 0% error = 40pts, 100% error = 0pts
+  // Error rate component (35%): 0% error = 35pts, 100% error = 0pts
   const errorComponent = errorRate7d !== null
-    ? (1 - Math.min(errorRate7d / 100, 1)) * 40
-    : 30 // valor neutral si no hay datos
+    ? (1 - Math.min(errorRate7d / 100, 1)) * 35
+    : 26.25 // valor neutral si no hay datos (35 * 0.75)
 
-  // Latency component (30%): <=200ms = 30pts, >=2000ms = 0pts
+  // Latency component (25%): <=200ms = 25pts, >=2000ms = 0pts
   const latencyScore = p95Ms !== null
-    ? Math.max(0, 30 - (p95Ms / 2000) * 30)
-    : 20 // valor neutral si no hay datos
+    ? Math.max(0, 25 - (p95Ms / 2000) * 25)
+    : 16.67 // valor neutral si no hay datos
 
   // Dispute rate component (20%): 0% = 20pts, 100% = 0pts
   const disputeComponent = (1 - Math.min(disputeRate, 1)) * 20
@@ -54,25 +57,39 @@ function calcScore(params: {
   // Verified bonus (10%)
   const verifiedBonus = isVerified ? 10 : 0
 
-  return Math.round(Math.min(100, Math.max(0,
-    errorComponent + latencyScore + disputeComponent + verifiedBonus
+  // Votes weighted component (10%) — WAS-188
+  // Si totalCalls < 5, no penalizar agentes nuevos (votesBoost = 1.0)
+  const votesBoost = totalCalls >= 5 && paidRatio > 0.5 ? 1.2 : 1.0
+  const votesComponent = Math.min(10, (reputationScore ?? 0.5) * 10 * votesBoost)
+
+  const score = Math.round(Math.min(100, Math.max(0,
+    errorComponent + latencyScore + disputeComponent + verifiedBonus + votesComponent
   )))
+
+  return {
+    score,
+    signalWeights: {
+      paid_ratio:  paidRatio,
+      votes_boost: votesBoost,
+      model:       'v2-weighted',
+    },
+  }
 }
 
 /** Calcula trend comparando error_rate últimos 7 días vs 7 días previos */
 async function calcTrend(supabase: Awaited<ReturnType<typeof createClient>>, agentId: string): Promise<'improving' | 'stable' | 'declining'> {
   const { data } = await supabase
     .from('agent_calls')
-    .select('status, created_at')
+    .select('status, called_at')
     .eq('agent_id', agentId)
-    .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+    .gte('called_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
 
   if (!data || data.length < 5) return 'stable'
 
   const now = Date.now()
-  const week1 = data.filter(c => new Date(c.created_at).getTime() > now - 7 * 86400_000)
+  const week1 = data.filter(c => new Date(c.called_at).getTime() > now - 7 * 86400_000)
   const week2 = data.filter(c => {
-    const t = new Date(c.created_at).getTime()
+    const t = new Date(c.called_at).getTime()
     return t > now - 14 * 86400_000 && t <= now - 7 * 86400_000
   })
 
@@ -133,11 +150,23 @@ export async function GET(
   // Última invocación
   const { data: lastCall } = await supabase
     .from('agent_calls')
-    .select('created_at')
+    .select('called_at')
     .eq('agent_id', agent.id)
-    .order('created_at', { ascending: false })
+    .order('called_at', { ascending: false })
     .limit(1)
     .single()
+
+  // Breakdown de tipos de invocación últimos 30 días (WAS-188) — usa called_at (idx_agent_calls_agent_called_at)
+  const { data: callsBreakdown } = await supabase
+    .from('agent_calls')
+    .select('payment_type, is_trial')
+    .eq('agent_id', agent.id)
+    .gte('called_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+
+  const totalCalls30d  = callsBreakdown?.length ?? 0
+  const paidCount      = callsBreakdown?.filter(c => c.payment_type === 'x402').length ?? 0
+  const keyCount       = callsBreakdown?.filter(c => c.payment_type === 'key').length ?? 0
+  const paidRatio      = totalCalls30d > 0 ? (paidCount + keyCount) / totalCalls30d : 0
 
   // Trend (comparación 7d vs 7d previos)
   const trend = await calcTrend(supabase, agent.id)
@@ -150,12 +179,15 @@ export async function GET(
     agent.last_checked_at !== undefined &&
     new Date(agent.last_checked_at as string).getTime() > Date.now() - 24 * 60 * 60 * 1000
 
-  // Score
-  const score = calcScore({
-    errorRate7d:  metrics?.error_rate_7d ?? null,
-    p95Ms:        metrics?.p95_latency_ms ?? null,
-    disputeRate:  0, // dispute_rate = 0 hasta WAS-194/tabla agent_disputes
-    isVerified:   agent.is_verified ?? false,
+  // Score (WAS-188: ponderación diferenciada v2-weighted)
+  const { score, signalWeights } = calcScore({
+    errorRate7d:      metrics?.error_rate_7d ?? null,
+    p95Ms:            metrics?.p95_latency_ms ?? null,
+    disputeRate:      0, // dispute_rate = 0 hasta WAS-194/tabla agent_disputes
+    isVerified:       agent.is_verified ?? false,
+    reputationScore:  agent.reputation_score ?? null,
+    paidRatio,
+    totalCalls:       totalCalls30d,
   })
 
   return NextResponse.json({
@@ -165,15 +197,16 @@ export async function GET(
     error_rate_7d:         metrics?.error_rate_7d    ?? null,
     error_rate_sample_size: metrics?.error_rate_sample ?? null,
     trend,
-    last_invocation_at:    lastCall?.created_at       ?? null,
+    last_invocation_at:    lastCall?.called_at        ?? null,
     is_available:          isAvailable,
     is_verified:           agent.is_verified          ?? false,
     invocation_count:      agent.total_calls          ?? 0,
     dispute_rate:          0,   // placeholder — WAS-189 implementará tabla agent_disputes
     performance_score:     agent.performance_score    ?? null,  // WAS-213: 0-100, null si <5 calls
-    reputation_score:      agent.reputation_score     ?? null,  // votos: 0.0-1.0
+    reputation_score:      agent.reputation_score     ?? null,  // votos: 0.0-1.0 (NO modificado — fuente on-chain)
     reputation_count:      agent.reputation_count     ?? 0,     // número de votos
     erc8004_score:         agent.reputation_score     ?? null,  // WAS-199: normalizado 0-1 (= reputation_score)
     format_compliance_pct: null,  // placeholder — WAS-202
+    signal_weights:        signalWeights,             // WAS-188: metadata de ponderación
   }, { status: 200, headers: CORS })
 }
