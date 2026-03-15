@@ -59,3 +59,8 @@
 | 054 | 2026-03-14 | WAS-197 | AgentKit × WasiAI ejemplo funcional con x-agent-key | feature | HU-MAJOR | DONE | 77cc218 |
 | 055 | 2026-03-14 | WAS-186 | Scope check en invoke directo + error code agent_not_in_scope | fix | QUALITY | DONE | 1adff02 |
 | 056 | 2026-03-14 | WAS-200 | validateInput pre-cobro en POST /invoke — input inválido retorna 422 sin cobrar | fix | QUALITY | DONE | c1d5e55 |
+| 057 | 2026-03-14 | F-03 | SECURITY_NOTE comment en probeEndpoint SERVICE_ROLE | fix | FAST-FIX | DONE | 4b0c789 |
+| 058 | 2026-03-14 | WAS-199 | /reputation endpoint: performance_score + reputation_score + erc8004_score + format_compliance_pct | feature | HU-MAJOR | DONE | c0c113f |
+| 059 | 2026-03-14 | WAS-191 | performance_score badge semafórico en perfil del agente UI | feature | HU-MINOR | DONE | 659251d |
+| 060 | 2026-03-14 | WAS-187 | discoverAgent rankea por performance_score DESC + min_performance constraint | improvement | HU-MAJOR | DONE | de42329 |
+| 061 | 2026-03-14 | F-02 | DNS rebinding en health-probe: node:https.request con SNI + fail-closed + IPv6 brackets | fix | QUALITY | DONE | 992a1dc |
