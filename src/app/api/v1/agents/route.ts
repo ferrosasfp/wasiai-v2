@@ -8,9 +8,10 @@
  *   category    → filter by category
  *   agent_type  → filter by type: model | agent | workflow
  *   q           → semantic search (name + description)
- *   max_price   → max price per call in USDC
- *   limit       → results per page (default 20, max 100)
- *   offset      → pagination offset
+ *   max_price       → max price per call in USDC
+ *   min_performance → filter by performance_score [0-100]
+ *   limit           → results per page (default 20, max 100)
+ *   offset          → pagination offset
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -32,7 +33,21 @@ export async function GET(request: NextRequest) {
   const offset     = Number(searchParams.get('offset') ?? 0)
   const slim        = searchParams.get('slim') === 'true' // PERF-05: lightweight mode
   const sandboxOnly = searchParams.get('sandbox') === 'true' // WAS-196: solo agentes con sandbox habilitado
-  const minReputation = searchParams.get('min_reputation') // WAS-213: filter by performance_score
+  const minReputation   = searchParams.get('min_reputation')  // WAS-213: filter by reputation_score
+  const minPerfRaw      = searchParams.get('min_performance') // S6-A3: filter by performance_score
+
+  // S6-A3: NaN guard for min_performance
+  let minPerformance: number | undefined = undefined
+  if (minPerfRaw !== null) {
+    const parsed = Number(minPerfRaw)
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+      return NextResponse.json(
+        { error: 'invalid_parameter', field: 'min_performance', message: 'Must be a number between 0 and 100' },
+        { status: 400 }
+      )
+    }
+    minPerformance = parsed
+  }
 
   const supabase = await createClient()
 
@@ -148,8 +163,9 @@ export async function GET(request: NextRequest) {
   if (sandboxOnly)    query = query.eq('sandbox_enabled', true) // WAS-196
   if (minReputation) { // WAS-213
     const val = parseFloat(minReputation)
-    if (!isNaN(val)) query = query.gte('performance_score', val)
+    if (!isNaN(val)) query = query.gte('reputation_score', val)
   }
+  if (minPerformance !== undefined) query = query.gte('performance_score', minPerformance) // S6-A3
 
   const { data, error, count } = await query
 
