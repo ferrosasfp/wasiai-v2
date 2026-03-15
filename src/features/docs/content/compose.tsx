@@ -10,11 +10,11 @@ X-API-Key: wai_your_key_here
   "steps": [
     {
       "agent_slug": "wasi-chainlink-price",
-      "input": "{\\"feed_address\\":\\"0x..\\",\\"token_symbol\\":\\"AVAX\\"}"
+      "input": { "feed_address": "0x..", "token_symbol": "AVAX" }
     },
     {
       "agent_slug": "wasi-defi-sentiment",
-      "input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}",
+      "input": { "token_name": "AVAX", "token_symbol": "AVAX" },
       "pass_output": false
     },
     {
@@ -36,12 +36,12 @@ X-API-Key: wai_your_key_here
   "steps": [
     {
       "agent_slug": "wasi-chainlink-price",
-      "input": "{\\"feed_address\\":\\"0x..\\",\\"token_symbol\\":\\"AVAX\\"}",
+      "input": { "feed_address": "0x..", "token_symbol": "AVAX" },
       "parallel": true
     },
     {
       "agent_slug": "wasi-defi-sentiment",
-      "input": "{\\"token_name\\":\\"AVAX\\",\\"token_symbol\\":\\"AVAX\\"}",
+      "input": { "token_name": "AVAX", "token_symbol": "AVAX" },
       "parallel": true
     },
     {

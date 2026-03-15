@@ -29,11 +29,11 @@ const INVOKE: Parameters<typeof CodeBlock>[0]['tabs'] = [
     label: 'Node.js',
     language: 'javascript',
     code: `const result = await client.agents.invoke('wasi-defi-sentiment', {
-  input: JSON.stringify({
+  input: {
     token_name:   'SafeMoonElonGem',
     token_symbol: 'SMEG',
     description:  '100x guaranteed returns!',
-  })
+  }
 })
 
 console.log(result.output)
@@ -73,7 +73,7 @@ const ERROR_HANDLING: Parameters<typeof CodeBlock>[0]['tabs'] = [
 
 try {
   const result = await client.agents.invoke('wasi-defi-sentiment', {
-    input: JSON.stringify({ token_name: 'AVAX', token_symbol: 'AVAX' })
+    input: { token_name: 'AVAX', token_symbol: 'AVAX' }
   })
 } catch (err) {
   if (err instanceof WasiAIError) {

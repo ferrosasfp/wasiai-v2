@@ -41,7 +41,7 @@ const USE_KEY: Parameters<typeof CodeBlock>[0]['tabs'] = [
 const client = new WasiAI({ apiKey: process.env.WASIAI_API_KEY })
 
 const result = await client.agents.invoke('wasi-defi-sentiment', {
-  input: JSON.stringify({ token_name: 'AVAX', token_symbol: 'AVAX' })
+  input: { token_name: 'AVAX', token_symbol: 'AVAX' }
 })
 console.log(result.output)`,
   },
