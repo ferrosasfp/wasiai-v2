@@ -381,8 +381,9 @@ export async function POST(
         // La llamada ya fue exitosa — logearla sin cobro para auditoría
       }
     } else {
-      // Log failed call (no receipt needed)
-      await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
+      // Log failed call (no receipt needed) — capture id for call_id exposure
+      const { id: errCallId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
+      callId = errCallId ?? null
     }
 
     // WAS-74: Fire-and-forget webhook trigger — never await, never blocks TTFB
@@ -404,7 +405,7 @@ export async function POST(
       try { await getSharedRedis().del(mutexKey) } catch { /* non-fatal */ }
     }
 
-    return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown })
+    return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined)
   }
 
   // ── 3. Route B: x402 Payment (WasiAI-native settlement) ────────────────
@@ -527,7 +528,7 @@ export async function POST(
     ).catch((err: unknown) => logger.error('[invoke] increment_pending_earnings failed', { err }))
   }
 
-  return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown })
+  return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined)
   } catch (err) {
     logger.error('[invoke] unhandled error', { err })
     // S-10: Never expose raw error details in production
@@ -687,6 +688,7 @@ function buildResponse(
   txHash?: string,
   receiptSignature?: string,
   pricingInfo?: PricingInfo,
+  callId?: string,
 ) {
   return NextResponse.json(
     {
@@ -704,6 +706,7 @@ function buildResponse(
         chain: CHAIN_NAME,
         tx_hash: txHash ?? null,
         status: result.status,
+        call_id: callId ?? undefined,
       },
       // Cryptographic receipt — lets the caller audit that this call was real.
       // Verify with: verifyReceipt(receipt, signature) from @/lib/receipts/signReceipt

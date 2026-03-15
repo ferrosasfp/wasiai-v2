@@ -32,6 +32,16 @@ interface ModelRow {
   free_trial_limit: number
 }
 
+interface DisputeRow {
+  id: string
+  call_id: string
+  reason: string
+  status: string
+  description: string | null
+  created_at: string
+  agent: { name: string; slug: string } | null
+}
+
 interface CallRow {
   id: string
   agent_id: string
@@ -107,6 +117,17 @@ export default async function CreatorDashboardPage({
   const recentCalls: CallRow[] = (recentCallsData.data as unknown as CallRow[]) ?? []
   const totalCallsCount = recentCallsData.count ?? 0
   const totalPages = Math.ceil(totalCallsCount / CALLS_PER_PAGE)
+
+  // WAS-189: Disputes for creator's agents (read-only)
+  const disputesData = modelIds.length > 0
+    ? await supabase
+        .from('disputes')
+        .select('id, call_id, reason, status, description, created_at, agent:agents(name, slug)')
+        .in('agent_id', modelIds)
+        .order('created_at', { ascending: false })
+        .limit(50)
+    : { data: [] }
+  const disputes = (disputesData.data ?? []) as unknown as DisputeRow[]
 
   // Aggregate stats
   const totalCalls = safeModels.reduce((s, m) => s + (m.total_calls ?? 0), 0)
@@ -306,6 +327,60 @@ export default async function CreatorDashboardPage({
           )}
         </section>
 
+        {/* WAS-189: Disputes */}
+        <section>
+          <div className="mb-4 flex items-center gap-2">
+            <div className="h-5 w-1 rounded-full bg-red-500" />
+            <h2 className="font-bold text-gray-900">Disputes</h2>
+            {disputes.length > 0 && (
+              <span className="text-xs text-gray-400 font-normal">({disputes.length})</span>
+            )}
+          </div>
+          {disputes.length === 0 ? (
+            <div className="rounded-2xl border border-gray-100 bg-white py-10 text-center shadow-sm">
+              <p className="font-medium text-gray-700">No disputes</p>
+              <p className="text-sm text-gray-400">No disputes have been filed for your agents.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left">Agent</th>
+                    <th className="px-4 py-2.5 text-left">Call ID</th>
+                    <th className="px-4 py-2.5 text-left">Reason</th>
+                    <th className="px-4 py-2.5 text-center">Status</th>
+                    <th className="px-4 py-2.5 text-right">Filed</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {disputes.map((dispute) => (
+                    <tr key={dispute.id} className="hover:bg-gray-50/50 transition">
+                      <td className="px-4 py-2.5 font-medium text-gray-800 text-sm">
+                        {dispute.agent?.name ?? '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-400 font-mono">
+                        {dispute.call_id.slice(0, 8)}…
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-600 text-xs">
+                        <span className="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 font-medium">
+                          {dispute.reason}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <DisputeStatusBadge status={dispute.status} />
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-xs text-gray-400">
+                        {new Date(dispute.created_at).toLocaleString('en-US')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         {/* WAS-74: Webhooks */}
         <WebhooksPanel />
 
@@ -397,6 +472,19 @@ function StatusBadge({ status }: { status: string }) {
     reviewing: 'bg-blue-100 text-avax-600',
     success: 'bg-green-100 text-green-700',
     error: 'bg-red-100 text-red-600',
+  }
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
+      {status}
+    </span>
+  )
+}
+
+function DisputeStatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    open:     'bg-yellow-100 text-yellow-700',
+    approved: 'bg-green-100 text-green-700',
+    rejected: 'bg-red-100 text-red-600',
   }
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
