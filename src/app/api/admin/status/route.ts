@@ -34,7 +34,10 @@ export async function GET(req: Request) {
       { count: invocations24h },
     ] = await Promise.all([
       OPERATOR_ADDRESS
-        ? client.getBalance({ address: OPERATOR_ADDRESS }).catch(() => 0n)
+        ? client.getBalance({ address: OPERATOR_ADDRESS as `0x${string}` }).catch((err) => {
+            logger.warn('[admin/status] getBalance failed', { err: String(err).slice(0, 200), address: OPERATOR_ADDRESS })
+            return 0n
+          })
         : Promise.resolve(0n),
       CONTRACT_ADDRESS
         ? client.readContract({
@@ -63,7 +66,9 @@ export async function GET(req: Request) {
       supabase.from('agent_calls').select('id', { count: 'exact', head: true }).eq('payment_type', 'x402').gte('called_at', new Date(Date.now() - 86400000).toISOString()),
     ])
 
+    const IS_MAINNET = process.env.NEXT_PUBLIC_CHAIN === 'mainnet'
     const avaxBalance = Number(avaxBalanceRaw) / 1e18
+    const avaxBalanceError = avaxBalanceRaw === 0n && IS_MAINNET ? 'check_rpc_or_address' : null
 
     let x402Alert: string | null = null
     if ((failuresPending ?? 0) > 0) x402Alert = `CRITICAL: ${failuresPending} settlement failures pending`
@@ -73,6 +78,7 @@ export async function GET(req: Request) {
       platformFeeBps: Number(platformFeeBpsRaw),
       avaxBalance,
       avaxBalanceLow: avaxBalance < 0.5,
+      avaxBalanceError,
       settlementMode: configRow?.value ?? 'vercel',
       lastSettlement: lastSettlement?.called_at ?? null,
       settlement_failures_pending: failuresPending ?? 0,
