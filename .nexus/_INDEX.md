@@ -80,3 +80,8 @@
 | 070 | 2026-03-15 | S7-03 | Nonce x402 persistido en agent_calls + 402 payment_already_used en replay | improvement | HU-MINOR | DONE | 2189aa6f |
 | 071 | 2026-03-15 | WAS-207 | POST /introspect — COB firmado + pricing por depth + auth dual | feature | HU-MAJOR | DONE | eeeddaa1 |
 | 072 | 2026-03-15 | WAS-188 | Reputación ponderada — votes_weighted component + weightedPaidRatio | improvement | HU-MAJOR | DONE | e6033cf7 |
+| 073 | 2026-03-15 | WAS-182 | improvement | FAST-FIX | DONE | 1b0638bb3 |
+| 074 | 2026-03-15 | WAS-204 | bugfix | HU-MINOR | DONE | 865094ad6 |
+| 075 | 2026-03-15 | WAS-189 | feature | HU-MAJOR | DONE | e299ab0d7 |
+| 076 | 2026-03-15 | BUG-03 | bugfix | FAST-FIX | DONE | bf173c2d0 |
+| 077 | 2026-03-15 | DEUDA-docs | bugfix | FAST-FIX | DONE | 868aee249 |
