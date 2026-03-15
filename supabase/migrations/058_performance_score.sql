@@ -29,7 +29,9 @@ BEGIN
     FROM get_agent_percentile_metrics(NEW.agent_id);
 
     IF v_metrics.error_rate_7d IS NOT NULL THEN
-      v_score := ROUND((1.0 - v_metrics.error_rate_7d) * 100.0, 1);
+      -- error_rate_7d is already 0–100 (e.g. 5.00 = 5% errors)
+      -- performance_score = 100 - error_rate_7d
+      v_score := ROUND(100.0 - v_metrics.error_rate_7d, 1);
       v_score := GREATEST(0, LEAST(100, v_score)); -- clamp 0-100
 
       UPDATE agents

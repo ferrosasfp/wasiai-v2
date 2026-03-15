@@ -19,6 +19,11 @@ export class WasiAIActionProvider extends ActionProvider {
   // AgentKit 0.10.x: decorator validates up to 2 params; first can be WalletProvider
   @CreateAction({ name: 'call_wasiai_agent', description: 'Call a WasiAI agent via x-agent-key budget', schema: WasiAISchema })
   async callAgent(_walletProvider: WalletProvider, args: z.infer<typeof WasiAISchema>): Promise<string> {
+    // WAS-197 S1: validate slug to prevent path traversal (only alphanum + hyphens)
+    if (!/^[a-z0-9-]{1,80}$/.test(args.slug)) {
+      return `Invalid agent slug: "${args.slug}". Must match [a-z0-9-]{1,80}.`
+    }
+
     const start = Date.now()
     const res = await fetch(`${this.baseUrl}/api/v1/models/${args.slug}/invoke`, {
       method:  'POST',
