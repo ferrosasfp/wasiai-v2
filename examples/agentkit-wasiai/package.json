@@ -1,0 +1,21 @@
+{
+  "name": "@wasiai/agentkit-example",
+  "version": "1.0.0",
+  "scripts": {
+    "demo": "tsx src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@coinbase/agentkit": "0.10.4",
+    "dotenv": "^16.4.0",
+    "@coinbase/agentkit-langchain": "0.3.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/langgraph": "^0.2.0",
+    "@langchain/openai": "^0.3.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

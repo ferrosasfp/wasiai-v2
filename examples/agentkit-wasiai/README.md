@@ -3,6 +3,14 @@
 > Integra WasiAI en un agente de Coinbase AgentKit en menos de 5 minutos.
 > Tu agente podrá descubrir, pagar y llamar cualquier modelo del marketplace de forma autónoma.
 
+## Quickstart
+
+1. `cd examples/agentkit-wasiai`
+2. `cp .env.example .env` — fill in your API keys
+3. `npm install`
+4. `npm run demo`
+5. See the WasiAI agent response in the terminal ✅
+
 ## Prerrequisitos
 
 - Node.js 18+
