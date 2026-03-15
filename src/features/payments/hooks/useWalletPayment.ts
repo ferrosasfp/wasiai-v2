@@ -37,6 +37,10 @@ interface UseWalletPaymentOptions {
   priceUsdc:   number
 }
 
+function parseInput(raw: string): unknown {
+  try { return JSON.parse(raw) } catch { return raw }
+}
+
 export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOptions) {
   const [flowState, setFlowState] = useState<PaymentFlowState>('idle')
   const [result,    setResult]    = useState<string>()
@@ -82,7 +86,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
       probeRes = await fetch(`/api/v1/models/${slug}/invoke`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ input }),
+        body:    JSON.stringify({ input: parseInput(input) }),
       })
     } catch {
       setErrorMsg('Error de red. Verifica tu conexión e intenta de nuevo.')
@@ -167,7 +171,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
           'Content-Type': 'application/json',
           'X-PAYMENT':    btoa(JSON.stringify(paymentHeader)),
         },
-        body: JSON.stringify({ input }),
+        body: JSON.stringify({ input: parseInput(input) }),
       })
 
       const paidData = await paidRes.json() as { result?: string; error?: string; meta?: { tx_hash?: `0x${string}` } }
