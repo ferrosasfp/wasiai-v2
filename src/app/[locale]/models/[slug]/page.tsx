@@ -81,7 +81,7 @@ export default async function ModelDetailPage({ params }: Props) {
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-bold text-gray-900">{model.name}</h1>
                     {model.is_featured && (
-                      <span className="rounded-full bg-avax-50 px-3 py-0.5 text-xs font-semibold text-avax-600">{tDetail('featured')}</span>
+                      <span className="rounded-full bg-avax-50 px-3 py-0.5 text-xs font-semibold text-avax-600">WasiAI Official</span>
                     )}
                     {/* HU-3.3: Badge Free Trial — solo si el creator lo activó */}
                     {model.free_trial_enabled && (
