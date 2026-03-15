@@ -414,16 +414,34 @@ export async function POST(
 
   if (!paymentHeader) {
     // No payment — return 402 with x402 payment instructions
+    logger.info('[x402] probe', { slug, ip: getIdentifier(request) })
     return build402Instructions(model, priceStr, resourceUrl)
   }
 
   // ── 5. Verify + Settle (Route B) ───────────────────────────────────────
+  const settleStart = Date.now()
   const settlementOrError = await settleX402(paymentHeader, model, priceStr)
 
   // If helper returned a NextResponse (error), return it directly
-  if (settlementOrError instanceof NextResponse) return settlementOrError
+  if (settlementOrError instanceof NextResponse) {
+    logger.info('[x402] settle_result', {
+      slug,
+      verified: false,
+      settled: false,
+      latency_ms: Date.now() - settleStart,
+      error: 'payment_invalid',
+    })
+    return settlementOrError
+  }
 
   const settlement = settlementOrError as SettlementResult
+  logger.info('[x402] settle_result', {
+    slug,
+    verified: settlement.verified ?? false,
+    settled: settlement.settled ?? false,
+    latency_ms: Date.now() - settleStart,
+    error: settlement.error ?? null,
+  })
 
   if (!settlement.verified) {
     logger.error('[invoke] payment verification failed', settlement)
@@ -443,6 +461,12 @@ export async function POST(
 
   // ── 6. Payment valid — call the upstream model ────────────────────────────
   const result = await callUpstream(model, request, slug)
+  logger.info('[x402] upstream_result', {
+    slug,
+    status: result.status,
+    latency_ms: result.latencyMs,
+    charged: result.status === 'success',
+  })
   const { id: callId } = await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug)
 
   // S6-01: Fire-and-forget — registrar failure "cobro sin servicio"
