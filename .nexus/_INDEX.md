@@ -54,3 +54,8 @@
 | 049 | 2026-03-05 | WAS-162 | Transparency Dashboard — on-chain economics en footer + /transparency | feature | QUALITY | DONE | master |
 | 050 | 2026-03-14 | WAS-214 | Registro programático de agentes sin browser — POST /api/v1/auth/agent-signup | feature | QUALITY | DONE | b370c1d |
 | 051 | 2026-03-14 | WAS-215 | Health check async al registrar agente — activación automática sin cron | feature | QUALITY | DONE | defb237 |
+| 052 | 2026-03-14 | WAS-196 | sandbox_enabled expuesto en GET /agents y GET /agents/:slug | feature | QUALITY | DONE | 8a26b8b |
+| 053 | 2026-03-14 | WAS-213 | performance_score basado en error_rate_7d + trigger 058 + filter min_reputation | feature | QUALITY | DONE | 93cd8d1 |
+| 054 | 2026-03-14 | WAS-197 | AgentKit × WasiAI ejemplo funcional con x-agent-key | feature | HU-MAJOR | DONE | 77cc218 |
+| 055 | 2026-03-14 | WAS-186 | Scope check en invoke directo + error code agent_not_in_scope | fix | QUALITY | DONE | 1adff02 |
+| 056 | 2026-03-14 | WAS-200 | validateInput pre-cobro en POST /invoke — input inválido retorna 422 sin cobrar | fix | QUALITY | DONE | c1d5e55 |
