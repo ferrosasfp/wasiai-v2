@@ -68,7 +68,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: searchError.message }, { status: 500 })
     }
 
-    const agents = (searchData ?? []) as Record<string, unknown>[]
+    let agents = (searchData ?? []) as Record<string, unknown>[]
+
+    // S7-02: post-filter by min_performance (search_agents RPC doesn't accept this param)
+    if (minPerformance !== undefined) {
+      agents = agents.filter(a => ((a.performance_score as number) ?? 0) >= minPerformance!)
+    }
 
     return NextResponse.json({
       schema: 'wasiai/agents/v1',
@@ -107,10 +112,11 @@ export async function GET(request: NextRequest) {
       .order('total_calls', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (category)    slimQuery = slimQuery.eq('category', category)
-    if (agentType)   slimQuery = slimQuery.eq('agent_type', agentType)
-    if (maxPrice)    slimQuery = slimQuery.lte('price_per_call', parseFloat(maxPrice))
-    if (sandboxOnly) slimQuery = slimQuery.eq('sandbox_enabled', true) // WAS-196
+    if (category)           slimQuery = slimQuery.eq('category', category)
+    if (agentType)          slimQuery = slimQuery.eq('agent_type', agentType)
+    if (maxPrice)           slimQuery = slimQuery.lte('price_per_call', parseFloat(maxPrice))
+    if (sandboxOnly)        slimQuery = slimQuery.eq('sandbox_enabled', true) // WAS-196
+    if (minPerformance !== undefined) slimQuery = slimQuery.gte('performance_score', minPerformance) // S7-02
 
     const { data: slimData, count: slimCount } = await slimQuery
 
