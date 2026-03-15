@@ -64,3 +64,13 @@
 | 059 | 2026-03-14 | WAS-191 | performance_score badge semafórico en perfil del agente UI | feature | HU-MINOR | DONE | 659251d |
 | 060 | 2026-03-14 | WAS-187 | discoverAgent rankea por performance_score DESC + min_performance constraint | improvement | HU-MAJOR | DONE | de42329 |
 | 061 | 2026-03-14 | F-02 | DNS rebinding en health-probe: node:https.request con SNI + fail-closed + IPv6 brackets | fix | QUALITY | DONE | 992a1dc |
+| 062 | 2026-03-15 | S6-03 | Formalizar WAS-132: nonce en agent_calls + docs arquitectura pagos | improvement | FAST-FIX | DONE | d893455 |
+| 063 | 2026-03-15 | S6-A3 | Exponer min_performance en GET /agents + NaN guard + fix min_reputation bug | feature | FAST-FIX | DONE | 15f82d0 |
+| 064 | 2026-03-15 | S6-01 | Error recovery post-settlement: tabla settlement_failures + admin status | feature | HU-MAJOR | DONE | edb3461 |
+| 065 | 2026-03-15 | S6-02 | Observabilidad x402: logs estructurados + x402_health en admin/status | feature | HU-MAJOR | DONE | b2defe6 |
+| 066 | 2026-03-15 | S6-audit | Fix post-audit: RLS settlement_failures + auth admin/status + Supabase error check | fix | FAST-FIX | DONE | 45b9bdf |
+| 062 | 2026-03-15 | S6-03 | Formalizar WAS-132: nonce en agent_calls + docs arquitectura pagos | improvement | FAST-FIX | DONE | d893455 |
+| 063 | 2026-03-15 | S6-A3 | Exponer min_performance en GET /agents + NaN guard + fix min_reputation bug | feature | FAST-FIX | DONE | 15f82d0 |
+| 064 | 2026-03-15 | S6-01 | Error recovery post-settlement: tabla settlement_failures + admin status | feature | HU-MAJOR | DONE | edb3461 |
+| 065 | 2026-03-15 | S6-02 | Observabilidad x402: logs estructurados + x402_health en admin/status | feature | HU-MAJOR | DONE | b2defe6 |
+| 066 | 2026-03-15 | S6-audit | Fix post-audit: RLS settlement_failures + auth admin/status + Supabase error check | fix | FAST-FIX | DONE | 45b9bdf |
