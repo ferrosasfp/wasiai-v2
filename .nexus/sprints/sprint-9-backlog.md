@@ -72,3 +72,31 @@ DEUDA-03 (paralelo)  ─┤→ WAS-206 → DEUDA-01 → WAS-205
 - WAS-205: ~1.5h
 
 **Total estimado: ~4.5h**
+
+---
+
+## Backlog post-Sprint 9 (hallazgos de pruebas integrales)
+
+### BUG-01 — liquidity-analyzer: summary.total_liquidity_usd es null
+- **Agente:** wasi-liquidity-analyzer
+- **Síntoma:** `summary.total_liquidity_usd` y `summary.total_volume_24h` devuelven null
+- **Causa probable:** El handler no agrega los valores de `pairs[]`
+- **Impacto:** Bajo — pares individuales tienen valores correctos
+- **Prioridad:** P3
+
+### BUG-02 — risk-report: recommendation vacío para tokens SAFE
+- **Agente:** wasi-risk-report
+- **Síntoma:** `recommendation` field vacío cuando `rating === "SAFE"`
+- **Causa probable:** El prompt del LLM no fuerza recommendation cuando el riesgo es bajo
+- **Impacto:** Bajo — cosmético
+- **Prioridad:** P3
+
+### DEUDA-04 — PayToCallButton: no usa resolveExampleInput (solo buildExampleFromSchema)
+- **Archivo:** src/features/payments/components/PayToCallButton.tsx línea 196
+- **Síntoma:** Lee `metadata.input_example` directamente en lugar de usar resolveExampleInput con jerarquía completa
+- **Prioridad:** P3
+
+### DEUDA-05 — /api/v1/agents?slim=true no incluye metadata/input_example
+- **Síntoma:** Slim mode no expone example_input (retorna objeto sin ese campo)
+- **Impacto:** Bajo — slim mode es solo para listados ligeros sin ejemplo
+- **Prioridad:** P4
