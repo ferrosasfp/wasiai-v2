@@ -191,6 +191,51 @@ export async function POST(request: NextRequest) {
           .update({ settled_at: new Date().toISOString() })
           .in('id', batchCallIds)
 
+        // Actualizar pending_earnings_usdc en creator_profiles por cada creator
+        // Calcular earnings por creator (85% del total, después de 15% platform fee)
+        const PLATFORM_FEE_BPS = 1500 // 15%
+        const earningsByCreator = new Map<string, number>()
+        for (let i = 0; i < batchSlugs.length; i++) {
+          let creatorWallet: string | null = null
+          if (batchSlugs[i]) {
+            try {
+              const { data: agentRow } = await supabase
+                .from('agents')
+                .select('creator_wallet_address')
+                .eq('slug', batchSlugs[i])
+                .single()
+              creatorWallet = agentRow?.creator_wallet_address ?? null
+            } catch { /* skip */ }
+          }
+          if (creatorWallet) {
+            const net = batchAmounts[i] * (1 - PLATFORM_FEE_BPS / 10000)
+            earningsByCreator.set(creatorWallet, (earningsByCreator.get(creatorWallet) ?? 0) + net)
+          }
+        }
+        for (const [wallet, amount] of earningsByCreator.entries()) {
+          if (amount > 0) {
+            try {
+              // Try RPC first; if it doesn't exist fall back to direct update
+              const { error: rpcErr } = await supabase.rpc('increment_pending_earnings', { p_wallet: wallet, p_amount: amount })
+              if (rpcErr) {
+                const { data: profileRow } = await supabase
+                  .from('creator_profiles')
+                  .select('id, pending_earnings_usdc')
+                  .eq('wallet_address', wallet)
+                  .single()
+                if (profileRow) {
+                  await supabase
+                    .from('creator_profiles')
+                    .update({ pending_earnings_usdc: Number(profileRow.pending_earnings_usdc) + amount })
+                    .eq('id', profileRow.id)
+                }
+              }
+            } catch {
+              logger.warn('[admin/settlement] could not update pending_earnings for creator', { wallet })
+            }
+          }
+        }
+
         totalSettled += batchCallIds.length
         const skipped = callIds.length - batchCallIds.length
         results.push({ keyId, txHash, calls: batchCallIds.length, ...(skipped > 0 ? { skipped } : {}) })
