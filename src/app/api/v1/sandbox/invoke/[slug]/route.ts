@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { logger } from '@/lib/logger'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { checkIpLimit } from '@/lib/rate-limit-ip'
 import { validateInput } from '@/lib/schema-validator'
 
@@ -233,7 +233,7 @@ export async function POST(
 
   // 7. Validar endpoint_url contra SSRF (B-02)
   try {
-    validateEndpointUrl(agent.endpoint_url)
+    await validateEndpointUrlAsync(agent.endpoint_url)
   } catch {
     // Reembolso atómico antes de retornar (authenticated only)
     if (!isAnonymous) {

@@ -9,7 +9,7 @@ const X402_CORS_HEADERS = {
 import { keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
 import { signReceipt } from '@/lib/receipts/signReceipt'
 import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitBreaker'
 import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
 import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits, getSharedRedis } from '@/lib/ratelimit'
@@ -588,7 +588,7 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
 
   // SEC-01: Validate endpoint URL to prevent SSRF
   try {
-    validateEndpointUrl(model.endpoint_url as string)
+    await validateEndpointUrlAsync(model.endpoint_url as string)
   } catch (err) {
     return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error' as const, latencyMs: 0 }
   }

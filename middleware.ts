@@ -111,7 +111,7 @@ export async function middleware(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     "font-src 'self'",
-    "connect-src 'self' https://*.supabase.co https://api.avax.network https://api.avax-test.network https://facilitator.ultravioletadao.xyz wss://*.supabase.co https://*.thirdweb.com wss://*.thirdweb.com",
+    "connect-src 'self' https://*.supabase.co https://api.avax.network https://api.avax-test.network wss://*.supabase.co https://*.thirdweb.com wss://*.thirdweb.com",
     "frame-src 'self' https://*.thirdweb.com",
     "frame-ancestors 'none'",
   ].join('; ')

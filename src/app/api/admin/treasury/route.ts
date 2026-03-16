@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createPublicClient, http } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
+import { verifyAdminSignature } from '@/lib/admin/verifyAdminSignature'
 
 // Chain-agnostic: usa las mismas vars que el resto del sistema
 const IS_MAINNET  = process.env.NEXT_PUBLIC_CHAIN_ID === '43114'
@@ -23,10 +24,19 @@ const MARKETPLACE_ABI = [
 
 /**
  * GET /api/admin/treasury
- * Sin Supabase auth — el panel admin ya verifica wallet en cliente (ADMIN_ALLOWED).
+ * Requiere firma EIP-712 admin (NG-C01).
  * Lee estado on-chain del contrato: USDC, key balances, earnings, fee, treasury.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr    = request.headers.get('x-admin-timestamp')
+  if (!sig || !nonceHdr || !tsHdr) {
+    return NextResponse.json({ error: 'Missing admin auth headers' }, { status: 401 })
+  }
+  const { ok, reason } = await verifyAdminSignature(sig, { action: 'getTreasury', nonce: nonceHdr, timestamp: BigInt(tsHdr) })
+  if (!ok) return NextResponse.json({ error: 'Unauthorized', reason }, { status: 401 })
+
   if (!MARKETPLACE) return NextResponse.json({ error: 'Contract not configured' }, { status: 500 })
 
   const chain  = IS_MAINNET ? avalanche : avalancheFuji

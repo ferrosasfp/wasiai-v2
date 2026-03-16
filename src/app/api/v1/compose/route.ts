@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash, randomUUID }    from 'crypto'
 import { createServiceClient }       from '@/lib/supabase/server'
-import { validateEndpointUrl }       from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync }       from '@/lib/security/validateEndpointUrl'
 import { getComposeLimit, checkCreatorRateLimits } from '@/lib/ratelimit'
 import { signReceipt }               from '@/lib/receipts/signReceipt'
 import { keyHashToBytes32 }          from '@/lib/contracts/marketplaceClient'
@@ -397,7 +397,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   for (let i = 0; i < steps.length; i++) {
     const agent = agentMap.get(steps[i].agent_slug ?? '')!
     try {
-      validateEndpointUrl(agent.endpoint_url)
+      await validateEndpointUrlAsync(agent.endpoint_url)
     } catch {
       return NextResponse.json(
         {

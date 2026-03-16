@@ -118,50 +118,33 @@ contract NexusAuditValidationTest is Test {
         assertEq(marketplace.getKeyBalance(KEY_ID), USER_DEPOSIT);
         assertEq(usdc.balanceOf(address(marketplace)), USER_DEPOSIT);
 
-        // 2. Operador llama recordInvocation usando el mismo pool de USDC
-        //    Usa PRICE (pricePerCall) para pasar la validacion de amount mismatch
-        //    El contrato no distingue si ese USDC vino de una key o de otra fuente
+        // 2. FIXED: Operador intenta recordInvocation usando el mismo pool de USDC
+        //    Con el fix HIGH-2, el balance check ahora resta totalKeyBalances + totalEarnings
+        //    Por lo tanto, free balance = 1_000_000 - 1_000_000 - 0 = 0 < PRICE → REVERT
         vm.prank(operator);
+        vm.expectRevert("WasiAI: insufficient balance");
         marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("payment-1"));
 
-        // 3. Calcular insolvencia
+        // 3. El contrato permanece solvente — no hubo phantom invocation
         uint256 keyBalancesTotal = marketplace.getKeyBalance(KEY_ID);
         uint256 earningsTotal    = marketplace.getPendingEarnings(creator);
         uint256 contractBalance  = usdc.balanceOf(address(marketplace));
-
-        // Platform share salio al treasury -- lo que queda en el contrato
-        uint256 platformShare = PRICE * 1000 / 10000; // 10%
 
         emit log_named_uint("keyBalances[KEY_ID]         ", keyBalancesTotal);
         emit log_named_uint("earnings[creator]           ", earningsTotal);
         emit log_named_uint("sum(keyBalances+earnings)   ", keyBalancesTotal + earningsTotal);
         emit log_named_uint("usdc.balanceOf(contract)    ", contractBalance);
-        emit log_named_uint("DEFICIT                     ",
-            (keyBalancesTotal + earningsTotal) > contractBalance
-                ? (keyBalancesTotal + earningsTotal) - contractBalance
-                : 0
-        );
 
-        // INSOLVENCIA: el contrato debe mas de lo que tiene
-        // keyBalances = 1_000_000, earnings = 90_000, sum = 1_090_000, contract = 900_000
-        assertGt(
+        // SOLVENCIA: el contrato sigue teniendo fondos suficientes
+        assertEq(contractBalance, USER_DEPOSIT, "NA-H01 FIXED: contract balance intact");
+        assertEq(earningsTotal, 0, "NA-H01 FIXED: no phantom earnings created");
+        assertLe(
             keyBalancesTotal + earningsTotal,
             contractBalance,
-            "NA-H01 CONFIRMED: sum(keyBalances+earnings) > contract balance"
+            "NA-H01 FIXED: contract solvent - obligations <= balance"
         );
 
-        // El usuario quiere su key de vuelta -- el contrato no tiene USDC suficiente
-        // para pagar TANTO al creator (earnings) COMO devolver la key completa
-        vm.prank(operator);
-        marketplace.refundKeyToEarnings(KEY_ID);
-
-        // Ahora earnings[payer] = USER_DEPOSIT pero el contrato solo tiene USER_DEPOSIT - platformShare
-        uint256 payerEarnings = marketplace.getPendingEarnings(payer);
-        emit log_named_uint("payer quiere retirar        ", payerEarnings);
-        emit log_named_uint("contrato tiene              ", usdc.balanceOf(address(marketplace)));
-
-        assertGt(payerEarnings + earningsTotal, usdc.balanceOf(address(marketplace)),
-            "NA-H01 CONFIRMED: payer + creator no pueden retirar -- contrato insolvente");
+        emit log_string("NA-H01 FIXED: recordInvocation correctly rejects phantom payment");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -311,15 +294,16 @@ contract NexusAuditValidationTest is Test {
         // Operator disappears — 25 days pass
         vm.warp(block.timestamp + 25 days);
 
-        // Attacker calls performUpkeep — should NOT reset lastOperatorActivity
+        // FIXED: Attacker can no longer call performUpkeep (onlyOperator ACL)
         vm.warp(block.timestamp + 23 hours + 1);
         vm.prank(attacker);
+        vm.expectRevert("WasiAI: not operator");
         marketplace.performUpkeep("");
 
         // 5 more days — total 30+ days since real operator activity
         vm.warp(block.timestamp + 5 days);
 
-        // Emergency exit should NOW WORK (fix confirmed)
+        // Emergency exit should NOW WORK (attacker can't reset the clock)
         vm.prank(payer);
         marketplace.emergencyWithdrawKey(KEY_ID);  // must NOT revert
         assertEq(usdc.balanceOf(payer), 1_000_000, "NA-M01 FIXED: user recovered funds");
@@ -576,6 +560,7 @@ contract NexusAuditValidationTest is Test {
         (bool needed,) = marketplace.checkUpkeep("");
         assertTrue(needed, "checkUpkeep returns true after interval");
 
+        vm.prank(operator);
         marketplace.performUpkeep("");
 
         emit log_string("NA-I03 INFO: checkUpkeep/performUpkeep work but no formal interface declared");

@@ -802,11 +802,13 @@ contract WasiAIMarketplaceTest is Test {
     function testPerformUpkeepUpdatesTimestamp() public {
         vm.warp(block.timestamp + 23 hours + 1);
         uint256 before = marketplace.lastUpkeepTimestamp();
+        vm.prank(operator);
         marketplace.performUpkeep("");
         assertGt(marketplace.lastUpkeepTimestamp(), before, "Timestamp should update");
     }
 
     function testPerformUpkeepRevertsBeforeInterval() public {
+        vm.prank(operator);
         vm.expectRevert("WasiAI: upkeep not needed");
         marketplace.performUpkeep("");
     }
@@ -1324,10 +1326,13 @@ contract WasiAIMarketplaceTest is Test {
         // 2. 30 days + 1 second pass with no operator activity
         vm.warp(block.timestamp + 30 days + 1);
 
-        // 3. performUpkeep called by attacker — must NOT update lastOperatorActivity (v7 fix)
+        // 3. performUpkeep now requires onlyOperator — non-operator call reverts
+        address attacker = address(0xBEEF);
+        vm.prank(attacker);
+        vm.expectRevert("WasiAI: not operator");
         marketplace.performUpkeep("");
         uint256 activityAfterUpkeep = marketplace.lastOperatorActivity();
-        // lastOperatorActivity should NOT have changed due to performUpkeep
+        // lastOperatorActivity should NOT have changed (attacker call reverted)
         assertTrue(
             block.timestamp > activityAfterUpkeep + 30 days,
             "performUpkeep must not reset lastOperatorActivity"

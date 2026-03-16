@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { verifyAdminSignature } from '@/lib/admin/verifyAdminSignature'
 import { getPublicClient } from '@/shared/lib/web3/client'
 import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
 import { logger } from '@/lib/logger'
@@ -9,11 +10,19 @@ const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x
 
 /**
  * GET /api/admin/status
- * Sin auth requerida — el panel verifica ownership en cliente con wallet conectada.
- * La protección real es que la UI solo renderiza el panel si address ∈ ADMIN_ALLOWED.
+ * Requiere firma EIP-712 admin (NG-C02).
  * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement }
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr    = request.headers.get('x-admin-timestamp')
+  if (!sig || !nonceHdr || !tsHdr) {
+    return NextResponse.json({ error: 'Missing admin auth headers' }, { status: 401 })
+  }
+  const { ok, reason } = await verifyAdminSignature(sig, { action: 'getStatus', nonce: nonceHdr, timestamp: BigInt(tsHdr) })
+  if (!ok) return NextResponse.json({ error: 'Unauthorized', reason }, { status: 401 })
+
 
   try {
     const supabase = createServiceClient()
