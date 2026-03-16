@@ -72,7 +72,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema }: Pro
       const res = await fetch(`/api/v1/agents/${slug}/trial`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: (() => { try { return JSON.parse(input) } catch { return input } })() }),
+        body: JSON.stringify({ input: input.trim() }),
       })
       const data = (await res.json()) as { error?: string; output?: string }
 
