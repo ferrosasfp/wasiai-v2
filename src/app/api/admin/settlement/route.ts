@@ -109,10 +109,21 @@ export async function POST(request: NextRequest) {
     // Forzar settlement con los datos disponibles
     const slugs   = [pendingCall.agent_slug as string]
     const amounts = [Number(pendingCall.amount_paid)]
+
+    logger.info('[admin/settlement] attempting', { slug: slugs[0], amount: amounts[0], keyHash: keyRow.key_hash?.slice(0,10) })
+
     const txHash  = await settleKeyBatchOnChain(keyRow.key_hash, slugs, amounts)
 
+    if (!txHash) {
+      return NextResponse.json({
+        ok: false,
+        error: 'On-chain tx failed — check logs for contract revert. Slug may not be registered on-chain.',
+        debug: { slug: slugs[0], amount: amounts[0], keyHash: keyRow.key_hash?.slice(0, 10) },
+      }, { status: 500 })
+    }
+
     logger.info('[admin/settlement] manual run', { txHash })
-    return NextResponse.json({ ok: true, txHash: txHash ?? null })
+    return NextResponse.json({ ok: true, txHash })
   } catch (err) {
     logger.error('[admin/settlement] run failed', { err })
     return NextResponse.json(
