@@ -537,7 +537,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         try {
           await supabase
             .from('agent_calls')
-            .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: 0, tx_hash: null, status: 'error', result_type: 'schema_violation', latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex, called_at: new Date().toISOString() })
+            .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: 0, tx_hash: null, status: 'error', result_type: 'schema_violation', latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex, called_at: new Date().toISOString(), payment_type: 'api_key', agent_slug: agent.slug })
         } catch { /* best-effort */ }
         return { receipt: null, output: null, status: 'error', reason: `output_schema_violation: ${outputErr}`, chargeDecision: 'refund', refundFailure: schemaRefundFailure }
       }
@@ -551,7 +551,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       const { data: callRecord } = await supabase
         .from('agent_calls')
-        .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: agent.price_per_call, tx_hash: null, status: stepStatus, result_type: agentCallResultType, latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex, called_at: new Date().toISOString() })
+        .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: agent.price_per_call, tx_hash: null, status: stepStatus, result_type: agentCallResultType, latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex, called_at: new Date().toISOString(), payment_type: 'api_key', agent_slug: agent.slug })
         .select('id').single()
       callId = callRecord?.id ?? ''
     } catch { /* best-effort */ }

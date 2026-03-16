@@ -338,7 +338,7 @@ export async function POST(
 
     if (result.status === 'success') {
       // 1. Log call to DB first to get the call ID
-      const { id: insertedId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
+      const { id: insertedId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug, null, 'api_key')
       callId = insertedId ?? null
       // HAL-027: Mismo timestamp para receipt y called_at — auditoría consistente
       const receiptTimestamp = Math.floor(Date.now() / 1000)
@@ -382,7 +382,7 @@ export async function POST(
       }
     } else {
       // Log failed call (no receipt needed) — capture id for call_id exposure
-      const { id: errCallId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug)
+      const { id: errCallId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug, null, 'api_key')
       callId = errCallId ?? null
     }
 
@@ -472,7 +472,7 @@ export async function POST(
   const x402Nonce = (paymentHeader?.payload as X402EVMPayload | undefined)
     ?.authorization?.nonce ?? null
 
-  const logResult = await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug, x402Nonce)
+  const logResult = await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug, x402Nonce, 'x402')
   // WAS-132: Unique constraint violation on nonce = replay attack — return 402
   if (logResult.error?.code === 'payment_already_used') {
     return NextResponse.json(
@@ -643,6 +643,7 @@ async function logCall(
   keyId?: string | null,
   agentSlug?: string | null,
   nonce?: string | null,
+  paymentType?: string,
 ): Promise<{ id?: string; error?: { code: string } }> {
   // PERF-06: supabase is already resolved — no redundant await
   const [insertResult] = await Promise.all([
@@ -657,6 +658,7 @@ async function logCall(
       key_id:          keyId ?? null,
       agent_slug:      agentSlug ?? null,
       nonce:           nonce ?? null,
+      payment_type:    paymentType ?? 'unknown',
     }).select('id').single(),
     result.status === 'success'
       ? supabase.rpc('increment_agent_stats', {

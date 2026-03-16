@@ -301,6 +301,7 @@ export async function POST(
         amount_paid:  0,
         is_trial:     true,
         payment_type: 'sandbox',
+        agent_slug:   slug,
         status:       'error',
         result_type:  'schema_violation',
         called_at:    new Date().toISOString(),
@@ -322,6 +323,7 @@ export async function POST(
     amount_paid:  agent.price_per_call,  // columna real (no cost_usdc)
     is_trial:     true,
     payment_type: 'sandbox',
+    agent_slug:   slug,
     status:       'completed',
     result_type:  'success',
     called_at:    new Date().toISOString(),
