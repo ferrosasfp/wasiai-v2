@@ -36,7 +36,7 @@ export async function GET(
         price_per_call, cover_image, is_featured,
         endpoint_url, mcp_tool_name, capabilities, input_schema, output_schema,
         total_calls, total_revenue, reputation_score, reputation_count, performance_score,
-        sandbox_enabled, metadata,
+        sandbox_enabled, metadata, input_example,
         created_at,
         creator:creator_profiles(id, username, display_name, avatar_url, verified)
       `)
