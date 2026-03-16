@@ -6,6 +6,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { resolveExampleInput } from '@/features/agents/utils/resolveExampleInput'
 
 const discoverSchema = z.object({
   category:   z.string().optional(),
@@ -70,8 +71,13 @@ export async function GET(request: NextRequest) {
     })
   }
 
+  const agentsWithExample = filtered.map((a: Record<string, unknown>) => ({
+    ...a,
+    example_input: resolveExampleInput(a as Parameters<typeof resolveExampleInput>[0]),
+  }))
+
   return NextResponse.json({
-    agents: filtered,
+    agents: agentsWithExample,
     total: filtered.length,
     meta: {
       invoke_endpoint: '/api/v1/models/{slug}/invoke',

@@ -21,6 +21,7 @@ import { getSearchLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 // WasiAI handles x402 settlement natively — no external facilitator
 import { SITE_URL } from '@/lib/constants'
+import { resolveExampleInput } from '@/features/agents/utils/resolveExampleInput'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
@@ -94,6 +95,7 @@ export async function GET(request: NextRequest) {
         price_per_call: agent.price_per_call,
         currency:    'USDC',
         invoke_url:  `${SITE_URL}/api/v1/models/${agent.slug}/invoke`,
+        example_input: resolveExampleInput(agent),
       })),
     }, { headers: { 'Access-Control-Allow-Origin': '*' } })
   }
@@ -138,6 +140,7 @@ export async function GET(request: NextRequest) {
         mcp_tool_name:  a.mcp_tool_name ?? a.slug.replace(/-/g, '_'),
         featured:       a.is_featured,
         sandbox_enabled: a.sandbox_enabled ?? true,
+        example_input: resolveExampleInput(a as Parameters<typeof resolveExampleInput>[0]),
       })),
     }, { headers: CORS })
   }
@@ -276,6 +279,7 @@ export async function GET(request: NextRequest) {
       performance_score: agent.performance_score ?? null,
 
       // Input/Output validation (WAS-200/202)
+      example_input: resolveExampleInput(agent),
       input_schema:  agent.input_schema ?? null,
       output_schema: agent.output_schema ?? null,
       capabilities:  agent.capabilities ?? [],

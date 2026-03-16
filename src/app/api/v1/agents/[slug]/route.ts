@@ -8,6 +8,7 @@ import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of truth
 
 import { SITE_URL } from '@/lib/constants'
+import { resolveExampleInput } from '@/features/agents/utils/resolveExampleInput'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -35,7 +36,7 @@ export async function GET(
         price_per_call, cover_image, is_featured,
         endpoint_url, mcp_tool_name, capabilities, input_schema, output_schema,
         total_calls, total_revenue, reputation_score, reputation_count, performance_score,
-        sandbox_enabled,
+        sandbox_enabled, metadata,
         created_at,
         creator:creator_profiles(id, username, display_name, avatar_url, verified)
       `)
@@ -106,6 +107,7 @@ export async function GET(
         total_calls:   agent.total_calls ?? 0,
         total_revenue: Number(agent.total_revenue ?? 0),
       },
+      example_input: resolveExampleInput(agent),
       input_schema:  agent.input_schema ?? null,
       output_schema: agent.output_schema ?? null,
       sandbox_enabled: agent.sandbox_enabled ?? true,
