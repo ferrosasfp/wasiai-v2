@@ -6,7 +6,7 @@ import { AlertTriangle, Info, KeyRound, Bot } from 'lucide-react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { useUnifiedWalletClient } from '@/features/wallet/hooks/useUnifiedWalletClient'
 import { WITHDRAW_KEY_ABI }       from '@/lib/contracts/abis'
-import { keyHashToBytes32 }       from '@/lib/contracts/marketplaceClient'
+import { keyHashToBytes32 }       from '@/lib/contracts/utils'
 import { createPublicClient, http } from 'viem'
 import { avalancheFuji, avalanche }  from 'viem/chains'
 
