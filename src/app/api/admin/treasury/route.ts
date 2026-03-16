@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
 import { createPublicClient, http } from 'viem'
-import { avalancheFuji } from 'viem/chains'
+import { avalanche, avalancheFuji } from 'viem/chains'
 
-const MARKETPLACE = (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI ?? '') as `0x${string}`
-const USDC_FUJI   = '0x5425890298aed601595a70AB815c96711a31Bc65' as `0x${string}`
+// Chain-agnostic: usa las mismas vars que el resto del sistema
+const IS_MAINNET  = process.env.NEXT_PUBLIC_CHAIN_ID === '43114'
+const MARKETPLACE = (process.env.MARKETPLACE_CONTRACT_ADDRESS ?? '') as `0x${string}`
+const USDC_ADDR   = (IS_MAINNET
+  ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'   // USDC mainnet Avalanche
+  : '0x5425890298aed601595a70AB815c96711a31Bc65'    // USDC Fuji testnet
+) as `0x${string}`
 
 const ERC20_ABI = [
   { name: 'balanceOf', type: 'function' as const, stateMutability: 'view' as const, inputs: [{ name: '', type: 'address' }], outputs: [{ type: 'uint256' }] },
@@ -17,34 +21,47 @@ const MARKETPLACE_ABI = [
   { name: 'earnings',         type: 'function' as const, stateMutability: 'view' as const, inputs: [{ name: '', type: 'address' }], outputs: [{ type: 'uint256' }] },
 ]
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function GET(_req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-
+/**
+ * GET /api/admin/treasury
+ * Sin Supabase auth — el panel admin ya verifica wallet en cliente (ADMIN_ALLOWED).
+ * Lee estado on-chain del contrato: USDC, key balances, earnings, fee, treasury.
+ */
+export async function GET() {
   if (!MARKETPLACE) return NextResponse.json({ error: 'Contract not configured' }, { status: 500 })
 
-  const rpcUrl = process.env.FUJI_RPC_URL ?? 'https://api.avax-test.network/ext/bc/C/rpc'
-  const client = createPublicClient({ chain: avalancheFuji, transport: http(rpcUrl) })
+  const chain  = IS_MAINNET ? avalanche : avalancheFuji
+  const rpcUrl = IS_MAINNET
+    ? (process.env.NEXT_PUBLIC_RPC_MAINNET ?? 'https://api.avax.network/ext/bc/C/rpc')
+    : (process.env.NEXT_PUBLIC_RPC_TESTNET ?? 'https://api.avax-test.network/ext/bc/C/rpc')
 
-  const [contractUsdc, totalKeyBal, totalEarnings, feeBps, treasuryAddr] = await Promise.all([
-    client.readContract({ address: USDC_FUJI,   abi: ERC20_ABI,      functionName: 'balanceOf',      args: [MARKETPLACE] }),
-    client.readContract({ address: MARKETPLACE, abi: MARKETPLACE_ABI, functionName: 'totalKeyBalances' }),
-    client.readContract({ address: MARKETPLACE, abi: MARKETPLACE_ABI, functionName: 'totalEarnings'    }),
-    client.readContract({ address: MARKETPLACE, abi: MARKETPLACE_ABI, functionName: 'platformFeeBps'   }),
-    client.readContract({ address: MARKETPLACE, abi: MARKETPLACE_ABI, functionName: 'treasury'         }),
-  ])
+  const client = createPublicClient({ chain, transport: http(rpcUrl) })
 
-  const treasuryBal = await client.readContract({ address: USDC_FUJI, abi: ERC20_ABI, functionName: 'balanceOf', args: [treasuryAddr as `0x${string}`] })
+  try {
+    const [contractUsdc, totalKeyBal, totalEarnings, feeBps, treasuryAddr] = await Promise.all([
+      client.readContract({ address: USDC_ADDR,   abi: ERC20_ABI,       functionName: 'balanceOf',       args: [MARKETPLACE] }),
+      client.readContract({ address: MARKETPLACE, abi: MARKETPLACE_ABI, functionName: 'totalKeyBalances' }),
+      client.readContract({ address: MARKETPLACE, abi: MARKETPLACE_ABI, functionName: 'totalEarnings'    }),
+      client.readContract({ address: MARKETPLACE, abi: MARKETPLACE_ABI, functionName: 'platformFeeBps'   }),
+      client.readContract({ address: MARKETPLACE, abi: MARKETPLACE_ABI, functionName: 'treasury'         }),
+    ])
 
-  return NextResponse.json({
-    total_usdc:             Number(contractUsdc)    / 1e6,
-    key_balances_usdc:      Number(totalKeyBal)     / 1e6,
-    settled_earnings_usdc:  Number(totalEarnings)   / 1e6,
-    platform_fee_bps:       Number(feeBps),
-    treasury_address:       treasuryAddr,
-    treasury_balance_usdc:  Number(treasuryBal)     / 1e6,
-  })
+    const treasuryBal = await client.readContract({
+      address: USDC_ADDR,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [treasuryAddr as `0x${string}`],
+    })
+
+    return NextResponse.json({
+      total_usdc:             Number(contractUsdc)  / 1e6,
+      key_balances_usdc:      Number(totalKeyBal)   / 1e6,
+      settled_earnings_usdc:  Number(totalEarnings) / 1e6,
+      platform_fee_bps:       Number(feeBps),
+      treasury_address:       treasuryAddr,
+      treasury_balance_usdc:  Number(treasuryBal)   / 1e6,
+      chain:                  IS_MAINNET ? 'mainnet' : 'fuji',
+    })
+  } catch (err) {
+    return NextResponse.json({ error: 'Contract read failed', detail: String(err).slice(0, 200) }, { status: 500 })
+  }
 }
