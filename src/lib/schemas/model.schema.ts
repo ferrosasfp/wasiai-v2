@@ -77,6 +77,9 @@ export const createModelSchema = z.object({
 
   // WAS-212: Tags semánticos para discovery
   tags: z.array(z.string().transform(t => t.toLowerCase().trim())).optional().default([]),
+
+  // WAS-206: Input example auto-generated or manually edited
+  input_example: z.string().optional().nullable(),
 })
 
 export type CreateModelInput = z.infer<typeof createModelSchema>

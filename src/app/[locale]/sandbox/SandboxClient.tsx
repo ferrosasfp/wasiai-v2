@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { CopyableOutput } from '@/components/ui/CopyableOutput'
+import { buildExampleFromSchema, EXAMPLE_FALLBACK } from '@/features/agents/utils/buildExampleFromSchema'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface AgentOption {
@@ -18,32 +19,6 @@ interface AgentOption {
   price_per_call: number
   status: string
   input_schema?: Record<string, unknown> | null
-}
-
-/** Genera un ejemplo de input a partir del JSON Schema del agente */
-function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
-  if (!schema) return 'Hello, agent!'
-  if (schema.type === 'string') return schema.description ? `<${schema.description}>` : 'Write your input here...'
-  if (schema.type !== 'object') return 'Hello, agent!'
-  const props = schema.properties as Record<string, Record<string, unknown>> | undefined
-  if (!props) return '{"prompt": "Hola, agente!"}'
-
-  const example: Record<string, unknown> = {}
-  for (const [key, def] of Object.entries(props)) {
-    if (def.type === 'string') {
-      if (def.enum && Array.isArray(def.enum)) example[key] = def.default ?? def.enum[0]
-      else example[key] = def.description ? `<${def.description}>` : `<${key}>`
-    } else if (def.type === 'number' || def.type === 'integer') {
-      example[key] = 0
-    } else if (def.type === 'boolean') {
-      example[key] = true
-    } else if (def.type === 'array') {
-      example[key] = []
-    } else {
-      example[key] = {}
-    }
-  }
-  return JSON.stringify(example, null, 2)
 }
 
 interface SandboxInvokeResponse {
@@ -256,7 +231,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
             <textarea
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142] font-mono resize-none"
               rows={6}
-              placeholder={buildExampleFromSchema(selectedAgent?.input_schema)}
+              placeholder={buildExampleFromSchema(selectedAgent?.input_schema) ?? EXAMPLE_FALLBACK}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
             />

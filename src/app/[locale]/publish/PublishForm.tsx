@@ -176,6 +176,7 @@ export default function PublishForm({ initialDraft, from }: Props) {
           input_schema:    data.input_schema ?? null,
           output_schema:   data.output_schema ?? null,
           tags:            Array.isArray(data.tags) ? data.tags : [],
+          input_example:   data.input_example ?? null,
         }),
       })
       if (!patchRes.ok) {

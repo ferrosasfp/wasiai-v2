@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CreateModelDraft } from '@/lib/schemas/model.schema'
+import { buildExampleFromSchema, EXAMPLE_FALLBACK } from '@/features/agents/utils/buildExampleFromSchema'
 import { DollarSign, Rocket } from 'lucide-react'
 
 interface Props {
@@ -26,6 +27,9 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
   const [tagsRaw, setTagsRaw] = useState(
     Array.isArray(data.tags) ? data.tags.join(', ') : ''
   )
+  const [inputExampleRaw, setInputExampleRaw] = useState<string>('')
+  const [exampleEditedByUser, setExampleEditedByUser] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [testResult, setTestResult] = useState<{
     ok: boolean
     status?: number
@@ -235,8 +239,16 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
                 const val = e.target.value
                 setInputSchemaRaw(val)
                 if (!val.trim()) { onChange('input_schema', null); return }
-                try { onChange('input_schema', JSON.parse(val)) }
-                catch { /* esperar JSON válido */ }
+                try {
+                  const parsed = JSON.parse(val)
+                  onChange('input_schema', parsed)
+                  // Solo auto-generar si el usuario no ha editado el ejemplo manualmente
+                  if (!exampleEditedByUser) {
+                    const generated = buildExampleFromSchema(parsed) ?? EXAMPLE_FALLBACK
+                    setInputExampleRaw(generated)
+                    onChange('input_example', generated)
+                  }
+                } catch { /* esperar JSON válido */ }
               }}
               placeholder={'{\n  "type": "object",\n  "required": ["query"],\n  "properties": {\n    "query": { "type": "string" }\n  }\n}'}
               className={`w-full rounded-xl border px-4 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-avax-100 ${
@@ -249,6 +261,27 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
                   ? t('step3SchemaRequired')
                   : t('step3SchemaWarning')}
               </p>
+            )}
+            {inputSchemaRaw.trim() && (
+              <div className="mt-3">
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Input Example <span className="text-gray-400 font-normal">(auto-generated — edit if needed)</span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={inputExampleRaw}
+                  onChange={e => {
+                    setInputExampleRaw(e.target.value)
+                    setExampleEditedByUser(true)
+                    if (debounceRef.current) clearTimeout(debounceRef.current)
+                    debounceRef.current = setTimeout(() => {
+                      onChange('input_example', e.target.value)
+                    }, 300)
+                  }}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-avax-100"
+                />
+                <p className="mt-1 text-xs text-gray-400">This will be shown to users as a pre-filled example</p>
+              </div>
             )}
           </div>
         )

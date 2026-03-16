@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { CopyableOutput } from '@/components/ui/CopyableOutput'
+import { buildExampleFromSchema, EXAMPLE_FALLBACK } from '@/features/agents/utils/buildExampleFromSchema'
 
 interface Props {
   slug: string
@@ -12,36 +13,11 @@ interface Props {
   inputExample?: string | null
 }
 
-function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
-  if (!schema) return ''
-  if (schema.type === 'string') return schema.description ? `e.g. ${schema.description}` : 'Write your input here...'
-  if (schema.type !== 'object') return ''
-  const props = schema.properties as Record<string, Record<string, unknown>> | undefined
-  if (!props) return ''
-  const example: Record<string, unknown> = {}
-  for (const [key, def] of Object.entries(props)) {
-    if (def.type === 'string') {
-      example[key] = def.enum && Array.isArray(def.enum)
-        ? (def.default ?? def.enum[0])
-        : (def.description ? `<${def.description}>` : `<${key}>`)
-    } else if (def.type === 'number' || def.type === 'integer') {
-      example[key] = 0
-    } else if (def.type === 'boolean') {
-      example[key] = true
-    } else if (def.type === 'array') {
-      example[key] = []
-    } else {
-      example[key] = {}
-    }
-  }
-  return JSON.stringify(example, null, 2)
-}
-
 type TrialState = 'checking' | 'idle' | 'loading' | 'success' | 'error' | 'timeout' | 'used'
 
 export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, inputExample }: Props) {
   const t = useTranslations('trial')
-  const defaultInput = inputExample ?? buildExampleFromSchema(inputSchema) ?? ''
+  const defaultInput = inputExample ?? buildExampleFromSchema(inputSchema) ?? EXAMPLE_FALLBACK
   const [input, setInput] = useState(defaultInput)
   const [anonLimitHit, setAnonLimitHit] = useState(false)
   // Initialize directly from prop — avoids synchronous setState in effect
