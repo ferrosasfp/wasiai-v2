@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { CopyableOutput } from '@/components/ui/CopyableOutput'
-import { buildExampleFromSchema, EXAMPLE_FALLBACK } from '@/features/agents/utils/buildExampleFromSchema'
+
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface AgentOption {
@@ -58,6 +58,22 @@ export function SandboxClient({ userId }: { userId: string | null }) {
   const [errorMsg, setErrorMsg]           = useState<string | null>(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
   const [anonLimitHit, setAnonLimitHit]   = useState(false)
+  const [inputDirty, setInputDirty]       = useState(false)
+
+  const fetchExampleInput = useCallback(async (slug: string) => {
+    try {
+      const res = await fetch(`/api/v1/agents/${encodeURIComponent(slug)}`, {
+        signal: AbortSignal.timeout(5_000)
+      })
+      if (!res.ok) return
+      const data = await res.json() as { example_input?: string }
+      if (data.example_input && !inputDirty) {
+        setInputText(data.example_input)
+      }
+    } catch {
+      if (!inputDirty) setInputText('{"input": ""}')
+    }
+  }, [inputDirty])
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -66,10 +82,20 @@ export function SandboxClient({ userId }: { userId: string | null }) {
         const data = await res.json() as { agents?: AgentOption[]; data?: AgentOption[] }
         const list: AgentOption[] = data.agents ?? data.data ?? []
         setAgents(list)
-        if (list.length > 0 && !selectedSlug) setSelectedSlug(list[0].slug)
+        if (list.length > 0 && !selectedSlug) {
+          const firstSlug = list[0].slug
+          setSelectedSlug(firstSlug)
+          void fetchExampleInput(firstSlug)
+        }
       }
     } catch { /* fail silently */ }
-  }, [selectedSlug])
+  }, [selectedSlug, fetchExampleInput])
+
+  function handleSlugChange(newSlug: string) {
+    setSelectedSlug(newSlug)
+    setInputDirty(false)
+    void fetchExampleInput(newSlug)
+  }
 
   const fetchBalance = useCallback(async () => {
     if (!userId) { setBalance(null); return }
@@ -212,7 +238,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
               <select
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142]"
                 value={selectedSlug}
-                onChange={e => setSelectedSlug(e.target.value)}
+                onChange={e => handleSlugChange(e.target.value)}
               >
                 {agents.map(a => (
                   <option key={a.slug} value={a.slug}>
@@ -231,9 +257,9 @@ export function SandboxClient({ userId }: { userId: string | null }) {
             <textarea
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142] font-mono resize-none"
               rows={6}
-              placeholder={buildExampleFromSchema(selectedAgent?.input_schema) ?? EXAMPLE_FALLBACK}
+              placeholder='{"input": ""}'
               value={inputText}
-              onChange={e => setInputText(e.target.value)}
+              onChange={e => { setInputText(e.target.value); setInputDirty(true) }}
             />
           </div>
 

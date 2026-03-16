@@ -9,25 +9,13 @@ interface Agent {
   name: string
 }
 
-// Pre-filled example payloads per slug (or category fallback)
-const EXAMPLE_PAYLOADS: Record<string, string> = {
-  'summarizer':  '{\n  "text": "Paste your text here to summarize..."\n}',
-  'translator':  '{\n  "text": "Hello world",\n  "target_lang": "es"\n}',
-  'classifier':  '{\n  "text": "Classify this input..."\n}',
-  'extractor':   '{\n  "text": "Extract structured data from this..."\n}',
-  'default':     '{\n  "input": "Your input here"\n}',
-}
-
-function getExamplePayload(slug: string): string {
-  return EXAMPLE_PAYLOADS[slug] ?? EXAMPLE_PAYLOADS['default']
-}
-
 export function TryIt() {
   const t = useTranslations('docs')
 
   const [agents, setAgents]     = useState<Agent[]>([])
   const [slug, setSlug]         = useState('')
-  const [payload, setPayload]   = useState(EXAMPLE_PAYLOADS['default'])
+  const [payload, setPayload]   = useState('{"input": ""}')
+  const [payloadDirty, setPayloadDirty] = useState(false)
   const [response, setResponse] = useState<string | null>(null)
   const [statusCode, setStatusCode] = useState<number | null>(null)
   const [latency, setLatency]   = useState<number | null>(null)
@@ -47,7 +35,7 @@ export function TryIt() {
         if (list.length > 0) {
           const firstSlug = list[0].slug
           setSlug((prev) => prev || firstSlug)
-          setPayload(getExamplePayload(firstSlug))
+          void fetchAndSetPayload(firstSlug)
         }
       })
       .catch(() => {/* ignore — user can type slug manually */})
@@ -59,9 +47,24 @@ export function TryIt() {
     }
   }, [])
 
+  async function fetchAndSetPayload(newSlug: string) {
+    try {
+      const res = await fetch(`/api/v1/agents/${encodeURIComponent(newSlug)}`, {
+        signal: AbortSignal.timeout(5_000)
+      })
+      if (res.ok) {
+        const data = await res.json() as { example_input?: string }
+        if (!payloadDirty) setPayload(data.example_input ?? '{"input": ""}')
+      }
+    } catch {
+      if (!payloadDirty) setPayload('{"input": ""}')
+    }
+  }
+
   function handleSlugChange(newSlug: string) {
     setSlug(newSlug)
-    setPayload(getExamplePayload(newSlug))
+    setPayloadDirty(false)
+    void fetchAndSetPayload(newSlug)
   }
 
   async function handleRun() {
@@ -179,7 +182,7 @@ export function TryIt() {
         <label className="block text-xs font-medium text-gray-600 mb-1">{t('tryItPayload')}</label>
         <textarea
           value={payload}
-          onChange={(e) => setPayload(e.target.value)}
+          onChange={(e) => { setPayload(e.target.value); setPayloadDirty(true) }}
           rows={4}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-avax-500"
         />
