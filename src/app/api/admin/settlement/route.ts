@@ -37,8 +37,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing admin auth headers' }, { status: 401 })
   }
 
+  // Client signs with 'runSettlement' or 'toggleSettlement' — must match exactly
+  const actionMap: Record<SettlementAction, string> = {
+    run:    'runSettlement',
+    toggle: 'toggleSettlement',
+  }
   const message: AdminActionMessage = {
-    action:    `settlement:${body.action}`,
+    action:    actionMap[body.action] ?? body.action,
     nonce:     nonceHdr,
     timestamp: BigInt(tsHdr),
   }
