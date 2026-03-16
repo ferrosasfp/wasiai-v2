@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
       agent_type, dependencies,
       price_per_call, currency, chain,
       capabilities, mcp_tool_name, mcp_description,
-      input_schema, output_schema, input_example, metadata,
+      input_schema, output_schema, metadata,
       total_calls, total_revenue,
       on_chain_registered, erc8004_id,
       reputation_score, reputation_count,

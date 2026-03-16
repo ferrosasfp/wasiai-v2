@@ -176,7 +176,8 @@ export default function PublishForm({ initialDraft, from }: Props) {
           input_schema:    data.input_schema ?? null,
           output_schema:   data.output_schema ?? null,
           tags:            Array.isArray(data.tags) ? data.tags : [],
-          input_example:   data.input_example ?? null,
+          // input_example se guarda dentro de metadata (JSONB existente, no requiere migración)
+          metadata:        data.input_example ? { input_example: data.input_example } : undefined,
         }),
       })
       if (!patchRes.ok) {
