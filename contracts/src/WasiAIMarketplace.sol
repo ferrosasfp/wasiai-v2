@@ -183,6 +183,9 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     /// @notice Emitted when a key owner withdraws USDC directly from their key balance.
     event KeyWithdrawn(bytes32 indexed keyId, address indexed owner, uint256 amount);
 
+    /// @notice Emitted when settleKeyBatch skips a slug not registered in the contract.
+    event SettlementSkipped(bytes32 indexed keyId, string slug, uint256 amount);
+
     // ─── Modifiers ────────────────────────────────────────────────────────────
 
     function _checkOperator() internal view {
@@ -293,6 +296,59 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         });
 
         emit AgentRegistered(slug, msg.sender, pricePerCall, erc8004Id);
+    }
+
+    /**
+     * @notice Batch self-registration: creator registers multiple agents in a single tx.
+     * @dev msg.sender becomes the creator for all slugs.
+     *      WAS-216: batchSelfRegister — up to 50 slugs per call.
+     *      Free registrations tier applies across the batch.
+     * @param slugs       Agent slug identifiers (unique per slug)
+     * @param prices      Price per call for each agent in USDC atomic units (6 decimals)
+     * @param erc8004Ids  ERC-8004 identity token IDs (0 = not registered)
+     */
+    function batchSelfRegister(
+        string[]  calldata slugs,
+        uint256[] calldata prices,
+        uint64[]  calldata erc8004Ids
+    ) external whenNotPaused {
+        require(slugs.length > 0,                            "WasiAI: empty batch");
+        require(slugs.length <= 50,                          "WasiAI: batch too large");
+        require(slugs.length == prices.length,               "WasiAI: array length mismatch");
+        require(slugs.length == erc8004Ids.length,           "WasiAI: array length mismatch");
+
+        // Pre-check: all slugs must be available (revert whole tx on duplicate)
+        for (uint256 i = 0; i < slugs.length; i++) {
+            require(
+                agents[slugs[i]].creator == address(0),
+                string(abi.encodePacked("WasiAI: slug taken: ", slugs[i]))
+            );
+        }
+
+        // Fee calculation using ternary to avoid underflow in 0.8.x checked arithmetic
+        uint256 userCount      = userRegistrationCount[msg.sender];
+        uint256 freeRestantes  = (userCount >= freeRegistrationsPerUser)
+            ? 0
+            : freeRegistrationsPerUser - userCount;
+        uint256 feeCount       = (slugs.length > freeRestantes)
+            ? slugs.length - freeRestantes
+            : 0;
+        uint256 totalFee       = feeCount * registrationFee;
+
+        if (totalFee > 0) {
+            usdc.safeTransferFrom(msg.sender, address(this), totalFee);
+        }
+
+        userRegistrationCount[msg.sender] += slugs.length;
+
+        for (uint256 i = 0; i < slugs.length; i++) {
+            agents[slugs[i]] = Agent({
+                creator:      msg.sender,
+                pricePerCall: prices[i],
+                erc8004Id:    erc8004Ids[i]
+            });
+            emit AgentRegistered(slugs[i], msg.sender, prices[i], erc8004Ids[i]);
+        }
     }
 
     /**
@@ -561,15 +617,21 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     }
 
     /**
-     * @notice Liquida un batch de llamadas de key en una sola tx.
+     * @notice Liquida un batch de llamadas de key en una sola tx, skipping slugs no registrados.
      * @dev flow: Key
-     * @dev Gas amortizado: una tx cubre cientos de llamadas.
-     *      slugs[i] y amounts[i] corresponden 1-a-1.
-     *      El balance total se deduce primero para evitar reentrancy parcial.
+     * @dev Gas amortizado: una tx cubre cientos de llamadas (~5,000 gas/item, max seguro ~300 slugs ≈ 1.5M gas
+     *      de un bloque de 15M). El loop NO contiene external calls (solo storage writes).
+     *      El único transfer USDC ocurre post-loop: `safeTransfer(treasury, totalPlatformShare)`.
+     *      WAS-216: graceful — slugs no registrados se skipean emitiendo SettlementSkipped.
+     *      La deducción de keyBalance ocurre post-loop sobre totalSettled (solo slugs registrados).
+     *      reentrancy safety: garantizado por nonReentrant; no hay external calls durante el loop.
+     * @param keyId   bytes32 derived from SHA-256 of the raw API key
+     * @param slugs   Agent slug identifiers (1-1 with amounts)
+     * @param amounts USDC amounts in atomic units per slug
      */
     function settleKeyBatch(
-        bytes32          keyId,
-        string[] calldata slugs,
+        bytes32           keyId,
+        string[]  calldata slugs,
         uint256[] calldata amounts
     ) external onlyOperator nonReentrant whenNotPaused {
         lastOperatorActivity = block.timestamp;
@@ -577,48 +639,46 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         require(slugs.length > 0,               "WasiAI: empty batch");
         require(slugs.length <= 500,            "WasiAI: batch too large");
 
-        // Compute total first — fail early if insufficient balance
-        uint256 total = 0;
-        for (uint256 i = 0; i < amounts.length; i++) {
-            total += amounts[i];
-        }
-        require(keyBalances[keyId] >= total, "WasiAI: insufficient key balance");
-
-        // Reset daily window if needed, then check cap (before any transfer)
-        _checkAndResetDailyWindow();
-        if (dailySettlementCap > 0) {
-            require(
-                dailySettledAmount + total <= dailySettlementCap,
-                "WasiAI: daily cap exceeded"
-            );
-        }
-        dailySettledAmount += total;
-
-        // Deduct full amount atomically before any transfers (reentrancy-safe)
-        keyBalances[keyId]  -= total;
-        totalKeyBalances    -= total;
-
+        uint256 totalSettled       = 0;
         uint256 totalPlatformShare = 0;
+
         for (uint256 i = 0; i < slugs.length; i++) {
-            require(amounts[i] > 0,          "WasiAI: zero amount");
-            Agent storage agent = agents[slugs[i]];
-            require(agent.creator != address(0), "WasiAI: agent not found");
-            // NA-206: DEFERRED — settleKeyBatch permite amounts flexibles (descuentos, bundles).
-            // El operador es el único que puede llamar esta función (onlyOperator).
-            // La validación de amount == pricePerCall no aplica por diseño del batch settlement.
+            // WAS-216: graceful — skip unregistered slugs, emit event
+            if (agents[slugs[i]].creator == address(0)) {
+                emit SettlementSkipped(keyId, slugs[i], amounts[i]);
+                continue;
+            }
+
+            require(amounts[i] > 0, "WasiAI: zero amount");
 
             uint256 platformShare = (amounts[i] * platformFeeBps) / 10_000;
             uint256 creatorShare  = amounts[i] - platformShare;
 
-            earnings[agent.creator] += creatorShare;
-            totalEarnings           += creatorShare;
-            totalPlatformShare     += platformShare;
+            earnings[agents[slugs[i]].creator] += creatorShare;
+            totalEarnings                      += creatorShare;
+            totalPlatformShare                 += platformShare;
+            totalSettled                       += amounts[i];
 
             totalVolume      += amounts[i];
             totalInvocations += 1;
 
             emit KeyCallSettled(keyId, slugs[i], amounts[i], creatorShare, platformShare);
         }
+
+        // Daily cap check post-loop (total real settled, not pre-loop estimate)
+        _checkAndResetDailyWindow();
+        if (dailySettlementCap > 0) {
+            require(
+                dailySettledAmount + totalSettled <= dailySettlementCap,
+                "WasiAI: daily cap exceeded"
+            );
+        }
+        dailySettledAmount += totalSettled;
+
+        // Deduct key balance post-loop (only registered slugs' amounts)
+        require(keyBalances[keyId] >= totalSettled, "WasiAI: insufficient key balance");
+        keyBalances[keyId]  -= totalSettled;
+        totalKeyBalances    -= totalSettled;
 
         // Single transfer to treasury after loop — avoids gas blowup in large batches
         if (totalPlatformShare > 0) {
@@ -787,6 +847,22 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         emit TreasuryCanceled(canceled);
     }
 
+    /**
+     * @notice Emergency withdraw of USDC not covered by key balances or earnings.
+     * @dev    WAS-216 AC-20: Only callable by owner when paused. Allows recovery of
+     *         excess USDC (e.g., accidental deposits) without touching user funds.
+     *         Invariant: only transfers USDC above (totalKeyBalances + totalEarnings).
+     * @param to  Recipient address for the excess USDC
+     */
+    function emergencyWithdrawUSDC(address to) external onlyOwner whenPaused {
+        require(to != address(0), "WasiAI: zero address");
+        uint256 balance     = usdc.balanceOf(address(this));
+        uint256 obligated   = totalKeyBalances + totalEarnings;
+        require(balance > obligated, "WasiAI: no excess USDC");
+        uint256 excess = balance - obligated;
+        usdc.safeTransfer(to, excess);
+    }
+
     function setOperator(address operator, bool active) external onlyOwner {
         require(operator != address(0), "WasiAI: zero operator");
         operators[operator] = active;
@@ -858,9 +934,12 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     // ─── ERC-8004 Reputation Registry ─────────────────────────────────────────
 
     struct ReputationRecord {
-        uint16  avgRating;    // scaled ×100 (e.g. 450 = 4.50 stars, max 500)
-        uint32  voteCount;    // total votes aggregated
-        uint64  lastUpdated;  // block.timestamp of last batch
+        uint16  avgRating;     // scaled ×100 (e.g. 450 = 4.50 stars, max 500)
+        uint32  totalCalls;    // WAS-216: total invocations in reporting period
+        uint32  successCalls;  // WAS-216: successful invocations
+        uint32  disputeCount;  // WAS-216: number of disputes raised
+        uint32  avgResponseMs; // WAS-216: average response time in milliseconds
+        uint64  lastUpdated;   // block.timestamp of last batch
     }
 
     /// slug → on-chain reputation
@@ -872,25 +951,34 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     );
 
     /**
-     * @notice Submit aggregated reputation scores for a batch of agents.
+     * @notice Submit aggregated reputation scores for a batch of agents (V2: 6 fields).
      * @dev    Called daily by cron operator. Overwrites previous values.
+     *         WAS-216: extended with totalCalls, successCalls, disputeCount, avgResponseMs.
      *         avgRatings scaled ×100 (uint16): 0–500 (0.00–5.00 stars).
-     *         For thumbs up/down systems: up=500, down=0, mixed=proportional.
-     * @param slugs       Agent slug identifiers
-     * @param avgRatings  Average rating per agent (uint16, ×100 scaled)
-     * @param voteCounts  Total vote count per agent (cumulative)
+     * @param slugs          Agent slug identifiers
+     * @param avgRatings     Average rating per agent (uint16, ×100 scaled)
+     * @param totalCalls     Total invocations per agent in reporting period
+     * @param successCalls   Successful invocations per agent
+     * @param disputeCounts  Dispute count per agent
+     * @param avgResponseMs  Average response time per agent in milliseconds
      */
     function submitReputationBatch(
         string[] calldata slugs,
         uint16[] calldata avgRatings,
-        uint32[] calldata voteCounts
+        uint32[] calldata totalCalls,
+        uint32[] calldata successCalls,
+        uint32[] calldata disputeCounts,
+        uint32[] calldata avgResponseMs
     ) external onlyOperator whenNotPaused {
         lastOperatorActivity = block.timestamp;
         uint256 len = slugs.length;
         require(len > 0,                      "WasiAI: empty batch");
         require(len <= 500,                   "WasiAI: batch too large");
         require(len == avgRatings.length,     "WasiAI: length mismatch");
-        require(len == voteCounts.length,     "WasiAI: length mismatch");
+        require(len == totalCalls.length,     "WasiAI: length mismatch");
+        require(len == successCalls.length,   "WasiAI: length mismatch");
+        require(len == disputeCounts.length,  "WasiAI: length mismatch");
+        require(len == avgResponseMs.length,  "WasiAI: length mismatch");
 
         for (uint256 i = 0; i < len; i++) {
             require(avgRatings[i] <= 500,     "WasiAI: rating out of range");
@@ -900,9 +988,12 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
             );
 
             reputations[slugs[i]] = ReputationRecord({
-                avgRating:   avgRatings[i],
-                voteCount:   voteCounts[i],
-                lastUpdated: uint64(block.timestamp)
+                avgRating:     avgRatings[i],
+                totalCalls:    totalCalls[i],
+                successCalls:  successCalls[i],
+                disputeCount:  disputeCounts[i],
+                avgResponseMs: avgResponseMs[i],
+                lastUpdated:   uint64(block.timestamp)
             });
         }
 
@@ -910,14 +1001,27 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     }
 
     /**
-     * @notice Read on-chain reputation for an agent.
+     * @notice Read on-chain reputation for an agent (V2: 6 fields).
+     * @return avgRating     Average rating scaled ×100 (0–500)
+     * @return totalCalls    Total invocations in reporting period
+     * @return successCalls  Successful invocations
+     * @return disputeCount  Number of disputes
+     * @return avgResponseMs Average response time in milliseconds
+     * @return lastUpdated   Timestamp of last reputation update
      */
     function getReputation(string calldata slug)
         external view
-        returns (uint16 avgRating, uint32 voteCount, uint64 lastUpdated)
+        returns (
+            uint16 avgRating,
+            uint32 totalCalls,
+            uint32 successCalls,
+            uint32 disputeCount,
+            uint32 avgResponseMs,
+            uint64 lastUpdated
+        )
     {
         ReputationRecord memory r = reputations[slug];
-        return (r.avgRating, r.voteCount, r.lastUpdated);
+        return (r.avgRating, r.totalCalls, r.successCalls, r.disputeCount, r.avgResponseMs, r.lastUpdated);
     }
 
     /// @notice Compute the canonical paymentId for an invocation.

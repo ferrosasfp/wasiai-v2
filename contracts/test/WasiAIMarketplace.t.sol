@@ -1572,24 +1572,54 @@ contract WasiAIMarketplaceTest is Test {
 
     // ── Reputation Batch Tests ───────────────────────────────────────────────
 
+    // ── Helpers for reputation batch (WAS-216: 6-param signature) ────────────
+
+    function _reputationBatch1(
+        string memory slug,
+        uint16 rating,
+        uint32 total,
+        uint32 success,
+        uint32 disputes,
+        uint32 responseMs
+    ) internal view returns (
+        string[] memory slugs,
+        uint16[] memory ratings,
+        uint32[] memory totalCalls,
+        uint32[] memory successCalls,
+        uint32[] memory disputeCounts,
+        uint32[] memory avgResponseMs
+    ) {
+        slugs          = new string[](1);   slugs[0]          = slug;
+        ratings        = new uint16[](1);   ratings[0]        = rating;
+        totalCalls     = new uint32[](1);   totalCalls[0]     = total;
+        successCalls   = new uint32[](1);   successCalls[0]   = success;
+        disputeCounts  = new uint32[](1);   disputeCounts[0]  = disputes;
+        avgResponseMs  = new uint32[](1);   avgResponseMs[0]  = responseMs;
+    }
+
     function test_submitReputationBatch_single() public {
         vm.prank(operator);
         marketplace.registerAgent("test-agent", PRICE, creator, 0);
 
-        string[] memory slugs = new string[](1);
-        slugs[0] = "test-agent";
-        uint16[] memory ratings = new uint16[](1);
-        ratings[0] = 450;
-        uint32[] memory counts = new uint32[](1);
-        counts[0] = 42;
+        (
+            string[] memory slugs,
+            uint16[] memory ratings,
+            uint32[] memory totalCalls,
+            uint32[] memory successCalls,
+            uint32[] memory disputeCounts,
+            uint32[] memory avgResponseMs
+        ) = _reputationBatch1("test-agent", 450, 42, 40, 1, 120);
 
         vm.prank(operator);
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
 
-        (uint16 avg, uint32 cnt, uint64 ts) = marketplace.getReputation("test-agent");
+        (uint16 avg, uint32 tc, uint32 sc, uint32 dc, uint32 arm, uint64 ts) = marketplace.getReputation("test-agent");
         assertEq(avg, 450);
-        assertEq(cnt, 42);
-        assertGt(ts, 0);
+        assertEq(tc,  42);
+        assertEq(sc,  40);
+        assertEq(dc,  1);
+        assertEq(arm, 120);
+        assertGt(ts,  0);
     }
 
     function test_submitReputationBatch_multi() public {
@@ -1598,20 +1628,18 @@ contract WasiAIMarketplaceTest is Test {
         marketplace.registerAgent("agent-b", 30000, creator, 0);
 
         string[] memory slugs = new string[](2);
-        slugs[0] = "agent-a";
-        slugs[1] = "agent-b";
-        uint16[] memory ratings = new uint16[](2);
-        ratings[0] = 500;
-        ratings[1] = 250;
-        uint32[] memory counts = new uint32[](2);
-        counts[0] = 100;
-        counts[1] = 5;
+        slugs[0] = "agent-a"; slugs[1] = "agent-b";
+        uint16[] memory ratings       = new uint16[](2); ratings[0]  = 500; ratings[1]  = 250;
+        uint32[] memory totalCalls    = new uint32[](2); totalCalls[0]  = 100; totalCalls[1]  = 5;
+        uint32[] memory successCalls  = new uint32[](2); successCalls[0] = 98; successCalls[1] = 4;
+        uint32[] memory disputeCounts = new uint32[](2); disputeCounts[0] = 0; disputeCounts[1] = 1;
+        uint32[] memory avgResponseMs = new uint32[](2); avgResponseMs[0] = 80; avgResponseMs[1] = 200;
 
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
         vm.stopPrank();
 
-        (uint16 avg1,,) = marketplace.getReputation("agent-a");
-        (uint16 avg2,,) = marketplace.getReputation("agent-b");
+        (uint16 avg1,,,,,) = marketplace.getReputation("agent-a");
+        (uint16 avg2,,,,,) = marketplace.getReputation("agent-b");
         assertEq(avg1, 500);
         assertEq(avg2, 250);
     }
@@ -1620,92 +1648,455 @@ contract WasiAIMarketplaceTest is Test {
         vm.startPrank(operator);
         marketplace.registerAgent("overwrite-test", PRICE, creator, 0);
 
-        string[] memory slugs = new string[](1);
-        slugs[0] = "overwrite-test";
-        uint16[] memory ratings = new uint16[](1);
-        ratings[0] = 300;
-        uint32[] memory counts = new uint32[](1);
-        counts[0] = 10;
+        (
+            string[] memory slugs,
+            uint16[] memory ratings,
+            uint32[] memory totalCalls,
+            uint32[] memory successCalls,
+            uint32[] memory disputeCounts,
+            uint32[] memory avgResponseMs
+        ) = _reputationBatch1("overwrite-test", 300, 10, 9, 0, 100);
 
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
 
-        ratings[0] = 480;
-        counts[0] = 25;
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        ratings[0] = 480; totalCalls[0] = 25; successCalls[0] = 24;
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
         vm.stopPrank();
 
-        (uint16 avg, uint32 cnt,) = marketplace.getReputation("overwrite-test");
+        (uint16 avg, uint32 tc,,,,) = marketplace.getReputation("overwrite-test");
         assertEq(avg, 480);
-        assertEq(cnt, 25);
+        assertEq(tc,  25);
     }
 
     function test_submitReputationBatch_notOperator_Reverts() public {
         vm.prank(operator);
         marketplace.registerAgent("no-op-test", PRICE, creator, 0);
 
-        string[] memory slugs = new string[](1);
-        slugs[0] = "no-op-test";
-        uint16[] memory ratings = new uint16[](1);
-        ratings[0] = 400;
-        uint32[] memory counts = new uint32[](1);
-        counts[0] = 1;
+        (
+            string[] memory slugs,
+            uint16[] memory ratings,
+            uint32[] memory totalCalls,
+            uint32[] memory successCalls,
+            uint32[] memory disputeCounts,
+            uint32[] memory avgResponseMs
+        ) = _reputationBatch1("no-op-test", 400, 1, 1, 0, 100);
 
         vm.prank(address(0xBEEF));
         vm.expectRevert("WasiAI: not operator");
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
     }
 
     function test_submitReputationBatch_ratingTooHigh_Reverts() public {
         vm.prank(operator);
         marketplace.registerAgent("high-rating", PRICE, creator, 0);
 
-        string[] memory slugs = new string[](1);
-        slugs[0] = "high-rating";
-        uint16[] memory ratings = new uint16[](1);
-        ratings[0] = 501;
-        uint32[] memory counts = new uint32[](1);
-        counts[0] = 1;
+        (
+            string[] memory slugs,
+            uint16[] memory ratings,
+            uint32[] memory totalCalls,
+            uint32[] memory successCalls,
+            uint32[] memory disputeCounts,
+            uint32[] memory avgResponseMs
+        ) = _reputationBatch1("high-rating", 501, 1, 1, 0, 100);
 
         vm.prank(operator);
         vm.expectRevert("WasiAI: rating out of range");
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
     }
 
     function test_submitReputationBatch_emptyBatch_Reverts() public {
-        string[] memory slugs = new string[](0);
-        uint16[] memory ratings = new uint16[](0);
-        uint32[] memory counts = new uint32[](0);
+        string[] memory slugs         = new string[](0);
+        uint16[] memory ratings       = new uint16[](0);
+        uint32[] memory totalCalls    = new uint32[](0);
+        uint32[] memory successCalls  = new uint32[](0);
+        uint32[] memory disputeCounts = new uint32[](0);
+        uint32[] memory avgResponseMs = new uint32[](0);
 
         vm.prank(operator);
         vm.expectRevert("WasiAI: empty batch");
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
     }
 
     function test_submitReputationBatch_agentNotFound_Reverts() public {
-        string[] memory slugs = new string[](1);
-        slugs[0] = "nonexistent-agent";
-        uint16[] memory ratings = new uint16[](1);
-        ratings[0] = 400;
-        uint32[] memory counts = new uint32[](1);
-        counts[0] = 1;
+        (
+            string[] memory slugs,
+            uint16[] memory ratings,
+            uint32[] memory totalCalls,
+            uint32[] memory successCalls,
+            uint32[] memory disputeCounts,
+            uint32[] memory avgResponseMs
+        ) = _reputationBatch1("nonexistent-agent", 400, 1, 1, 0, 100);
 
         vm.prank(operator);
         vm.expectRevert("WasiAI: agent not found");
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
     }
 
     function test_submitReputationBatch_lengthMismatch_Reverts() public {
         string[] memory slugs = new string[](1);
         slugs[0] = "mismatch-test";
-        uint16[] memory ratings = new uint16[](2);
-        ratings[0] = 400;
-        ratings[1] = 300;
-        uint32[] memory counts = new uint32[](1);
-        counts[0] = 1;
+        uint16[] memory ratings       = new uint16[](2); ratings[0] = 400; ratings[1] = 300;
+        uint32[] memory totalCalls    = new uint32[](1); totalCalls[0]    = 1;
+        uint32[] memory successCalls  = new uint32[](1); successCalls[0]  = 1;
+        uint32[] memory disputeCounts = new uint32[](1); disputeCounts[0] = 0;
+        uint32[] memory avgResponseMs = new uint32[](1); avgResponseMs[0] = 100;
 
         vm.prank(operator);
         vm.expectRevert("WasiAI: length mismatch");
-        marketplace.submitReputationBatch(slugs, ratings, counts);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
+    }
+
+    // ── WAS-216: batchSelfRegister Tests (W2.1) ──────────────────────────────
+
+    function test_batchSelfRegister_EmptyBatch_Reverts() public {
+        // AC-1: empty batch reverts
+        string[]  memory slugs  = new string[](0);
+        uint256[] memory prices = new uint256[](0);
+        uint64[]  memory ids    = new uint64[](0);
+        vm.prank(creator);
+        vm.expectRevert("WasiAI: empty batch");
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    function test_batchSelfRegister_ArrayLengthMismatch_Reverts() public {
+        // AC-2: arrays of different length revert
+        string[]  memory slugs  = new string[](2);
+        slugs[0] = "s1"; slugs[1] = "s2";
+        uint256[] memory prices = new uint256[](1);
+        prices[0] = PRICE;
+        uint64[]  memory ids    = new uint64[](2);
+
+        vm.prank(creator);
+        vm.expectRevert("WasiAI: array length mismatch");
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    function test_batchSelfRegister_TooLarge_Reverts() public {
+        // AC-3: batch > 50 reverts
+        uint256 n = 51;
+        string[]  memory slugs  = new string[](n);
+        uint256[] memory prices = new uint256[](n);
+        uint64[]  memory ids    = new uint64[](n);
+        for (uint256 i = 0; i < n; i++) {
+            slugs[i]  = string(abi.encodePacked("slug-", vm.toString(i)));
+            prices[i] = PRICE;
+        }
+        vm.prank(creator);
+        vm.expectRevert("WasiAI: batch too large");
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    function test_batchSelfRegister_SlugTaken_Reverts() public {
+        // AC-4: slug already registered → revert whole tx
+        vm.prank(creator);
+        marketplace.selfRegisterAgent("existing", PRICE, 0);
+
+        string[]  memory slugs  = new string[](2);
+        slugs[0] = "new-slug"; slugs[1] = "existing";
+        uint256[] memory prices = new uint256[](2);
+        prices[0] = PRICE; prices[1] = PRICE;
+        uint64[]  memory ids    = new uint64[](2);
+
+        vm.prank(creator);
+        vm.expectRevert(); // "WasiAI: slug taken: existing"
+        marketplace.batchSelfRegister(slugs, prices, ids);
+
+        // Verify rollback: new-slug was NOT registered (tx reverted atomically)
+        assertEq(marketplace.getAgent("new-slug").creator, address(0));
+    }
+
+    function test_batchSelfRegister_HappyPath_EmitsEvents() public {
+        // AC-5: successful batch emits AgentRegistered per slug
+        string[]  memory slugs  = new string[](3);
+        slugs[0] = "batch-a"; slugs[1] = "batch-b"; slugs[2] = "batch-c";
+        uint256[] memory prices = new uint256[](3);
+        prices[0] = PRICE; prices[1] = PRICE * 2; prices[2] = PRICE * 3;
+        uint64[]  memory ids    = new uint64[](3);
+
+        vm.prank(creator);
+        marketplace.batchSelfRegister(slugs, prices, ids);
+
+        WasiAIMarketplace.Agent memory a = marketplace.getAgent("batch-a");
+        WasiAIMarketplace.Agent memory b = marketplace.getAgent("batch-b");
+        WasiAIMarketplace.Agent memory c = marketplace.getAgent("batch-c");
+
+        assertEq(a.creator, creator); assertEq(a.pricePerCall, PRICE);
+        assertEq(b.creator, creator); assertEq(b.pricePerCall, PRICE * 2);
+        assertEq(c.creator, creator); assertEq(c.pricePerCall, PRICE * 3);
+        assertEq(marketplace.userRegistrationCount(creator), 3);
+    }
+
+    function test_batchSelfRegister_FeeCalculation_FreeTierExhausted() public {
+        // Fee calculation: feeCount = max(0, n - freeRestantes)
+        uint256 fee = 1_000_000; // 1 USDC per agent
+        vm.prank(owner);
+        marketplace.setRegistrationFee(fee);
+
+        // Use 1 free registration (freeRegistrationsPerUser = 2 by default)
+        vm.prank(creator);
+        marketplace.selfRegisterAgent("free-used", PRICE, 0);
+        assertEq(marketplace.userRegistrationCount(creator), 1);
+
+        // batchSelfRegister 3 slugs: 1 free remaining, 2 paid
+        string[]  memory slugs  = new string[](3);
+        slugs[0] = "b1"; slugs[1] = "b2"; slugs[2] = "b3";
+        uint256[] memory prices = new uint256[](3);
+        prices[0] = PRICE; prices[1] = PRICE; prices[2] = PRICE;
+        uint64[]  memory ids    = new uint64[](3);
+
+        uint256 expectedFee = 2 * fee; // 2 paid
+        usdc.mint(creator, expectedFee);
+        vm.startPrank(creator);
+        usdc.approve(address(marketplace), expectedFee);
+        marketplace.batchSelfRegister(slugs, prices, ids);
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(address(marketplace)), expectedFee);
+        assertEq(marketplace.userRegistrationCount(creator), 4);
+    }
+
+    function test_batchSelfRegister_WhenPaused_Reverts() public {
+        vm.prank(owner);
+        marketplace.pause();
+
+        string[]  memory slugs  = new string[](1);
+        slugs[0] = "paused-slug";
+        uint256[] memory prices = new uint256[](1); prices[0] = PRICE;
+        uint64[]  memory ids    = new uint64[](1);
+
+        vm.prank(creator);
+        vm.expectRevert();
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    function test_batchSelfRegister_AllFreeNoFeeCharged() public {
+        // 2 slugs, 2 free slots remaining → no fee
+        uint256 fee = 500_000;
+        vm.prank(owner);
+        marketplace.setRegistrationFee(fee);
+
+        string[]  memory slugs  = new string[](2);
+        slugs[0] = "free-batch-1"; slugs[1] = "free-batch-2";
+        uint256[] memory prices = new uint256[](2); prices[0] = PRICE; prices[1] = PRICE;
+        uint64[]  memory ids    = new uint64[](2);
+
+        vm.prank(creator);
+        marketplace.batchSelfRegister(slugs, prices, ids);
+
+        assertEq(usdc.balanceOf(address(marketplace)), 0); // no fee charged
+        assertEq(marketplace.userRegistrationCount(creator), 2);
+    }
+
+    // ── WAS-216: settleKeyBatch graceful Tests (W2.2) ─────────────────────────
+
+    function test_settleKeyBatch_Graceful_SkipsUnregistered() public {
+        // AC-6: mix of registered and unregistered slugs
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 1_000_000);
+
+        string[]  memory slugs   = new string[](3);
+        uint256[] memory amounts = new uint256[](3);
+        slugs[0] = SLUG;        amounts[0] = 50_000; // registered
+        slugs[1] = "missing-1"; amounts[1] = 30_000; // NOT registered → skip
+        slugs[2] = "missing-2"; amounts[2] = 20_000; // NOT registered → skip
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        // AC-8: keyBalance reduced only by registered slug amounts (50_000)
+        assertEq(marketplace.getKeyBalance(KEY_ID), 1_000_000 - 50_000);
+        // Creator gets 90% of 50_000 = 45_000
+        assertEq(marketplace.getPendingEarnings(creator), 45_000);
+        // Treasury gets 10% of 50_000 = 5_000
+        assertEq(usdc.balanceOf(treasury), 5_000);
+        // Stats: only registered slug counted
+        assertEq(marketplace.totalVolume(),      50_000);
+        assertEq(marketplace.totalInvocations(), 1);
+    }
+
+    function test_settleKeyBatch_Graceful_KeyBalanceCorrect() public {
+        // AC-8: keyBalances[keyId] decrements ONLY by amounts of registered slugs
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 500_000);
+
+        string[]  memory slugs   = new string[](2);
+        uint256[] memory amounts = new uint256[](2);
+        slugs[0] = "unregistered-x"; amounts[0] = 300_000; // skip
+        slugs[1] = SLUG;             amounts[1] = 100_000; // settle
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        // Only 100_000 deducted (not 400_000)
+        assertEq(marketplace.getKeyBalance(KEY_ID), 400_000);
+    }
+
+    function test_settleKeyBatch_DailyCapPostLoop() public {
+        // AC: daily cap checked post-loop on totalSettled (not pre-loop total)
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 15_000 * 1e6);
+
+        // Mix: 6k registered + 11k unregistered → totalSettled = 6k (under 10k cap)
+        string[]  memory slugs   = new string[](2);
+        uint256[] memory amounts = new uint256[](2);
+        slugs[0] = "unregistered-big"; amounts[0] = 11_000 * 1e6; // skip
+        slugs[1] = SLUG;               amounts[1] =  6_000 * 1e6; // settle
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts); // should NOT revert (6k < 10k cap)
+
+        (, uint256 settled,) = marketplace.getDailySettlementStatus();
+        assertEq(settled, 6_000 * 1e6);
+    }
+
+    function test_settleKeyBatch_Graceful_AllSkipped_ZeroDeducted() public {
+        // If all slugs are unregistered, nothing is deducted from keyBalance
+        _fundKey(KEY_ID, payer, 500_000);
+
+        string[]  memory slugs   = new string[](2);
+        uint256[] memory amounts = new uint256[](2);
+        slugs[0] = "ghost-1"; amounts[0] = 100_000;
+        slugs[1] = "ghost-2"; amounts[1] = 200_000;
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        // Nothing deducted
+        assertEq(marketplace.getKeyBalance(KEY_ID), 500_000);
+        assertEq(marketplace.totalVolume(),      0);
+        assertEq(marketplace.totalInvocations(), 0);
+    }
+
+    // ── WAS-216: Solvency Invariant Tests (W2.3) ─────────────────────────────
+
+    function test_solvency_AfterSettleWithSkip() public {
+        // Invariant: usdc.balanceOf(contract) >= totalKeyBalances + totalEarnings
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 1_000_000);
+
+        string[]  memory slugs   = new string[](2);
+        uint256[] memory amounts = new uint256[](2);
+        slugs[0] = SLUG;         amounts[0] = 200_000; // registered
+        slugs[1] = "not-here";   amounts[1] = 100_000; // skipped
+
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+
+        (bool solvent, uint256 accounted, uint256 balance) = marketplace.checkSolvency();
+        assertTrue(solvent, "Invariant: contract must be solvent after settle+skip");
+        assertGe(balance, accounted);
+    }
+
+    function test_solvency_AfterBatchSelfRegisterWithFee() public {
+        uint256 fee = 1_000_000;
+        vm.prank(owner);
+        marketplace.setRegistrationFee(fee);
+
+        // Exhaust free tier
+        vm.prank(creator);
+        marketplace.selfRegisterAgent("free-slot-1", PRICE, 0);
+        vm.prank(creator);
+        marketplace.selfRegisterAgent("free-slot-2", PRICE, 0);
+
+        // Batch with fee
+        string[]  memory slugs  = new string[](1);
+        slugs[0] = "paid-slot";
+        uint256[] memory prices = new uint256[](1); prices[0] = PRICE;
+        uint64[]  memory ids    = new uint64[](1);
+        usdc.mint(creator, fee);
+        vm.startPrank(creator);
+        usdc.approve(address(marketplace), fee);
+        marketplace.batchSelfRegister(slugs, prices, ids);
+        vm.stopPrank();
+
+        (bool solvent,,) = marketplace.checkSolvency();
+        assertTrue(solvent, "Solvency holds after fee-paid batchSelfRegister");
+    }
+
+    // ── WAS-216: submitReputationBatch 6 Fields Tests (W2.4) ─────────────────
+
+    function test_submitReputationBatch_AllSixFieldsWritten() public {
+        // AC-9: all 6 fields of ReputationRecord are persisted
+        vm.prank(operator);
+        marketplace.registerAgent("six-field-agent", PRICE, creator, 0);
+
+        (
+            string[] memory slugs,
+            uint16[] memory ratings,
+            uint32[] memory totalCalls,
+            uint32[] memory successCalls,
+            uint32[] memory disputeCounts,
+            uint32[] memory avgResponseMs
+        ) = _reputationBatch1("six-field-agent", 420, 1000, 980, 3, 250);
+
+        vm.prank(operator);
+        marketplace.submitReputationBatch(slugs, ratings, totalCalls, successCalls, disputeCounts, avgResponseMs);
+
+        (
+            uint16 avg,
+            uint32 tc,
+            uint32 sc,
+            uint32 dc,
+            uint32 arm,
+            uint64 ts
+        ) = marketplace.getReputation("six-field-agent");
+
+        assertEq(avg, 420,  "avgRating mismatch");
+        assertEq(tc,  1000, "totalCalls mismatch");
+        assertEq(sc,  980,  "successCalls mismatch");
+        assertEq(dc,  3,    "disputeCount mismatch");
+        assertEq(arm, 250,  "avgResponseMs mismatch");
+        assertGt(ts,  0,    "lastUpdated not set");
+    }
+
+    // ── WAS-216: whenPaused Tests (W2.5) ──────────────────────────────────────
+
+    function test_whenPaused_batchSelfRegister_Reverts() public {
+        // AC-10
+        vm.prank(owner);
+        marketplace.pause();
+
+        string[]  memory slugs  = new string[](1); slugs[0]  = "slug-x";
+        uint256[] memory prices = new uint256[](1); prices[0] = PRICE;
+        uint64[]  memory ids    = new uint64[](1);
+
+        vm.prank(creator);
+        vm.expectRevert();
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    function test_whenPaused_depositForKey_Reverts() public {
+        // AC-10: already covered by test_EdgeCase_DepositWhenPaused_Reverts
+        vm.prank(owner);
+        marketplace.pause();
+        usdc.mint(payer, PRICE);
+        vm.prank(operator);
+        vm.expectRevert();
+        marketplace.depositForKey(KEY_ID, payer, PRICE, 0, type(uint256).max, bytes32(0), 0, bytes32(0), bytes32(0));
+    }
+
+    function test_whenPaused_settleKeyBatch_Reverts() public {
+        // AC-10: already covered by test_EdgeCase_SettleWhenPaused_Reverts
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, PRICE);
+        vm.prank(owner);
+        marketplace.pause();
+        string[]  memory slugs   = new string[](1); slugs[0]   = SLUG;
+        uint256[] memory amounts = new uint256[](1); amounts[0] = PRICE;
+        vm.prank(operator);
+        vm.expectRevert();
+        marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
+    }
+
+    function test_whenPaused_recordInvocation_Reverts() public {
+        // AC-10
+        _registerAgent(SLUG, creator);
+        usdc.mint(address(marketplace), PRICE);
+        vm.prank(owner);
+        marketplace.pause();
+        vm.prank(operator);
+        vm.expectRevert();
+        marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-paused-record"));
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
