@@ -80,13 +80,19 @@ export async function POST(request: NextRequest) {
   // action === 'run'
   // Procesar TODAS las calls pendientes agrupadas por key_id
   try {
+    const {
+      getKeyBalanceOnChain,
+      isAgentRegisteredOnChain,
+    } = await import('@/lib/contracts/marketplaceClient')
+
     const { data: pendingCalls, error: fetchError } = await supabase
       .from('agent_calls')
       .select('id, key_id, agent_slug, amount_paid')
       .not('key_id', 'is', null)
+      .not('agent_slug', 'is', null)  // skip null slugs — cannot settle on-chain
       .is('settled_at', null)
       .neq('status', 'error')
-      .limit(500) // safety cap
+      .limit(500)
 
     if (fetchError) throw fetchError
 
@@ -94,22 +100,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, message: 'No pending calls to settle', settled: 0 })
     }
 
-    // Agrupar calls por key_id → una tx on-chain por key
+    // Pre-verificar qué slugs están registrados on-chain
+    const uniqueSlugs = [...new Set(pendingCalls.map(c => c.agent_slug as string))]
+    const registrationMap = new Map<string, boolean>()
+    await Promise.all(
+      uniqueSlugs.map(s =>
+        isAgentRegisteredOnChain(s)
+          .then(ok => registrationMap.set(s, ok))
+          .catch(() => registrationMap.set(s, false))
+      )
+    )
+    const unregisteredSlugs = uniqueSlugs.filter(s => !registrationMap.get(s))
+    if (unregisteredSlugs.length > 0) {
+      logger.warn('[admin/settlement] unregistered slugs will be skipped', { unregisteredSlugs })
+    }
+
+    // Agrupar calls por key_id, excluyendo slugs no registrados
     const byKey = new Map<string, { slugs: string[]; amounts: number[]; callIds: string[] }>()
     for (const call of pendingCalls) {
+      const slug = call.agent_slug as string
+      if (!registrationMap.get(slug)) continue  // skip unregistered
       const keyId = call.key_id as string
       if (!byKey.has(keyId)) byKey.set(keyId, { slugs: [], amounts: [], callIds: [] })
       const group = byKey.get(keyId)!
-      group.slugs.push(call.agent_slug as string)
+      group.slugs.push(slug)
       group.amounts.push(Number(call.amount_paid))
       group.callIds.push(call.id as string)
     }
 
-    const results: Array<{ keyId: string; txHash: string | null; calls: number; error?: string }> = []
+    if (byKey.size === 0) {
+      return NextResponse.json({
+        ok: false,
+        message: 'All pending calls have unregistered slugs',
+        unregistered: unregisteredSlugs,
+        settled: 0,
+      })
+    }
+
+    const results: Array<{ keyId: string; txHash: string | null; calls: number; skipped?: number; error?: string }> = []
     let totalSettled = 0
 
     for (const [keyId, { slugs, amounts, callIds }] of byKey.entries()) {
-      // Obtener key_hash
       const { data: keyRow } = await supabase
         .from('agent_keys')
         .select('key_hash')
@@ -121,26 +152,25 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Verificar balance on-chain de la key antes de enviar
-      const { getKeyBalanceOnChain } = await import('@/lib/contracts/marketplaceClient')
+      // Verificar balance on-chain de la key
       const keyBalanceUsdc = await getKeyBalanceOnChain(keyRow.key_hash).catch(() => 0)
-      const totalAmount = amounts.reduce((a, b) => a + b, 0)
+      const totalAmount    = amounts.reduce((a, b) => a + b, 0)
 
-      // Si el total excede el balance, recortar el batch hasta lo que alcanza
-      let finalSlugs = slugs
-      let finalAmounts = amounts
-      let trimEnd = callIds.length
+      // Recortar batch si el total excede el balance on-chain
+      let batchSlugs   = slugs
+      let batchAmounts = amounts
+      let batchCallIds = callIds
       if (totalAmount > keyBalanceUsdc) {
         let running = 0
         const cutIdx = amounts.findIndex(a => { running += a; return running > keyBalanceUsdc })
         if (cutIdx === 0) {
-          results.push({ keyId, txHash: null, calls: slugs.length, error: `key balance insufficient: $${keyBalanceUsdc.toFixed(4)} < first call $${amounts[0]}` })
+          results.push({ keyId, txHash: null, calls: slugs.length, error: `key balance $${keyBalanceUsdc.toFixed(4)} < first call $${amounts[0]}` })
           continue
         }
-        const end = cutIdx === -1 ? slugs.length : cutIdx
-        finalSlugs   = slugs.slice(0, end)
-        finalAmounts = amounts.slice(0, end)
-        trimEnd      = end
+        const end    = cutIdx === -1 ? slugs.length : cutIdx
+        batchSlugs   = slugs.slice(0, end)
+        batchAmounts = amounts.slice(0, end)
+        batchCallIds = callIds.slice(0, end)
         logger.warn('[admin/settlement] batch trimmed to fit key balance', {
           original: slugs.length, trimmed: end, balance: keyBalanceUsdc, total: totalAmount,
         })
@@ -148,25 +178,25 @@ export async function POST(request: NextRequest) {
 
       logger.info('[admin/settlement] processing key batch', {
         keyId: keyId.slice(0, 8),
-        calls: finalSlugs.length,
-        totalAmount: finalAmounts.reduce((a, b) => a + b, 0).toFixed(6),
+        calls: batchSlugs.length,
+        totalAmount: batchAmounts.reduce((a, b) => a + b, 0).toFixed(6),
         keyBalance: keyBalanceUsdc,
       })
 
-      const txHash = await settleKeyBatchOnChain(keyRow.key_hash, finalSlugs, finalAmounts)
+      const txHash = await settleKeyBatchOnChain(keyRow.key_hash, batchSlugs, batchAmounts)
 
       if (txHash) {
-        // Marcar calls como settled (solo las incluidas en el batch)
         await supabase
           .from('agent_calls')
           .update({ settled_at: new Date().toISOString() })
-          .in('id', callIds.slice(0, trimEnd))
+          .in('id', batchCallIds)
 
-        totalSettled += callIds.length
-        results.push({ keyId, txHash, calls: slugs.length })
-        logger.info('[admin/settlement] key settled', { txHash, calls: slugs.length })
+        totalSettled += batchCallIds.length
+        const skipped = callIds.length - batchCallIds.length
+        results.push({ keyId, txHash, calls: batchCallIds.length, ...(skipped > 0 ? { skipped } : {}) })
+        logger.info('[admin/settlement] key settled', { txHash, calls: batchCallIds.length })
       } else {
-        results.push({ keyId, txHash: null, calls: slugs.length, error: 'on-chain tx failed' })
+        results.push({ keyId, txHash: null, calls: batchSlugs.length, error: 'on-chain tx failed' })
         logger.error('[admin/settlement] key settlement failed', { keyId: keyId.slice(0, 8) })
       }
     }

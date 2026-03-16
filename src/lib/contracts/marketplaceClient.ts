@@ -513,3 +513,23 @@ export async function getKeyBalanceOnChain(keyHash: string): Promise<number> {
     return 0
   }
 }
+
+/**
+ * Check whether an agent slug is registered on-chain.
+ */
+export async function isAgentRegisteredOnChain(slug: string): Promise<boolean> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) return false
+  try {
+    const { public: pub } = getOperatorClient()
+    const result = await pub.readContract({
+      address:      contractAddress,
+      abi:          WASIAI_MARKETPLACE_ABI,
+      functionName: 'agents',
+      args:         [slug],
+    }) as [string, bigint, bigint]
+    return result[0] !== '0x0000000000000000000000000000000000000000'
+  } catch {
+    return false
+  }
+}
