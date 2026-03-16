@@ -9,6 +9,7 @@ interface Props {
   slug: string
   isAuthenticated: boolean
   inputSchema?: Record<string, unknown> | null
+  inputExample?: string | null
 }
 
 function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
@@ -38,9 +39,10 @@ function buildExampleFromSchema(schema: Record<string, unknown> | null | undefin
 
 type TrialState = 'checking' | 'idle' | 'loading' | 'success' | 'error' | 'timeout' | 'used'
 
-export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema }: Props) {
+export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, inputExample }: Props) {
   const t = useTranslations('trial')
-  const [input, setInput] = useState('')
+  const defaultInput = inputExample ?? buildExampleFromSchema(inputSchema) ?? ''
+  const [input, setInput] = useState(defaultInput)
   const [anonLimitHit, setAnonLimitHit] = useState(false)
   // Initialize directly from prop — avoids synchronous setState in effect
   const [state, setState] = useState<TrialState>(() =>
@@ -140,7 +142,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema }: Pro
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder={buildExampleFromSchema(inputSchema) || t('placeholder')}
+                placeholder={defaultInput || t('placeholder')}
                 maxLength={2000}
                 rows={6}
                 disabled={state === 'loading'}

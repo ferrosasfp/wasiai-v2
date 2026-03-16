@@ -181,7 +181,12 @@ export default async function ModelDetailPage({ params }: Props) {
 
             {/* HU-3.3: Trial Playground solo si el creator lo activó — ausente del DOM si no */}
             {model.free_trial_enabled ? (
-              <AgentTrialPlayground slug={model.slug} isAuthenticated={isAuthenticated} inputSchema={model.input_schema} />
+              <AgentTrialPlayground
+                slug={model.slug}
+                isAuthenticated={isAuthenticated}
+                inputSchema={model.input_schema}
+                inputExample={(model.metadata?.input_example as string | null | undefined) ?? model.capabilities?.[0]?.example?.input ?? null}
+              />
             ) : null}
 
             {/* UX-04: Code Examples auto-generated */}
