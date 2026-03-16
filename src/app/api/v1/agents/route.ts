@@ -124,7 +124,15 @@ export async function GET(request: NextRequest) {
     if (sandboxOnly)        slimQuery = slimQuery.eq('sandbox_enabled', true) // WAS-196
     if (minPerformance !== undefined) slimQuery = slimQuery.gte('performance_score', minPerformance) // S7-02
 
-    const { data: slimData, count: slimCount } = await slimQuery
+    const { data: slimData, error: slimError, count: slimCount } = await slimQuery
+
+    if (slimError) {
+      console.error('[agents/slim] Supabase error:', slimError.message)
+      return NextResponse.json(
+        { error: 'internal_error', message: 'Service temporarily unavailable' },
+        { status: 503, headers: CORS }
+      )
+    }
 
     return NextResponse.json({
       schema: 'wasiai/agents/v1',
