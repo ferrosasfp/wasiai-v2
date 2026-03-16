@@ -85,5 +85,5 @@ export async function GET(request: NextRequest) {
       docs_url: 'https://app.wasiai.io/docs',
       sdk: 'npm install @wasiai/sdk',
     },
-  })
+  }, { headers: CORS })
 }
