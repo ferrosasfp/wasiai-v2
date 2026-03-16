@@ -86,7 +86,6 @@ export async function POST(request: NextRequest) {
       .not('key_id', 'is', null)
       .is('settled_at', null)
       .neq('status', 'error')
-      .order('created_at', { ascending: true })
       .limit(500) // safety cap
 
     if (fetchError) throw fetchError
