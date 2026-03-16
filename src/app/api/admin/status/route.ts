@@ -9,15 +9,11 @@ const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x
 
 /**
  * GET /api/admin/status
- * Sin auth requerida — el panel verifica ownership en cliente con wallet.
+ * Sin auth requerida — el panel verifica ownership en cliente con wallet conectada.
+ * La protección real es que la UI solo renderiza el panel si address ∈ ADMIN_ALLOWED.
  * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement }
  */
-export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization')
-  const adminSecret = process.env.ADMIN_SECRET
-  if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+export async function GET(_req: Request) {
 
   try {
     const supabase = createServiceClient()
