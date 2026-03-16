@@ -376,7 +376,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     function updateAgent(
         string  calldata slug,
         uint256 newPrice
-    ) external {
+    ) external whenNotPaused {
         Agent storage agent = agents[slug];
         require(agent.creator != address(0), "WasiAI: agent not found");
         require(
@@ -459,7 +459,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         // Verify contract actually holds the funds
         // (soft check — if the operator is trusted this is just defensive)
         require(
-            usdc.balanceOf(address(this)) >= amount,
+            usdc.balanceOf(address(this)) - totalKeyBalances - totalEarnings >= amount,
             "WasiAI: insufficient balance"
         );
 
@@ -562,7 +562,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
 
         // 4. Balance guard — protect Agent Key balances
         require(
-            usdc.balanceOf(address(this)) - totalKeyBalances >= grossAmount,
+            usdc.balanceOf(address(this)) - totalKeyBalances - totalEarnings >= grossAmount,
             "WasiAI: insufficient free balance"
         );
 
@@ -932,7 +932,7 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
     ///      El settlement real sigue ejecutándose desde el operador backend.
     ///      Cualquier address puede llamar performUpkeep — el intervalo protege
     ///      de abuso (solo ejecutable cada 23h máximo).
-    function performUpkeep(bytes calldata /* performData */) external override {
+    function performUpkeep(bytes calldata /* performData */) external override onlyOperator {
         require(
             (block.timestamp - lastUpkeepTimestamp) >= UPKEEP_INTERVAL,
             "WasiAI: upkeep not needed"
