@@ -18,10 +18,9 @@ interface SettlementBody {
  * Body: { action: 'run' | 'toggle', mode?: 'vercel' | 'chainlink' }
  *
  * toggle → actualiza system_config.settlement_mode
- * run    → dispara settleKeyBatchOnChain() directamente
+ * run    → procesa TODAS las calls pendientes agrupadas por key_id en batch
  */
 export async function POST(request: NextRequest) {
-  // ORDEN OBLIGATORIO: leer body PRIMERO → construir message → verificar firma
   let body: SettlementBody
   try {
     body = await request.json() as SettlementBody
@@ -29,15 +28,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
 
-  const sig       = request.headers.get('x-admin-signature') as `0x${string}` | null
-  const nonceHdr  = request.headers.get('x-admin-nonce')     as `0x${string}` | null
-  const tsHdr     = request.headers.get('x-admin-timestamp')
+  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr    = request.headers.get('x-admin-timestamp')
 
   if (!sig || !nonceHdr || !tsHdr) {
     return NextResponse.json({ error: 'Missing admin auth headers' }, { status: 401 })
   }
 
-  // Client signs with 'runSettlement' or 'toggleSettlement' — must match exactly
   const actionMap: Record<SettlementAction, string> = {
     run:    'runSettlement',
     toggle: 'toggleSettlement',
@@ -80,50 +78,89 @@ export async function POST(request: NextRequest) {
   }
 
   // action === 'run'
-  // Obtener todas las llamadas pendientes y procesarlas
+  // Procesar TODAS las calls pendientes agrupadas por key_id
   try {
-    // Encontrar un key pendiente para forzar settlement
-    const { data: pendingCall } = await supabase
+    const { data: pendingCalls, error: fetchError } = await supabase
       .from('agent_calls')
-      .select('key_id, agent_slug, amount_paid')
+      .select('id, key_id, agent_slug, amount_paid')
       .not('key_id', 'is', null)
       .is('settled_at', null)
       .neq('status', 'error')
-      .limit(1)
-      .single()
+      .order('created_at', { ascending: true })
+      .limit(500) // safety cap
 
-    if (!pendingCall?.key_id) {
-      return NextResponse.json({ ok: true, message: 'No pending calls to settle' })
+    if (fetchError) throw fetchError
+
+    if (!pendingCalls || pendingCalls.length === 0) {
+      return NextResponse.json({ ok: true, message: 'No pending calls to settle', settled: 0 })
     }
 
-    const { data: keyRow } = await supabase
-      .from('agent_keys')
-      .select('key_hash')
-      .eq('id', pendingCall.key_id)
-      .single()
-
-    if (!keyRow?.key_hash) {
-      return NextResponse.json({ error: 'Key not found' }, { status: 404 })
+    // Agrupar calls por key_id → una tx on-chain por key
+    const byKey = new Map<string, { slugs: string[]; amounts: number[]; callIds: string[] }>()
+    for (const call of pendingCalls) {
+      const keyId = call.key_id as string
+      if (!byKey.has(keyId)) byKey.set(keyId, { slugs: [], amounts: [], callIds: [] })
+      const group = byKey.get(keyId)!
+      group.slugs.push(call.agent_slug as string)
+      group.amounts.push(Number(call.amount_paid))
+      group.callIds.push(call.id as string)
     }
 
-    // Forzar settlement con los datos disponibles
-    const slugs   = [pendingCall.agent_slug as string]
-    const amounts = [Number(pendingCall.amount_paid)]
+    const results: Array<{ keyId: string; txHash: string | null; calls: number; error?: string }> = []
+    let totalSettled = 0
 
-    logger.info('[admin/settlement] attempting', { slug: slugs[0], amount: amounts[0], keyHash: keyRow.key_hash?.slice(0,10) })
+    for (const [keyId, { slugs, amounts, callIds }] of byKey.entries()) {
+      // Obtener key_hash
+      const { data: keyRow } = await supabase
+        .from('agent_keys')
+        .select('key_hash')
+        .eq('id', keyId)
+        .single()
 
-    const txHash  = await settleKeyBatchOnChain(keyRow.key_hash, slugs, amounts)
+      if (!keyRow?.key_hash) {
+        results.push({ keyId, txHash: null, calls: slugs.length, error: 'key_hash not found' })
+        continue
+      }
 
-    if (!txHash) {
-      return NextResponse.json({
-        ok: false,
-        error: 'On-chain tx failed — check logs for contract revert. Slug may not be registered on-chain.',
-        debug: { slug: slugs[0], amount: amounts[0], keyHash: keyRow.key_hash?.slice(0, 10) },
-      }, { status: 500 })
+      logger.info('[admin/settlement] processing key batch', {
+        keyId: keyId.slice(0, 8),
+        calls: slugs.length,
+        totalAmount: amounts.reduce((a, b) => a + b, 0).toFixed(6),
+      })
+
+      const txHash = await settleKeyBatchOnChain(keyRow.key_hash, slugs, amounts)
+
+      if (txHash) {
+        // Marcar calls como settled
+        await supabase
+          .from('agent_calls')
+          .update({ settled_at: new Date().toISOString() })
+          .in('id', callIds)
+
+        totalSettled += callIds.length
+        results.push({ keyId, txHash, calls: slugs.length })
+        logger.info('[admin/settlement] key settled', { txHash, calls: slugs.length })
+      } else {
+        results.push({ keyId, txHash: null, calls: slugs.length, error: 'on-chain tx failed' })
+        logger.error('[admin/settlement] key settlement failed', { keyId: keyId.slice(0, 8) })
+      }
     }
 
-    logger.info('[admin/settlement] manual run', { txHash })
-    return NextResponse.json({ ok: true, txHash })
+    // Actualizar lastSettlement en system_config
+    await supabase
+      .from('system_config')
+      .upsert({ key: 'last_manual_settlement', value: new Date().toISOString(), updated_at: new Date().toISOString() })
+
+    const failed = results.filter(r => !r.txHash).length
+    logger.info('[admin/settlement] batch complete', { totalSettled, failed, keys: results.length })
+
+    return NextResponse.json({
+      ok:            failed === 0,
+      settled:       totalSettled,
+      keys_processed: results.length,
+      keys_failed:   failed,
+      results,
+    })
   } catch (err) {
     logger.error('[admin/settlement] run failed', { err })
     return NextResponse.json(
