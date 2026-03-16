@@ -4,28 +4,7 @@ import { useState, useEffect, useRef, startTransition } from 'react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { CopyableOutput } from '@/components/ui/CopyableOutput'
 
-function buildExampleFromSchema(schema: Record<string, unknown> | null | undefined): string {
-  if (!schema) return ''
-  if (schema.type === 'string') return schema.description ? `e.g. ${schema.description}` : 'Write your input here...'
-  if (schema.type !== 'object') return ''
-  const props = schema.properties as Record<string, Record<string, unknown>> | undefined
-  if (!props) return ''
-  const example: Record<string, unknown> = {}
-  for (const [key, def] of Object.entries(props)) {
-    if (def.type === 'string') {
-      example[key] = def.enum && Array.isArray(def.enum)
-        ? (def.default ?? def.enum[0])
-        : (def.description ? `<${def.description}>` : `<${key}>`)
-    } else if (def.type === 'number' || def.type === 'integer') {
-      example[key] = 0
-    } else if (def.type === 'boolean') {
-      example[key] = true
-    } else {
-      example[key] = {}
-    }
-  }
-  return JSON.stringify(example, null, 2)
-}
+import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
 import { WalletConnectModal } from './WalletConnectModal'
 import { useTranslations } from 'next-intl'
 import type { Model } from '@/features/models/types/models.types'

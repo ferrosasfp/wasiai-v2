@@ -3,6 +3,7 @@
 import { useState, useEffect, useReducer, useRef } from 'react'
 import { Trash2, Plus, ArrowDown, Play, Loader2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -30,21 +31,7 @@ interface AvailableAgent {
   input_schema?:  Record<string, unknown> | null
 }
 
-function buildPlaceholder(schema: Record<string, unknown> | null | undefined): string {
-  if (!schema) return ''
-  if (schema.type === 'string') return schema.description ? `e.g. ${schema.description}` : 'Write your input here...'
-  if (schema.type !== 'object') return ''
-  const props = schema.properties as Record<string, Record<string, unknown>> | undefined
-  if (!props) return ''
-  const example: Record<string, unknown> = {}
-  for (const [key, def] of Object.entries(props)) {
-    if (def.type === 'string') example[key] = def.description ? `<${def.description}>` : `<${key}>`
-    else if (def.type === 'number' || def.type === 'integer') example[key] = 0
-    else if (def.type === 'boolean') example[key] = true
-    else example[key] = {}
-  }
-  return JSON.stringify(example, null, 2)
-}
+
 
 export interface PipelineBuilderProps {
   onRun:           (steps: ComposeStep[], apiKey: string) => void
@@ -273,7 +260,7 @@ export function PipelineBuilder({ onRun, isRunning, availableAgents }: PipelineB
                     className={`w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-avax-400 ${
                       !step.input?.trim() ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
                     }`}
-                    placeholder={buildPlaceholder(availableAgents.find(a => a.slug === step.agent_slug)?.input_schema) || t('stepInputPlaceholder')}
+                    placeholder={buildExampleFromSchema(availableAgents.find(a => a.slug === step.agent_slug)?.input_schema) || t('stepInputPlaceholder')}
                   />
                   {!step.input?.trim() && (
                     <p className="mt-1 text-xs text-amber-600">
