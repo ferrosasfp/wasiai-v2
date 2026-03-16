@@ -121,20 +121,46 @@ export async function POST(request: NextRequest) {
         continue
       }
 
+      // Verificar balance on-chain de la key antes de enviar
+      const { getKeyBalanceOnChain } = await import('@/lib/contracts/marketplaceClient')
+      const keyBalanceUsdc = await getKeyBalanceOnChain(keyRow.key_hash).catch(() => 0)
+      const totalAmount = amounts.reduce((a, b) => a + b, 0)
+
+      // Si el total excede el balance, recortar el batch hasta lo que alcanza
+      let finalSlugs = slugs
+      let finalAmounts = amounts
+      let trimEnd = callIds.length
+      if (totalAmount > keyBalanceUsdc) {
+        let running = 0
+        const cutIdx = amounts.findIndex(a => { running += a; return running > keyBalanceUsdc })
+        if (cutIdx === 0) {
+          results.push({ keyId, txHash: null, calls: slugs.length, error: `key balance insufficient: $${keyBalanceUsdc.toFixed(4)} < first call $${amounts[0]}` })
+          continue
+        }
+        const end = cutIdx === -1 ? slugs.length : cutIdx
+        finalSlugs   = slugs.slice(0, end)
+        finalAmounts = amounts.slice(0, end)
+        trimEnd      = end
+        logger.warn('[admin/settlement] batch trimmed to fit key balance', {
+          original: slugs.length, trimmed: end, balance: keyBalanceUsdc, total: totalAmount,
+        })
+      }
+
       logger.info('[admin/settlement] processing key batch', {
         keyId: keyId.slice(0, 8),
-        calls: slugs.length,
-        totalAmount: amounts.reduce((a, b) => a + b, 0).toFixed(6),
+        calls: finalSlugs.length,
+        totalAmount: finalAmounts.reduce((a, b) => a + b, 0).toFixed(6),
+        keyBalance: keyBalanceUsdc,
       })
 
-      const txHash = await settleKeyBatchOnChain(keyRow.key_hash, slugs, amounts)
+      const txHash = await settleKeyBatchOnChain(keyRow.key_hash, finalSlugs, finalAmounts)
 
       if (txHash) {
-        // Marcar calls como settled
+        // Marcar calls como settled (solo las incluidas en el batch)
         await supabase
           .from('agent_calls')
           .update({ settled_at: new Date().toISOString() })
-          .in('id', callIds)
+          .in('id', callIds.slice(0, trimEnd))
 
         totalSettled += callIds.length
         results.push({ keyId, txHash, calls: slugs.length })
