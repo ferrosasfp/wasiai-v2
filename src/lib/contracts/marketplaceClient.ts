@@ -492,29 +492,6 @@ export async function getKeyOwnerOnChain(keyHash: string): Promise<string | null
 }
 
 /**
- * Read on-chain balance of a key in USDC (float).
- * Returns 0 on error or if contract not configured.
- */
-export async function getKeyBalanceOnChain(keyHash: string): Promise<number> {
-  const contractAddress = getContractAddress()
-  if (!contractAddress) return 0
-  try {
-    const { public: pub } = getOperatorClient()
-    const bytes32KeyId = keyHashToBytes32(keyHash)
-    const balance = await pub.readContract({
-      address:      contractAddress,
-      abi:          WASIAI_MARKETPLACE_ABI,
-      functionName: 'getKeyBalance',
-      args:         [bytes32KeyId],
-    }) as bigint
-    return Number(balance) / 1_000_000
-  } catch (err) {
-    logger.error('[marketplace] getKeyBalanceOnChain failed', { err: String(err).slice(0, 200) })
-    return 0
-  }
-}
-
-/**
  * Check whether an agent slug is registered on-chain.
  */
 export async function isAgentRegisteredOnChain(slug: string): Promise<boolean> {
