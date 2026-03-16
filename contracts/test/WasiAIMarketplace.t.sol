@@ -1887,6 +1887,78 @@ contract WasiAIMarketplaceTest is Test {
         assertEq(marketplace.userRegistrationCount(creator), 2);
     }
 
+    // Finding #1: intra-batch duplicate detection
+    function test_batchSelfRegister_IntraBatchDuplicate_Reverts() public {
+        string[]  memory slugs  = new string[](2);
+        slugs[0] = "slug-a"; slugs[1] = "slug-a"; // duplicate
+        uint256[] memory prices = new uint256[](2); prices[0] = PRICE; prices[1] = PRICE;
+        uint64[]  memory ids    = new uint64[](2);
+
+        vm.prank(creator);
+        vm.expectRevert();
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    function test_batchSelfRegister_IntraBatchDuplicate_ExactMessage() public {
+        string[]  memory slugs  = new string[](2);
+        slugs[0] = "slug-dup"; slugs[1] = "slug-dup";
+        uint256[] memory prices = new uint256[](2); prices[0] = PRICE; prices[1] = PRICE;
+        uint64[]  memory ids    = new uint64[](2);
+
+        vm.prank(creator);
+        vm.expectRevert(
+            abi.encodePacked("WasiAI: duplicate slug in batch: ", "slug-dup")
+        );
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    // Finding #2: slug length validation in batch
+    function test_batchSelfRegister_EmptySlug_Reverts() public {
+        string[]  memory slugs  = new string[](1);
+        slugs[0] = ""; // empty
+        uint256[] memory prices = new uint256[](1); prices[0] = PRICE;
+        uint64[]  memory ids    = new uint64[](1);
+
+        vm.prank(creator);
+        vm.expectRevert("WasiAI: invalid slug length");
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    function test_batchSelfRegister_SlugTooLong_Reverts() public {
+        bytes memory longSlug = new bytes(81);
+        for (uint256 i = 0; i < 81; i++) longSlug[i] = "a";
+
+        string[]  memory slugs  = new string[](1);
+        slugs[0] = string(longSlug);
+        uint256[] memory prices = new uint256[](1); prices[0] = PRICE;
+        uint64[]  memory ids    = new uint64[](1);
+
+        vm.prank(creator);
+        vm.expectRevert("WasiAI: invalid slug length");
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    // Finding #3: price range validation in batch
+    function test_batchSelfRegister_PriceTooLow_Reverts() public {
+        string[]  memory slugs  = new string[](1); slugs[0] = "low-price";
+        uint256[] memory prices = new uint256[](1); prices[0] = 999; // below min
+        uint64[]  memory ids    = new uint64[](1);
+
+        vm.prank(creator);
+        vm.expectRevert("WasiAI: invalid price");
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
+    function test_batchSelfRegister_PriceTooHigh_Reverts() public {
+        string[]  memory slugs  = new string[](1); slugs[0] = "high-price";
+        uint256[] memory prices = new uint256[](1); prices[0] = 100_000_001; // above max
+        uint64[]  memory ids    = new uint64[](1);
+
+        vm.prank(creator);
+        vm.expectRevert("WasiAI: invalid price");
+        marketplace.batchSelfRegister(slugs, prices, ids);
+    }
+
     // ── WAS-216: settleKeyBatch graceful Tests (W2.2) ─────────────────────────
 
     function test_settleKeyBatch_Graceful_SkipsUnregistered() public {
@@ -1899,6 +1971,12 @@ contract WasiAIMarketplaceTest is Test {
         slugs[0] = SLUG;        amounts[0] = 50_000; // registered
         slugs[1] = "missing-1"; amounts[1] = 30_000; // NOT registered → skip
         slugs[2] = "missing-2"; amounts[2] = 20_000; // NOT registered → skip
+
+        // Finding #4: verify SettlementSkipped events are emitted for unregistered slugs
+        vm.expectEmit(true, false, false, true);
+        emit WasiAIMarketplace.SettlementSkipped(KEY_ID, "missing-1", 30_000);
+        vm.expectEmit(true, false, false, true);
+        emit WasiAIMarketplace.SettlementSkipped(KEY_ID, "missing-2", 20_000);
 
         vm.prank(operator);
         marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
@@ -1923,6 +2001,10 @@ contract WasiAIMarketplaceTest is Test {
         uint256[] memory amounts = new uint256[](2);
         slugs[0] = "unregistered-x"; amounts[0] = 300_000; // skip
         slugs[1] = SLUG;             amounts[1] = 100_000; // settle
+
+        // Finding #4: verify SettlementSkipped event for the unregistered slug
+        vm.expectEmit(true, false, false, true);
+        emit WasiAIMarketplace.SettlementSkipped(KEY_ID, "unregistered-x", 300_000);
 
         vm.prank(operator);
         marketplace.settleKeyBatch(KEY_ID, slugs, amounts);
@@ -2097,6 +2179,97 @@ contract WasiAIMarketplaceTest is Test {
         vm.prank(operator);
         vm.expectRevert();
         marketplace.recordInvocation(SLUG, payer, PRICE, keccak256("pid-paused-record"));
+    }
+
+    // ── emergencyWithdrawUSDC Tests (Finding #5) ─────────────────────────────
+
+    function test_emergencyWithdrawUSDC_HappyPath_TransfersOnlyExcess() public {
+        // Setup: fund a key (obligated) + send extra USDC (excess)
+        _fundKey(KEY_ID, payer, 500_000);              // totalKeyBalances = 500_000
+        usdc.mint(address(marketplace), 200_000);      // excess = 200_000
+
+        // Pause and withdraw excess
+        vm.prank(owner);
+        marketplace.pause();
+
+        address recipient = address(0xABC);
+        vm.prank(owner);
+        marketplace.emergencyWithdrawUSDC(recipient);
+
+        // Only excess transferred
+        assertEq(usdc.balanceOf(recipient), 200_000);
+        // Contract still holds at least the obligated amount
+        assertGe(usdc.balanceOf(address(marketplace)), marketplace.totalKeyBalances() + marketplace.totalEarnings());
+    }
+
+    function test_emergencyWithdrawUSDC_OnlyOwner_Reverts() public {
+        _fundKey(KEY_ID, payer, 100_000);
+        usdc.mint(address(marketplace), 50_000);
+
+        vm.prank(owner);
+        marketplace.pause();
+
+        vm.prank(stranger);
+        vm.expectRevert();
+        marketplace.emergencyWithdrawUSDC(stranger);
+    }
+
+    function test_emergencyWithdrawUSDC_WhenNotPaused_Reverts() public {
+        usdc.mint(address(marketplace), 100_000);
+        // contract is NOT paused
+        vm.prank(owner);
+        vm.expectRevert();
+        marketplace.emergencyWithdrawUSDC(owner);
+    }
+
+    function test_emergencyWithdrawUSDC_NoExcess_Reverts() public {
+        // All USDC is obligated (no excess)
+        _fundKey(KEY_ID, payer, 500_000); // exactly totalKeyBalances
+
+        vm.prank(owner);
+        marketplace.pause();
+
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: no excess USDC");
+        marketplace.emergencyWithdrawUSDC(owner);
+    }
+
+    function test_emergencyWithdrawUSDC_ZeroAddress_Reverts() public {
+        usdc.mint(address(marketplace), 100_000);
+        vm.prank(owner);
+        marketplace.pause();
+
+        vm.prank(owner);
+        vm.expectRevert("WasiAI: zero address");
+        marketplace.emergencyWithdrawUSDC(address(0));
+    }
+
+    function test_emergencyWithdrawUSDC_Invariant_SolvencyPreserved() public {
+        // Setup: key balance + earnings + excess
+        _registerAgent(SLUG, creator);
+        _fundKey(KEY_ID, payer, 300_000);     // key balance
+
+        // Simulate some earnings via settle
+        string[]  memory slugs_   = new string[](1);
+        uint256[] memory amounts_ = new uint256[](1);
+        slugs_[0] = SLUG; amounts_[0] = 100_000;
+        vm.prank(operator);
+        marketplace.settleKeyBatch(KEY_ID, slugs_, amounts_);
+
+        // Add extra excess USDC
+        usdc.mint(address(marketplace), 999_999);
+
+        vm.prank(owner);
+        marketplace.pause();
+
+        address recipient = address(0xDEF);
+        vm.prank(owner);
+        marketplace.emergencyWithdrawUSDC(recipient);
+
+        // Invariant: contract balance >= totalKeyBalances + totalEarnings
+        uint256 contractBal = usdc.balanceOf(address(marketplace));
+        uint256 obligated   = marketplace.totalKeyBalances() + marketplace.totalEarnings();
+        assertGe(contractBal, obligated, "Invariant violated: contract must cover all obligations");
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────

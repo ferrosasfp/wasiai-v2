@@ -317,12 +317,29 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
         require(slugs.length == prices.length,               "WasiAI: array length mismatch");
         require(slugs.length == erc8004Ids.length,           "WasiAI: array length mismatch");
 
-        // Pre-check: all slugs must be available (revert whole tx on duplicate)
+        // Pre-check: validate each slug and ensure all are available
         for (uint256 i = 0; i < slugs.length; i++) {
+            // Finding #2: slug length validation (mirrors selfRegisterAgent)
+            require(
+                bytes(slugs[i]).length > 0 && bytes(slugs[i]).length <= 80,
+                "WasiAI: invalid slug length"
+            );
+            // Finding #3: price range validation (mirrors selfRegisterAgent)
+            require(
+                prices[i] >= 1_000 && prices[i] <= 100_000_000,
+                "WasiAI: invalid price"
+            );
             require(
                 agents[slugs[i]].creator == address(0),
                 string(abi.encodePacked("WasiAI: slug taken: ", slugs[i]))
             );
+            // Finding #1: detect intra-batch duplicates (O(n²), safe for n<=50)
+            for (uint256 j = 0; j < i; j++) {
+                require(
+                    keccak256(bytes(slugs[i])) != keccak256(bytes(slugs[j])),
+                    string(abi.encodePacked("WasiAI: duplicate slug in batch: ", slugs[i]))
+                );
+            }
         }
 
         // Fee calculation using ternary to avoid underflow in 0.8.x checked arithmetic
