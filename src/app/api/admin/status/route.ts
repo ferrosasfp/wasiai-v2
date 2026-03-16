@@ -13,7 +13,7 @@ const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x
  * La protección real es que la UI solo renderiza el panel si address ∈ ADMIN_ALLOWED.
  * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement }
  */
-export async function GET(_req: Request) {
+export async function GET() {
 
   try {
     const supabase = createServiceClient()
