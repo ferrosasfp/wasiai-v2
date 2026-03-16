@@ -65,7 +65,11 @@ export async function GET(request: NextRequest) {
     })
 
     if (searchError) {
-      return NextResponse.json({ error: searchError.message }, { status: 500 })
+      console.error('[agents/search] Supabase RPC error:', searchError.message)
+      return NextResponse.json(
+        { error: 'internal_error', message: 'Service temporarily unavailable' },
+        { status: 503, headers: { 'Access-Control-Allow-Origin': '*' } }
+      )
     }
 
     let agents = (searchData ?? []) as Record<string, unknown>[]
@@ -173,10 +177,25 @@ export async function GET(request: NextRequest) {
   }
   if (minPerformance !== undefined) query = query.gte('performance_score', minPerformance) // S6-A3
 
-  const { data, error, count } = await query
+  let result
+  try {
+    result = await query
+  } catch (err) {
+    console.error('[agents] Unexpected error:', err)
+    return NextResponse.json(
+      { error: 'internal_error', message: 'Service temporarily unavailable' },
+      { status: 503, headers: CORS }
+    )
+  }
+
+  const { data, error, count } = result
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[agents] Supabase error:', error.message)
+    return NextResponse.json(
+      { error: 'internal_error', message: 'Service temporarily unavailable' },
+      { status: 503, headers: CORS }
+    )
   }
 
   const baseUrl = `${request.nextUrl.origin}/api/v1/agents`

@@ -28,15 +28,36 @@ export async function GET(request: NextRequest) {
   const { category, max_price, capability, limit } = parsed.data
   const supabase = await createClient()
 
-  // WAS-160e: Use RPC function with on-chain boost ordering
-  const { data: agents, error } = await supabase.rpc('discover_agents_v2', {
-    p_category:  category ?? null,
-    p_max_price: max_price ?? null,
-    p_limit:     limit,
-  })
+  const CORS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  }
 
-  if (error) {
-    return NextResponse.json({ error: 'Discovery failed' }, { status: 500 })
+  // WAS-160e: Use RPC function with on-chain boost ordering
+  let agents
+  try {
+    const { data, error } = await supabase.rpc('discover_agents_v2', {
+      p_category:  category ?? null,
+      p_max_price: max_price ?? null,
+      p_limit:     limit,
+    })
+
+    if (error) {
+      console.error('[agents/discover] Supabase RPC error:', error.message)
+      return NextResponse.json(
+        { error: 'internal_error', message: 'Service temporarily unavailable' },
+        { status: 503, headers: CORS }
+      )
+    }
+
+    agents = data
+  } catch (err) {
+    console.error('[agents/discover] Unexpected error:', err)
+    return NextResponse.json(
+      { error: 'internal_error', message: 'Service temporarily unavailable' },
+      { status: 503, headers: CORS }
+    )
   }
 
   // Client-side filter by capability name (capabilities is JSONB array)
