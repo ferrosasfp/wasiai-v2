@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { CopyableOutput } from '@/components/ui/CopyableOutput'
 
@@ -21,6 +21,20 @@ export function TryIt() {
   const [latency, setLatency]   = useState<number | null>(null)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
+
+  const fetchAndSetPayload = useCallback(async (newSlug: string) => {
+    try {
+      const res = await fetch(`/api/v1/agents/${encodeURIComponent(newSlug)}`, {
+        signal: AbortSignal.timeout(5_000)
+      })
+      if (res.ok) {
+        const data = await res.json() as { example_input?: string }
+        if (!payloadDirty) setPayload(data.example_input ?? '{"input": ""}')
+      }
+    } catch {
+      if (!payloadDirty) setPayload('{"input": ""}')
+    }
+  }, [payloadDirty])
 
   // Fetch agents list
   useEffect(() => {
@@ -45,21 +59,7 @@ export function TryIt() {
       clearTimeout(timeoutId)
       controller.abort()
     }
-  }, [])
-
-  async function fetchAndSetPayload(newSlug: string) {
-    try {
-      const res = await fetch(`/api/v1/agents/${encodeURIComponent(newSlug)}`, {
-        signal: AbortSignal.timeout(5_000)
-      })
-      if (res.ok) {
-        const data = await res.json() as { example_input?: string }
-        if (!payloadDirty) setPayload(data.example_input ?? '{"input": ""}')
-      }
-    } catch {
-      if (!payloadDirty) setPayload('{"input": ""}')
-    }
-  }
+  }, [fetchAndSetPayload])
 
   function handleSlugChange(newSlug: string) {
     setSlug(newSlug)
