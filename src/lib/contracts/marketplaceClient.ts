@@ -499,13 +499,15 @@ export async function isAgentRegisteredOnChain(slug: string): Promise<boolean> {
   if (!contractAddress) return false
   try {
     const { public: pub } = getOperatorClient()
+    const AGENTS_ABI = [{ name: 'agents', type: 'function', stateMutability: 'view', inputs: [{ name: '', type: 'string' }], outputs: [{ name: 'creator', type: 'address' }, { name: 'pricePerCall', type: 'uint256' }, { name: 'erc8004Id', type: 'uint64' }] }] as const
     const result = await pub.readContract({
       address:      contractAddress,
-      abi:          WASIAI_MARKETPLACE_ABI,
+      abi:          AGENTS_ABI,
       functionName: 'agents',
       args:         [slug],
-    }) as [string, bigint, bigint]
-    return result[0] !== '0x0000000000000000000000000000000000000000'
+    })
+    const creator = (result as readonly [`0x${string}`, bigint, bigint])[0]
+    return creator !== '0x0000000000000000000000000000000000000000'
   } catch {
     return false
   }
