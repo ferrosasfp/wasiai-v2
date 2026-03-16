@@ -165,9 +165,12 @@ export async function POST(request: NextRequest) {
       results,
     })
   } catch (err) {
-    logger.error('[admin/settlement] run failed', { err })
+    const detail = err instanceof Error
+      ? err.message
+      : (typeof err === 'object' ? JSON.stringify(err) : String(err))
+    logger.error('[admin/settlement] run failed', { err: detail })
     return NextResponse.json(
-      { error: 'Settlement failed', detail: String(err).slice(0, 300) },
+      { error: 'Settlement failed', detail: detail.slice(0, 500) },
       { status: 500 },
     )
   }
