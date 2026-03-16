@@ -149,7 +149,10 @@ export async function POST(request: NextRequest) {
     // Actualizar lastSettlement en system_config
     await supabase
       .from('system_config')
-      .upsert({ key: 'last_manual_settlement', value: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .upsert(
+        { key: 'last_manual_settlement', value: new Date().toISOString(), updated_at: new Date().toISOString() },
+        { onConflict: 'key' },
+      )
 
     const failed = results.filter(r => !r.txHash).length
     logger.info('[admin/settlement] batch complete', { totalSettled, failed, keys: results.length })
