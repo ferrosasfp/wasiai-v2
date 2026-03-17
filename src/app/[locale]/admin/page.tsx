@@ -110,6 +110,7 @@ export default function AdminPage() {
     if (!isOwner) return
     void loadStatus()
     void loadTreasury()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOwner, loadTreasury])
 
   async function signAdminAction(action: string): Promise<{
