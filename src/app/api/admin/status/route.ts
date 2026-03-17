@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { verifyAdminSignature } from '@/lib/admin/verifyAdminSignature'
+
 import { getPublicClient } from '@/shared/lib/web3/client'
 import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
 import { logger } from '@/lib/logger'
@@ -13,7 +13,7 @@ const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x
  * Requiere firma EIP-712 admin (NG-C02).
  * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement }
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   // GET reads public on-chain/DB data — no auth required
   // Mutative operations require EIP-712 admin signature
 

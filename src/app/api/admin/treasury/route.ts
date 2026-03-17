@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createPublicClient, http } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
-import { verifyAdminSignature } from '@/lib/admin/verifyAdminSignature'
+
 
 // Chain-agnostic: usa las mismas vars que el resto del sistema
 const IS_MAINNET  = process.env.NEXT_PUBLIC_CHAIN_ID === '43114'
@@ -27,7 +27,7 @@ const MARKETPLACE_ABI = [
  * Requiere firma EIP-712 admin (NG-C01).
  * Lee estado on-chain del contrato: USDC, key balances, earnings, fee, treasury.
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   // GET reads public on-chain data — no auth required
   // Mutative operations (POST/PUT/DELETE) require EIP-712 admin signature
 
