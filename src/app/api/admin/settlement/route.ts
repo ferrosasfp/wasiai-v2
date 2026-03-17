@@ -202,6 +202,20 @@ export async function POST(request: NextRequest) {
           .update({ settled_at: new Date().toISOString() })
           .in('id', batchCallIds)
 
+        // WAS-218: Post-settlement sync — update budget_usdc from on-chain truth
+        try {
+          const postSettleBalance = await getKeyBalanceOnChain(keyRow.key_hash)
+          await supabase
+            .from('agent_keys')
+            .update({
+              budget_usdc: postSettleBalance,
+              balance_synced_at: new Date().toISOString(),
+            })
+            .eq('key_hash', keyRow.key_hash)
+        } catch (syncErr) {
+          logger.warn('[admin/settlement] post-settlement balance sync failed', { keyId, err: String(syncErr).slice(0, 200) })
+        }
+
         // Actualizar pending_earnings_usdc en creator_profiles por cada creator
         // Calcular earnings por creator (85% del total, después de 15% platform fee)
         const PLATFORM_FEE_BPS = 1500 // 15%

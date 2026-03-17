@@ -11,6 +11,7 @@ export interface AgentKey {
   is_active: boolean
   last_used_at: string | null
   created_at: string
+  balance_synced_at: string | null
   owner_wallet_address?: string | null   // HU-058: first depositor's wallet
   allowed_slugs: string[] | null
   allowed_categories: string[] | null
@@ -111,7 +112,7 @@ export async function validateAgentKey(rawKey: string): Promise<AgentKey | null>
   if (!data) return null
 
   const key = data as AgentKey
-  if (key.spent_usdc >= key.budget_usdc) return null // Budget exhausted
+  if (key.budget_usdc <= 0) return null // on-chain balance is 0 or negative = exhausted
 
   return key
 }

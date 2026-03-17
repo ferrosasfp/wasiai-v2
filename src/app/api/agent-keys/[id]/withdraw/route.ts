@@ -13,7 +13,7 @@ import { logger }                            from '@/lib/logger'
 import { z }                                 from 'zod'
 import { createPublicClient, http }          from 'viem'
 import { avalancheFuji, avalanche }          from 'viem/chains'
-import { getKeyOwnerOnChain }                from '@/lib/contracts/marketplaceClient'
+import { getKeyOwnerOnChain, getKeyBalanceOnChain } from '@/lib/contracts/marketplaceClient'
 
 // topic0 = keccak256("KeyWithdrawn(bytes32,address,uint256)")
 const KEY_WITHDRAWN_TOPIC = '0xf968df119e62b53960f5b7aaa847537e4b933ffd14eaba1e7ea5fb99bffb2632'
@@ -135,15 +135,27 @@ export async function POST(
   const realAmount = Number(BigInt(log.data)) / 1_000_000
 
   // 11. Actualizar DB — HAL-025: solo tras receipt verificado
-  const newBudget = Math.max(0, Number(keyRow.budget_usdc) - realAmount)
+  // WAS-218: Post-withdraw sync — read on-chain truth instead of computing locally
   const serviceClient = createServiceClient()
+
+  let newBudget = Math.max(0, Number(keyRow.budget_usdc) - realAmount)
+  let balanceSyncedAt: string | null = null
+  try {
+    newBudget = await getKeyBalanceOnChain(keyRow.key_hash)
+    balanceSyncedAt = new Date().toISOString()
+  } catch (syncErr) {
+    logger.warn('[withdraw] post-withdraw on-chain read failed, using computed fallback', { err: String(syncErr).slice(0, 200) })
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    budget_usdc: newBudget,
+    is_active:   newBudget > 0,
+  }
+  if (balanceSyncedAt) updatePayload.balance_synced_at = balanceSyncedAt
 
   const { error: updateError } = await serviceClient
     .from('agent_keys')
-    .update({
-      budget_usdc: newBudget,
-      is_active:   newBudget > 0,
-    })
+    .update(updatePayload)
     .eq('id', id)
 
   if (updateError) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { AlertTriangle, Info, KeyRound, Bot } from 'lucide-react'
+import { AlertTriangle, Info, KeyRound, Bot, RefreshCw } from 'lucide-react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
 import { useUnifiedWalletClient } from '@/features/wallet/hooks/useUnifiedWalletClient'
 import { WITHDRAW_KEY_ABI }       from '@/lib/contracts/abis'
@@ -23,6 +23,8 @@ interface AgentKey {
   owner_wallet_address?: string | null   // HU-058: first depositor's wallet
   allowed_slugs: string[] | null
   allowed_categories: string[] | null
+  balance_synced_at?: string | null      // WAS-218: last on-chain sync timestamp
+  stale?: boolean                        // WAS-218: true if balance may be outdated
 }
 
 // USDC contract addresses by chain
@@ -629,6 +631,39 @@ export default function AgentKeysPage() {
   const [showForm, setShowForm] = useState(false)
   const [copied, setCopied]     = useState(false)
 
+  // WAS-218: sync state per key
+  const [syncingKeyId, setSyncingKeyId] = useState<string | null>(null)
+  const [syncMsg, setSyncMsg]           = useState<{ id: string; msg: string } | null>(null)
+
+  async function handleSyncBalance(keyId: string) {
+    setSyncingKeyId(keyId)
+    setSyncMsg(null)
+    try {
+      const res = await fetch(`/api/agent-keys/${keyId}/sync-balance`, { method: 'POST' })
+      if (res.status === 429) {
+        setSyncMsg({ id: keyId, msg: t('syncRateLimit') })
+        return
+      }
+      if (!res.ok) {
+        setSyncMsg({ id: keyId, msg: 'Sync failed' })
+        return
+      }
+      const data = await res.json() as { budget_usdc: number; balance_synced_at: string; stale: boolean }
+      // Update local state for this key
+      setKeys(prev => prev.map(k =>
+        k.id === keyId
+          ? { ...k, budget_usdc: data.budget_usdc, balance_synced_at: data.balance_synced_at, stale: data.stale }
+          : k
+      ))
+      setSyncMsg({ id: keyId, msg: t('syncSuccess') })
+      setTimeout(() => setSyncMsg(prev => prev?.id === keyId ? null : prev), 3000)
+    } catch {
+      setSyncMsg({ id: keyId, msg: 'Sync failed' })
+    } finally {
+      setSyncingKeyId(null)
+    }
+  }
+
   // Modal state
   const [depositKey,  setDepositKey]  = useState<{ id: string; name: string; ownerWalletAddress?: string | null } | null>(null)
   const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
@@ -794,10 +829,12 @@ export default function AgentKeysPage() {
           ) : (
             <div className="divide-y divide-gray-50">
               {keys.map(key => {
-                const available = Math.max(0, Number(key.budget_usdc) - Number(key.spent_usdc))
-                const pct       = key.budget_usdc > 0
-                  ? Math.min((key.spent_usdc / key.budget_usdc) * 100, 100)
-                  : 0
+                // WAS-218: available = budget_usdc (on-chain truth); spent_usdc deprecated for UI
+                const available = Math.max(0, Number(key.budget_usdc))
+                // WAS-218: stale if balance_synced_at is null or > 5 min ago
+                const syncedMs = key.balance_synced_at ? new Date(key.balance_synced_at).getTime() : 0
+                const isStale = key.stale || !key.balance_synced_at || (Date.now() - syncedMs > 5 * 60 * 1000)
+                const isSyncing = syncingKeyId === key.id
 
                 return (
                   <div key={key.id} className="px-6 py-4">
@@ -811,24 +848,28 @@ export default function AgentKeysPage() {
                           {key.is_active && key.budget_usdc === 0 && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600">{t('noFunds')}</span>
                           )}
+                          {/* WAS-218: stale indicator */}
+                          {isStale && (
+                            <span
+                              className="flex items-center gap-0.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700 cursor-help"
+                              title={t('balanceStale')}
+                            >
+                              <AlertTriangle size={10} />
+                              <span>{t('balanceStale')}</span>
+                            </span>
+                          )}
                         </div>
                         <div className="mt-1 flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                          <span>{t('totalDeposited')}: <strong className="text-gray-600">${Number(key.budget_usdc).toFixed(2)}</strong></span>
-                          <span>{t('spent')}: <strong className="text-gray-600">${Number(key.spent_usdc).toFixed(3)}</strong></span>
+                          {/* WAS-218: show only Available (on-chain truth); spent_usdc hidden */}
                           <span>{t('available')}: <strong className="text-avax-600">${available.toFixed(3)}</strong></span>
                           {key.last_used_at && (
                             <span>{t('lastUsed')}: {new Date(key.last_used_at).toLocaleDateString()}</span>
                           )}
+                          {/* Sync feedback */}
+                          {syncMsg?.id === key.id && (
+                            <span className="text-green-600 font-medium">{syncMsg.msg}</span>
+                          )}
                         </div>
-                        {/* Budget bar */}
-                        {key.budget_usdc > 0 && (
-                          <div className="mt-2 h-1.5 w-full rounded-full bg-gray-100">
-                            <div
-                              className="h-1.5 rounded-full bg-avax-400"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        )}
                         {/* Scope (WAS-186) */}
                         <div className="mt-2 flex flex-wrap gap-1 text-xs">
                           {!key.allowed_slugs && !key.allowed_categories ? (
@@ -848,6 +889,16 @@ export default function AgentKeysPage() {
 
                       {key.is_active && address && (
                         <div className="flex shrink-0 gap-2">
+                          {/* WAS-218: Sync balance button */}
+                          <button
+                            onClick={() => handleSyncBalance(key.id)}
+                            disabled={isSyncing}
+                            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition disabled:opacity-50"
+                            title={t('balanceStale')}
+                          >
+                            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                          </button>
+
                           {/* Add USDC */}
                           <button
                             onClick={() => setDepositKey({ id: key.id, name: key.name, ownerWalletAddress: key.owner_wallet_address })}
