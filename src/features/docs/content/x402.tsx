@@ -31,7 +31,7 @@ const SIGN: Parameters<typeof CodeBlock>[0]['tabs'] = [
 import { avalanche } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 
-const MARKETPLACE = '0x24be31D0F538C5551c536b09C85907C43c24d062'
+const MARKETPLACE = '0x9316E902760f2c37CDA57C8Be01358D890a26276'
 const USDC_MAINNET = '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
 
 export async function signERC3009Payment({
@@ -86,7 +86,7 @@ const CONTRACTS: Parameters<typeof CodeBlock>[0]['tabs'] = [
     label: 'Mainnet Contracts',
     language: 'bash',
     code: `# Avalanche C-Chain (chainId: 43114)
-Marketplace: 0x24be31D0F538C5551c536b09C85907C43c24d062
+Marketplace: 0x9316E902760f2c37CDA57C8Be01358D890a26276
 USDC:        0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E`,
   },
 ]

@@ -70,7 +70,7 @@ export function ApiReferenceSection() {
         "method": "x402",
         "asset": "USDC",
         "chain": "avalanche",
-        "contract": "0x24be31D0F538C5551c536b09C85907C43c24d062"
+        "contract": "0x9316E902760f2c37CDA57C8Be01358D890a26276"
       }
     }
   ],
