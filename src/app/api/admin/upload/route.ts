@@ -1,11 +1,18 @@
 /**
  * POST /api/admin/upload — upload image to Supabase Storage
- * Returns public URL. No server auth (admin pattern).
+ * Auth: requires authenticated user (Supabase session).
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
+  // Auth: require logged-in user
+  const supabaseAuth = await createClient()
+  const { data: { user } } = await supabaseAuth.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const formData = await request.formData()
   const file = formData.get('file') as File | null
   const bucket = (formData.get('bucket') as string) || 'collections'

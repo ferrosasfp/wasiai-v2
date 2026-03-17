@@ -1,10 +1,25 @@
 /**
  * /api/admin/collections — CRUD for curated collections
- * Auth: client-side wallet check (admin pattern)
+ * Auth: GET is public (UI listing). POST/PUT/DELETE require EIP-712 admin signature.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
+
+async function requireAdmin(request: NextRequest): Promise<{ ok: true } | NextResponse> {
+  const body = await request.clone().json().catch(() => null)
+  const sig = body?.signature as `0x${string}` | undefined
+  const msg = body?.message as AdminActionMessage | undefined
+  if (!sig || !msg) {
+    return NextResponse.json({ error: 'Admin signature required' }, { status: 401 })
+  }
+  const { ok, reason } = await verifyAdminSignature(sig, { ...msg, timestamp: BigInt(msg.timestamp) })
+  if (!ok) {
+    return NextResponse.json({ error: reason ?? 'unauthorized' }, { status: 401 })
+  }
+  return { ok: true }
+}
 
 // GET — list all collections with agent count
 export async function GET() {
@@ -35,6 +50,9 @@ const createSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (auth instanceof NextResponse) return auth
+
   const body = await request.json().catch(() => null)
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) {
@@ -71,6 +89,9 @@ const updateSchema = z.object({
 })
 
 export async function PUT(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (auth instanceof NextResponse) return auth
+
   const body = await request.json().catch(() => null)
   const parsed = updateSchema.safeParse(body)
   if (!parsed.success) {
@@ -97,6 +118,9 @@ export async function PUT(request: NextRequest) {
 const deleteSchema = z.object({ id: z.string().uuid() })
 
 export async function DELETE(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (auth instanceof NextResponse) return auth
+
   const body = await request.json().catch(() => null)
   const parsed = deleteSchema.safeParse(body)
   if (!parsed.success) {

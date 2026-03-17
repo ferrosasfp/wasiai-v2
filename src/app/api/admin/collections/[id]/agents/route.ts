@@ -1,9 +1,25 @@
 /**
  * /api/admin/collections/[id]/agents — manage agents in a collection
+ * Auth: GET is public. POST/DELETE/PUT require EIP-712 admin signature.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
+
+async function requireAdmin(request: NextRequest): Promise<{ ok: true } | NextResponse> {
+  const body = await request.clone().json().catch(() => null)
+  const sig = body?.signature as `0x${string}` | undefined
+  const msg = body?.message as AdminActionMessage | undefined
+  if (!sig || !msg) {
+    return NextResponse.json({ error: 'Admin signature required' }, { status: 401 })
+  }
+  const { ok, reason } = await verifyAdminSignature(sig, { ...msg, timestamp: BigInt(msg.timestamp) })
+  if (!ok) {
+    return NextResponse.json({ error: reason ?? 'unauthorized' }, { status: 401 })
+  }
+  return { ok: true }
+}
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -29,6 +45,9 @@ const addSchema = z.object({ agent_id: z.string().uuid() })
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const { id } = await context.params
+  const auth = await requireAdmin(request)
+  if (auth instanceof NextResponse) return auth
+
   const body = await request.json().catch(() => null)
   const parsed = addSchema.safeParse(body)
   if (!parsed.success) {
@@ -63,8 +82,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
 const removeSchema = z.object({ agent_id: z.string().uuid() })
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
+  const auth = await requireAdmin(request)
+  if (auth instanceof NextResponse) return auth
+
   const { id } = await context.params
   const body = await request.json().catch(() => null)
+
   const parsed = removeSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed' }, { status: 400 })
@@ -90,9 +113,13 @@ const reorderSchema = z.object({
 })
 
 export async function PUT(request: NextRequest, context: RouteContext) {
+  const auth = await requireAdmin(request)
+  if (auth instanceof NextResponse) return auth
+
   const { id } = await context.params
   const body = await request.json().catch(() => null)
   const parsed = reorderSchema.safeParse(body)
+
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed' }, { status: 400 })
   }

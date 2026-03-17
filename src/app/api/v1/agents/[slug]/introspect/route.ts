@@ -20,6 +20,7 @@ import { SITE_URL } from '@/lib/constants'
 import { buildCOB } from '@/lib/introspect/buildCOB'
 import type { IntrospectDepth } from '@/lib/introspect/buildCOB'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { assertPaymentType } from '@/lib/validation/payment-type'
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -133,6 +134,7 @@ async function logCall(
   agentSlug?: string | null,
   nonce?: string | null,
 ): Promise<{ id?: string }> {
+  assertPaymentType('api_key')
   const [insertResult] = await Promise.all([
     supabase.from('agent_calls').insert({
       agent_id:        model.id,
