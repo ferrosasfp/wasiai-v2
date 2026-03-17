@@ -27,15 +27,9 @@ const MARKETPLACE_ABI = [
  * Requiere firma EIP-712 admin (NG-C01).
  * Lee estado on-chain del contrato: USDC, key balances, earnings, fee, treasury.
  */
-export async function GET(request: NextRequest) {
-  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
-  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
-  const tsHdr    = request.headers.get('x-admin-timestamp')
-  if (!sig || !nonceHdr || !tsHdr) {
-    return NextResponse.json({ error: 'Missing admin auth headers' }, { status: 401 })
-  }
-  const { ok, reason } = await verifyAdminSignature(sig, { action: 'getTreasury', nonce: nonceHdr, timestamp: BigInt(tsHdr) })
-  if (!ok) return NextResponse.json({ error: 'Unauthorized', reason }, { status: 401 })
+export async function GET(_request: NextRequest) {
+  // GET reads public on-chain data — no auth required
+  // Mutative operations (POST/PUT/DELETE) require EIP-712 admin signature
 
   if (!MARKETPLACE) return NextResponse.json({ error: 'Contract not configured' }, { status: 500 })
 

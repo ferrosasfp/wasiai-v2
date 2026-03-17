@@ -66,18 +66,9 @@ export default function AdminPage() {
   const isOwner = isConnected && !!address && ADMIN_ALLOWED.includes(address.toLowerCase())
 
   async function loadStatus() {
-    if (!walletClient) return
     setLoading(true)
     try {
-      const auth = await signAdminAction('getStatus')
-      if (!auth) return
-      const res = await fetch('/api/admin/status', {
-        headers: {
-          'x-admin-signature': auth.signature,
-          'x-admin-nonce':     auth.nonce,
-          'x-admin-timestamp': auth.timestamp,
-        },
-      })
+      const res = await fetch('/api/admin/status')
       if (res.ok) setStatus(await res.json() as AdminStatus)
     } finally {
       setLoading(false)
@@ -85,33 +76,19 @@ export default function AdminPage() {
   }
 
   const loadTreasury = useCallback(async () => {
-    if (!walletClient) return
     setTreasuryLoading(true)
     try {
-      const auth = await signAdminAction('getTreasury')
-      if (!auth) return
-      const headers = {
-        'x-admin-signature': auth.signature,
-        'x-admin-nonce':     auth.nonce,
-        'x-admin-timestamp': auth.timestamp,
-      }
       const [t, c] = await Promise.all([
-        fetch('/api/admin/treasury',          { headers }).then(r => r.ok ? r.json() : null) as Promise<TreasuryData | null>,
-        fetch('/api/admin/treasury/creators', { headers }).then(r => r.ok ? r.json() : []) as Promise<CreatorRow[]>,
+        fetch('/api/admin/treasury').then(r => r.ok ? r.json() : null) as Promise<TreasuryData | null>,
+        fetch('/api/admin/treasury/creators').then(r => r.ok ? r.json() : []) as Promise<CreatorRow[]>,
       ])
       setTreasury(t)
       setCreators(Array.isArray(c) ? c : [])
     } catch { /* best-effort */ }
     finally { setTreasuryLoading(false) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletClient])
+  }, [])
 
-  useEffect(() => {
-    if (!isOwner) return
-    void loadStatus()
-    void loadTreasury()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOwner, loadTreasury])
+  useEffect(() => { void loadStatus(); void loadTreasury() }, [loadTreasury])
 
   async function signAdminAction(action: string): Promise<{
     signature: string

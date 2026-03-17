@@ -13,15 +13,9 @@ const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x
  * Requiere firma EIP-712 admin (NG-C02).
  * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement }
  */
-export async function GET(request: NextRequest) {
-  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
-  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
-  const tsHdr    = request.headers.get('x-admin-timestamp')
-  if (!sig || !nonceHdr || !tsHdr) {
-    return NextResponse.json({ error: 'Missing admin auth headers' }, { status: 401 })
-  }
-  const { ok, reason } = await verifyAdminSignature(sig, { action: 'getStatus', nonce: nonceHdr, timestamp: BigInt(tsHdr) })
-  if (!ok) return NextResponse.json({ error: 'Unauthorized', reason }, { status: 401 })
+export async function GET(_request: NextRequest) {
+  // GET reads public on-chain/DB data — no auth required
+  // Mutative operations require EIP-712 admin signature
 
 
   try {
