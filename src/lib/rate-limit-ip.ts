@@ -33,3 +33,16 @@ export async function checkIpLimit(
   const { success, remaining, reset } = await rl.limit(ip)
   return { success, remaining, reset }
 }
+
+/**
+ * Global daily cap per agent for sandbox — applies across ALL anonymous users.
+ * Prevents total abuse even with IP/UA rotation.
+ */
+export async function checkGlobalAgentLimit(
+  slug: string,
+  maxCalls: number,
+): Promise<{ success: boolean; remaining: number; reset: number }> {
+  const rl = getIpLimiter('sandbox-global-agent', maxCalls)
+  const { success, remaining, reset } = await rl.limit(slug)
+  return { success, remaining, reset }
+}

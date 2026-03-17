@@ -15,7 +15,7 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { logger } from '@/lib/logger'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
-import { checkIpLimit } from '@/lib/rate-limit-ip'
+import { checkIpLimit, checkGlobalAgentLimit } from '@/lib/rate-limit-ip'
 import { validateInput } from '@/lib/schema-validator'
 import { assertPaymentType } from '@/lib/validation/payment-type'
 
@@ -78,6 +78,19 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params
+
+  // WAS-223: Global sandbox cap per agent — 100 calls/day across ALL users
+  const globalCap = await checkGlobalAgentLimit(slug, 100)
+  if (!globalCap.success) {
+    return NextResponse.json({
+      error: 'Sandbox limit reached for this agent',
+      code: 'sandbox_agent_cap',
+      remaining: 0,
+      reset_at: new Date(globalCap.reset).toISOString(),
+      message: 'This agent has reached its daily sandbox limit. Use an API key for unlimited access.',
+    }, { status: 429 })
+  }
+
   const supabase = await createClient()
 
   // 1. Auth (optional — anonymous allowed)
@@ -98,7 +111,7 @@ export async function POST(
 
     // F-05 fix: sequential checks — perAgent first, perUa only if perAgent passes.
     // Avoids double-decrement when one limit is already exceeded.
-    const perAgent = await checkIpLimit(identifier, `sandbox-anon:${slug}`, 5)  // 5/día por agente
+    const perAgent = await checkIpLimit(identifier, `sandbox-anon:${slug}`, 2)  // 2/día por agente
     if (!perAgent.success) {
       return NextResponse.json({
         error: 'Anonymous rate limit exceeded',

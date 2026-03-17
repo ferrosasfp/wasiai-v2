@@ -108,6 +108,12 @@ export async function middleware(request: NextRequest) {
   const csp = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ''} https://embedded-wallet.thirdweb.com`,
+    // WAS-224 KNOWN-LIMITATION: unsafe-inline required for style-src
+    // Tailwind CSS generates inline styles that cannot use nonces.
+    // Removing unsafe-inline breaks all UI styling.
+    // Scripts are protected via nonce (line above). Styles remain unsafe-inline.
+    // Risk: LOW — style injection can cause visual defacement but not XSS.
+    // To fix: migrate all CSS to CSS Modules or external stylesheets (major refactor).
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     "font-src 'self'",
