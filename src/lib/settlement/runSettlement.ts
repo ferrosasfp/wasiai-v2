@@ -223,6 +223,32 @@ async function _runSettlementPipeline(supabase: SupabaseClient): Promise<{
             })
             .in('id', callIds)
 
+          // #17: Sync pending_earnings_usdc for creators WITH wallet after on-chain settlement.
+          // The contract splits 90/10 (platformFeeBps=1000), so we increment by creator share only.
+          // Without this, api_key calls settle on-chain but the creator's DB earnings never update,
+          // making the voucher-based withdraw show $0 for api_key revenue.
+          const earningsByCreator = new Map<string, number>()
+          for (const call of validCalls) {
+            const info = slugCreatorMap.get(call.agent_slug ?? '')
+            if (!info) continue
+            const amount = Number(call.amount_paid)
+            // Mirror contract logic: creatorShare = amount - (amount * platformFeeBps / 10000)
+            const creatorShare = amount - (amount * 1000 / 10000) // 90%
+            earningsByCreator.set(info.creatorId, (earningsByCreator.get(info.creatorId) ?? 0) + creatorShare)
+          }
+
+          for (const [creatorId, amount] of earningsByCreator.entries()) {
+            try {
+              await supabase.rpc('increment_pending_earnings', {
+                p_user_id: creatorId,
+                p_amount:  Math.round(amount * 1_000_000) / 1_000_000, // round to 6 decimals (USDC precision)
+              })
+              logger.info('[runSettlement] synced earnings for wallet creator', { creatorId, amount })
+            } catch (err) {
+              logger.error('[runSettlement] increment_pending_earnings failed (wallet creator)', { creatorId, err })
+            }
+          }
+
           totalSettled += validCalls.length
           results.push({ keyId, txHash, callCount: validCalls.length })
         } else {
