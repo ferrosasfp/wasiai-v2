@@ -495,7 +495,7 @@ export async function POST(
         agent_slug: slug,
         amount_usdc: model.price_per_call,
         caller_wallet: null,
-        error_reason: String(result.data ?? 'upstream_error').slice(0, 500),
+        error_reason: (typeof result.data === 'string' ? result.data : JSON.stringify(result.data ?? 'upstream_error')).slice(0, 500),
         agent_call_id: callId ?? null,
       })
     ).then((res) => {
