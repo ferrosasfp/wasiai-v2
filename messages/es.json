@@ -335,6 +335,7 @@
     "earningsBannerSub": "Se transferirán directamente a tu wallet",
     "earningsAccumulatedIn": "Acumulado en",
     "earningsNone": "Sin earnings aún",
+    "earningsAccumulating": "+${amount} USDC acumulándose hoy",
     "withdrawBtn": "Retirar USDC →",
     "withdrawSigning": "Confirma en tu wallet…",
     "withdrawConfirming": "Confirmando…",

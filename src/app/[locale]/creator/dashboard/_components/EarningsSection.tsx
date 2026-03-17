@@ -28,6 +28,30 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
 
   const pendingOnChain = Number(profile?.pending_earnings_usdc ?? 0)
 
+  // #14: Show "accumulating today" — successful calls in last 24h not yet withdrawn
+  // These are already included in pending_earnings_usdc but we surface them separately
+  // so the creator knows activity is happening even if the number looks small.
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data: agentRows } = await supabase
+    .from('agents')
+    .select('id')
+    .eq('creator_id', userId)
+
+  const agentIds = (agentRows ?? []).map((a: { id: string }) => a.id)
+
+  let recentEarnings = 0
+  if (agentIds.length > 0) {
+    const { data: recentCalls } = await supabase
+      .from('agent_calls')
+      .select('amount_paid')
+      .in('agent_id', agentIds)
+      .eq('status', 'success')
+      .gte('called_at', since24h)
+      .neq('is_trial', true)
+
+    recentEarnings = (recentCalls ?? []).reduce((sum: number, c: { amount_paid: string | number }) => sum + Number(c.amount_paid ?? 0), 0)
+  }
+
   const hasEarnings = pendingOnChain > 0
 
   return (
@@ -54,7 +78,12 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
             <span className="inline-block h-2 w-2 rounded-full bg-avax-500" />
             <h2 className="font-semibold text-gray-900">{t('onchainEarnings')}</h2>
           </div>
-
+          {recentEarnings > 0 && (
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+              {t('earningsAccumulating', { amount: recentEarnings.toFixed(4) })}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-4">
           {!hasEarnings && (
