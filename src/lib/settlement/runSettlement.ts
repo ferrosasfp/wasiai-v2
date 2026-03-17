@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
+import { settleKeyBatchOnChain, getPlatformFeeBps } from '@/lib/contracts/marketplaceClient'
 import { PENDING_WALLET_SENTINEL } from '@/lib/settlement/immediateSettlement'
 import { logger } from '@/lib/logger'
 
@@ -101,6 +101,19 @@ async function _runSettlementPipeline(supabase: SupabaseClient): Promise<{
       }
     }
   }
+
+  // SDD #17: Read platformFeeBps once per cron run to calculate creator share for walletCalls.
+  // Asymmetry note:
+  //   x402 calls  → NO on-chain split (USDC lands as free balance). DB incremented by 100% (invoke/route.ts).
+  //   api_key calls → on-chain split via settleKeyBatch (90% creator / 10% platform). DB incremented by 90% here.
+  // If on-chain read fails, fall back to PLATFORM_FEE_BPS env var (default 1000 = 10%).
+  const onChainFeeBps = await getPlatformFeeBps()
+  if (onChainFeeBps === null) {
+    logger.warn('[runSettlement] getPlatformFeeBps failed — using fallback', {
+      fallback: process.env.PLATFORM_FEE_BPS ?? '1000',
+    })
+  }
+  const platformFeeBps = onChainFeeBps ?? Number(process.env.PLATFORM_FEE_BPS ?? '1000')
 
   // 2. Agrupar por key_id
   const byKey = new Map<string, typeof unsettledCalls>()
@@ -222,6 +235,30 @@ async function _runSettlementPipeline(supabase: SupabaseClient): Promise<{
               settlement_batch_id: batchRecord?.id,
             })
             .in('id', callIds)
+
+          // SDD #17: Sync pending_earnings_usdc for wallet creators after on-chain settlement.
+          // Contract split 90/10 already happened in settleKeyBatch — increment DB by creator share only.
+          const earningsByCreator = new Map<string, number>()
+          for (const call of validCalls) {
+            const info = slugCreatorMap.get(call.agent_slug ?? '')
+            if (!info) continue
+            const amount      = Number(call.amount_paid)
+            const creatorShare = amount - (amount * platformFeeBps / 10_000)
+            earningsByCreator.set(info.creatorId, (earningsByCreator.get(info.creatorId) ?? 0) + creatorShare)
+          }
+
+          for (const [creatorId, amount] of earningsByCreator.entries()) {
+            try {
+              await supabase.rpc('increment_pending_earnings', {
+                p_user_id: creatorId,
+                p_amount:  Math.round(amount * 1_000_000) / 1_000_000, // USDC 6-decimal precision
+              })
+              logger.info('[runSettlement] synced earnings for wallet creator', { creatorId, amount })
+            } catch (err) {
+              // Non-blocking: settlement already recorded. Log and continue.
+              logger.error('[runSettlement] increment_pending_earnings failed (wallet creator)', { creatorId, err })
+            }
+          }
 
           totalSettled += validCalls.length
           results.push({ keyId, txHash, callCount: validCalls.length })

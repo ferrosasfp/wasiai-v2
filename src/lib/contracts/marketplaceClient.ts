@@ -444,6 +444,33 @@ export async function getKeyBalanceOnChain(keyId: string): Promise<number> {
 }
 
 /**
+ * Read the current platformFeeBps from the contract.
+ * Returns null on failure so caller can apply a fallback — distinguishes
+ * "fee is 0" (valid) from "RPC failed" (should use fallback).
+ * SDD #17: used by runSettlement to calculate creator share for api_key calls.
+ */
+export async function getPlatformFeeBps(): Promise<number | null> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) {
+    logger.warn('[marketplace] getPlatformFeeBps: contract not configured')
+    return null
+  }
+
+  try {
+    const { public: pub } = getOperatorClient()
+    const bps = await pub.readContract({
+      address:      contractAddress,
+      abi:          WASIAI_MARKETPLACE_ABI,
+      functionName: 'platformFeeBps',
+    }) as unknown as bigint | number
+    return Number(bps)
+  } catch (err) {
+    logger.error('[marketplace] getPlatformFeeBps failed', { err: String(err).slice(0, 200) })
+    return null
+  }
+}
+
+/**
  * Read pending earnings for a creator wallet.
  */
 export async function getPendingEarnings(creatorWallet: string): Promise<number> {
