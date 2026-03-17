@@ -12,6 +12,7 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { z } from 'zod'
 import { checkIpLimit } from '@/lib/rate-limit-ip'
+import { assertPaymentType } from '@/lib/validation/payment-type'
 
 const BodySchema = z.object({ input: z.string().min(1).max(2000) })
 
@@ -211,6 +212,7 @@ async function logTrialCall(
 ): Promise<void> {
   // Map to actual agent_calls column names
   const status = statusCode >= 400 ? 'error' : 'success'
+  assertPaymentType('free_trial')
   await svc.from('agent_calls').insert({
     agent_id: agentId,
     status,

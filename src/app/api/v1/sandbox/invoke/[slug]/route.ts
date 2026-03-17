@@ -17,6 +17,7 @@ import { logger } from '@/lib/logger'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { checkIpLimit } from '@/lib/rate-limit-ip'
 import { validateInput } from '@/lib/schema-validator'
+import { assertPaymentType } from '@/lib/validation/payment-type'
 
 // ── Rate limiter sandbox (lazy singleton) ────────────────────────────────────
 let _sandboxLimit: Ratelimit | null = null
@@ -293,6 +294,7 @@ export async function POST(
         })
       }
       // Insertar agent_calls con result_type schema_violation
+      assertPaymentType('sandbox')
       await supabase.from('agent_calls').insert({
         id:           randomUUID(),
         agent_id:     agent.id,
@@ -314,6 +316,7 @@ export async function POST(
   }
 
   // 10. Registrar en agent_calls
+  assertPaymentType('sandbox')
   const callId = randomUUID()
   await supabase.from('agent_calls').insert({
     id:           callId,

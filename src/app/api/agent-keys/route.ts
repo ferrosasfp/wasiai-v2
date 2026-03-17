@@ -16,23 +16,21 @@ const createSchema = z.object({
 const SYNC_STALE_MS = 30 * 1000 // 30s — skip on-chain read if fresher than this
 const CONCURRENCY_LIMIT = 5
 
-type KeyWithMeta = AgentKey & { stale?: boolean; synced_at?: string | null }
+type KeyWithMeta = AgentKey & { stale?: boolean }
 
 async function syncKeysOnChain(keys: AgentKey[]): Promise<KeyWithMeta[]> {
   const serviceClient = createServiceClient()
   const now = Date.now()
 
-  // Split keys: fresh (skip RPC) vs stale (need RPC)
+  // Split keys: needsSync (stale) vs skip (fresh/no hash)
   const needsSync: AgentKey[] = []
-  const fresh: AgentKey[] = []
   for (const key of keys) {
     if (!key.key_hash) {
-      fresh.push(key) // no hash → skip on-chain read, return stale
-      continue
+      continue // no hash → skip on-chain read, return stale
     }
     const syncedAt = key.balance_synced_at ? new Date(key.balance_synced_at).getTime() : 0
     if (now - syncedAt < SYNC_STALE_MS) {
-      fresh.push(key)
+      // fresh — skip
     } else {
       needsSync.push(key)
     }
@@ -73,10 +71,9 @@ async function syncKeysOnChain(keys: AgentKey[]): Promise<KeyWithMeta[]> {
       return { ...key, budget_usdc: synced.budget_usdc, balance_synced_at: synced.balance_synced_at, stale: false }
     }
     // fresh or RPC-failed → return cached value
-    const syncedAt = key.balance_synced_at
-    const syncedMs = syncedAt ? new Date(syncedAt).getTime() : 0
+    const syncedMs = key.balance_synced_at ? new Date(key.balance_synced_at).getTime() : 0
     const isStale = !key.key_hash || (now - syncedMs >= SYNC_STALE_MS)
-    return { ...key, stale: isStale, synced_at: syncedAt } as KeyWithMeta
+    return { ...key, stale: isStale } as KeyWithMeta
   })
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 const X402_CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, X-PAYMENT, PAYMENT-SIGNATURE, Authorization',
   'Access-Control-Expose-Headers': 'X-PAYMENT-RESPONSE, PAYMENT-RESPONSE, PAYMENT-REQUIRED',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -31,6 +32,7 @@ const USDC_ADDR  = CHAIN_ID_NUM === 43114
 import { SITE_URL } from '@/lib/constants'
 import { isAgentInScope } from '@/lib/scope-check'
 import { validateInput } from '@/lib/schema-validator'
+import { assertPaymentType } from '@/lib/validation/payment-type'
 
 /**
  * Build x402 payment requirements manually.
@@ -338,6 +340,7 @@ export async function POST(
 
     if (result.status === 'success') {
       // 1. Log call to DB first to get the call ID
+      assertPaymentType('api_key')
       const { id: insertedId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug, null, 'api_key')
       callId = insertedId ?? null
       // HAL-027: Mismo timestamp para receipt y called_at — auditoría consistente
@@ -382,6 +385,7 @@ export async function POST(
       }
     } else {
       // Log failed call (no receipt needed) — capture id for call_id exposure
+      assertPaymentType('api_key')
       const { id: errCallId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug, null, 'api_key')
       callId = errCallId ?? null
     }
@@ -472,6 +476,7 @@ export async function POST(
   const x402Nonce = (paymentHeader?.payload as X402EVMPayload | undefined)
     ?.authorization?.nonce ?? null
 
+  assertPaymentType('x402')
   const logResult = await logCall(supabase, model, 'human', null, settlement.transactionHash ?? null, result, null, slug, x402Nonce, 'x402')
   // WAS-132: Unique constraint violation on nonce = replay attack — return 402
   if (logResult.error?.code === 'payment_already_used') {
@@ -727,4 +732,8 @@ function buildResponse(
     },
     { headers: X402_CORS_HEADERS },
   )
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: X402_CORS_HEADERS })
 }

@@ -5,6 +5,7 @@ import { mcpRequestSchema } from '@/lib/schemas/api.schemas'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { logger } from '@/lib/logger'
 import { getInvokeLimit, checkRateLimit } from '@/lib/ratelimit'
+import { assertPaymentType } from '@/lib/validation/payment-type'
 
 /**
  * WasiAI MCP Server Endpoint
@@ -239,6 +240,7 @@ export async function POST(request: NextRequest) {
 
     // 6. Deduct budget + log call (fire-and-forget safe — non-critical path)
     if (result.status === 'success') {
+      assertPaymentType('api_key')
       await Promise.all([
         // NG-008: Atomic check+deduct — reemplaza increment_agent_key_spend
         supabase.rpc('check_and_deduct_budget', {

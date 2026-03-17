@@ -92,7 +92,6 @@ export async function POST(request: NextRequest) {
       .not('agent_slug', 'is', null)  // skip null slugs — cannot settle on-chain
       .is('settled_at', null)
       .eq('payment_type', 'api_key')
-      .not('agent_slug', 'is', null)
       .neq('status', 'error')
       .limit(500)
 

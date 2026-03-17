@@ -1,4 +1,13 @@
 import { recoverTypedDataAddress } from 'viem'
+import { Redis } from '@upstash/redis'
+
+let _redis: Redis | null = null
+function getRedis(): Redis {
+  return _redis ??= new Redis({
+    url:   process.env.UPSTASH_REDIS_REST_URL!,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  })
+}
 
 // NA-010: usar WASIAI_OWNER_ADDRESS (server-only) para el check de autorización.
 // NA-003 Parte A: NEXT_PUBLIC_OPERATOR_ADDRESS eliminado — operador NO tiene privilegios admin.
@@ -54,6 +63,13 @@ export async function verifyAdminSignature(
     if (!ALLOWED_ADDRESSES.includes(recovered.toLowerCase())) {
       return { ok: false, reason: 'not_authorized' }
     }
+
+    const nonceKey = `admin-nonce:${message.nonce}`
+    const existing = await getRedis().get(nonceKey)
+    if (existing) {
+      return { ok: false, reason: 'nonce_already_used' }
+    }
+    await getRedis().set(nonceKey, '1', { ex: 360 }) // 6 min TTL
 
     return { ok: true }
   } catch {

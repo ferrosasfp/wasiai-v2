@@ -19,6 +19,7 @@ import { logger }                    from '@/lib/logger'
 import { isAgentInScope }            from '@/lib/scope-check'
 import { discoverAgent }             from '@/lib/agent-discovery'
 import { validateInput }             from '@/lib/schema-validator'
+import { assertPaymentType }         from '@/lib/validation/payment-type'
 
 // ── Constantes (env-driven, no hardcodes) ────────────────────────────────────
 const MAX_STEPS       = 5
@@ -535,6 +536,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const schemaRefundFailure = (!refundOk || refundErr) ? `step_${stepIndex}` : null
         // Insert agent_calls con result_type schema_violation
         try {
+          assertPaymentType('api_key')
           await supabase
             .from('agent_calls')
             .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: 0, tx_hash: null, status: 'error', result_type: 'schema_violation', latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex, called_at: new Date().toISOString(), payment_type: 'api_key', agent_slug: agent.slug })
@@ -549,6 +551,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Log en agent_calls
     let callId = ''
     try {
+      assertPaymentType('api_key')
       const { data: callRecord } = await supabase
         .from('agent_calls')
         .insert({ agent_id: agent.id, caller_type: 'agent', amount_paid: agent.price_per_call, tx_hash: null, status: stepStatus, result_type: agentCallResultType, latency_ms: latencyMs, key_id: safeKeyRow.id, is_trial: false, pipeline_id: pipelineId, step_index: stepIndex, called_at: new Date().toISOString(), payment_type: 'api_key', agent_slug: agent.slug })
