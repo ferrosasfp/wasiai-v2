@@ -280,7 +280,16 @@ export async function settleKeyBatchOnChain(
     })
 
     const txHash = await wallet.writeContract(request)
-    logger.info('[marketplace] settleKeyBatch tx', { txHash, keyHash: keyHash.slice(0, 8), batchSize: slugs.length })
+    logger.info('[marketplace] settleKeyBatch tx submitted', { txHash, keyHash: keyHash.slice(0, 8), batchSize: slugs.length })
+
+    // HAL-025: wait for confirmation — caller must not mark settled_at if tx reverts on-chain
+    const receipt = await pub.waitForTransactionReceipt({ hash: txHash as `0x${string}`, timeout: 30_000 })
+    if (receipt.status !== 'success') {
+      logger.error('[marketplace] settleKeyBatch reverted on-chain', { txHash, keyHash: keyHash.slice(0, 8) })
+      return null
+    }
+
+    logger.info('[marketplace] settleKeyBatch confirmed', { txHash, keyHash: keyHash.slice(0, 8), batchSize: slugs.length })
     return txHash
   } catch (err) {
     logger.error('[marketplace] settleKeyBatch failed', { err: String(err).slice(0, 300) })
