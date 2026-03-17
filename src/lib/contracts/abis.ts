@@ -29,6 +29,22 @@ export const CLAIM_EARNINGS_ABI = [
   },
 ] as const
 
+// SDD-217 W1.2: ABI for batchSelfRegister(string[],uint256[],uint64[])
+// Extracted from contracts/out/WasiAIMarketplace.sol/WasiAIMarketplace.json
+export const BATCH_SELF_REGISTER_ABI = [
+  {
+    name:            'batchSelfRegister',
+    type:            'function' as const,
+    inputs:          [
+      { name: 'slugs',      type: 'string[]'  },
+      { name: 'prices',     type: 'uint256[]' },
+      { name: 'erc8004Ids', type: 'uint64[]'  },
+    ],
+    outputs:         [],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
 export const WITHDRAW_KEY_ABI = [
   {
     name:            'withdrawKey',

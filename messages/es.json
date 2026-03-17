@@ -341,7 +341,14 @@
     "withdrawViewTx": "Ver tx",
     "withdrawRequesting": "Solicitando voucher…",
     "withdrawNoWallet": "Sin wallet",
-    "withdrawNeedsExternalWallet": "Conecta MetaMask o Core Wallet para retirar"
+    "withdrawNeedsExternalWallet": "Conecta MetaMask o Core Wallet para retirar",
+    "registerTitle": "Registrar agentes on-chain",
+    "registerDesc": "Estos agentes necesitan ser registrados antes de poder retirar",
+    "registerButton": "Registrar {count} agentes",
+    "registerEstGas": "Gas estimado: {gas} AVAX",
+    "registerPending": "Transacción pendiente...",
+    "registerSuccess": "¡Agentes registrados! Tus earnings se acumularán con cada settlement futuro.",
+    "withdrawNoEarnings": "Gana ingresos invocando tus agentes"
   },
   "onboarding": {
     "step1": {
