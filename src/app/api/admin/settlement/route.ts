@@ -91,6 +91,8 @@ export async function POST(request: NextRequest) {
       .not('key_id', 'is', null)
       .not('agent_slug', 'is', null)  // skip null slugs — cannot settle on-chain
       .is('settled_at', null)
+      .eq('payment_type', 'api_key')
+      .not('agent_slug', 'is', null)
       .neq('status', 'error')
       .limit(500)
 
@@ -99,6 +101,15 @@ export async function POST(request: NextRequest) {
     if (!pendingCalls || pendingCalls.length === 0) {
       return NextResponse.json({ ok: true, message: 'No pending calls to settle', settled: 0 })
     }
+
+    // AC-10: Log excluded calls (non api_key or no slug)
+    const { count: excluded } = await supabase
+      .from('agent_calls')
+      .select('id', { count: 'exact', head: true })
+      .is('settled_at', null)
+      .neq('status', 'error')
+      .or('payment_type.neq.api_key,agent_slug.is.null')
+    console.debug(`[settlement] Excluding ${excluded ?? 0} calls (non api_key or no slug)`)
 
     // Pre-verificar qué slugs están registrados on-chain
     const uniqueSlugs = [...new Set(pendingCalls.map(c => c.agent_slug as string))]

@@ -145,6 +145,7 @@ async function logCall(
       key_id:          keyId ?? null,
       agent_slug:      agentSlug ?? null,
       nonce:           nonce ?? null,
+      payment_type:    'api_key',
     }).select('id').single(),
   ])
   return { id: (insertResult.data as { id?: string } | null)?.id }

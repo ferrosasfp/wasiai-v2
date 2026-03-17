@@ -180,7 +180,7 @@ export async function POST(
     statusCode = agentRes.status
 
     if (statusCode >= 400) {
-      await logTrialCall(svc, agent.id, statusCode, Date.now() - t0)
+      await logTrialCall(svc, agent.id, statusCode, Date.now() - t0, slug)
       return NextResponse.json({ error: 'agent_error', hint: 'El agente retornó error' }, { status: 502 })
     }
 
@@ -191,13 +191,13 @@ export async function POST(
     clearTimeout(timeout)
     const isTimeout = (err as Error).name === 'AbortError'
     statusCode = isTimeout ? 504 : 502
-    await logTrialCall(svc, agent.id, statusCode, Date.now() - t0)
+    await logTrialCall(svc, agent.id, statusCode, Date.now() - t0, slug)
     if (isTimeout) return NextResponse.json({ error: 'timeout' }, { status: 504 })
     return NextResponse.json({ error: 'agent_error', hint: 'El agente no fue alcanzable' }, { status: 502 })
   }
 
   const latencyMs = Date.now() - t0
-  await logTrialCall(svc, agent.id, statusCode, latencyMs)
+  await logTrialCall(svc, agent.id, statusCode, latencyMs, slug)
 
   return NextResponse.json({ output, latencyMs })
 }
@@ -206,7 +206,8 @@ async function logTrialCall(
   svc: ReturnType<typeof createServiceClient>,
   agentId: string,
   statusCode: number,
-  durationMs: number
+  durationMs: number,
+  agentSlug: string,
 ): Promise<void> {
   // Map to actual agent_calls column names
   const status = statusCode >= 400 ? 'error' : 'success'
@@ -215,5 +216,8 @@ async function logTrialCall(
     status,
     latency_ms: durationMs,
     is_trial: true,
+    payment_type: 'free_trial',
+    agent_slug: agentSlug,
+    amount_paid: 0,
   })
 }

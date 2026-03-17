@@ -257,6 +257,8 @@ export async function POST(request: NextRequest) {
           tx_hash: null,
           status: 'success',
           latency_ms: result.latencyMs,
+          payment_type: 'api_key',
+          agent_slug: model.slug,
         }),
       ])
     }
