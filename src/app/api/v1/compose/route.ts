@@ -418,8 +418,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const pipelineId = randomUUID()
   const receipts: StepReceipt[] = []
   let lastOutput: string | null = resumedFromStep !== undefined ? retryLastOutput : null
-  // Contexto propagado entre steps (token_address, token_symbol, etc.)
-  const pipelineCtx: Record<string, string> = {}
+  // WAS-231: Contexto propagado entre steps — tipo expandido para soportar primitivos numéricos/booleanos.
+  // Los campos acumulados se envían al body de cada agente endpoint junto con el input explícito.
+  // Nota de diseño: todos los agentes son de WasiAI hoy; si se admiten agentes de terceros en el
+  // futuro, revisar qué campos del ctx se exponen por razones de privacidad.
+  const pipelineCtx: Record<string, string | number | boolean> = {}
   const groups = groupSteps(steps)
   let globalStepIndex = 0
 
@@ -571,11 +574,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const output = typeof stepOutput === 'string' ? stepOutput : JSON.stringify(stepOutput)
 
-    // Propagar campos clave entre steps (token_address, token_symbol)
+    // WAS-231: Propagar campos clave entre steps. Los outputs tienen estructura { result: {...}, meta: {...} }
+    // — acceder a out.result primero, con fallback a out para retrocompatibilidad.
+    // Bug fix: código anterior accedía out.* (raíz) pero los campos viven en out.result.*.
     if (stepOutput && typeof stepOutput === 'object') {
-      const out = stepOutput as Record<string, unknown>
-      if (typeof out.token_address === 'string' && out.token_address) pipelineCtx.token_address = out.token_address
-      if (typeof out.token_symbol  === 'string' && out.token_symbol)  pipelineCtx.token_symbol  = out.token_symbol
+      const top = stepOutput as Record<string, unknown>
+      const src = (top.result && typeof top.result === 'object')
+        ? top.result as Record<string, unknown>
+        : top
+
+      // String fields
+      const strFields = ['token_address', 'token_symbol', 'token_name'] as const
+      for (const f of strFields) {
+        if (typeof src[f] === 'string' && src[f]) pipelineCtx[f] = src[f] as string
+      }
+
+      // Number fields
+      const numFields = ['price_usd', 'volatility_7d_pct', 'sentiment_score',
+                         'holder_count', 'contract_age_days', 'top10_concentration_pct',
+                         'bytecode_size', 'risk_score'] as const
+      for (const f of numFields) {
+        if (typeof src[f] === 'number') pipelineCtx[f] = src[f] as number
+      }
+
+      // Boolean fields
+      const boolFields = ['is_verified'] as const
+      for (const f of boolFields) {
+        if (typeof src[f] === 'boolean') pipelineCtx[f] = src[f] as boolean
+      }
     }
     supabase.rpc('increment_agent_stats', { p_agent_id: agent.id, p_amount: agent.price_per_call }).then(undefined, () => {})
 
