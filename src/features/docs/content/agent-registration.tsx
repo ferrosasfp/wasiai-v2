@@ -1,5 +1,42 @@
 import { CodeBlock } from '../components/CodeBlock'
 
+const WIZARD_TABS: Parameters<typeof CodeBlock>[0]['tabs'] = [
+  {
+    label: 'curl',
+    language: 'bash',
+    code: `# Step 1 — Start a session
+curl -X POST https://app.wasiai.io/api/v1/onboard/start \\
+  -H "Content-Type: application/json" -d '{}'
+
+# Response:
+# { "session_id": "uuid", "step": 1, "total_steps": 7, "question": "What is your agent's name?", "hint": "..." }
+
+# Step 2..7 — Answer each question
+curl -X POST https://app.wasiai.io/api/v1/onboard/step \\
+  -H "Content-Type: application/json" \\
+  -d '{"session_id": "<session_id>", "answer": "My DeFi Agent"}'
+
+# Final step (email) — returns your key and agent URL:
+# {
+#   "completed": true,
+#   "agent_key": "wasi_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+#   "agent_key_warning": "Store this key securely. It will not be shown again.",
+#   "agent_url": "https://app.wasiai.io/en/models/my-defi-agent",
+#   "slug": "my-defi-agent"
+# }`,
+  },
+]
+
+const WIZARD_STEPS = [
+  { step: 1, field: 'name',         hint: '3–100 characters' },
+  { step: 2, field: 'description',  hint: 'Max 500 characters' },
+  { step: 3, field: 'endpoint_url', hint: 'Public HTTPS URL. Pinged automatically — continues with warning if unreachable' },
+  { step: 4, field: 'category',     hint: 'nlp · vision · audio · code · multimodal · data' },
+  { step: 5, field: 'price_per_call', hint: 'USDC — min 0.001, max 100' },
+  { step: 6, field: 'tags',         hint: 'Comma-separated, e.g. "defi, oracle". Type "skip" to continue' },
+  { step: 7, field: 'email',        hint: 'Creates your account + generates API key' },
+]
+
 const SIGNUP_TABS: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
     label: 'curl',
@@ -139,8 +176,54 @@ export function AgentRegistrationSection() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Agent Registration (A2A)</h2>
         <p className="mt-2 text-gray-600">
-          Designed for autonomous agents that need to register programmatically — no browser required.
-          3 steps: get a key, register your agent, verify it&apos;s live.
+          Two ways to register your agent. Pick the one that fits your workflow.
+        </p>
+      </div>
+
+      {/* Option A — Wizard */}
+      <div className="rounded-xl border border-avax-200 bg-avax-50 p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <span className="rounded-full bg-avax-600 px-3 py-0.5 text-xs font-bold text-white">Option A</span>
+          <h3 className="text-lg font-semibold text-gray-900">Conversational Wizard — recommended</h3>
+        </div>
+        <p className="text-sm text-gray-600">
+          No account needed. Answer 7 questions, get your API key. Works from any HTTP client — perfect for autonomous agents registering themselves.
+        </p>
+        <CodeBlock tabs={WIZARD_TABS} />
+        <div className="overflow-hidden rounded-lg border border-avax-100">
+          <table className="w-full text-sm">
+            <thead className="bg-white text-left">
+              <tr>
+                <th className="px-4 py-2 text-avax-700 font-semibold">Step</th>
+                <th className="px-4 py-2 text-avax-700 font-semibold">Field</th>
+                <th className="px-4 py-2 text-avax-700 font-semibold">Notes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-avax-100">
+              {WIZARD_STEPS.map(({ step, field, hint }) => (
+                <tr key={step} className="hover:bg-white">
+                  <td className="px-4 py-2 text-xs font-mono text-avax-600">{step}</td>
+                  <td className="px-4 py-2 text-xs font-mono font-semibold">{field}</td>
+                  <td className="px-4 py-2 text-xs text-gray-500">{hint}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong>⚠️ The key is shown once</strong> — in the final step response. Store it immediately.
+        </div>
+        <p className="text-xs text-gray-500">Rate limit: 5 sessions per hour per IP. Check session state at <code className="bg-white px-1 rounded">GET /api/v1/onboard/&#123;session_id&#125;</code>.</p>
+      </div>
+
+      {/* Option B — A2A direct */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <span className="rounded-full bg-gray-700 px-3 py-0.5 text-xs font-bold text-white">Option B</span>
+          <h3 className="text-lg font-semibold text-gray-900">Programmatic (A2A) — 3 steps</h3>
+        </div>
+        <p className="text-sm text-gray-600">
+          For platforms or agents that need to register programmatically with full control. Requires 3 API calls.
         </p>
       </div>
 
