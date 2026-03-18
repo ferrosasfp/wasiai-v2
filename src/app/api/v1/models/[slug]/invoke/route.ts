@@ -226,28 +226,6 @@ export async function POST(
   const priceStr   = totalPrice.toFixed(6)
   const resourceUrl = `${SITE_URL}/api/v1/models/${slug}/invoke`
 
-  // WAS-200: Validate input BEFORE payment — no cobrar input inválido
-  if (model.input_schema) {
-    let inputVal: unknown
-    try {
-      const rawBody = await request.clone().json()
-      inputVal = rawBody.input ?? rawBody
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid JSON body', code: 'invalid_body' },
-        { status: 400 },
-      )
-    }
-
-    const validErr = validateInput(model.input_schema, inputVal)
-    if (validErr) {
-      return NextResponse.json(
-        { error: 'Input validation failed', code: 'input_invalid', details: [validErr] },
-        { status: 422 },
-      )
-    }
-  }
-
   // ── 2. Route A: Agent Key (budget-based) ─────────────────────────────────
   if (rawAgentKey) {
     const keyRow = keyRowResult?.data ?? null
@@ -330,6 +308,24 @@ export async function POST(
           headers: { 'Retry-After': '0' }, // A2A-10: refill and retry immediately
         },
       )
+    }
+
+    // WAS-200 (moved): Validate input AFTER auth — prevent schema info leak to unauthed callers
+    if (model.input_schema) {
+      let inputVal: unknown
+      try {
+        const rawBody = await request.clone().json()
+        inputVal = rawBody.input ?? rawBody
+      } catch {
+        return NextResponse.json({ error: 'Invalid JSON body', code: 'invalid_body' }, { status: 400 })
+      }
+      const validErr = validateInput(model.input_schema as Record<string, unknown>, inputVal)
+      if (validErr) {
+        return NextResponse.json(
+          { error: 'Input validation failed', code: 'input_invalid', details: [validErr] },
+          { status: 422 },
+        )
+      }
     }
 
     const result = await callUpstream(model, request, slug)
@@ -464,7 +460,25 @@ export async function POST(
     )
   }
 
-  // ── 6. Payment valid — call the upstream model ────────────────────────────
+  // ── 6. Payment valid — validate input then call upstream ─────────────────
+  // WAS-200 (moved): Validate input AFTER payment auth — prevent schema info leak
+  if (model.input_schema) {
+    let inputVal: unknown
+    try {
+      const rawBody = await request.clone().json()
+      inputVal = rawBody.input ?? rawBody
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'invalid_body' }, { status: 400 })
+    }
+    const validErr = validateInput(model.input_schema as Record<string, unknown>, inputVal)
+    if (validErr) {
+      return NextResponse.json(
+        { error: 'Input validation failed', code: 'input_invalid', details: [validErr] },
+        { status: 422 },
+      )
+    }
+  }
+
   const result = await callUpstream(model, request, slug)
   logger.info('[x402] upstream_result', {
     slug,
