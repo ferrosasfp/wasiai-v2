@@ -31,7 +31,7 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
   // #14: Show "accumulating today" — successful calls in last 24h not yet withdrawn
   // These are already included in pending_earnings_usdc but we surface them separately
   // so the creator knows activity is happening even if the number looks small.
-  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const since24h = new Date(new Date().getTime() - 24 * 60 * 60 * 1000).toISOString()
   const { data: agentRows } = await supabase
     .from('agents')
     .select('id')
