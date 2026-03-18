@@ -19,12 +19,13 @@ const QUESTIONS: Record<number, { question: string; hint: string }> = {
 const VALID_CATEGORIES = ['nlp', 'vision', 'audio', 'code', 'multimodal', 'data'] as const
 type Category = (typeof VALID_CATEGORIES)[number]
 
-function generateSlug(name: string): string {
-  return name
+function generateSlug(name: string, suffix?: string): string {
+  const base = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 80)
+    .slice(0, 76)
+  return suffix ? `${base}-${suffix}` : base
 }
 
 export async function POST(request: NextRequest) {
@@ -192,9 +193,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to create agent key' }, { status: 500 })
       }
 
-      // Register agent
+      // Register agent — slug collision handled with random suffix
       const name = String(data.name ?? 'Unnamed Agent')
-      const slug = generateSlug(name)
+      let slug = generateSlug(name)
+
+      // Check slug availability and resolve collision (F2 fix)
+      const { data: existing } = await serviceClient.from('agents').select('id').eq('slug', slug).single()
+      if (existing) {
+        slug = generateSlug(name, randomBytes(3).toString('hex'))
+      }
 
       const { data: agent, error: agentError } = await serviceClient
         .from('agents')
@@ -218,12 +225,17 @@ export async function POST(request: NextRequest) {
         .select('id, slug')
         .single()
 
+      // F1 fix: agent insert failure is fatal — rollback user+key and return error
       if (agentError || !agent) {
-        console.error('[onboard/step7] agent insert failed', agentError)
-        // Still complete session — user was created
+        console.error('[onboard/step7] agent insert failed — rolling back', agentError)
+        await serviceClient.from('agent_keys').delete().eq('key_hash', hash)
+        await serviceClient.auth.admin.deleteUser(userData.user.id).catch((e) =>
+          console.error('[onboard/step7] ZOMBIE USER cleanup failed', e),
+        )
+        return NextResponse.json({ error: 'Failed to register agent. Please try again.' }, { status: 500 })
       }
 
-      const finalSlug = agent?.slug ?? slug
+      const finalSlug = agent.slug
 
       // Mark session completed
       await serviceClient

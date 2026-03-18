@@ -74,7 +74,8 @@ export async function GET(req: NextRequest) {
 
   // Parse page param
   const pageParam = req.nextUrl.searchParams.get('page')
-  const page = Math.max(1, parseInt(pageParam ?? '1', 10))
+  const parsed = parseInt(pageParam ?? '1', 10)
+  const page = Number.isFinite(parsed) && parsed > 0 ? parsed : 1
 
   // Get creator's agent IDs
   const { data: agentRows } = await svc
