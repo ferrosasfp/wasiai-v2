@@ -205,7 +205,7 @@
       "capabilitiesHint": "JSON array · optional",
       "errorCapabilitiesArray": "Must be a JSON array",
       "errorCapabilitiesJson": "Invalid JSON",
-      "errorPriceMin": "Price must be greater than 0",
+      "errorPriceMin": "Minimum price is $0.001 USDC",
       "optional": "(optional)",
       "rateLimits": {
         "title": "Rate limits",
@@ -294,7 +294,13 @@
     "step3HttpMethod": "HTTP Method",
     "step3AuthLabel": "Authorization header",
     "step3AuthPlaceholder": "Bearer sk-...",
-    "invalidJsonSchema": "Invalid JSON — check the syntax"
+    "invalidJsonSchema": "Invalid JSON — check the syntax",
+    "step3": {
+      "tagsLabel": "Tags",
+      "tagsOptional": "(optional, comma-separated)",
+      "tagsPlaceholder": "oracle, defi, price-feed",
+      "tagsHint": "Helps other agents discover yours by capability"
+    }
   },
   "dashboard": {
     "title": "Creator Dashboard",

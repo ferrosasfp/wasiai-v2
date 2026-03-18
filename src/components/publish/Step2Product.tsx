@@ -23,7 +23,7 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
 
   function handleNext() {
     const errs: Record<string, string> = {}
-    if (!data.price_per_call || data.price_per_call <= 0) {
+    if (!data.price_per_call || data.price_per_call < 0.001) {
       errs.price_per_call = t('step2.errorPriceMin')
     }
     const capsValid = capabilitiesEditorRef.current?.validate() ?? true
@@ -53,8 +53,8 @@ export function Step2Product({ data, onChange, errors, onNext, onBack, saving }:
           <span className="border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-400">$</span>
           <input
             type="number"
-            step="0.01"
-            min="0.01"
+            step="0.001"
+            min="0.001"
             value={data.price_per_call ?? ''}
             onChange={e => {
               onChange('price_per_call', parseFloat(e.target.value) || 0)

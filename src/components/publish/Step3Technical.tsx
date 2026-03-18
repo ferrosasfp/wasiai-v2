@@ -328,12 +328,12 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
       {/* WAS-212: Tags */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
-          Tags <span className="text-gray-400 font-normal">(opcional, separados por coma)</span>
+          {t('step3.tagsLabel')} <span className="text-gray-400 font-normal">{t('step3.tagsOptional')}</span>
         </label>
         <input
           type="text"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-          placeholder="oracle, defi, price-feed"
+          placeholder={t('step3.tagsPlaceholder')}
           value={tagsRaw}
           onChange={e => setTagsRaw(e.target.value)}
           onBlur={e => {
@@ -341,7 +341,7 @@ export function Step3Technical({ data, onChange, errors, onPublish, onBack, publ
             onChange('tags', arr)
           }}
         />
-        <p className="text-xs text-gray-500">Ayuda a otros agentes a encontrar tu agente por capability</p>
+        <p className="text-xs text-gray-500">{t('step3.tagsHint')}</p>
       </div>
 
       {/* Actions */}
