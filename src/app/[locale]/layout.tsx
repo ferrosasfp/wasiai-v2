@@ -1,5 +1,5 @@
 import { NextIntlClientProvider, hasLocale } from 'next-intl'
-import { setRequestLocale } from 'next-intl/server'
+import { setRequestLocale, getMessages } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { routing } from '@/i18n/routing'
 import { Web3Provider } from '@/shared/providers/Web3Provider'
@@ -25,13 +25,16 @@ export default async function LocaleLayout({ children, params }: Props) {
 
   setRequestLocale(locale)
 
+  // Forward all messages to client components (required for t.rich() in Client Components)
+  const messages = await getMessages()
+
   // Read session server-side so the navbar gets the email in the initial HTML
   // — no flash, no delay, no client-side round-trip needed
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   return (
-    <NextIntlClientProvider>
+    <NextIntlClientProvider messages={messages}>
       <Web3Provider>
         <WasiNavBar initialEmail={user?.email ?? null} />
         <div className="pb-20 sm:pb-0">{children}</div>
