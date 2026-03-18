@@ -9,6 +9,7 @@ import type { ReactNode } from 'react'
 // WithdrawButton and WalletSetup are used inside EarningsSection sub-component
 // A-02: Sub-component with Suspense for streaming — async blockchain call isolated
 import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection'
+import { TransactionHistory, TransactionHistorySkeleton } from './_components/TransactionHistory'
 import { AgentActions } from './_components/AgentActions'
 import { FreeTrialToggle } from './_components/FreeTrialToggle'
 import { WebhooksPanel } from './_components/WebhooksPanel'
@@ -165,6 +166,11 @@ export default async function CreatorDashboardPage({
         {/* A-02: On-chain Earnings with Suspense — blockchain RPC doesn't block page render */}
         <Suspense fallback={<EarningsSkeleton />}>
           <EarningsSection userId={user.id} />
+        </Suspense>
+
+        {/* WAS-225: Transaction History with Suspense */}
+        <Suspense fallback={<TransactionHistorySkeleton />}>
+          <TransactionHistory userId={user.id} />
         </Suspense>
 
         {/* HU-1.4: Creator Analytics */}
