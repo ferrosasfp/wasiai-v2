@@ -97,7 +97,8 @@ export async function GET(request: NextRequest) {
       const AGENT_SELECT = 'id,slug,name,description,category,agent_type,price_per_call,is_featured,total_calls,performance_score,reputation_score,mcp_tool_name,sandbox_enabled,input_schema,output_schema,example_input'
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      const ilikePattern = encodeURIComponent(`%${ilikeQ}%`)
+      // Use * wildcard (PostgREST-compatible, no URL encoding needed — % becomes %25 via encodeURIComponent)
+      const ilikePattern = `*${ilikeQ}*`
       const qs = `select=${AGENT_SELECT}&status=eq.active&or=(name.ilike.${ilikePattern},description.ilike.${ilikePattern})&order=is_featured.desc,total_calls.desc&limit=${limit}&offset=${offset}`
       const resp = await fetch(`${sbUrl}/rest/v1/agents?${qs}`, {
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, Accept: 'application/json' },
