@@ -157,10 +157,21 @@ export async function GET(
     .limit(1)
     .single()
 
+  // Señal de disponibilidad: calls exitosas en las últimas 24h (no 30d como callsBreakdown)
+  const { data: recentCalls24h } = await serviceClient
+    .from('agent_calls')
+    .select('status')
+    .eq('agent_id', agent.id)
+    .gte('called_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+
+  const hasRecentActivity = (recentCalls24h ?? []).filter(
+    (c: { status?: string }) => c.status === 'success'
+  ).length > 0
+
   // Breakdown de tipos de invocación últimos 30 días (WAS-188) — usa called_at (idx_agent_calls_agent_called_at)
   const { data: callsBreakdown } = await supabase
     .from('agent_calls')
-    .select('payment_type, is_trial, status')
+    .select('payment_type, is_trial')
     .eq('agent_id', agent.id)
     .gte('called_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
 
@@ -187,11 +198,7 @@ export async function GET(
     agent.last_checked_at !== null &&
     new Date(agent.last_checked_at as string).getTime() > Date.now() - 24 * 60 * 60 * 1000
 
-  // Secondary signal: recent successful calls (cuando health_check no está poblado)
-  const recentSuccessCount = callsBreakdown?.filter(
-    (c: { status?: string }) => c.status === 'success'
-  ).length ?? 0
-  const hasRecentActivity = recentSuccessCount > 0
+  // Secondary signal: hasRecentActivity already calculated from 24h query above
 
   // Explicit health_check failure overrides all other signals
   const healthCheckFailed = healthCheck?.passed === false
