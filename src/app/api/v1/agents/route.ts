@@ -14,7 +14,7 @@
  *   offset          → pagination offset
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of truth
 import { getSearchLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
@@ -94,9 +94,11 @@ export async function GET(request: NextRequest) {
       const ilikeQ = translated.replace(/[%_\\]/g, '\\$&') // escape SQL wildcards
       // Use .ilike() (native Supabase JS method) — .or() with ilike has wildcard encoding issues
       const AGENT_SELECT = 'id, slug, name, description, category, agent_type, price_per_call, is_featured, total_calls, performance_score, reputation_score, mcp_tool_name, sandbox_enabled, input_schema, output_schema, example_input'
+      // Use serviceClient for ILIKE — SSR anon client has issues with .ilike() filter encoding
+      const svcClient = createServiceClient()
       const [{ data: byName }, { data: byDesc }] = await Promise.all([
-        supabase.from('agents').select(AGENT_SELECT).eq('status', 'active').ilike('name', `%${ilikeQ}%`).order('is_featured', { ascending: false }).order('total_calls', { ascending: false }).limit(limit),
-        supabase.from('agents').select(AGENT_SELECT).eq('status', 'active').ilike('description', `%${ilikeQ}%`).order('is_featured', { ascending: false }).order('total_calls', { ascending: false }).limit(limit),
+        svcClient.from('agents').select(AGENT_SELECT).eq('status', 'active').ilike('name', `%${ilikeQ}%`).order('is_featured', { ascending: false }).order('total_calls', { ascending: false }).limit(limit),
+        svcClient.from('agents').select(AGENT_SELECT).eq('status', 'active').ilike('description', `%${ilikeQ}%`).order('is_featured', { ascending: false }).order('total_calls', { ascending: false }).limit(limit),
       ])
       // Deduplicate by id, preserve order (name matches first)
       const seen = new Set<string>()
