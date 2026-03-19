@@ -89,6 +89,8 @@ export async function GET(request: NextRequest) {
         .order('total_calls', { ascending: false })
         .range(offset, offset + limit - 1)
       agents = (ilikeData ?? []) as Record<string, unknown>[]
+      // ILIKE results don't have a rank field — add synthetic rank=null for response consistency
+      agents = agents.map(a => ({ ...a, rank: null }))
     }
 
     // S7-02: post-filter by min_performance (search_agents RPC doesn't accept this param)
