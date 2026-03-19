@@ -106,6 +106,7 @@ export async function GET(request: NextRequest) {
         return true
       }).slice(offset, offset + limit)
       agents = ilikeData as Record<string, unknown>[]
+      console.log('[WAS-248] ilike debug — q:', q, 'translated:', translated, 'ilikeQ:', ilikeQ, 'byName:', byName?.length ?? 'null', 'byDesc:', byDesc?.length ?? 'null', 'merged:', agents.length)
       // ILIKE results don't have a rank field — add synthetic rank=null for response consistency
       agents = agents.map(a => ({ ...a, rank: null }))
     }
