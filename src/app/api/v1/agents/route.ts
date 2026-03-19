@@ -14,7 +14,7 @@
  *   offset          → pagination offset
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of truth
 import { getSearchLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
@@ -86,33 +86,24 @@ export async function GET(request: NextRequest) {
       'informe': 'report', 'perfil': 'profiler', 'token': 'token',
     }
     let searchMethod = 'fts'
-    let _dbg: { bn?: number|null; bd?: number|null; iq?: string } | undefined
     if (agents.length === 0) {
       searchMethod = 'fallback_ilike'
       // Translate common Spanish DeFi terms to English for ILIKE matching
       const qLower = q.toLowerCase()
       const translated = ES_EN_DEFI[qLower] ?? q
-      const ilikeQ = translated.replace(/[%_\\]/g, '\\$&') // escape SQL wildcards
-      // Use .ilike() (native Supabase JS method) — .or() with ilike has wildcard encoding issues
-      const AGENT_SELECT = 'id, slug, name, description, category, agent_type, price_per_call, is_featured, total_calls, performance_score, reputation_score, mcp_tool_name, sandbox_enabled, input_schema, output_schema, example_input'
-      // Use serviceClient for ILIKE — SSR anon client has issues with .ilike() filter encoding
-      const svcClient = createServiceClient()
-      const [{ data: byName }, { data: byDesc }] = await Promise.all([
-        svcClient.from('agents').select(AGENT_SELECT).eq('status', 'active').ilike('name', `%${ilikeQ}%`).order('is_featured', { ascending: false }).order('total_calls', { ascending: false }).limit(limit),
-        svcClient.from('agents').select(AGENT_SELECT).eq('status', 'active').ilike('description', `%${ilikeQ}%`).order('is_featured', { ascending: false }).order('total_calls', { ascending: false }).limit(limit),
-      ])
-      // Deduplicate by id, preserve order (name matches first)
-      const seen = new Set<string>()
-      const ilikeData = [...(byName ?? []), ...(byDesc ?? [])].filter(a => {
-        if (seen.has(a.id as string)) return false
-        seen.add(a.id as string)
-        return true
-      }).slice(offset, offset + limit)
-      agents = ilikeData as Record<string, unknown>[]
-      _dbg = { bn: byName?.length ?? null, bd: byDesc?.length ?? null, iq: ilikeQ }
-      console.log('[WAS-248] ilike debug — q:', q, 'translated:', translated, 'ilikeQ:', ilikeQ, 'byName:', byName?.length ?? 'null', 'byDesc:', byDesc?.length ?? 'null')
-      // ILIKE results don't have a rank field — add synthetic rank=null for response consistency
-      agents = agents.map(a => ({ ...a, rank: null }))
+      const ilikeQ = translated.replace(/[%_]/g, '') // strip wildcards
+      // WAS-248: Use direct fetch() to Supabase REST API — bypasses Supabase JS client
+      // encoding issues with % wildcards in .ilike() and .or() methods on Vercel
+      const AGENT_SELECT = 'id,slug,name,description,category,agent_type,price_per_call,is_featured,total_calls,performance_score,reputation_score,mcp_tool_name,sandbox_enabled,input_schema,output_schema,example_input'
+      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const ilikePattern = encodeURIComponent(`%${ilikeQ}%`)
+      const qs = `select=${AGENT_SELECT}&status=eq.active&or=(name.ilike.${ilikePattern},description.ilike.${ilikePattern})&order=is_featured.desc,total_calls.desc&limit=${limit}&offset=${offset}`
+      const resp = await fetch(`${sbUrl}/rest/v1/agents?${qs}`, {
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, Accept: 'application/json' },
+      })
+      const ilikeData = resp.ok ? (await resp.json() as Record<string, unknown>[]) : []
+      agents = ilikeData.map(a => ({ ...a, rank: null }))
     }
 
     // S7-02: post-filter by min_performance (search_agents RPC doesn't accept this param)
@@ -126,7 +117,6 @@ export async function GET(request: NextRequest) {
       limit,
       offset,
       search_method: searchMethod,
-      _dbg,
 
       agents: agents.map(agent => ({
         slug:        agent.slug,
