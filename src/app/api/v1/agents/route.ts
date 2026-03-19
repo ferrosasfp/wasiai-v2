@@ -95,7 +95,8 @@ export async function GET(request: NextRequest) {
       // Note: Supabase JS .or() with ilike uses PostgREST syntax where % must be literal
       // Using separate .ilike() chained with .or() is not supported — use raw filter string
       // The % chars work correctly when passed as literal characters in the or() string
-      const ilikeFilter = `name.ilike.%${ilikeQ}%,description.ilike.%${ilikeQ}%`
+      // Use * as ILIKE wildcard — Supabase JS client encodes % as %25 breaking the filter
+      const ilikeFilter = `name.ilike.*${ilikeQ}*,description.ilike.*${ilikeQ}*`
       const { data: ilikeData } = await supabase
         .from('agents')
         .select('id, slug, name, description, category, agent_type, price_per_call, is_featured, total_calls, performance_score, reputation_score, mcp_tool_name, sandbox_enabled, input_schema, output_schema, example_input')
