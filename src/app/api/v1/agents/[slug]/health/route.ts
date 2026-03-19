@@ -45,16 +45,16 @@ export async function GET(
     )
   }
 
-  // Lightweight ping — HEAD or POST with empty body
+  // Lightweight ping — GET probe (returns agent spec, no body required)
+  // POST with {ping:true} would be rejected as invalid input by the agent (400).
+  // GET returns AGENT_SPEC (200) if the agent is live, regardless of input.
   const start = Date.now()
   try {
     const probe = await fetch(model.endpoint_url, {
-      method: 'POST',
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         ...(model.webhook_secret ? { 'Authorization': `Bearer ${model.webhook_secret}` } : {}),
       },
-      body: JSON.stringify({ ping: true }),
       signal: AbortSignal.timeout(5_000), // 5s probe
     })
     const latency = Date.now() - start
