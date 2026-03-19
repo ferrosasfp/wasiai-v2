@@ -92,11 +92,15 @@ export async function GET(request: NextRequest) {
       const qLower = q.toLowerCase()
       const translated = ES_EN_DEFI[qLower] ?? q
       const ilikeQ = translated.replace(/[%_\\]/g, '\\$&') // escape SQL wildcards
+      // Note: Supabase JS .or() with ilike uses PostgREST syntax where % must be literal
+      // Using separate .ilike() chained with .or() is not supported — use raw filter string
+      // The % chars work correctly when passed as literal characters in the or() string
+      const ilikeFilter = `name.ilike.%${ilikeQ}%,description.ilike.%${ilikeQ}%`
       const { data: ilikeData } = await supabase
         .from('agents')
         .select('id, slug, name, description, category, agent_type, price_per_call, is_featured, total_calls, performance_score, reputation_score, mcp_tool_name, sandbox_enabled, input_schema, output_schema, example_input')
         .eq('status', 'active')
-        .or(`name.ilike.%${ilikeQ}%,description.ilike.%${ilikeQ}%`)
+        .or(ilikeFilter)
         .order('is_featured', { ascending: false })
         .order('total_calls', { ascending: false })
         .range(offset, offset + limit - 1)
