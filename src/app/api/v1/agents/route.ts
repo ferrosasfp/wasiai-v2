@@ -75,6 +75,22 @@ export async function GET(request: NextRequest) {
 
     let agents = (searchData ?? []) as Record<string, unknown>[]
 
+    // WAS-248: ILIKE fallback cuando FTS retorna 0 (soporta español y términos parciales)
+    let searchMethod = 'fts'
+    if (agents.length === 0) {
+      searchMethod = 'fallback_ilike'
+      const ilikeQ = q.replace(/[%_\\]/g, '\\$&') // escape SQL wildcards
+      const { data: ilikeData } = await supabase
+        .from('agents')
+        .select('id, slug, name, description, category, agent_type, price_per_call, is_featured, total_calls, performance_score, reputation_score, mcp_tool_name, sandbox_enabled, input_schema, output_schema, example_input')
+        .eq('status', 'active')
+        .or(`name.ilike.%${ilikeQ}%,description.ilike.%${ilikeQ}%`)
+        .order('is_featured', { ascending: false })
+        .order('total_calls', { ascending: false })
+        .range(offset, offset + limit - 1)
+      agents = (ilikeData ?? []) as Record<string, unknown>[]
+    }
+
     // S7-02: post-filter by min_performance (search_agents RPC doesn't accept this param)
     if (minPerformance !== undefined) {
       agents = agents.filter(a => ((a.performance_score as number) ?? 0) >= minPerformance!)
@@ -85,6 +101,7 @@ export async function GET(request: NextRequest) {
       total:  agents.length,
       limit,
       offset,
+      search_method: searchMethod,
       agents: agents.map(agent => ({
         slug:        agent.slug,
         name:        agent.name,
