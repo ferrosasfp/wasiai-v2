@@ -23,7 +23,7 @@ export async function GET(
 
   const { data: model } = await supabase
     .from('agents')
-    .select('slug, name, status, endpoint_url')
+    .select('slug, name, status, endpoint_url, webhook_secret')
     .eq('slug', slug)
     .eq('status', 'active')
     .single()
@@ -50,7 +50,10 @@ export async function GET(
   try {
     const probe = await fetch(model.endpoint_url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(model.webhook_secret ? { 'Authorization': `Bearer ${model.webhook_secret}` } : {}),
+      },
       body: JSON.stringify({ ping: true }),
       signal: AbortSignal.timeout(5_000), // 5s probe
     })
@@ -60,7 +63,7 @@ export async function GET(
       {
         slug,
         name:    model.name,
-        status:  probe.ok || probe.status < 500 ? 'healthy' : 'unhealthy',
+        status:  probe.ok ? 'healthy' : 'unhealthy',
         latency_ms: latency,
         upstream_status: probe.status,
       },
