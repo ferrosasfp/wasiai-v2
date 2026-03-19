@@ -100,11 +100,14 @@ export async function GET(request: NextRequest) {
       // Use * wildcard (PostgREST-compatible, no URL encoding needed — % becomes %25 via encodeURIComponent)
       const ilikePattern = `*${ilikeQ}*`
       const qs = `select=${AGENT_SELECT}&status=eq.active&or=(name.ilike.${ilikePattern},description.ilike.${ilikePattern})&order=is_featured.desc,total_calls.desc&limit=${limit}&offset=${offset}`
-      const resp = await fetch(`${sbUrl}/rest/v1/agents?${qs}`, {
+      const fetchUrl = `${sbUrl}/rest/v1/agents?${qs}`
+      console.log('[WAS-248] fetch URL:', fetchUrl, 'key prefix:', sbKey?.slice(0,20))
+      const resp = await fetch(fetchUrl, {
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, Accept: 'application/json' },
       })
-      const ilikeData = resp.ok ? (await resp.json() as Record<string, unknown>[]) : []
-      agents = ilikeData.map(a => ({ ...a, rank: null }))
+      const rawData = resp.ok ? (await resp.json() as Record<string, unknown>[]) : []
+      console.log('[WAS-248] fetch status:', resp.status, 'results:', rawData.length, 'url_logged:', fetchUrl.slice(0, 120))
+      agents = rawData.map(a => ({ ...a, rank: null, _fetchUrl: fetchUrl.slice(0,100) }))
     }
 
     // S7-02: post-filter by min_performance (search_agents RPC doesn't accept this param)
@@ -118,6 +121,7 @@ export async function GET(request: NextRequest) {
       limit,
       offset,
       search_method: searchMethod,
+      _debug_ilike_url: searchMethod === 'fallback_ilike' ? agents[0]?.['_fetchUrl'] ?? 'no-results' : undefined,
 
       agents: agents.map(agent => ({
         slug:        agent.slug,
