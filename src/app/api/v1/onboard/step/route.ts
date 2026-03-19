@@ -28,24 +28,7 @@ function generateSlug(name: string, suffix?: string): string {
   return suffix ? `${base}-${suffix}` : base
 }
 
-export async function POST(request: NextRequest) {
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  const { session_id, answer } = body as { session_id?: string; answer?: unknown }
-
-  if (!session_id) {
-    return NextResponse.json({ error: 'session_id is required' }, { status: 400 })
-  }
-
-  if (answer === null || answer === undefined || answer === '') {
-    return NextResponse.json({ error: 'answer is required' }, { status: 400 })
-  }
-
+export async function processOnboardStep(session_id: string, answer: unknown): Promise<NextResponse> {
   const serviceClient = createServiceClient()
 
   // Fetch session — must not be expired
@@ -267,4 +250,25 @@ export async function POST(request: NextRequest) {
     step: nextStep,
     ...(nextQ ?? { question: 'Done', hint: '' }),
   })
+}
+
+export async function POST(request: NextRequest) {
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const { session_id, answer } = body as { session_id?: string; answer?: unknown }
+
+  if (!session_id) {
+    return NextResponse.json({ error: 'session_id is required' }, { status: 400 })
+  }
+
+  if (answer === null || answer === undefined || answer === '') {
+    return NextResponse.json({ error: 'answer is required' }, { status: 400 })
+  }
+
+  return processOnboardStep(session_id, answer)
 }

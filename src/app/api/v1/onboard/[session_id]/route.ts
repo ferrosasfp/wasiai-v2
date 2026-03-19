@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { processOnboardStep } from '../step/route'
 
 export async function GET(
   _request: NextRequest,
@@ -23,4 +24,25 @@ export async function GET(
     status: session.status,
     completed_fields: Object.keys(session.data ?? {}),
   })
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ session_id: string }> },
+) {
+  const { session_id } = await params
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const { answer } = body as { answer?: unknown }
+
+  if (answer === null || answer === undefined || answer === '') {
+    return NextResponse.json({ error: 'answer is required' }, { status: 400 })
+  }
+
+  return processOnboardStep(session_id, answer)
 }

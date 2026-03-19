@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(
     {
       session_id: session.id,
+      next_url: `/api/v1/onboard/${session.id}`,
       step: 1,
       total_steps: 7,
       question: "What is your agent's name?",
