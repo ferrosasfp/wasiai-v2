@@ -19,7 +19,7 @@ import { logger } from '@/lib/logger'
 import { SITE_URL } from '@/lib/constants'
 import { buildCOB } from '@/lib/introspect/buildCOB'
 import type { IntrospectDepth } from '@/lib/introspect/buildCOB'
-import { validateEndpointUrl, validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { assertPaymentType } from '@/lib/validation/payment-type'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
