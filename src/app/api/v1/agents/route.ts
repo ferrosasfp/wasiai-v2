@@ -76,10 +76,22 @@ export async function GET(request: NextRequest) {
     let agents = (searchData ?? []) as Record<string, unknown>[]
 
     // WAS-248: ILIKE fallback cuando FTS retorna 0 (soporta español y términos parciales)
+    // Diccionario ES→EN para términos DeFi comunes (LATAM builders)
+    const ES_EN_DEFI: Record<string, string> = {
+      'precio': 'price', 'riesgo': 'risk', 'liquidez': 'liquidity',
+      'billetera': 'wallet', 'cartera': 'wallet', 'contrato': 'contract',
+      'análisis': 'analyzer', 'analisis': 'analyzer', 'auditoria': 'auditor',
+      'auditoría': 'auditor', 'cadena': 'chain', 'oraculo': 'oracle',
+      'oráculo': 'oracle', 'sentimiento': 'sentiment', 'reporte': 'report',
+      'informe': 'report', 'perfil': 'profiler', 'token': 'token',
+    }
     let searchMethod = 'fts'
     if (agents.length === 0) {
       searchMethod = 'fallback_ilike'
-      const ilikeQ = q.replace(/[%_\\]/g, '\\$&') // escape SQL wildcards
+      // Translate common Spanish DeFi terms to English for ILIKE matching
+      const qLower = q.toLowerCase()
+      const translated = ES_EN_DEFI[qLower] ?? q
+      const ilikeQ = translated.replace(/[%_\\]/g, '\\$&') // escape SQL wildcards
       const { data: ilikeData } = await supabase
         .from('agents')
         .select('id, slug, name, description, category, agent_type, price_per_call, is_featured, total_calls, performance_score, reputation_score, mcp_tool_name, sandbox_enabled, input_schema, output_schema, example_input')
