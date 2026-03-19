@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { triggerAgentEvent } from '@/lib/webhooks/triggerAgentEvent'
+import { logger } from '@/lib/logger'
 
 interface ProcessJobResponse {
   jobId: string
@@ -101,7 +102,7 @@ export async function POST(
         ...(agent.webhook_secret ? {
           'Authorization': `Bearer ${agent.webhook_secret}`,
           'X-WasiAI-Agent-Id': agent.id,
-        } : {}),
+        } : (logger.warn('[jobs] agent missing webhook_secret', { slug: job.agent_slug }), {})),
       },
       body:    JSON.stringify({ input: job.input }),
       signal:  AbortSignal.timeout(timeoutMs),

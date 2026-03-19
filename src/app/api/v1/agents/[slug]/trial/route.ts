@@ -13,6 +13,7 @@ import { Redis } from '@upstash/redis'
 import { z } from 'zod'
 import { checkIpLimit } from '@/lib/rate-limit-ip'
 import { assertPaymentType } from '@/lib/validation/payment-type'
+import { logger } from '@/lib/logger'
 
 const BodySchema = z.object({ input: z.string().min(1).max(2000) })
 
@@ -170,6 +171,8 @@ export async function POST(
     if (agent.webhook_secret) {
       reqHeaders['Authorization'] = `Bearer ${agent.webhook_secret}`
       reqHeaders['X-WasiAI-Agent-Id'] = agent.id as string
+    } else {
+      logger.warn('[trial] agent missing webhook_secret', { slug })
     }
 
     const agentRes = await fetch(agent.endpoint_url as string, {

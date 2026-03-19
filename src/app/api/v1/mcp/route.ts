@@ -57,10 +57,10 @@ async function callUpstreamMcp(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(webhookSecret ? {
+        ...(webhookSecret && agentId ? {
           'Authorization': `Bearer ${webhookSecret}`,
-          'X-WasiAI-Agent-Id': agentId ?? '',
-        } : {}),
+          'X-WasiAI-Agent-Id': agentId,
+        } : (logger.warn('[mcp] agent missing webhook_secret or agentId', { endpointUrl }), {})),
       },
       body: JSON.stringify({ input, ...(options ?? {}) }),
       signal: AbortSignal.timeout(10_000),

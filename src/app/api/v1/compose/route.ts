@@ -488,7 +488,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           ...(agent.webhook_secret ? {
             'Authorization': `Bearer ${agent.webhook_secret}`,
             'X-WasiAI-Agent-Id': agent.id,
-          } : {}),
+          } : (logger.warn('[compose] agent missing webhook_secret', { slug: agent.slug }), {})),
         },
         body:     JSON.stringify({ input: stepInput, ...pipelineCtx }),
         signal:   AbortSignal.timeout(STEP_TIMEOUT_MS),

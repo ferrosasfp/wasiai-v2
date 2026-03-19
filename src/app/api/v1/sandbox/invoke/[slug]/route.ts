@@ -272,7 +272,7 @@ export async function POST(
         ...(agent.webhook_secret ? {
           'Authorization': `Bearer ${agent.webhook_secret}`,
           'X-WasiAI-Agent-Id': agent.id,
-        } : {}),
+        } : (logger.warn('[sandbox] agent missing webhook_secret', { slug }), {})),
       },
       body:    JSON.stringify({ input }),
       signal:  AbortSignal.timeout(8000),
