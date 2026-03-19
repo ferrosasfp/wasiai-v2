@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { triggerAgentEvent } from '@/lib/webhooks/triggerAgentEvent'
 import { logger } from '@/lib/logger'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 
 interface ProcessJobResponse {
   jobId: string
@@ -89,6 +90,16 @@ export async function POST(
   }
 
   // [6] Llamar al agente externo
+  // SEC: SSRF check antes de fetch (S2 — WAS-078)
+  try {
+    await validateEndpointUrlAsync(agent.endpoint_url)
+  } catch (err) {
+    const failedAt = new Date().toISOString()
+    await serviceClient.from('jobs').update({ status: 'failed', error: 'Invalid agent endpoint', completed_at: failedAt, updated_at: failedAt }).eq('id', id)
+    logger.warn('[jobs] SSRF check failed', { id, endpoint: agent.endpoint_url, err: String(err) })
+    return NextResponse.json({ jobId: id, status: 'failed', completedAt: failedAt }, { status: 200 })
+  }
+
   const timeoutMs = parseInt(process.env.COMPOSE_STEP_TIMEOUT_MS ?? '8000', 10)
   let completedAt: string
   let responseJson: Record<string, unknown>

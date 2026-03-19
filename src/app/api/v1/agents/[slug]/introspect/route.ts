@@ -19,8 +19,9 @@ import { logger } from '@/lib/logger'
 import { SITE_URL } from '@/lib/constants'
 import { buildCOB } from '@/lib/introspect/buildCOB'
 import type { IntrospectDepth } from '@/lib/introspect/buildCOB'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrl, validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { assertPaymentType } from '@/lib/validation/payment-type'
+import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ async function callUpstreamIntrospect(
 ): Promise<{ data: unknown; status: 'success' | 'error'; latencyMs: number; timedOut: boolean }> {
   // SEC-01: Validate endpoint URL to prevent SSRF
   try {
-    validateEndpointUrl(model.endpoint_url as string)
+    await validateEndpointUrlAsync(model.endpoint_url as string)
   } catch (err) {
     return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error', latencyMs: 0, timedOut: false }
   }
@@ -209,6 +210,11 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
+    // ── 0. Rate limiting (SEC: S1 — WAS-078) ─────────────────────────────
+    const rlId  = getIdentifier(request)
+    const rlHit = await checkRateLimit(getInvokeLimit(), rlId)
+    if (rlHit) return rlHit
+
     const { slug } = await params
     const supabase = createServiceClient()
 

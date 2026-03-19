@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { z } from 'zod'
@@ -142,7 +142,7 @@ export async function POST(
 
   // 5. SSRF check
   try {
-    validateEndpointUrl(agent.endpoint_url ?? '')
+    await validateEndpointUrlAsync(agent.endpoint_url ?? '')
   } catch {
     return NextResponse.json({ error: 'invalid_endpoint' }, { status: 400 })
   }
