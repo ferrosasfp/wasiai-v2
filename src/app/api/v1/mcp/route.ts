@@ -63,7 +63,7 @@ async function callUpstreamMcp(
         } : (logger.warn('[mcp] agent missing webhook_secret or agentId', { endpointUrl }), {})),
       },
       body: JSON.stringify({ input, ...(options ?? {}) }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(55_000), // aumentado de 10s — agentes externos (wasiai-agents) tardan más en cold start
     })
     const data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
     return { data, status: upstream.ok ? 'success' : 'error', latencyMs: Date.now() - startMs }
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     const keyHash = createHash('sha256').update(rawKey).digest('hex')
 
     const [{ data: model, error: modelError }, { data: keyRow }] = await Promise.all([
-      supabase.from('agents').select('*').eq('slug', slug).eq('status', 'active').single(),
+      supabase.from('agents').select('id, slug, name, description, category, price_per_call, endpoint_url, webhook_secret, status').eq('slug', slug).eq('status', 'active').single(),
       supabase
         .from('agent_keys')
         .select('id, is_active, budget_usdc, spent_usdc')

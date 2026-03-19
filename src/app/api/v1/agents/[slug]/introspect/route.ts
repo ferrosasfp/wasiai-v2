@@ -250,7 +250,7 @@ export async function POST(
       : null
 
     const [{ data: model, error: modelError }, keyRowResult] = await Promise.all([
-      supabase.from('agents').select('*').eq('slug', slug).single(),
+      supabase.from('agents').select('id, slug, name, status, price_per_call, endpoint_url, webhook_secret, on_chain_registered, creator_wallet').eq('slug', slug).single(),
       keyHash
         ? supabase
             .from('agent_keys')
