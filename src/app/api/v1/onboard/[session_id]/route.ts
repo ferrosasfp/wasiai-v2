@@ -40,7 +40,7 @@ export async function POST(
 
   const { answer } = body as { answer?: unknown }
 
-  if (answer === null || answer === undefined || answer === '') {
+  if (answer === null || answer === undefined) {
     return NextResponse.json({ error: 'answer is required' }, { status: 400 })
   }
 

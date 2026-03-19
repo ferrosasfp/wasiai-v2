@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'session_id is required' }, { status: 400 })
   }
 
-  if (answer === null || answer === undefined || answer === '') {
+  if (answer === null || answer === undefined) {
     return NextResponse.json({ error: 'answer is required' }, { status: 400 })
   }
 
