@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
       'informe': 'report', 'perfil': 'profiler', 'token': 'token',
     }
     let searchMethod = 'fts'
+    let _dbg: { bn?: number|null; bd?: number|null; iq?: string } | undefined
     if (agents.length === 0) {
       searchMethod = 'fallback_ilike'
       // Translate common Spanish DeFi terms to English for ILIKE matching
@@ -108,7 +109,8 @@ export async function GET(request: NextRequest) {
         return true
       }).slice(offset, offset + limit)
       agents = ilikeData as Record<string, unknown>[]
-      console.log('[WAS-248] ilike debug — q:', q, 'translated:', translated, 'ilikeQ:', ilikeQ, 'byName:', byName?.length ?? 'null', 'byDesc:', byDesc?.length ?? 'null', 'merged:', agents.length)
+      _dbg = { bn: byName?.length ?? null, bd: byDesc?.length ?? null, iq: ilikeQ }
+      console.log('[WAS-248] ilike debug — q:', q, 'translated:', translated, 'ilikeQ:', ilikeQ, 'byName:', byName?.length ?? 'null', 'byDesc:', byDesc?.length ?? 'null')
       // ILIKE results don't have a rank field — add synthetic rank=null for response consistency
       agents = agents.map(a => ({ ...a, rank: null }))
     }
@@ -124,6 +126,8 @@ export async function GET(request: NextRequest) {
       limit,
       offset,
       search_method: searchMethod,
+      _dbg,
+
       agents: agents.map(agent => ({
         slug:        agent.slug,
         name:        agent.name,
