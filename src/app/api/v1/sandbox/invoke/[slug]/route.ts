@@ -66,6 +66,7 @@ interface AgentRow {
   sandbox_enabled: boolean
   input_schema: unknown | null
   output_schema: unknown | null
+  webhook_secret: string | null
 }
 
 interface SandboxCreditsRow {
@@ -152,7 +153,7 @@ export async function POST(
   // 3. Obtener agente por slug
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('id, endpoint_url, price_per_call, status, sandbox_enabled, input_schema, output_schema')
+    .select('id, endpoint_url, price_per_call, status, sandbox_enabled, input_schema, output_schema, webhook_secret')
     .eq('slug', slug)
     .single<AgentRow>()
 
@@ -268,7 +269,10 @@ export async function POST(
       method:  'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(process.env.INTERNAL_API_SECRET ? { 'x-internal-secret': process.env.INTERNAL_API_SECRET } : {}),
+        ...(agent.webhook_secret ? {
+          'Authorization': `Bearer ${agent.webhook_secret}`,
+          'X-WasiAI-Agent-Id': agent.id,
+        } : {}),
       },
       body:    JSON.stringify({ input }),
       signal:  AbortSignal.timeout(8000),

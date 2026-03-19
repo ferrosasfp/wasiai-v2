@@ -12,6 +12,7 @@ import { EarningsSection, EarningsSkeleton } from './_components/EarningsSection
 import { TransactionHistory, TransactionHistorySkeleton } from './_components/TransactionHistory'
 import { AgentActions } from './_components/AgentActions'
 import { FreeTrialToggle } from './_components/FreeTrialToggle'
+import { WebhookSecretWidget } from './_components/WebhookSecretWidget'
 import { WebhooksPanel } from './_components/WebhooksPanel'
 import { AgentWalletSection } from './_components/AgentWalletSection'
 import { AgentKeyWidget }     from './_components/AgentKeyWidget'
@@ -258,6 +259,11 @@ export default async function CreatorDashboardPage({
                           initialEnabled={model.free_trial_enabled ?? false}
                           initialLimit={model.free_trial_limit ?? 1}
                         />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={7} className="px-6 pb-4">
+                        <WebhookSecretWidget slug={model.slug} />
                       </td>
                     </tr>
                     </React.Fragment>

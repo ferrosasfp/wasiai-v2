@@ -124,7 +124,7 @@ export async function POST(
   const svc = createServiceClient()
   const { data: agent } = await svc
     .from('agents')
-    .select('id, endpoint_url, name, free_trial_enabled, free_trial_limit')  // HU-3.3
+    .select('id, endpoint_url, name, free_trial_enabled, free_trial_limit, webhook_secret')  // HU-3.3
     .eq('slug', slug)
     .eq('status', 'active')
     .single()
@@ -167,8 +167,9 @@ export async function POST(
 
   try {
     const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (process.env.INTERNAL_API_SECRET) {
-      reqHeaders['x-internal-secret'] = process.env.INTERNAL_API_SECRET
+    if (agent.webhook_secret) {
+      reqHeaders['Authorization'] = `Bearer ${agent.webhook_secret}`
+      reqHeaders['X-WasiAI-Agent-Id'] = agent.id as string
     }
 
     const agentRes = await fetch(agent.endpoint_url as string, {

@@ -172,7 +172,10 @@ async function callUpstreamIntrospect(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(process.env.INTERNAL_API_SECRET ? { 'x-internal-secret': process.env.INTERNAL_API_SECRET } : {}),
+        ...((model.webhook_secret as string | null) ? {
+          'Authorization': `Bearer ${model.webhook_secret}`,
+          'X-WasiAI-Agent-Id': model.id as string,
+        } : {}),
       },
       body: JSON.stringify({ ...body, __introspect: true }),
       signal: AbortSignal.timeout(timeoutMs),

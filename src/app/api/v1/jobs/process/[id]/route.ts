@@ -27,6 +27,7 @@ interface AgentRow {
   id: string
   endpoint_url: string
   user_id: string
+  webhook_secret: string | null
 }
 
 export async function POST(
@@ -69,7 +70,7 @@ export async function POST(
   // [5] Obtener agente
   const { data: agent, error: agentError } = await serviceClient
     .from('agents')
-    .select('id, endpoint_url, user_id')
+    .select('id, endpoint_url, user_id, webhook_secret')
     .eq('slug', job.agent_slug)
     .single<AgentRow>()
 
@@ -95,7 +96,13 @@ export async function POST(
   try {
     const res = await fetch(agent.endpoint_url, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(agent.webhook_secret ? {
+          'Authorization': `Bearer ${agent.webhook_secret}`,
+          'X-WasiAI-Agent-Id': agent.id,
+        } : {}),
+      },
       body:    JSON.stringify({ input: job.input }),
       signal:  AbortSignal.timeout(timeoutMs),
     })

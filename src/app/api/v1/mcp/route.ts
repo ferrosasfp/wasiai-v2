@@ -41,6 +41,8 @@ async function callUpstreamMcp(
   endpointUrl: string,
   input: string,
   options?: Record<string, unknown>,
+  webhookSecret?: string | null,
+  agentId?: string,
 ): Promise<{ data: unknown; status: 'success' | 'error'; latencyMs: number }> {
   // SEC-01 + NG-005: validate endpoint to prevent SSRF (async version includes DNS probe)
   try {
@@ -53,7 +55,13 @@ async function callUpstreamMcp(
   try {
     const upstream = await fetch(endpointUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(webhookSecret ? {
+          'Authorization': `Bearer ${webhookSecret}`,
+          'X-WasiAI-Agent-Id': agentId ?? '',
+        } : {}),
+      },
       body: JSON.stringify({ input, ...(options ?? {}) }),
       signal: AbortSignal.timeout(10_000),
     })
@@ -236,7 +244,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Call the agent
-    const result = await callUpstreamMcp(model.endpoint_url as string, input, options)
+    const result = await callUpstreamMcp(model.endpoint_url as string, input, options, model.webhook_secret as string | null, model.id as string)
 
     // 6. Deduct budget + log call (fire-and-forget safe — non-critical path)
     if (result.status === 'success') {

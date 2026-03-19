@@ -121,6 +121,7 @@ interface AgentRow {
   max_rpd:        number
   input_schema:   unknown | null
   output_schema:  unknown | null
+  webhook_secret: string | null
 }
 
 interface KeyRow {
@@ -241,7 +242,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (staticSlugs.length > 0) {
     const { data: agentsData } = await supabase
       .from('agents')
-      .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema, output_schema')
+      .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema, output_schema, webhook_secret')
       .in('slug', staticSlugs)
       .eq('status', 'active')
 
@@ -289,7 +290,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           if (!fbAgent) {
             const { data: fbData } = await supabase
               .from('agents')
-              .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema, output_schema')
+              .select('id, slug, name, price_per_call, endpoint_url, status, category, max_rpm, max_rpd, input_schema, output_schema, webhook_secret')
               .eq('slug', step.fallback_slug)
               .eq('status', 'active')
               .single<AgentRow>()
@@ -484,7 +485,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           'Cache-Control':  'no-store',
           'X-Pipeline-Id':  pipelineId,
           'X-Pipeline-Step': String(stepIndex),
-          ...(process.env.INTERNAL_API_SECRET ? { 'x-internal-secret': process.env.INTERNAL_API_SECRET } : {}),
+          ...(agent.webhook_secret ? {
+            'Authorization': `Bearer ${agent.webhook_secret}`,
+            'X-WasiAI-Agent-Id': agent.id,
+          } : {}),
         },
         body:     JSON.stringify({ input: stepInput, ...pipelineCtx }),
         signal:   AbortSignal.timeout(STEP_TIMEOUT_MS),

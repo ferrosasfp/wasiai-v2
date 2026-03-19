@@ -629,7 +629,10 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              ...(process.env.INTERNAL_API_SECRET ? { 'x-internal-secret': process.env.INTERNAL_API_SECRET } : {}),
+              ...((model.webhook_secret as string | null) ? {
+                'Authorization': `Bearer ${model.webhook_secret}`,
+                'X-WasiAI-Agent-Id': model.id as string,
+              } : {}),
             },
             body: JSON.stringify(body),
             signal: AbortSignal.timeout(10_000), // PERF-02: 10s max, no infinite hangs

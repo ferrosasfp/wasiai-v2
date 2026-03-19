@@ -32,7 +32,7 @@ import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { CHAIN_NAME } from '@/lib/chain'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
-import { createHash } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 import { logger } from '@/lib/logger'
 
 import { SITE_URL } from '@/lib/constants'
@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
     currency:       'USDC',
     chain:          CHAIN_NAME,
     endpoint_url:   data.endpoint_url,
+    webhook_secret: 'whsec_' + randomBytes(32).toString('hex'),
     capabilities:   data.capabilities,
     dependencies:   data.dependencies,
     creator_wallet: data.creator_wallet ?? null,
