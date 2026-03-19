@@ -5,7 +5,7 @@
  * No requiere auth. Rate limit: 60 req/min por IP.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getClientIp } from '@/lib/get-client-ip'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
@@ -147,8 +147,9 @@ export async function GET(
     error_rate_sample: number | null
   } | null
 
-  // Última invocación
-  const { data: lastCall } = await supabase
+  // Última invocación — serviceClient para bypass RLS (agent_calls solo visible con service role)
+  const serviceClient = createServiceClient()
+  const { data: lastCall } = await serviceClient
     .from('agent_calls')
     .select('called_at')
     .eq('agent_id', agent.id)
@@ -159,7 +160,7 @@ export async function GET(
   // Breakdown de tipos de invocación últimos 30 días (WAS-188) — usa called_at (idx_agent_calls_agent_called_at)
   const { data: callsBreakdown } = await supabase
     .from('agent_calls')
-    .select('payment_type, is_trial')
+    .select('payment_type, is_trial, status')
     .eq('agent_id', agent.id)
     .gte('called_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
 
@@ -180,10 +181,22 @@ export async function GET(
   // is_available
   // health_check JSONB (migración 057) — legacy columns last_health_check_ok/at no existen en prod
   const healthCheck = agent.health_check as { passed?: boolean } | null
-  const isAvailable = healthCheck?.passed === true &&
+
+  // Primary signal: health_check cron result (cuando el cron ha corrido)
+  const healthCheckPassed = healthCheck?.passed === true &&
     agent.last_checked_at !== null &&
-    agent.last_checked_at !== undefined &&
     new Date(agent.last_checked_at as string).getTime() > Date.now() - 24 * 60 * 60 * 1000
+
+  // Secondary signal: recent successful calls (cuando health_check no está poblado)
+  const recentSuccessCount = callsBreakdown?.filter(
+    (c: { status?: string }) => c.status === 'success'
+  ).length ?? 0
+  const hasRecentActivity = recentSuccessCount > 0
+
+  // Explicit health_check failure overrides all other signals
+  const healthCheckFailed = healthCheck?.passed === false
+
+  const isAvailable = !healthCheckFailed && (healthCheckPassed || hasRecentActivity)
 
   // Score (WAS-188: ponderación diferenciada v2-weighted)
   const { score, signalWeights } = calcScore({
