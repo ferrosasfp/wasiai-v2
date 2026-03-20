@@ -149,6 +149,16 @@ export async function GET(
 
   // Última invocación — serviceClient para bypass RLS (agent_calls solo visible con service role)
   const serviceClient = createServiceClient()
+
+  // Leer ventana de disponibilidad desde app_settings (WAS-245)
+  const { data: windowSetting } = await serviceClient
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'agent_available_window_days')
+    .single()
+  const availableWindowDays = parseInt(windowSetting?.value ?? '7', 10)
+  const availableWindowMs = availableWindowDays * 24 * 60 * 60 * 1000
+
   const { data: lastCall } = await serviceClient
     .from('agent_calls')
     .select('called_at')
@@ -157,16 +167,14 @@ export async function GET(
     .limit(1)
     .single()
 
-  // Señal de disponibilidad: calls exitosas en las últimas 24h (no 30d como callsBreakdown)
-  const { data: recentCalls24h } = await serviceClient
+  // Señal de disponibilidad: calls exitosas en ventana configurable (WAS-245)
+  const { data: recentCalls } = await serviceClient
     .from('agent_calls')
     .select('status')
     .eq('agent_id', agent.id)
-    .gte('called_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .gte('called_at', new Date(Date.now() - availableWindowMs).toISOString())
 
-  const hasRecentActivity = (recentCalls24h ?? []).filter(
-    (c: { status?: string }) => c.status === 'success'
-  ).length > 0
+  const hasRecentActivity = (recentCalls ?? []).some(c => c.status === 'success')
 
   // Breakdown de tipos de invocación últimos 30 días (WAS-188) — usa called_at (idx_agent_calls_agent_called_at)
   const { data: callsBreakdown } = await supabase
@@ -196,7 +204,7 @@ export async function GET(
   // Primary signal: health_check cron result (cuando el cron ha corrido)
   const healthCheckPassed = healthCheck?.passed === true &&
     agent.last_checked_at !== null &&
-    new Date(agent.last_checked_at as string).getTime() > Date.now() - 24 * 60 * 60 * 1000
+    new Date(agent.last_checked_at as string).getTime() > Date.now() - availableWindowMs
 
   // Secondary signal: hasRecentActivity already calculated from 24h query above
 
