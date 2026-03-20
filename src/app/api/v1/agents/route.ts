@@ -86,6 +86,8 @@ export async function GET(request: NextRequest) {
       'informe': 'report', 'perfil': 'profiler', 'token': 'token',
     }
     let searchMethod = 'fts'
+    let _debugFetchUrl: string | undefined
+    let _debugFetchStatus: number | undefined
     if (agents.length === 0) {
       searchMethod = 'fallback_ilike'
       // Translate common Spanish DeFi terms to English for ILIKE matching
@@ -106,8 +108,10 @@ export async function GET(request: NextRequest) {
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, Accept: 'application/json' },
       })
       const rawData = resp.ok ? (await resp.json() as Record<string, unknown>[]) : []
-      console.log('[WAS-248] fetch status:', resp.status, 'results:', rawData.length, 'url_logged:', fetchUrl.slice(0, 120))
-      agents = rawData.map(a => ({ ...a, rank: null, _fetchUrl: fetchUrl.slice(0,100) }))
+      _debugFetchUrl = fetchUrl
+      _debugFetchStatus = resp.status
+      console.log('[WAS-248] fetch status:', resp.status, 'results:', rawData.length, 'url:', fetchUrl)
+      agents = rawData.map(a => ({ ...a, rank: null }))
     }
 
     // S7-02: post-filter by min_performance (search_agents RPC doesn't accept this param)
@@ -121,7 +125,8 @@ export async function GET(request: NextRequest) {
       limit,
       offset,
       search_method: searchMethod,
-      _debug_ilike_url: searchMethod === 'fallback_ilike' ? agents[0]?.['_fetchUrl'] ?? 'no-results' : undefined,
+      _debug_ilike_url: _debugFetchUrl,
+      _debug_ilike_status: _debugFetchStatus,
 
       agents: agents.map(agent => ({
         slug:        agent.slug,
