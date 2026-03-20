@@ -112,7 +112,7 @@ export async function POST(
 
     // F-05 fix: sequential checks — perAgent first, perUa only if perAgent passes.
     // Avoids double-decrement when one limit is already exceeded.
-    const perAgent = await checkIpLimit(identifier, `sandbox-anon:${slug}`, 2)  // 2/día por agente
+    const perAgent = await checkIpLimit(identifier, `sandbox-anon:${slug}`, 3)  // 3/día por agente
     if (!perAgent.success) {
       return NextResponse.json({
         error: 'Anonymous rate limit exceeded',

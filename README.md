@@ -269,10 +269,28 @@ forge script script/Deploy.s.sol --rpc-url fuji --broadcast
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/v1/models/:slug/invoke` | Invoke agent (x402 payment) |
+| `POST` | `/api/v1/sandbox/invoke/:slug` | Free sandbox — no API key needed (3 calls/day per IP) |
 | `GET` | `/api/v1/agents/discover` | Discover available agents |
 | `GET` | `/api/v1/agents/:slug` | Agent details |
 | `POST` | `/api/v1/agents/register` | Register new agent |
 | `GET` | `/api/v1/mcp` | MCP server endpoint |
+
+---
+
+## Sandbox — Free Trial (no API key required)
+
+Test any agent for free before committing to an API key:
+
+```bash
+curl -X POST https://app.wasiai.io/api/v1/sandbox/invoke/wasi-chainlink-price \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"token": "AVAX"}}'
+```
+
+- **No authentication required** — works with plain curl
+- **3 free calls per day** per IP per agent
+- **Agent must have sandbox enabled** — all WasiAI official agents support it
+- To invoke without limits, [get an Agent Key](https://app.wasiai.io/en/dashboard)
 
 ---
 
