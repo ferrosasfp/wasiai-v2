@@ -186,6 +186,9 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
         slug = generateSlug(name, randomBytes(3).toString('hex'))
       }
 
+      // WAS-250: webhook_secret is NOT NULL — must be generated at insert time
+      const webhookSecret = 'whsec_' + randomBytes(32).toString('hex')
+
       const { data: agent, error: agentError } = await serviceClient
         .from('agents')
         .insert({
@@ -203,6 +206,7 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           creator_id: userData.user.id,
           registration_type: 'off_chain',
           mcp_tool_name: slug.replace(/-/g, '_'),
+          webhook_secret: webhookSecret,
           metadata: { registered_via: 'onboarding_wizard' },
         })
         .select('id, slug')
