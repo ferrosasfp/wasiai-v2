@@ -103,7 +103,7 @@
     "updating": "Updating...",
     "updatePassword": "Update Password",
     "checkEmailTitle": "Check your email",
-    "checkEmailMessage": "We sent a password reset link to your email.",
+    "checkEmailMessage": "Check your email to confirm your account.",
     "backToLogin": "Back to sign in",
     "sendResetLink": "Send Reset Link",
     "continueWithGoogle": "Continue with Google",

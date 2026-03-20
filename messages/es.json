@@ -103,7 +103,7 @@
     "updating": "Actualizando...",
     "updatePassword": "Actualizar Contraseña",
     "checkEmailTitle": "Revisa tu correo",
-    "checkEmailMessage": "Te enviamos un enlace de restablecimiento de contraseña.",
+    "checkEmailMessage": "Revisa tu correo para confirmar tu cuenta.",
     "backToLogin": "Volver al inicio de sesión",
     "sendResetLink": "Enviar enlace",
     "continueWithGoogle": "Continuar con Google",
