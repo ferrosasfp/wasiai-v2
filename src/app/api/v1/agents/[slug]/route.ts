@@ -80,6 +80,7 @@ export async function GET(
       description:  agent.description,
       category:     agent.category,
       agent_type:   agent.agent_type,
+      is_featured:  agent.is_featured,
       cover_image:  agent.cover_image,
       price_per_call: agent.price_per_call,
       currency:     'USDC',
