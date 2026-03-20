@@ -4,7 +4,6 @@ import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
 import { randomBytes } from 'crypto'
 import { CHAIN_NAME } from '@/lib/chain'
-import { SITE_URL } from '@/lib/constants'
 
 const QUESTIONS: Record<number, { question: string; hint: string }> = {
   1: { question: "What is your agent's name?", hint: 'Choose a descriptive name between 3 and 100 characters.' },
@@ -254,8 +253,11 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
         completed: true,
         agent_key: raw,
         agent_key_warning: 'Store this key securely. It will not be shown again.',
-        agent_url: `${SITE_URL}/en/models/${finalSlug}`,
         slug: finalSlug,
+        status: 'reviewing',
+        status_message: 'Your agent is under review. It will be visible at the URL below once approved (usually within 24h).',
+        agent_url: `https://app.wasiai.io/en/models/${finalSlug}`,
+        dashboard_url: `https://app.wasiai.io/en/dashboard`,
       })
     }
     default:
