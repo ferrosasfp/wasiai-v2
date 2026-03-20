@@ -99,19 +99,28 @@ export async function GET(request: NextRequest) {
       const AGENT_SELECT = 'id,slug,name,description,category,agent_type,price_per_call,is_featured,total_calls,performance_score,reputation_score,mcp_tool_name,sandbox_enabled,input_schema,output_schema,example_input'
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      // Use * wildcard (PostgREST-compatible, no URL encoding needed — % becomes %25 via encodeURIComponent)
+      // WAS-248: Two separate fetches (name + description) — or=() with ilike returns 400 in Supabase
       const ilikePattern = `*${ilikeQ}*`
-      const qs = `select=${AGENT_SELECT}&status=eq.active&or=(name.ilike.${ilikePattern},description.ilike.${ilikePattern})&order=is_featured.desc,total_calls.desc&limit=${limit}&offset=${offset}`
-      const fetchUrl = `${sbUrl}/rest/v1/agents?${qs}`
-      console.log('[WAS-248] fetch URL:', fetchUrl, 'key prefix:', sbKey?.slice(0,20))
-      const resp = await fetch(fetchUrl, {
-        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, Accept: 'application/json' },
-      })
-      const rawData = resp.ok ? (await resp.json() as Record<string, unknown>[]) : []
-      _debugFetchUrl = fetchUrl
-      _debugFetchStatus = resp.status
-      console.log('[WAS-248] fetch status:', resp.status, 'results:', rawData.length, 'url:', fetchUrl)
-      agents = rawData.map(a => ({ ...a, rank: null }))
+      const baseQs = `select=${AGENT_SELECT}&status=eq.active&order=is_featured.desc,total_calls.desc&limit=${limit}`
+      const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}`, Accept: 'application/json' }
+      const [rName, rDesc] = await Promise.all([
+        fetch(`${sbUrl}/rest/v1/agents?${baseQs}&name=ilike.${ilikePattern}`, { headers }),
+        fetch(`${sbUrl}/rest/v1/agents?${baseQs}&description=ilike.${ilikePattern}`, { headers }),
+      ])
+      const [byName, byDesc] = await Promise.all([
+        rName.ok ? (rName.json() as Promise<Record<string, unknown>[]>) : Promise.resolve([]),
+        rDesc.ok ? (rDesc.json() as Promise<Record<string, unknown>[]>) : Promise.resolve([]),
+      ])
+      _debugFetchUrl = `name=${rName.status},desc=${rDesc.status},ilikeQ=${ilikeQ}`
+      _debugFetchStatus = rName.status
+      // Deduplicate by id (name matches first)
+      const seen = new Set<string>()
+      const merged = [...byName, ...byDesc].filter(a => {
+        if (seen.has(a.id as string)) return false
+        seen.add(a.id as string)
+        return true
+      }).slice(0, limit)
+      agents = merged.map(a => ({ ...a, rank: null }))
     }
 
     // S7-02: post-filter by min_performance (search_agents RPC doesn't accept this param)
