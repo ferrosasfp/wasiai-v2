@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 const X402_CORS_HEADERS = {
@@ -358,12 +358,16 @@ export async function POST(
         // 3. Save signature to DB (best effort)
         if (receiptSignature) {
           // Best-effort: save receipt signature in background
-          void Promise.resolve(
-            supabase
-              .from('agent_calls')
-              .update({ receipt_signature: receiptSignature })
-              .eq('id', callId)
-          ).catch(err => logger.warn('[invoke] receipt_signature update failed', { err }))
+          after(async () => {
+            try {
+              await supabase
+                .from('agent_calls')
+                .update({ receipt_signature: receiptSignature })
+                .eq('id', callId)
+            } catch (err) {
+              logger.warn('[invoke] receipt_signature update failed', { err, slug })
+            }
+          })
         }
       }
 
@@ -503,23 +507,24 @@ export async function POST(
 
   // S6-01: Fire-and-forget — registrar failure "cobro sin servicio"
   if (settlement.settled && result.status !== 'success') {
-    void Promise.resolve(
-      supabase.from('settlement_failures').insert({
-        settlement_tx_hash: settlement.transactionHash ?? 'unknown',
-        agent_slug: slug,
-        amount_usdc: model.price_per_call,
-        caller_wallet: null,
-        error_reason: (typeof result.data === 'string' ? result.data : JSON.stringify(result.data ?? 'upstream_error')).slice(0, 500),
-        agent_call_id: callId ?? null,
-      })
-    ).then((res) => {
-      if (res.error) {
-        logger.error('[invoke] settlement_failure insert DB error', { err: res.error.message, txHash: settlement.transactionHash })
-      } else {
-        logger.warn('[invoke] settlement_failure recorded', { slug, txHash: settlement.transactionHash })
+    after(async () => {
+      try {
+        const res = await supabase.from('settlement_failures').insert({
+          settlement_tx_hash: settlement.transactionHash ?? 'unknown',
+          agent_slug: slug,
+          amount_usdc: model.price_per_call,
+          caller_wallet: null,
+          error_reason: (typeof result.data === 'string' ? result.data : JSON.stringify(result.data ?? 'upstream_error')).slice(0, 500),
+          agent_call_id: callId ?? null,
+        })
+        if (res.error) {
+          logger.error('[invoke] settlement_failure insert DB error', { err: res.error.message, txHash: settlement.transactionHash, slug })
+        } else {
+          logger.warn('[invoke] settlement_failure recorded', { slug, txHash: settlement.transactionHash })
+        }
+      } catch (err: unknown) {
+        logger.error('[invoke] settlement_failure insert failed', { err: String(err).slice(0, 200), txHash: settlement.transactionHash, slug })
       }
-    }).catch((err: unknown) => {
-      logger.error('[invoke] settlement_failure insert failed', { err: String(err).slice(0, 200), txHash: settlement.transactionHash })
     })
   }
 
@@ -539,12 +544,16 @@ export async function POST(
 
   // HU-067: Contabilidad off-chain de earnings — fire-and-forget, nunca bloquea TTFB
   if (result.status === 'success' && model.creator_id) {
-    void Promise.resolve(
-      supabase.rpc('increment_pending_earnings', {
-        p_user_id: model.creator_id as string,
-        p_amount:  creatorPrice,
-      })
-    ).catch((err: unknown) => logger.error('[invoke] increment_pending_earnings failed', { err }))
+    after(async () => {
+      try {
+        await supabase.rpc('increment_pending_earnings', {
+          p_user_id: model.creator_id as string,
+          p_amount:  creatorPrice,
+        })
+      } catch (err: unknown) {
+        logger.error('[invoke] increment_pending_earnings failed', { err, slug })
+      }
+    })
   }
 
   return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined)
