@@ -156,7 +156,7 @@ export async function GET(
     .select('value')
     .eq('key', 'agent_available_window_days')
     .single()
-  const availableWindowDays = parseInt(windowSetting?.value ?? '7', 10)
+  const availableWindowDays = Math.max(1, parseInt(windowSetting?.value ?? '7', 10) || 7)
   const availableWindowMs = availableWindowDays * 24 * 60 * 60 * 1000
 
   const { data: lastCall } = await serviceClient
