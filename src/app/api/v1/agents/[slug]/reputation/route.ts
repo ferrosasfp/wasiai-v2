@@ -121,14 +121,25 @@ export async function GET(
   const { slug } = await params
   const supabase  = await createClient()
 
-  // Fetch agent
-  const { data: agent, error } = await supabase
-    .from('agents')
-    .select('id, total_calls, reputation_score, reputation_count, is_verified, health_check, last_checked_at, performance_score')
-    .eq('slug', slug)
-    .eq('status', 'active')
-    .single()
+  // serviceClient para bypass RLS (agent_calls solo visible con service role)
+  const serviceClient = createServiceClient()
 
+  // Ola 1: Paralelo — agent + windowSetting (independientes entre sí) (WAS-259)
+  const [{ data: agent, error }, { data: windowSetting }] = await Promise.all([
+    supabase
+      .from('agents')
+      .select('id, total_calls, reputation_score, reputation_count, is_verified, health_check, last_checked_at, performance_score')
+      .eq('slug', slug)
+      .eq('status', 'active')
+      .single(),
+    serviceClient
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'agent_available_window_days')
+      .single(),
+  ])
+
+  // Gate entre olas: si agent no existe → 404
   if (error || !agent) {
     return NextResponse.json(
       { error: 'agent_not_found' },
@@ -136,10 +147,41 @@ export async function GET(
     )
   }
 
-  // Métricas de percentil (WAS-183 prerequisito)
-  const { data: metricsRaw } = await supabase
-    .rpc('get_agent_percentile_metrics', { p_agent_id: agent.id })
-    .single()
+  // Derivados de windowSetting (necesarios antes de Ola 2)
+  const availableWindowDays = Math.max(1, parseInt(windowSetting?.value ?? '7', 10) || 7)
+  const availableWindowMs = availableWindowDays * 24 * 60 * 60 * 1000
+
+  // Ola 2: Paralelo — todas necesitan agent.id y availableWindowMs (WAS-259)
+  const [
+    { data: metricsRaw },
+    { data: lastCall },
+    { data: recentCalls },
+    { data: callsBreakdown },
+    trend,
+  ] = await Promise.all([
+    supabase
+      .rpc('get_agent_percentile_metrics', { p_agent_id: agent.id })
+      .single(),
+    serviceClient
+      .from('agent_calls')
+      .select('called_at')
+      .eq('agent_id', agent.id)
+      .order('called_at', { ascending: false })
+      .limit(1)
+      .single(),
+    serviceClient
+      .from('agent_calls')
+      .select('status')
+      .eq('agent_id', agent.id)
+      .gte('called_at', new Date(Date.now() - availableWindowMs).toISOString()),
+    supabase
+      .from('agent_calls')
+      .select('payment_type, is_trial')
+      .eq('agent_id', agent.id)
+      .gte('called_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+    calcTrend(supabase, agent.id),
+  ])
+
   const metrics = metricsRaw as {
     p50_latency_ms: number | null
     p95_latency_ms: number | null
@@ -147,42 +189,9 @@ export async function GET(
     error_rate_sample: number | null
   } | null
 
-  // Última invocación — serviceClient para bypass RLS (agent_calls solo visible con service role)
-  const serviceClient = createServiceClient()
-
-  // Leer ventana de disponibilidad desde app_settings (WAS-245)
-  const { data: windowSetting } = await serviceClient
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'agent_available_window_days')
-    .single()
-  const availableWindowDays = Math.max(1, parseInt(windowSetting?.value ?? '7', 10) || 7)
-  const availableWindowMs = availableWindowDays * 24 * 60 * 60 * 1000
-
-  const { data: lastCall } = await serviceClient
-    .from('agent_calls')
-    .select('called_at')
-    .eq('agent_id', agent.id)
-    .order('called_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  // Señal de disponibilidad: calls exitosas en ventana configurable (WAS-245)
-  const { data: recentCalls } = await serviceClient
-    .from('agent_calls')
-    .select('status')
-    .eq('agent_id', agent.id)
-    .gte('called_at', new Date(Date.now() - availableWindowMs).toISOString())
-
   const hasRecentActivity = (recentCalls ?? []).some(c => c.status === 'success')
 
   // Breakdown de tipos de invocación últimos 30 días (WAS-188) — usa called_at (idx_agent_calls_agent_called_at)
-  const { data: callsBreakdown } = await supabase
-    .from('agent_calls')
-    .select('payment_type, is_trial')
-    .eq('agent_id', agent.id)
-    .gte('called_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-
   const totalCalls30d  = callsBreakdown?.length ?? 0
   const paidCount      = callsBreakdown?.filter(c => c.payment_type === 'x402').length ?? 0
   const keyCount       = callsBreakdown?.filter(c => c.payment_type === 'key').length ?? 0
@@ -193,9 +202,6 @@ export async function GET(
     ? (paidCount * 3 + keyCount * 2) / Math.max(1, weightedTotal)
     : 0
   const paidRatio = weightedPaidRatio
-
-  // Trend (comparación 7d vs 7d previos)
-  const trend = await calcTrend(supabase, agent.id)
 
   // is_available
   // health_check JSONB (migración 057) — legacy columns last_health_check_ok/at no existen en prod
