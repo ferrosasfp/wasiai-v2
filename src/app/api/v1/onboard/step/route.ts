@@ -101,11 +101,26 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
       if (typeof answer !== 'string') {
         return NextResponse.json({ error: 'Category must be a string' }, { status: 400 })
       }
-      const { data: cats } = await serviceClient
+      const { data: cats, error: dbError } = await serviceClient
         .from('agent_categories')
         .select('slug')
         .eq('is_active', true)
-      const validSlugs = (cats ?? []).map((c) => c.slug)
+
+      if (dbError) {
+        console.error('[onboard/step4] agent_categories query failed', dbError)
+        return NextResponse.json(
+          { error: 'Unable to load categories. Please try again later.' },
+          { status: 503 }
+        )
+      }
+
+      const validSlugs = (cats ?? []).map((c: { slug: string }) => c.slug)
+      if (validSlugs.length === 0) {
+        return NextResponse.json(
+          { error: 'No active categories available. Please contact support.' },
+          { status: 500 }
+        )
+      }
       if (!validSlugs.includes(answer)) {
         return NextResponse.json(
           { error: `Category must be one of: ${validSlugs.join(', ')}` },
