@@ -25,12 +25,10 @@ export default async function LocaleLayout({ children, params }: Props) {
 
   setRequestLocale(locale)
 
-  // Forward all messages to client components (required for t.rich() in Client Components)
-  const messages = await getMessages()
-
-  // Read session server-side so the navbar gets the email in the initial HTML
-  // — no flash, no delay, no client-side round-trip needed
-  const supabase = await createClient()
+  const [messages, supabase] = await Promise.all([
+    getMessages(),
+    createClient(),
+  ])
   const { data: { user } } = await supabase.auth.getUser()
 
   return (
