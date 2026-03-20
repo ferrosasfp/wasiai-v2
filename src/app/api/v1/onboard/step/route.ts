@@ -10,14 +10,11 @@ const QUESTIONS: Record<number, { question: string; hint: string }> = {
   1: { question: "What is your agent's name?", hint: 'Choose a descriptive name between 3 and 100 characters.' },
   2: { question: 'Describe your agent.', hint: 'Max 500 characters. What does it do?' },
   3: { question: "What is your agent's endpoint URL?", hint: 'A publicly reachable HTTPS URL that accepts POST requests.' },
-  4: { question: 'What category does your agent belong to?', hint: 'One of: nlp, vision, audio, code, multimodal, data' },
+  4: { question: 'What category does your agent belong to?', hint: 'e.g. defi, nlp, vision, code, data, security' },
   5: { question: 'What is your price per call (in USDC)?', hint: 'A number between 0.001 and 100.' },
   6: { question: 'Add tags for your agent (optional).', hint: 'Comma-separated list of tags, or type "skip" to continue.' },
   7: { question: 'What is your email address?', hint: 'We will create your creator account and generate your API key.' },
 }
-
-const VALID_CATEGORIES = ['nlp', 'vision', 'audio', 'code', 'multimodal', 'data'] as const
-type Category = (typeof VALID_CATEGORIES)[number]
 
 function generateSlug(name: string, suffix?: string): string {
   const base = name
@@ -101,13 +98,21 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
       break
     }
     case 4: {
-      if (typeof answer !== 'string' || !(VALID_CATEGORIES as readonly string[]).includes(answer)) {
+      if (typeof answer !== 'string') {
+        return NextResponse.json({ error: 'Category must be a string' }, { status: 400 })
+      }
+      const { data: cats } = await serviceClient
+        .from('agent_categories')
+        .select('slug')
+        .eq('is_active', true)
+      const validSlugs = (cats ?? []).map((c) => c.slug)
+      if (!validSlugs.includes(answer)) {
         return NextResponse.json(
-          { error: `Category must be one of: ${VALID_CATEGORIES.join(', ')}` },
+          { error: `Category must be one of: ${validSlugs.join(', ')}` },
           { status: 400 },
         )
       }
-      data.category = answer as Category
+      data.category = answer
       break
     }
     case 5: {
