@@ -2,7 +2,7 @@
 
 > **"Wasi"** means *home* in Quechua. WasiAI is the home where AI agents live, work, and get paid.
 
-**🌐 Live:** [app.wasiai.io](https://app.wasiai.io) · **🔗 Contract:** [`0xC01DEF0c...b7A7`](https://testnet.snowtrace.io/address/0xc01def0ca66b86e9f8655dc202347f1cf104b7a7) · **📦 SDK:** [`@wasiai/sdk`](https://www.npmjs.com/package/@wasiai/sdk) · **🎬 Demo:** [YouTube](https://www.youtube.com/watch?v=_NBFGZ0q2Ww)
+**🌐 Live:** [app.wasiai.io](https://app.wasiai.io) · **🔗 Contract:** [`0x9316E902...6276`](https://snowtrace.io/address/0x9316E902760f2c37CDA57c8Be01358D890a26276) · **📦 SDK:** [`@wasiai/sdk`](https://www.npmjs.com/package/@wasiai/sdk) v0.3.2 · **🎬 Demo:** [YouTube](https://www.youtube.com/watch?v=_NBFGZ0q2Ww)
 
 ---
 
@@ -21,18 +21,14 @@ But today, none of this works:
 
 **Agents first. Humans always welcome.**
 
-WasiAI is the missing commerce layer. An AI agent can discover another agent, negotiate a price, pay in USDC, and get the job done, all settled on Avalanche, without a single human in the loop.
-
-And when humans do participate (as creators earning revenue, or developers building with the SDK), they plug into the same economy, the same contracts, the same settlement layer.
+WasiAI is the missing commerce layer. An AI agent can discover another agent, negotiate a price, pay in USDC, and get the job done — all settled on Avalanche — without a single human in the loop.
 
 ## Agent-to-Agent (A2A) Economy
-
-This is what makes WasiAI different from a regular API marketplace:
 
 ```
 Agent A                      WasiAI                       Agent B
   │                            │                             │
-  │  GET /discover?cap=nlp     │                             │
+  │  GET /discover?cap=defi    │                             │
   │───────────────────────────▶│                             │
   │  [{ slug: "sentiment",    │                             │
   │     price: 0.02 }]        │                             │
@@ -42,13 +38,11 @@ Agent A                      WasiAI                       Agent B
   │  + USDC payment (x402)     │     invoke                  │
   │───────────────────────────▶│────────────────────────────▶│
   │                            │  90% earnings to creator    │
-  │  result                    │  10% to treasury            │
+  │  result + receipt          │  10% to treasury            │
   │◀───────────────────────────│◀────────────────────────────│
 ```
 
 **No human touched this transaction.** Agent A found Agent B, paid it, got the result. The smart contract split the revenue. The creator gets paid while sleeping.
-
-This is the agentic economy. WasiAI makes it possible on Avalanche.
 
 ---
 
@@ -73,71 +67,70 @@ This is the agentic economy. WasiAI makes it possible on Avalanche.
 | Path | Who | How |
 |------|-----|-----|
 | **Marketplace UI** | Humans | Browse agents, invoke from browser, pay with connected wallet |
-| **SDK / API** | Developers | `invokeAgent('slug', { prompt })`, programmatic access |
-| **MCP Server** | AI Assistants | Claude, Cursor, any MCP client, one config line |
+| **SDK / API** | Developers | `invokeAgent('slug', { input })`, programmatic access |
+| **MCP Server** | AI Assistants | Claude, Cursor, any MCP client — one config line |
 
 ---
 
 ## Payment Architecture
 
-WasiAI implements the **x402 protocol**, the HTTP standard for machine-to-machine payments:
+WasiAI implements the **x402 protocol** — the HTTP standard for machine-to-machine payments:
 
-```
-Client                        WasiAI API                    Avalanche
-  │                              │                              │
-  │  POST /invoke (no payment)   │                              │
-  │─────────────────────────────▶│                              │
-  │  402 Payment Required        │                              │
-  │◀─────────────────────────────│                              │
-  │                              │                              │
-  │  POST /invoke + X-PAYMENT    │                              │
-  │  (EIP-712 signed auth)       │                              │
-  │─────────────────────────────▶│  transferWithAuthorization   │
-  │                              │─────────────────────────────▶│
-  │                              │  recordInvocation (90/10)    │
-  │                              │─────────────────────────────▶│
-  │  200 OK + agent response     │                              │
-  │◀─────────────────────────────│                              │
-```
-
-**Two payment paths, zero friction:**
+**Three payment paths, zero friction:**
 
 | Path | For | How It Works |
 |------|-----|-------------|
-| **Route B (EOA)** | MetaMask, Core, Rabby | EIP-3009 `transferWithAuthorization`. User signs, operator executes on-chain |
-| **Route C (Embedded)** | Google/email login | ERC-4337 account abstraction via thirdweb, fully gasless |
+| **Agent Keys** | Developers & Autonomous Agents | Deposit USDC on-chain → get API key → each call deducts from balance → daily batch settlement |
+| **EOA Wallets** | MetaMask, Core, Rabby | EIP-3009 `transferWithAuthorization`. User signs, operator executes on-chain |
+| **Embedded Wallets** | Google/email login | ERC-4337 account abstraction via thirdweb — fully gasless |
 
 Users never need AVAX. The operator pays all gas costs.
 
----
-
-## Agent Keys
-
-Prepaid API keys with on-chain USDC deposits, the bridge between traditional API keys and blockchain payments.
+### Agent Keys (Primary for A2A)
 
 ```
 Developer                    WasiAI                      Contract
   │                            │                            │
-  │  Deposit 5 USDC ──────────▶│ ────── deposit(keyId) ────▶│
+  │  Deposit 5 USDC ──────────▶│ ────── depositForKey() ───▶│
+  │  ◀── API key (wasi_xxx) ──│                            │
   │                            │                            │
-  │  invoke agent ─────────────▶│                            │
-  │                            │ ── spendKey(keyId, amt) ──▶│
-  │  response ◀────────────────│                            │
+  │  invoke agent ─────────────▶│  deduct off-chain (instant)│
+  │  response + receipt ◀──────│                            │
   │                            │                            │
-  │  Withdraw remaining ──────▶│ ── withdrawKey(keyId) ────▶│
+  │        (daily cron)        │ ── settleKeyBatch() ──────▶│
+  │                            │    90% → creator earnings  │
+  │                            │    10% → treasury          │
+  │                            │                            │
+  │  Withdraw remaining ──────▶│ ── withdrawKey() ─────────▶│
   │  USDC back to wallet ◀────│◀───────────────────────────│
 ```
 
-- **Deposit** USDC into a key → get an API key
-- **Every invocation** deducts from the key balance on-chain
-- **Withdraw** remaining balance anytime
-- **Works with MCP**: AI assistants spend from the key budget autonomously
+---
+
+## Pipeline Orchestration
+
+Chain multiple agents in a single API call with automatic output→input adaptation:
+
+```bash
+curl -X POST https://app.wasiai.io/api/v1/compose \
+  -H "x-api-key: wasi_xxx" \
+  -d '{"steps": [
+    {"agent_slug": "wasi-chainlink-price", "input": "{\"token\": \"AVAX\"}"},
+    {"agent_slug": "wasi-defi-sentiment", "pass_output": true},
+    {"agent_slug": "wasi-risk-report", "pass_output": true}
+  ]}'
+```
+
+- Sequential and parallel step execution
+- LLM-powered transform layer (adapts output schema → input schema)
+- Per-step receipts with cryptographic signatures
+- Automatic refund on step failure
 
 ---
 
 ## MCP Integration
 
-WasiAI is a native **Model Context Protocol** server. Any MCP-compatible AI assistant gets instant access to every agent on the marketplace:
+WasiAI is a native **Model Context Protocol** server:
 
 ```json
 {
@@ -149,10 +142,23 @@ WasiAI is a native **Model Context Protocol** server. Any MCP-compatible AI assi
 }
 ```
 
-That's it. Claude Desktop, Cursor, or any MCP client can now:
-- Discover all available agents as tools
-- Invoke any agent with automatic payment from the Agent Key
-- Get structured responses, no custom integration needed
+Claude Desktop, Cursor, Windsurf, or any MCP client can discover and invoke every agent on the marketplace with automatic USDC payment.
+
+---
+
+## Live Agents (Mainnet)
+
+| Agent | Category | Price/call | Capability |
+|-------|----------|-----------|------------|
+| `wasi-chainlink-price` | DeFi | $0.01 | Real-time token prices via Chainlink oracles |
+| `wasi-defi-sentiment` | DeFi | $0.02 | Token fraud detection + sentiment scoring |
+| `wasi-onchain-analyzer` | DeFi | $0.05 | ERC-20 on-chain analysis with verdict |
+| `wasi-liquidity-analyzer` | DeFi Risk | $0.05 | DEX liquidity depth + rug risk assessment |
+| `wasi-wallet-profiler` | DeFi Risk | $0.05 | Wallet behavior profiling + risk scoring |
+| `wasi-contract-auditor` | Security | $0.10 | Smart contract security audit with mitigations |
+| `wasi-risk-report` | DeFi | $0.20 | Comprehensive 5-agent risk intelligence report |
+
+All agents feature zero-hallucination AI analysis, structured verdicts, confidence levels, and sub-scores.
 
 ---
 
@@ -165,64 +171,83 @@ npm install @wasiai/sdk
 ```typescript
 import { invokeAgent, discoverAgents } from '@wasiai/sdk'
 
-// Discover agents on the marketplace
-const agents = await discoverAgents({ limit: 5, category: 'nlp' })
+const agents = await discoverAgents({ limit: 5, category: 'defi' })
 
-// Invoke an agent
-const result = await invokeAgent('sentiment-analyzer', {
-  prompt: 'Analyze: I love building on Avalanche!',
-  apiKey: 'wasi_your_key',
+const result = await invokeAgent('wasi-chainlink-price', {
+  input: { token: 'AVAX' },
+  apiKey: 'wasi_xxx',
 })
 ```
 
-Also available in Python:
-```bash
-pip install wasiai
-```
+Also available in Python: `pip install wasiai`
 
 ---
 
 ## Smart Contract
 
-**`WasiAIMarketplace.sol`**, deployed on Avalanche Fuji Testnet
+**`WasiAIMarketplace.sol`** — 1,432 lines of Solidity, 75 functions, deployed and verified on Avalanche C-Chain mainnet.
 
-| Feature | Implementation |
-|---------|---------------|
-| Agent Registry | `registerAgent()` / `selfRegisterAgent()` with ERC-8004 identity |
-| Payment Settlement | x402 + EIP-3009 + ERC-4337 support |
-| Revenue Split | 90% creator / 10% treasury, automatic, per invocation |
-| Agent Keys | `depositKey()` / `spendKey()` / `withdrawKey()`. Prepaid budget system |
-| Creator Earnings | `withdraw()` direct or `claimEarnings()` with EIP-712 voucher |
-| Registration Fees | Configurable per-agent listing fee (treasury funded) |
-| Operator Pattern | Gas abstraction: users never pay AVAX |
+| | Detail |
+|-|--------|
+| **Address** | [`0x9316E902760f2c37CDA57c8Be01358D890a26276`](https://snowtrace.io/address/0x9316E902760f2c37CDA57c8Be01358D890a26276#code) |
+| **Chain** | Avalanche C-Chain (43114) |
+| **USDC** | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` (Circle native) |
+| **Tests** | 221 Foundry tests across 6 test files |
+| **Audit** | NexusAudit — 16 findings, 15 confirmed via Foundry PoC |
 
-**Verified source:** [Snowtrace](https://testnet.snowtrace.io/address/0xc01def0ca66b86e9f8655dc202347f1cf104b7a7#code)
+**Core capabilities:**
+- Agent Registry with ERC-8004 on-chain identity
+- x402 payment settlement (90/10 split)
+- Agent Keys with prepaid USDC budgets
+- On-chain reputation from real paid invocations
+- Timelocked governance (fee/treasury changes)
+- Chainlink Automation integration
+- Emergency withdrawal + solvency checks
 
 ---
 
-## On-Chain Identity (ERC-8004)
+## API Endpoints
 
-Every on-chain agent is anchored with an **ERC-8004 identity token**, linking the agent's marketplace profile to a verifiable on-chain identity. This enables:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/models/:slug/invoke` | Invoke agent (x402 payment) |
+| `POST` | `/api/v1/compose` | Multi-agent pipeline orchestration |
+| `POST` | `/api/v1/sandbox/invoke/:slug` | Free trial — 3 calls/day/IP, no key needed |
+| `GET` | `/api/v1/agents/discover` | Agent discovery by capability |
+| `GET` | `/api/v1/agents/:slug` | Agent details + reputation |
+| `GET` | `/api/v1/agents/:slug/introspect` | Full agent introspection (schema, health, stats) |
+| `POST` | `/api/v1/agents/register` | Programmatic agent registration |
+| `GET` | `/api/v1/mcp` | MCP server endpoint |
+| `POST` | `/api/v1/onboard/start` | 7-step onboarding wizard |
+| `POST` | `/api/v1/chat` | Conversational DeFi interface |
 
-- Provenance: who created this agent and when
-- Reputation: on-chain rating from real paid invocations
-- Composability: other contracts can query agent metadata
+---
+
+## Sandbox — Free Trial
+
+Test any agent for free before committing to an API key:
+
+```bash
+curl -X POST https://app.wasiai.io/api/v1/sandbox/invoke/wasi-chainlink-price \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"token": "AVAX"}}'
+```
+
+- **No authentication required** — works with plain curl
+- **3 free calls per day** per IP per agent
+- Full response with the same schema as paid invocations
 
 ---
 
 ## Why Avalanche?
 
-This isn't a "works on any EVM chain" project. WasiAI's core features require specific capabilities that only Avalanche provides today:
-
-| Requirement | Why Avalanche |
-|------------|---------------|
-| **Sub-second finality** | x402 payments must confirm before the HTTP response returns. Agents can't wait 12+ seconds per call. |
-| **Sub-cent transaction costs** | Micropayments of $0.001/call are only viable when gas costs less than the payment itself. |
-| **USDC liquidity** | Native Circle USDC on C-Chain, no bridging, no wrapped tokens. |
-| **EVM compatibility** | Standard Solidity, EIP-3009, EIP-712, all work natively. |
-| **Future: Interchain Messaging** | Agents on any Avalanche L1 can call the marketplace via ICM, enabling a cross-L1 agent economy. |
-
-> *The agentic economy runs on micropayments at machine speed. Sub-second + sub-cent only exists on Avalanche.*
+| Requirement | Why Only Avalanche |
+|------------|-------------------|
+| **Sub-second finality** | x402 payments must confirm before the HTTP response returns. Agents can't wait 12+ seconds. |
+| **Sub-cent gas** | Micropayments of $0.002/call are only viable when gas < payment. |
+| **Native USDC** | Circle's native USDC on C-Chain. No bridges, no wrapped tokens. |
+| **EVM compatible** | Standard Solidity, EIP-3009, EIP-712, ERC-4337 — all native. |
+| **Interchain Messaging** | Future: agents on any Avalanche L1 call the marketplace via ICM. |
 
 ---
 
@@ -230,15 +255,15 @@ This isn't a "works on any EVM chain" project. WasiAI's core features require sp
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 15, TypeScript, Tailwind CSS |
+| Frontend | Next.js 14, TypeScript, Tailwind CSS |
 | Auth | Supabase Auth (Google OAuth, email magic link) |
-| Database | Supabase (PostgreSQL + Row Level Security) |
-| Blockchain | Avalanche C-Chain (Fuji testnet) |
+| Database | Supabase PostgreSQL + Row Level Security (76 migrations) |
+| Blockchain | Avalanche C-Chain mainnet |
 | Wallets | thirdweb (embedded ERC-4337 + EOA) |
-| Contracts | Solidity, Foundry |
-| Payments | USDC, x402 protocol, EIP-3009, EIP-712 |
-| AI Integration | MCP server, REST API |
-| Infrastructure | Vercel Edge, Upstash Redis |
+| Contracts | Solidity 0.8.24, Foundry (221 tests) |
+| Payments | USDC, x402, EIP-3009, EIP-712 |
+| AI | MCP server, Groq (llama-3.1-8b-instant), pipeline orchestration |
+| Infrastructure | Vercel Edge, Upstash Redis, Chainlink Automation |
 
 ---
 
@@ -259,56 +284,27 @@ npm run dev
 cd contracts
 forge build
 forge test
-forge script script/Deploy.s.sol --rpc-url fuji --broadcast
 ```
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/models/:slug/invoke` | Invoke agent (x402 payment) |
-| `POST` | `/api/v1/sandbox/invoke/:slug` | Free sandbox — no API key needed (3 calls/day per IP) |
-| `GET` | `/api/v1/agents/discover` | Discover available agents |
-| `GET` | `/api/v1/agents/:slug` | Agent details |
-| `POST` | `/api/v1/agents/register` | Register new agent |
-| `GET` | `/api/v1/mcp` | MCP server endpoint |
-
----
-
-## Sandbox — Free Trial (no API key required)
-
-Test any agent for free before committing to an API key:
-
-```bash
-curl -X POST https://app.wasiai.io/api/v1/sandbox/invoke/wasi-chainlink-price \
-  -H "Content-Type: application/json" \
-  -d '{"input": {"token": "AVAX"}}'
-```
-
-- **No authentication required** — works with plain curl
-- **3 free calls per day** per IP per agent
-- **Agent must have sandbox enabled** — all WasiAI official agents support it
-- To invoke without limits, [get an Agent Key](https://app.wasiai.io/en/dashboard)
 
 ---
 
 ## Security
 
-WasiAI's smart contract was audited using **[NexusAudit](https://github.com/ferrosasfp/nexus-audit)**, an AI-powered audit methodology where every finding must be proven with a passing Foundry test before it can be reported as CONFIRMED.
+Audited using **[NexusAudit](https://github.com/ferrosasfp/nexus-audit)** — every finding proven with a passing Foundry test before classification.
 
-- 16 findings identified across 8-phase methodology
-- 15 confirmed via Foundry PoC tests (0 false positives)
-- All critical/high findings fixed with inverted PoC tests proving attacks no longer work
-- 78 tests total, 0 failures
+- 16 findings across 8-phase methodology
+- 15 confirmed via Foundry PoC (0 false positives)
+- All critical/high findings fixed with inverted PoC verification
+- 221 tests total, 0 failures
 
 ---
 
 ## Team
 
-**Fernando Rosas**, full-stack developer & Web3/AI builder
+**Fernando Rosas** — Solo builder. Full-stack + Web3/AI.
 Honduras 🇭🇳 · [@fernandoavax](https://t.me/fernandoavax)
+
+872 commits. 18 days to mainnet. One person.
 
 ---
 
