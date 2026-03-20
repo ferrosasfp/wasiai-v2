@@ -5,6 +5,7 @@ import { generateApiKey } from '@/features/agent-api/services/agent-keys.service
 import { randomBytes, createHash } from 'crypto'
 import { CHAIN_NAME } from '@/lib/chain'
 import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
+import { metaValidateSchema } from '@/lib/schema-validator'
 
 type JsonSchema = Parameters<typeof buildExampleFromSchema>[0]
 
@@ -170,6 +171,11 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
         || (!parsed.type && !parsed.properties && Object.keys(parsed).length > 0)
       if (!hasProps) {
         return NextResponse.json({ error: 'Schema must have at least one property' }, { status: 400 })
+      }
+      // SECURITY: sanitize schema — blocks SSRF via $ref and other injection vectors
+      const schemaValidation = metaValidateSchema(parsed)
+      if (!schemaValidation.valid) {
+        return NextResponse.json({ error: schemaValidation.error ?? 'Invalid schema' }, { status: 400 })
       }
       data.input_schema = parsed
 
