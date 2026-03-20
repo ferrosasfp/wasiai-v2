@@ -829,8 +829,8 @@ export default function AgentKeysPage() {
           ) : (
             <div className="divide-y divide-gray-50">
               {keys.map(key => {
-                // WAS-218: available = budget_usdc (on-chain truth); spent_usdc deprecated for UI
-                const available = Math.max(0, Number(key.budget_usdc))
+                // WAS-257: available = remaining balance (budget - spent)
+                const available = Math.max(0, Number(key.budget_usdc) - Number(key.spent_usdc))
                 // WAS-218: stale if balance_synced_at is null or > 5 min ago
                 const syncedMs = key.balance_synced_at ? new Date(key.balance_synced_at).getTime() : 0
                 const isStale = key.stale || !key.balance_synced_at || (Date.now() - syncedMs > 5 * 60 * 1000)
@@ -845,7 +845,7 @@ export default function AgentKeysPage() {
                           {!key.is_active && (
                             <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">{t('revoked')}</span>
                           )}
-                          {key.is_active && key.budget_usdc === 0 && (
+                          {key.is_active && available === 0 && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600">{t('noFunds')}</span>
                           )}
                           {/* WAS-218: stale indicator */}
