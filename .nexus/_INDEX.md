@@ -85,3 +85,7 @@
 | 075 | 2026-03-15 | WAS-189 | feature | HU-MAJOR | DONE | e299ab0d7 |
 | 076 | 2026-03-15 | BUG-03 | bugfix | FAST-FIX | DONE | bf173c2d0 |
 | 077 | 2026-03-15 | DEUDA-docs | bugfix | FAST-FIX | DONE | 868aee249 |
+| 078 | 2026-03-19 | WAS-078 | improvement | QUALITY | DONE | 717011636 |
+| 079 | 2026-03-20 | WAS-256 | improvement | FAST-FIX | DONE | c3204e7a0 |
+| 080 | 2026-03-20 | WAS-258 | improvement | QUALITY | DONE | 4e0db2340 |
+| — | — | WAS-257 | improvement | HU-MAJOR | DEFERRED | — |
