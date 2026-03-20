@@ -138,6 +138,18 @@
 |--------|---------|---------|---------|
 | [nombre] | [cuando] | [datos] | [tool] |
 
+### 4.11 Headers de autenticación (si aplica)
+
+WasiAI usa dos headers distintos que viajan en direcciones opuestas:
+
+| Header | Dirección | Quién lo envía | Para qué |
+|--------|-----------|----------------|---------|
+| `x-api-key: wasi_xxx` | Consumer → WasiAI | El developer/agente que invoca | Autenticar al caller y deducir budget USDC |
+| `Authorization: Bearer {webhook_secret}` | WasiAI → Agente externo | WasiAI internamente | Autenticar que la llamada viene de WasiAI |
+| `X-WasiAI-Agent-Id: {uuid}` | WasiAI → Agente externo | WasiAI internamente | Identificar qué agente está siendo invocado |
+
+**Regla:** Nunca mezclar estos headers. El consumer nunca ve `webhook_secret`. El agente externo nunca ve `x-api-key`.
+
 ## -- FIN SECCIONES OPCIONALES --
 
 ## 5. Constraint Directives (Anti-Alucinacion)
