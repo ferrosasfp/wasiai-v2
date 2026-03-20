@@ -86,41 +86,34 @@ export async function GET(request: NextRequest) {
       'informe': 'report', 'perfil': 'profiler', 'token': 'token',
     }
     let searchMethod = 'fts'
-    let _debugFetchUrl: string | undefined
-    let _debugFetchStatus: number | undefined
     if (agents.length === 0) {
-      searchMethod = 'fallback_ilike'
-      // Translate common Spanish DeFi terms to English for ILIKE matching
+      // WAS-248: Fallback — re-run FTS with English translation of Spanish terms
       const qLower = q.toLowerCase()
-      const translated = ES_EN_DEFI[qLower] ?? q
-      const ilikeQ = translated.replace(/[%_]/g, '') // strip wildcards
-      // WAS-248: Use direct fetch() to Supabase REST API — bypasses Supabase JS client
-      // encoding issues with % wildcards in .ilike() and .or() methods on Vercel
-      const AGENT_SELECT = 'id,slug,name,description,category,agent_type,price_per_call,is_featured,total_calls,performance_score,reputation_score,mcp_tool_name,sandbox_enabled,input_schema,output_schema,example_input'
-      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      // WAS-248: Two separate fetches (name + description) — or=() with ilike returns 400 in Supabase
-      const ilikePattern = `*${ilikeQ}*`
-      const baseQs = `select=${AGENT_SELECT}&status=eq.active&order=is_featured.desc,total_calls.desc&limit=${limit}`
-      const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}`, Accept: 'application/json' }
-      const [rName, rDesc] = await Promise.all([
-        fetch(`${sbUrl}/rest/v1/agents?${baseQs}&name=ilike.${ilikePattern}`, { headers }),
-        fetch(`${sbUrl}/rest/v1/agents?${baseQs}&description=ilike.${ilikePattern}`, { headers }),
-      ])
-      const [byName, byDesc] = await Promise.all([
-        rName.ok ? (rName.json() as Promise<Record<string, unknown>[]>) : Promise.resolve([]),
-        rDesc.ok ? (rDesc.json() as Promise<Record<string, unknown>[]>) : Promise.resolve([]),
-      ])
-      _debugFetchUrl = `name=${rName.status},desc=${rDesc.status},ilikeQ=${ilikeQ}`
-      _debugFetchStatus = rName.status
-      // Deduplicate by id (name matches first)
-      const seen = new Set<string>()
-      const merged = [...byName, ...byDesc].filter(a => {
-        if (seen.has(a.id as string)) return false
-        seen.add(a.id as string)
-        return true
-      }).slice(0, limit)
-      agents = merged.map(a => ({ ...a, rank: null }))
+      const translated = ES_EN_DEFI[qLower]
+      if (translated && translated !== q) {
+        searchMethod = 'fallback_translated_fts'
+        const { data: translatedData } = await supabase.rpc('search_agents', {
+          search_query:      translated,
+          filter_category:   category ?? null,
+          filter_agent_type: null,
+          result_limit:      limit,
+          result_offset:     offset,
+        })
+        agents = (translatedData ?? []) as Record<string, unknown>[]
+      } else {
+        searchMethod = 'fallback_ilike'
+        // For non-Spanish queries: use Supabase .ilike() (JS client handles encoding)
+        const ilikeQ = q.replace(/[%_\\]/g, '\\$&')
+        const { data: ilikeData } = await supabase
+          .from('agents')
+          .select('id, slug, name, description, category, agent_type, price_per_call, is_featured, total_calls, performance_score, reputation_score, mcp_tool_name, sandbox_enabled, input_schema, output_schema, example_input')
+          .eq('status', 'active')
+          .or(`name.ilike.%${ilikeQ}%,description.ilike.%${ilikeQ}%`)
+          .order('is_featured', { ascending: false })
+          .order('total_calls', { ascending: false })
+          .range(offset, offset + limit - 1)
+        agents = (ilikeData ?? []).map(a => ({ ...a, rank: null })) as Record<string, unknown>[]
+      }
     }
 
     // S7-02: post-filter by min_performance (search_agents RPC doesn't accept this param)
@@ -134,8 +127,6 @@ export async function GET(request: NextRequest) {
       limit,
       offset,
       search_method: searchMethod,
-      _debug_ilike_url: _debugFetchUrl,
-      _debug_ilike_status: _debugFetchStatus,
 
       agents: agents.map(agent => ({
         slug:        agent.slug,
