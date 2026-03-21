@@ -29,7 +29,7 @@ import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
-import { getRegisterLimit, getRegisterEmailLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
+import { getRegisterLimit, getRegisterEmailLimit, getBootstrapLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { CHAIN_NAME } from '@/lib/chain'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
 import { createHash, randomBytes, randomUUID } from 'crypto'
@@ -329,9 +329,8 @@ export async function POST(request: NextRequest) {
   // Bootstrap anónimo: open/open_key sin creator_email → generar creator automáticamente
   if ((authMethod === 'open' || authMethod === 'open_key') && !creatorId && !data.creator_email) {
     // F1 (HIGH): Rate limit específico para bootstrap — 3 anónimos por IP por hora
-    // TEMP DISABLED for QA — re-enable after Sania QA session
-    // const rlBootstrap = await checkRateLimit(getBootstrapLimit(), `bootstrap:${getIdentifier(request)}`)
-    // if (rlBootstrap) return rlBootstrap
+    const rlBootstrap = await checkRateLimit(getBootstrapLimit(), `bootstrap:${getIdentifier(request)}`)
+    if (rlBootstrap) return rlBootstrap
 
     let bootstrapResult: { userId: string } | null = null
     try {
