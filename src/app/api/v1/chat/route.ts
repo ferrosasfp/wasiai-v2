@@ -161,8 +161,8 @@ export async function POST(req: NextRequest) {
     pipeline_id?: string
   }
 
-  // Build steps array from receipts (compose returns receipts, not steps array)
-  const steps = (result.receipts ?? []).map(r => ({
+  // Build pipeline steps from receipts (compose returns receipts, not a steps array)
+  steps = (result.receipts ?? []).map(r => ({
     step:              r.step,
     agent_slug:        r.agent_slug,
     cost_usdc:         r.cost_usdc,
