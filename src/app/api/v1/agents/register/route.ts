@@ -75,7 +75,7 @@ const RegisterAgentSchema = z.object({
   register_on_chain: z.boolean().optional(),
 
   // WAS-200: JSON Schema draft-07 para validar inputs
-  input_schema: z.unknown().optional().nullable(),
+  input_schema: z.record(z.string(), z.unknown()),
   output_schema: z.unknown().optional().nullable(),
 
   // WAS-212: Tags semánticos para discovery
