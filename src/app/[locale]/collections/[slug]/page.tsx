@@ -47,7 +47,7 @@ export default async function CollectionDetailPage({ params }: Props) {
   // Fetch agents in this collection, ordered by sort_order
   const { data: agentRows } = await supabase
     .from('collection_agents')
-    .select('sort_order, agent:agents(*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified))')
+    .select('sort_order, agent:agents(*, creator:creator_profiles(id, username, display_name, avatar_url, verified))')
     .eq('collection_id', collection.id)
     .order('sort_order')
 
