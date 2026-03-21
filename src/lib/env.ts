@@ -45,7 +45,9 @@ const envSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 
   // AI / Upstream
-  GROQ_API_KEY:  z.string().optional(),
+  GROQ_API_KEY:      z.string().optional(),
+  CEREBRAS_API_KEY:  z.string().optional(),
+  TOGETHER_API_KEY:  z.string().optional(),
 
   // Auth
   OPEN_REGISTRATION_KEY: z.string().optional(),

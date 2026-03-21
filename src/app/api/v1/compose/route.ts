@@ -20,6 +20,7 @@ import { isAgentInScope }            from '@/lib/scope-check'
 import { discoverAgent }             from '@/lib/agent-discovery'
 import { validateInput }             from '@/lib/schema-validator'
 import { assertPaymentType }         from '@/lib/validation/payment-type'
+import { transformStepOutput }       from '@/lib/step-transform'
 
 // ── Constantes (env-driven, no hardcodes) ────────────────────────────────────
 const MAX_STEPS       = 5
@@ -636,7 +637,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           continue
         }
 
-        const stepInput = globalStepIndex === 0 ? (step.input ?? '') : (step.pass_output ? (lastOutput ?? '') : (step.input ?? ''))
+        let stepInput: string
+        if (globalStepIndex === 0) {
+          stepInput = step.input ?? ''
+        } else if (step.pass_output && lastOutput) {
+          const nextAgent = agentMap.get(step.agent_slug ?? '')
+          if (nextAgent?.input_schema && typeof nextAgent.input_schema === 'object' && nextAgent.input_schema !== null) {
+            stepInput = await transformStepOutput(lastOutput, nextAgent.input_schema as Record<string, unknown>, nextAgent.slug)
+          } else {
+            stepInput = lastOutput  // AC3: no schema → raw passthrough
+          }
+        } else {
+          stepInput = step.input ?? ''
+        }
 
         // AC-6: Validar input contra schema ANTES de cobrar (WAS-200)
         const agentForStep = agentMap.get(step.agent_slug ?? '')!
