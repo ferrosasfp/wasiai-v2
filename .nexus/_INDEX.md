@@ -98,3 +98,4 @@
 | 087 | 2026-03-20 | WAS-263 | fix | FAST-FIX | DONE | d6bcb2a6d |
 | 088 | 2026-03-20 | WAS-260 | feature | HU-MINOR | DONE | 2cfb678b4 |
 | 089 | 2026-03-20 | WAS-264 | feature | HU-MINOR | DONE | 56c54b249 |
+| 090 | 2026-03-20 | WAS-254 | feature | HU-MAJOR | DONE | b4f2e42fe |

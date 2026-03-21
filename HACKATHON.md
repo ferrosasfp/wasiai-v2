@@ -1,82 +1,39 @@
-# 🏗️ WasiAI — AlephHack 2026
+# WasiAI — AlephHack Progress
 
-> **Marketplace de agentes IA con pagos USDC on-chain en Avalanche C-Chain**
+> Tag `hackathon-baseline` marks the "before" state.
+> `git diff hackathon-baseline..HEAD` shows all hackathon work.
 
-## Qué es WasiAI
+## Completed HUs
 
-WasiAI es un marketplace donde cualquier desarrollador puede publicar agentes de IA y monetizarlos con micropagos USDC. Los consumidores pagan por invocación via protocolo x402 (HTTP 402 nativo) o API keys con budget. Todo on-chain, sin intermediarios.
+| # | Issue | Feature | Commit | Date |
+|---|-------|---------|--------|------|
+| 1 | WAS-257 | Agent Keys balance fix | pre-baseline | 2026-03-20 |
+| 2 | WAS-256 (perf) | Layout sequential awaits → Promise.all | c3204e7a0 | 2026-03-20 |
+| 3 | WAS-258 (perf) | void Promise → after() in invoke | 4e0db2340 | 2026-03-20 |
+| 4 | WAS-259 (perf) | Reputation 7 awaits → Promise.all | e77456808 | 2026-03-20 |
+| 5 | WAS-260 (perf) | select('*') → explicit fields in invoke | a446446a8 | 2026-03-20 |
+| 6 | WAS-258 | Wizard input_schema + multi-agent onboarding | d7acb70a0 | 2026-03-20 |
+| 7 | WAS-259 | Multi-agent via agent key | d7acb70a0 | 2026-03-20 |
+| 8 | WAS-261 | Search ?search= alias | d6bcb2a6d | 2026-03-20 |
+| 9 | WAS-262 | Price formatting (no trailing zeros) | 3ec6a005b | 2026-03-20 |
+| 10 | WAS-263 | Dynamic meta title + OG tags | d6bcb2a6d | 2026-03-20 |
+| 11 | WAS-260 | PATCH /api/v1/agents/{slug} | 2cfb678b4 | 2026-03-20 |
+| 12 | WAS-264 | GET /api/v1/creator/agents | 56c54b249 | 2026-03-20 |
+| 13 | WAS-254 | **Transform Layer LLM** — compose pipeline auto-adapts output→input via LLM fallback chain | b4f2e42fe | 2026-03-20 |
+| 14 | WAS-231 | Pipeline encadenamiento real (resolved by WAS-254) | b4f2e42fe | 2026-03-20 |
 
-- **Live:** https://app.wasiai.io
-- **Repo principal:** https://github.com/ferrosasfp/wasiai-v2
+## Docs Updated
+- API Reference: PATCH /agents/:slug + GET /creator/agents
+- Creator Guide: "Managing Your Agents" section with curl examples
+- README: 2 new endpoints in API table
 
-## 🔖 Cómo ver los cambios del hackathon
+## Key Hackathon Features
+1. **LLM Transform Layer** — agents in a pipeline auto-adapt their output to the next agent's input_schema using Groq/Cerebras/Together AI fallback chain
+2. **Self-service agent editing** — creators can PATCH their agents (endpoint, price, schema) without re-registering
+3. **Creator dashboard API** — creators can list and monitor their agents programmatically
+4. **Multi-agent onboarding** — returning creators authenticate via agent key, skip email step
+5. **Input schema validation** — wizard collects input_schema, auto-generates examples
 
-```bash
-# Ver todos los commits del hackathon
-git log --oneline hackathon-baseline..HEAD
-
-# Ver el diff completo
-git diff hackathon-baseline..HEAD --stat
-```
-
-**Tag `hackathon-baseline`** = último commit antes del hackathon.
-Todo lo que viene después es desarrollo nuevo para AlephHack.
-
----
-
-## ✅ Features completadas durante el hackathon
-
-### Performance — API optimizations
-| Commit | Cambio | Impacto |
-|--------|--------|---------|
-| `c3204e7a0` | `layout.tsx`: `Promise.all` para `getMessages` + `createClient` | -50% latencia en carga de todas las páginas |
-| `4e0db2340` | `after()` reemplaza void Promises en invoke payment path | Background ops no bloquean respuesta al caller |
-| `e77456808` | Reputation endpoint: 7 queries secuenciales → `Promise.all` en 2 olas | ~5x más rápido |
-| `a446446a8` | `select('*')` → campos explícitos en invoke hot path | Menos datos transferidos por invocación |
-
-### Wizard Onboarding — WAS-258 + WAS-259
-| Commit | Cambio |
-|--------|--------|
-| `c5fea4a35` | `input_schema` obligatorio en wizard (nuevo paso 7, JSON Schema format) |
-| `c5fea4a35` | `example_input` auto-generado via `buildExampleFromSchema` |
-| `c5fea4a35` | Multi-agent: creators pueden registrar N agentes con su `x-agent-key` existente |
-| `6cc359e30` | Security fix: `metaValidateSchema` bloquea SSRF via `$ref` en wizard |
-| `cb0fbbf2a` | Fix: `example_input` guardado en `metadata.input_example` (no es columna directa) |
-
-### Bug fixes críticos
-| Commit | Cambio |
-|--------|--------|
-| `eb5314c64` | Fix: invoke 404 en todos los agentes — `user_id` no existe como columna |
-
-### Infra — LLM Fallback Chain (wasiai-agents)
-| Repo | Cambio |
-|------|--------|
-| `wasiai-agents` | Fallback: Groq → Cerebras → Together AI. `callGroq()` es alias de `callLLM()` |
-| `wasiai-agents` | Fix: 401 ahora es retryable — no corta el fallback chain |
-
----
-
-## 🚧 En progreso
-
-- [ ] **WAS-260** — `PATCH /api/v1/agents/{slug}` — endpoint de edición post-registro
-- [ ] **WAS-256** — Autonomous Agent Demo — agente descubre, paga y orquesta sin humano
-- [ ] **WAS-255** — Chat DeFi — interfaz conversacional + `/compose`
-- [ ] **WAS-254** — Transform Layer LLM — output de agente A → input de agente B
-
----
-
-## Stack
-
-- **Frontend:** Next.js 14 App Router + TypeScript
-- **Backend:** Supabase (Postgres + Auth + Realtime)
-- **Blockchain:** Avalanche C-Chain + USDC + Viem
-- **Payments:** x402 protocol (HTTP 402 native) + API keys con budget USDC
-- **AI:** Multi-provider fallback (Groq → Cerebras → Together AI)
-- **Methodology:** NexusAgile v1.3 (AI-driven dev pipeline with automated auditors)
-
-## Contratos
-
-| Red | Dirección |
-|-----|-----------|
-| Avalanche Mainnet | `0x9316E902760f2c37CDA57C8Be01358D890a26276` |
-| USDC | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
+## Remaining
+- [ ] WAS-255: Chat DeFi — conversational UI at /en/chat
+- [ ] WAS-256: Autonomous Agent Demo
