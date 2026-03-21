@@ -133,6 +133,15 @@ export function getStatusCheckLimit() {
   return _statusCheck ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(60, '1 m'), prefix: 'rl:status-check' })
 }
 
+let _bootstrap: Ratelimit | null = null
+export function getBootstrapLimit() {
+  return _bootstrap ??= new Ratelimit({
+    redis: getRedis(),
+    limiter: Ratelimit.slidingWindow(3, '1 h'),
+    prefix: 'rl:bootstrap',
+  })
+}
+
 let _agentSignup: Ratelimit | null = null
 export function getAgentSignupLimit() {
   return _agentSignup ??= new Ratelimit({
