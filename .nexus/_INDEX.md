@@ -93,3 +93,8 @@
 | 082 | 2026-03-20 | WAS-260 | improvement | FAST-FIX | DONE | — |
 | 083 | 2026-03-20 | WAS-258 | improvement | HU-MINOR | DONE | c5fea4a35 |
 | 084 | 2026-03-20 | WAS-259 | improvement | QUALITY | DONE | 6cc359e30 |
+| 085 | 2026-03-20 | WAS-261 | fix | FAST-FIX | DONE | d6bcb2a6d |
+| 086 | 2026-03-20 | WAS-262 | fix | FAST-FIX | DONE | 3ec6a005b |
+| 087 | 2026-03-20 | WAS-263 | fix | FAST-FIX | DONE | d6bcb2a6d |
+| 088 | 2026-03-20 | WAS-260 | feature | HU-MINOR | DONE | 2cfb678b4 |
+| 089 | 2026-03-20 | WAS-264 | feature | HU-MINOR | DONE | 56c54b249 |
