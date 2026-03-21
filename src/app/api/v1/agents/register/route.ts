@@ -76,6 +76,10 @@ const RegisterAgentSchema = z.object({
 
   // WAS-200: JSON Schema draft-07 para validar inputs
   input_schema: z.record(z.string(), z.unknown()),
+
+  // Free trial configuration
+  free_trial_enabled: z.boolean().optional().default(false),
+  free_trial_limit:   z.number().int().nonnegative().max(100).optional().default(1),
   output_schema: z.unknown().optional().nullable(),
 
   // WAS-212: Tags semánticos para discovery
@@ -295,6 +299,8 @@ export async function POST(request: NextRequest) {
     input_schema:  data.input_schema ?? null,
     output_schema: data.output_schema ?? null,
     tags:          data.tags ?? [],
+    free_trial_enabled: data.free_trial_enabled ?? false,
+    free_trial_limit:   data.free_trial_limit ?? 1,
     metadata: {
       registered_via: authMethod,
       framework:      data.framework,
