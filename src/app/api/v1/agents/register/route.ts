@@ -80,7 +80,50 @@ const RegisterAgentSchema = z.object({
 
   // WAS-212: Tags semánticos para discovery
   tags: z.array(z.string()).optional().default([]),
+
+  // MGMT-KEY fix: creator email para open/open_key registrations
+  creator_email: z.string().email().optional(),
 })
+
+async function resolveCreatorFromEmail(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  email: string
+): Promise<string | null> {
+  const { data: newUser, error: createError } = await serviceClient.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password: randomBytes(32).toString('hex'),
+  })
+
+  let userId: string | null = null
+
+  if (!createError && newUser?.user) {
+    userId = newUser.user.id
+  } else if (
+    createError?.message?.includes('User already registered') ||
+    createError?.message?.includes('already been registered') ||
+    createError?.message?.toLowerCase().includes('already exists') ||
+    createError?.code === 'email_exists' ||
+    createError?.code === 'user_already_exists' ||
+    createError?.status === 422
+  ) {
+    // TODO: paginar cuando haya >1000 usuarios
+    const { data: listData } = await serviceClient.auth.admin.listUsers({ perPage: 1000 })
+    const existing = listData?.users?.find((u) => u.email === email)
+    if (existing) userId = existing.id
+  }
+
+  if (!userId) return null
+
+  // Safety net: asegurar creator_profile existe (trigger lo crea, esto protege edge cases)
+  await serviceClient.from('creator_profiles').upsert({
+    id: userId,
+    username: `${email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase()}_${Date.now()}`,
+    display_name: email.split('@')[0],
+  }, { onConflict: 'id' })
+
+  return userId
+}
 
 export async function POST(request: NextRequest) {
   // ── Rate limiting ─────────────────────────────────────────────────────────
@@ -164,6 +207,11 @@ export async function POST(request: NextRequest) {
   }
 
   const data = parsed.data
+
+  // MGMT-KEY fix: resolver creator desde email para open/open_key registrations
+  if ((authMethod === 'open_key' || authMethod === 'open') && !creatorId && data.creator_email) {
+    creatorId = await resolveCreatorFromEmail(serviceClient, data.creator_email)
+  }
 
   // WAS-200: Validar input_schema si existe
   if (data.input_schema !== undefined && data.input_schema !== null) {
@@ -366,6 +414,7 @@ export async function POST(request: NextRequest) {
       on_chain_registered: false,
       registration_type: (registerOnChain && data.creator_wallet) ? 'pending_onchain' : 'off_chain',
     },
+    creator_id: creatorId,
     management_key: managementKey,
     management_key_warning: managementKey ? null : 'Management key could not be issued. Contact support@wasiai.io',
     verification: {
