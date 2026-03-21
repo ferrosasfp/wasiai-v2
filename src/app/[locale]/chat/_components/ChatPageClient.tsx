@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useLocale } from 'next-intl'
+import { Eye, EyeOff } from 'lucide-react'
 
 interface ChatStep {
   agent_slug: string
@@ -34,6 +35,7 @@ export function ChatPageClient() {
 
   const [question, setQuestion] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ChatResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -105,13 +107,23 @@ export function ChatPageClient() {
           {/* API Key */}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">{t('apiKeyLabel')}</label>
-            <input
-              type="text"
-              value={apiKey}
-              onChange={(e) => handleApiKeyChange(e.target.value)}
-              placeholder="wasi_..."
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-avax-500 focus:outline-none focus:ring-1 focus:ring-avax-500"
-            />
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => handleApiKeyChange(e.target.value)}
+                placeholder="wasi_..."
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-avax-500 focus:outline-none focus:ring-1 focus:ring-avax-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(v => !v)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600"
+                aria-label={showKey ? 'Hide key' : 'Show key'}
+              >
+                {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
             {!apiKey && (
               <p className="mt-1.5 text-sm text-amber-600">
                 {t('noKey')}{' '}
