@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
-import { randomBytes } from 'crypto'
+import { randomBytes, createHash } from 'crypto'
 import { CHAIN_NAME } from '@/lib/chain'
+import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
+import { metaValidateSchema } from '@/lib/schema-validator'
+
+type JsonSchema = Parameters<typeof buildExampleFromSchema>[0]
 
 const QUESTIONS: Record<number, { question: string; hint: string }> = {
   1: { question: "What is your agent's name?", hint: 'Choose a descriptive name between 3 and 100 characters.' },
@@ -12,7 +16,8 @@ const QUESTIONS: Record<number, { question: string; hint: string }> = {
   4: { question: 'What category does your agent belong to?', hint: 'e.g. defi, nlp, vision, code, data, security' },
   5: { question: 'What is your price per call (in USDC)?', hint: 'A number between 0.001 and 100.' },
   6: { question: 'Add tags for your agent (optional).', hint: 'Comma-separated list of tags, or type "skip" to continue.' },
-  7: { question: 'What is your email address?', hint: 'We will create your creator account and generate your API key.' },
+  7: { question: "Describe your agent's input schema (JSON Schema format).", hint: 'e.g. {"type":"object","properties":{"wallet":{"type":"string","description":"Avalanche address (0x...)"}}}' },
+  8: { question: 'What is your email address?', hint: 'We will create your creator account and generate your API key.' },
 }
 
 function generateSlug(name: string, suffix?: string): string {
@@ -150,6 +155,103 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
       break
     }
     case 7: {
+      let parsed: Record<string, unknown>
+      try {
+        parsed = typeof answer === 'string'
+          ? JSON.parse(answer) as Record<string, unknown>
+          : answer as Record<string, unknown>
+      } catch {
+        return NextResponse.json({ error: 'input_schema must be valid JSON' }, { status: 400 })
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        return NextResponse.json({ error: 'input_schema must be a JSON object' }, { status: 400 })
+      }
+      const props = parsed.properties as Record<string, unknown> | undefined
+      const hasProps = (props && Object.keys(props).length > 0)
+        || (!parsed.type && !parsed.properties && Object.keys(parsed).length > 0)
+      if (!hasProps) {
+        return NextResponse.json({ error: 'Schema must have at least one property' }, { status: 400 })
+      }
+      // SECURITY: sanitize schema — blocks SSRF via $ref and other injection vectors
+      const schemaValidation = metaValidateSchema(parsed)
+      if (!schemaValidation.valid) {
+        return NextResponse.json({ error: schemaValidation.error ?? 'Invalid schema' }, { status: 400 })
+      }
+      data.input_schema = parsed
+
+      // Agent-key flow: insert agent directly without email step
+      const isAgentKeyFlow = typeof data.owner_id === 'string' && data.owner_id.length > 0
+      if (isAgentKeyFlow) {
+        const name = String(data.name ?? 'Unnamed Agent')
+        let slug = generateSlug(name)
+        const { data: existing } = await serviceClient.from('agents').select('id').eq('slug', slug).single()
+        if (existing) slug = generateSlug(name, randomBytes(3).toString('hex'))
+
+        const webhookSecret = 'whsec_' + randomBytes(32).toString('hex')
+        const { raw, hash } = generateApiKey()
+
+        const { error: keyError } = await serviceClient.from('agent_keys').insert({
+          owner_id: data.owner_id as string,
+          name: slug,
+          key_hash: hash,
+          budget_usdc: 0,
+          spent_usdc: 0,
+          is_active: true,
+        })
+        if (keyError) {
+          return NextResponse.json({ error: 'Failed to create agent key' }, { status: 500 })
+        }
+
+        const { data: agent, error: agentError } = await serviceClient
+          .from('agents')
+          .insert({
+            name,
+            slug,
+            description: data.description ?? null,
+            category: data.category ?? 'nlp',
+            price_per_call: data.price_per_call ?? 0.001,
+            currency: 'USDC',
+            chain: CHAIN_NAME,
+            endpoint_url: data.endpoint_url ?? null,
+            tags: data.tags ?? [],
+            status: 'active',
+            is_featured: false,
+            creator_id: data.owner_id as string,
+            registration_type: 'off_chain',
+            mcp_tool_name: slug.replace(/-/g, '_'),
+            webhook_secret: webhookSecret,
+            example_input: data.input_schema
+              ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? '{}')
+              : '{}',
+            input_schema: data.input_schema ?? null,
+            metadata: { registered_via: 'onboarding_wizard_agent_key' },
+          })
+          .select('id, slug')
+          .single()
+
+        if (agentError || !agent) {
+          // Rollback: ONLY delete the new key — NEVER deleteUser
+          await serviceClient.from('agent_keys').delete().eq('key_hash', hash)
+          return NextResponse.json({ error: 'Failed to register agent. Please try again.' }, { status: 500 })
+        }
+
+        await serviceClient.from('onboarding_sessions').update({ status: 'completed', data }).eq('id', session_id)
+
+        return NextResponse.json({
+          completed: true,
+          agent_key: raw,
+          agent_key_warning: 'Store this key securely. It will not be shown again.',
+          slug: agent.slug,
+          status: 'active',
+          status_message: 'Your agent is now live on the marketplace.',
+          agent_url: `https://app.wasiai.io/en/models/${agent.slug}`,
+          dashboard_url: `https://app.wasiai.io/en/dashboard`,
+        })
+      }
+
+      break
+    }
+    case 8: {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (typeof answer !== 'string' || !emailRegex.test(answer)) {
         return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
@@ -226,6 +328,10 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           registration_type: 'off_chain',
           mcp_tool_name: slug.replace(/-/g, '_'),
           webhook_secret: webhookSecret,
+          example_input: data.input_schema
+            ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? '{}')
+            : '{}',
+          input_schema: data.input_schema ?? null,
           metadata: { registered_via: 'onboarding_wizard' },
         })
         .select('id, slug')

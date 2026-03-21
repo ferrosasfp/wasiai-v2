@@ -37,6 +37,9 @@ import { logger } from '@/lib/logger'
 
 import { SITE_URL } from '@/lib/constants'
 import { metaValidateSchema } from '@/lib/schema-validator'
+import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
+
+type JsonSchema = Parameters<typeof buildExampleFromSchema>[0]
 
 const RegisterAgentSchema = z.object({
   // Required
@@ -242,6 +245,9 @@ export async function POST(request: NextRequest) {
       process.env.WASIAI_SYSTEM_CREATOR_ID ?? null
     ),
     input_schema:  data.input_schema ?? null,
+    example_input: data.input_schema
+      ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? null)
+      : null,
     output_schema: data.output_schema ?? null,
     tags:          data.tags ?? [],
     metadata: {
