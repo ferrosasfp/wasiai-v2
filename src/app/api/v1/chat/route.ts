@@ -1,16 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callLLM } from '@/lib/agents/llm'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export const maxDuration = 60
 
-const PLANNER_SYSTEM = `You are WasiAI's pipeline planner. Given a user question about DeFi/crypto, return a JSON array of ComposeStep objects.
+// --- Types ---
+interface CollectionAgent {
+  slug: string
+  name: string
+  description: string | null
+}
 
-Available agents (ONLY these 5 exist in production):
-- wasi-chainlink-price: real-time token prices from Chainlink oracles (input: {"token": "SYMBOL"})
-- wasi-defi-sentiment: sentiment analysis and scam detection (input: {"token": "SYMBOL"})  
-- wasi-onchain-analyzer: on-chain token data, holder info, contract analysis (input: {"token": "SYMBOL"} or {"address": "0x..."})
-- wasi-contract-auditor: smart contract security audit (input: {"address": "0x..."})
-- wasi-risk-report: comprehensive risk report combining multiple data sources (input: {"token": "SYMBOL"})
+// --- Module-level cache ---
+let cachedAgents: CollectionAgent[] | null = null
+let cacheExpiresAt = 0
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+// --- Schema validation ---
+function extractAgent(row: unknown): CollectionAgent | null {
+  if (!row || typeof row !== 'object') return null
+  const r = row as Record<string, unknown>
+  const a = Array.isArray(r.agents) ? r.agents[0] : r.agents
+  if (!a || typeof a !== 'object') return null
+  const ag = a as Record<string, unknown>
+  if (typeof ag.slug !== 'string' || typeof ag.name !== 'string') return null
+  return { slug: ag.slug, name: ag.name, description: typeof ag.description === 'string' ? ag.description : null }
+}
+
+// --- Fetch agents from defi-chat collection ---
+async function getCollectionAgents(): Promise<CollectionAgent[]> {
+  const now = Date.now()
+  if (cachedAgents && now < cacheExpiresAt) return cachedAgents
+
+  const supabase = createServiceClient()
+  const { data, error } = await supabase
+    .from('collection_agents')
+    .select('agents(slug, name, description), collections!inner(slug)')
+    .eq('collections.slug', 'defi-chat')
+    .order('sort_order')
+
+  if (error) throw new Error(`getCollectionAgents: ${error.message}`)
+
+  const agents: CollectionAgent[] = (data ?? [])
+    .map(extractAgent)
+    .filter((a): a is CollectionAgent => a !== null)
+
+  cachedAgents = agents
+  cacheExpiresAt = now + CACHE_TTL_MS
+  return agents
+}
+
+// --- Build dynamic planner prompt ---
+function buildPlannerPrompt(agents: CollectionAgent[]): string {
+  const agentList = agents
+    .map(a => `- ${a.slug}: ${a.description ?? a.name}`)
+    .join('\n')
+
+  return `You are WasiAI's pipeline planner. Given a user question about DeFi/crypto, return a JSON array of ComposeStep objects.
+
+Available agents (ONLY use these):
+${agentList}
 
 Rules:
 - Return ONLY a valid JSON array, no explanation
@@ -19,18 +68,16 @@ Rules:
 - Maximum 5 steps
 - If the question is not about DeFi/crypto, return []
 - Match agents to what the user is actually asking — don't over-fetch
-- For price-only questions: wasi-chainlink-price is enough
-- For investment/safety/risk questions: combine price + sentiment + risk-report
-- For contract questions: onchain-analyzer + contract-auditor
 
 Format: [{"agent_slug":"...","input":{"key":"value"}},{"agent_slug":"...","pass_output":true}]
 
 IMPORTANT: "input" must be a JSON object (not a string). Example: {"agent_slug":"wasi-chainlink-price","input":{"token":"AVAX"}}`
+}
 
 const SUMMARY_SYSTEM = `You are a DeFi analyst. Summarize the following agent pipeline results in 2-3 clear sentences for a non-technical user. Always include the exact token price in USD if available (e.g. "AVAX is currently $9.49"). Include key numbers (prices, scores, risk ratings, liquidity). Be concise.`
 
 export async function POST(req: NextRequest) {
-  // Validate API key
+  // 1. Validate API key
   const apiKey = req.headers.get('x-api-key')
   if (!apiKey) {
     return NextResponse.json(
@@ -39,7 +86,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Parse body
+  // 2. Parse body
   let body: { question?: unknown }
   try {
     body = await req.json()
@@ -55,12 +102,35 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Step 1: LLM interprets question into pipeline steps
+  // 3. Get collection agents
+  let agents: CollectionAgent[]
+  try {
+    agents = await getCollectionAgents()
+  } catch (err) {
+    console.error('[chat] getCollectionAgents error:', err)
+    return NextResponse.json(
+      { error: 'Chat service temporarily unavailable', code: 'chat_unavailable' },
+      { status: 503 }
+    )
+  }
+
+  // 4. If no agents, 503
+  if (agents.length === 0) {
+    return NextResponse.json(
+      { error: 'Chat service temporarily unavailable', code: 'chat_unavailable' },
+      { status: 503 }
+    )
+  }
+
+  // 5. Build dynamic planner prompt
+  const plannerSystemPrompt = buildPlannerPrompt(agents)
+
+  // 6. Call LLM planner
   let plannerResponse
   try {
     plannerResponse = await callLLM({
       messages: [
-        { role: 'system', content: PLANNER_SYSTEM },
+        { role: 'system', content: plannerSystemPrompt },
         { role: 'user', content: question },
       ],
       temperature: 0,
@@ -74,11 +144,10 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Parse the LLM output
+  // 7. Parse LLM output → steps[]
   let steps: unknown[]
   try {
     const raw = plannerResponse.result.trim()
-    // Extract JSON array if wrapped in markdown code blocks
     const match = raw.match(/\[[\s\S]*\]/)
     steps = JSON.parse(match ? match[0] : raw)
     if (!Array.isArray(steps)) throw new Error('Not an array')
@@ -92,7 +161,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Validate: must have 1-5 steps
+  // 8. If steps.length === 0 → 422
   if (steps.length === 0) {
     return NextResponse.json(
       {
@@ -103,7 +172,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Normalize steps: if input is a JSON string, parse it to object
+  // 9. Normalize steps: if input is string → JSON.parse
   const normalizedSteps = steps.map((s: unknown) => {
     const step = s as Record<string, unknown>
     if (typeof step.input === 'string') {
@@ -112,9 +181,24 @@ export async function POST(req: NextRequest) {
     return step
   })
 
-  const limitedSteps = normalizedSteps.slice(0, 5)
+  // 10. Filter by validSlugs BEFORE compose
+  const validSlugs = new Set(agents.map(a => a.slug))
+  const filteredSteps = normalizedSteps.filter(s => validSlugs.has((s as Record<string, unknown>).agent_slug as string))
 
-  // Step 2: Forward to compose
+  if (filteredSteps.length === 0) {
+    return NextResponse.json(
+      {
+        error: 'I can only answer questions about DeFi and crypto on Avalanche.',
+        code: 'no_agents_matched',
+      },
+      { status: 422 }
+    )
+  }
+
+  // 11. Limit to 5
+  const limitedSteps = filteredSteps.slice(0, 5)
+
+  // 12. Forward to compose
   const composeUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'}/api/v1/compose`
 
   let composeResult: unknown
@@ -139,6 +223,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // 13. If !composeOk → 502
   if (!composeOk) {
     const errResult = composeResult as { error?: string; steps?: unknown[]; receipts?: unknown[] }
     return NextResponse.json(
@@ -152,7 +237,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Step 3: Summarize results with LLM (fail-open)
+  // 14. Summarize with LLM (fail-open)
   let answer: string
   try {
     const summaryResponse = await callLLM({
@@ -166,7 +251,6 @@ export async function POST(req: NextRequest) {
     answer = summaryResponse.result
   } catch (err) {
     console.error('[chat] summary LLM error (fail-open):', err)
-    // Fail-open: return raw compose result as answer
     answer = JSON.stringify(composeResult)
   }
 
@@ -176,7 +260,7 @@ export async function POST(req: NextRequest) {
     pipeline_id?: string
   }
 
-  // Build pipeline steps from receipts (compose returns receipts, not a steps array)
+  // 15. Build steps from receipts
   steps = (result.receipts ?? []).map(r => ({
     step:              r.step,
     agent_slug:        r.agent_slug,
@@ -185,6 +269,7 @@ export async function POST(req: NextRequest) {
     receipt_signature: r.receipt_signature,
   }))
 
+  // 16. Return response
   return NextResponse.json({
     answer,
     steps,
