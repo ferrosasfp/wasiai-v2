@@ -9,12 +9,14 @@ interface CollectionAgent {
   slug: string
   name: string
   description: string | null
+  status: string
+  input_schema: Record<string, unknown> | null
 }
 
 // --- Module-level cache ---
 let cachedAgents: CollectionAgent[] | null = null
 let cacheExpiresAt = 0
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const CACHE_TTL_MS = 60_000 // 60 seconds (per SDD #092 AC7)
 
 // --- Schema validation ---
 function extractAgent(row: unknown): CollectionAgent | null {
@@ -24,7 +26,19 @@ function extractAgent(row: unknown): CollectionAgent | null {
   if (!a || typeof a !== 'object') return null
   const ag = a as Record<string, unknown>
   if (typeof ag.slug !== 'string' || typeof ag.name !== 'string') return null
-  return { slug: ag.slug, name: ag.name, description: typeof ag.description === 'string' ? ag.description : null }
+  // F1+F2: status guard
+  if (ag.status !== 'active') return null
+  // F2: input_schema guard — omitir si null o sin propiedades
+  const schema = ag.input_schema
+  const hasSchema = schema !== null && typeof schema === 'object' && !Array.isArray(schema) && Object.keys(schema as object).length > 0
+  if (!hasSchema) return null
+  return {
+    slug: ag.slug,
+    name: ag.name,
+    description: typeof ag.description === 'string' ? ag.description : null,
+    status: ag.status as string,
+    input_schema: schema as Record<string, unknown>,
+  }
 }
 
 // --- Fetch agents from defi-chat collection ---
@@ -35,8 +49,9 @@ async function getCollectionAgents(): Promise<CollectionAgent[]> {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('collection_agents')
-    .select('agents(slug, name, description), collections!inner(slug)')
+    .select('agents(slug, name, description, status, input_schema), collections!inner(slug)')
     .eq('collections.slug', 'defi-chat')
+    .eq('agents.status', 'active')
     .order('sort_order')
 
   if (error) throw new Error(`getCollectionAgents: ${error.message}`)
@@ -52,9 +67,14 @@ async function getCollectionAgents(): Promise<CollectionAgent[]> {
 
 // --- Build dynamic planner prompt ---
 function buildPlannerPrompt(agents: CollectionAgent[]): string {
-  const agentList = agents
-    .map(a => `- ${a.slug}: ${a.description ?? a.name}`)
-    .join('\n')
+  const agentList = agents.map(a => {
+    const schema = a.input_schema ?? {}
+    const props = (schema.properties as Record<string, unknown> | undefined) ?? {}
+    const propList = Object.entries(props)
+      .map(([k, v]) => `"${k}": "${((v as Record<string, unknown>).type as string) ?? 'string'}"`)
+      .join(', ')
+    return `- ${a.slug}: ${a.description ?? a.name} (input: {${propList}})`
+  }).join('\n')
 
   return `You are WasiAI's pipeline planner. Given a user question about DeFi/crypto, return a JSON array of ComposeStep objects.
 
@@ -63,7 +83,7 @@ ${agentList}
 
 Rules:
 - Return ONLY a valid JSON array, no explanation
-- First step MUST have "input" with the extracted parameters
+- First step MUST have "input" with the extracted parameters as a JSON object (not a string)
 - Subsequent steps use "pass_output": true
 - Maximum 5 steps
 - If the question is not about DeFi/crypto, return []
