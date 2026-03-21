@@ -177,11 +177,14 @@ export async function PATCH(
 
     const agentKeyHeader = req.headers.get('x-agent-key')
     if (agentKeyHeader) {
-      // Lookup agent key → owner_id
+      // Lookup agent key → owner_id (hash the raw key first)
+      const { createHash } = await import('crypto')
+      const keyHash = createHash('sha256').update(agentKeyHeader).digest('hex')
       const { data: keyRow, error: keyErr } = await service
         .from('agent_keys')
         .select('owner_id')
-        .eq('key', agentKeyHeader)
+        .eq('key_hash', keyHash)
+        .eq('is_active', true)
         .single()
       if (keyErr || !keyRow) {
         return NextResponse.json(
