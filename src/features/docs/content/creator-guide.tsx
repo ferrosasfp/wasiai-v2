@@ -1,6 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 import { CodeBlock } from '../components/CodeBlock'
+import Link from 'next/link'
 
 const PUBLISH_FORM: Parameters<typeof CodeBlock>[0]['tabs'] = [
   {
@@ -131,7 +132,7 @@ curl https://app.wasiai.io/api/v1/creator/agents \\
   -H "x-agent-key: wasi_..."`}</pre>
         </div>
         <p className="text-sm text-gray-500">
-          See <a href="/en/docs#api-reference" className="text-avax-600 underline hover:text-avax-700">API Reference</a> for full details on editable fields.
+          See <Link href="/en/docs#api-reference" className="text-avax-600 underline hover:text-avax-700">API Reference</Link> for full details on editable fields.
         </p>
       </div>
 
