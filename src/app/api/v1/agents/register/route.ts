@@ -46,7 +46,8 @@ const RegisterAgentSchema = z.object({
   name:           z.string().min(3).max(100),
   slug:           z.string().min(3).max(80).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, numbers, and hyphens'),
   endpoint_url:   z.string().url('Must be a valid HTTPS URL').optional(),  // AC8: optional → draft if absent
-  category:       z.enum(['nlp', 'vision', 'audio', 'code', 'multimodal', 'data']),
+  // Keep in sync with agent_categories table slugs
+  category:       z.enum(['nlp', 'vision', 'audio', 'code', 'multimodal', 'data', 'defi', 'defi-risk', 'security']),
   price_per_call: z.number().min(0.001).max(100),
 
   // Optional

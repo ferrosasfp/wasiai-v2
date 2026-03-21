@@ -3,7 +3,25 @@ import { withSentryConfig } from '@sentry/nextjs'
 
 const withNextIntl = createNextIntlPlugin()
 
-// SEC-CSP: Content-Security-Policy movido al middleware (nonce por request)
+// SEC-CSP: Static CSP (no nonce). Middleware-based nonce is tracked as tech debt.
+const cspDirectives = [
+  "default-src 'self'",
+  // Next.js requires unsafe-inline for styles and inline scripts in pages
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live",
+  "style-src 'self' 'unsafe-inline'",
+  // Supabase, Avalanche RPCs, Sentry, WalletConnect, IPFS gateways
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.avalanche.network https://*.avax.network https://api.avax.network https://api.avax-test.network https://*.sentry.io https://*.walletconnect.com wss://*.walletconnect.com https://explorer-api.walletconnect.com https://*.mypinata.cloud https://gateway.pinata.cloud",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "frame-src 'self' https://verify.walletconnect.com",
+  "media-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "upgrade-insecure-requests",
+].join('; ')
+
 const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control',    value: 'on' },
   { key: 'X-Frame-Options',           value: 'SAMEORIGIN' },
@@ -11,6 +29,7 @@ const securityHeaders = [
   { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=()' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  { key: 'Content-Security-Policy',   value: cspDirectives },
 ]
 
 /** @type {import('next').NextConfig} */
@@ -31,6 +50,15 @@ const nextConfig = {
       { protocol: 'https', hostname: 'bdwvrwzvsldephfibmuu.supabase.co' },
     ],
   },
+  async redirects() {
+    return [
+      // B8: /en/models (no index) → homepage marketplace
+      { source: '/:locale/models', destination: '/:locale', permanent: false },
+      // B8: /en/register → onboarding wizard
+      { source: '/:locale/register', destination: '/:locale/onboarding', permanent: false },
+    ]
+  },
+
   async headers() {
     return [
       {
