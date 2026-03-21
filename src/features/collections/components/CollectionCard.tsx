@@ -24,10 +24,12 @@ export const CollectionCard = React.memo(function CollectionCard({
   const t = useTranslations('collections')
 
   return (
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
     <Link
       href={`/${locale}/collections/${collection.slug}`}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
-    >
+      className="absolute inset-0 z-0"
+      aria-label={collection.name}
+    />
       {/* Cover image */}
       <div className="relative h-36 w-full bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
         {collection.cover_image ? (
@@ -65,8 +67,7 @@ export const CollectionCard = React.memo(function CollectionCard({
           {collection.slug === 'defi-chat' && (
             <Link
               href={`/${locale}/chat`}
-              onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1 rounded-full bg-avax-600 px-3 py-1 text-xs font-semibold text-white hover:bg-avax-700 transition-colors"
+              className="relative z-10 inline-flex items-center gap-1 rounded-full bg-avax-600 px-3 py-1 text-xs font-semibold text-white hover:bg-avax-700 transition-colors"
             >
               <MessageCircle size={11} />
               Chat DeFi
@@ -74,6 +75,6 @@ export const CollectionCard = React.memo(function CollectionCard({
           )}
         </div>
       </div>
-    </Link>
+    </div>
   )
 })
