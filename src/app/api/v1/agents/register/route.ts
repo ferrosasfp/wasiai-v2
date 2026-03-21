@@ -329,8 +329,9 @@ export async function POST(request: NextRequest) {
   // Bootstrap anónimo: open/open_key sin creator_email → generar creator automáticamente
   if ((authMethod === 'open' || authMethod === 'open_key') && !creatorId && !data.creator_email) {
     // F1 (HIGH): Rate limit específico para bootstrap — 3 anónimos por IP por hora
-    const rlBootstrap = await checkRateLimit(getBootstrapLimit(), `bootstrap:${getIdentifier(request)}`)
-    if (rlBootstrap) return rlBootstrap
+    // TEMP DISABLED for QA — re-enable after Sania QA session
+    // const rlBootstrap = await checkRateLimit(getBootstrapLimit(), `bootstrap:${getIdentifier(request)}`)
+    // if (rlBootstrap) return rlBootstrap
 
     let bootstrapResult: { userId: string } | null = null
     try {
