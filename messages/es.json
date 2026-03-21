@@ -587,7 +587,8 @@
     "login": "Iniciar Sesión",
     "signup": "Crear Cuenta",
     "signout": "Cerrar Sesión",
-    "collections": "Colecciones"
+    "collections": "Colecciones",
+    "chat": "Chat DeFi"
   },
   "agentKeys": {
     "title": "Claves de Agente",
@@ -1131,5 +1132,21 @@
     "badge": "No custodial · Tu wallet, tus fondos",
     "tooltip": "WasiAI nunca custodia tus fondos. Firmas los pagos directamente con tu wallet — nunca tenemos acceso a tu USDC.",
     "onboardingNote": "Cómo funcionan los pagos: Firmas con tu wallet → el USDC va directo al creador → WasiAI cobra una pequeña comisión. Tus llaves, tu dinero."
+  },
+  "chat": {
+    "title": "Chat DeFi",
+    "subtitle": "Pregunta lo que quieras sobre DeFi en Avalanche",
+    "placeholder": "ej. ¿Es seguro invertir en AVAX?",
+    "send": "Analizar",
+    "loading": "Analizando tu pregunta...",
+    "totalCost": "Costo total",
+    "steps": "Pasos del pipeline",
+    "receipts": "Recibos",
+    "noKey": "Necesitas una Agent Key para usar Chat DeFi.",
+    "getKey": "Obtener Agent Key",
+    "apiKeyLabel": "Agent Key",
+    "errorGeneric": "Algo salió mal. Inténtalo de nuevo.",
+    "noAgents": "Solo puedo responder preguntas sobre DeFi y crypto en Avalanche.",
+    "summary": "Resumen"
   }
 }

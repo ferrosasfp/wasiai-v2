@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, startTransition } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { clearWalletState } from '@/lib/wallet-cleanup'
 import { ActionSheet } from '@/features/auth/components/ActionSheet'
-import { Package, GitBranch, KeyRound, User, BookOpen, Globe, LogOut, Sparkles } from 'lucide-react'
+import { Package, GitBranch, KeyRound, User, BookOpen, Globe, LogOut, Sparkles, MessageCircle } from 'lucide-react'
 
 interface BottomTabBarProps {
   locale: string
@@ -66,9 +66,11 @@ export function BottomTabBar({ locale: _locale, initialEmail = null }: BottomTab
     ? [
         { icon: <Package  size={18} />, label: t('publishAgent'), href: `/${locale}/publish` },
         { icon: <GitBranch size={18} />, label: t('pipelines'),   href: `/${locale}/pipelines` },
+        { icon: <MessageCircle size={18} />, label: t('chat'),    href: `/${locale}/chat` },
         { icon: <KeyRound  size={18} />, label: t('agentKeys'),   href: `/${locale}/agent-keys` },
       ]
     : [
+        { icon: <MessageCircle size={18} />, label: t('chat'), href: `/${locale}/chat` },
         { icon: <KeyRound size={18} />, label: t('login'), href: `/${locale}/login` },
       ]
 

@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/contracts', key: 'contracts' },
   { href: '/sandbox', key: 'sandbox' },
   { href: '/pipelines', key: 'pipelines' },
+  { href: '/chat', key: 'chat' },
   { href: '/profile', key: 'profile' },
 ] as const
 

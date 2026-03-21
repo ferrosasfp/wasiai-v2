@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Package, GitBranch, KeyRound, User, Globe } from 'lucide-react'
+import { Package, GitBranch, KeyRound, User, Globe, MessageCircle } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { clearWalletState } from '@/lib/wallet-cleanup'
@@ -110,6 +110,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   const createItems = [
     { icon: <Package size={15} />, label: tNav('publishAgent'), href: `/${locale}/publish` },
     { icon: <GitBranch size={15} />, label: tNav('pipelines'), href: `/${locale}/pipelines` },
+    { icon: <MessageCircle size={15} />, label: tNav('chat'), href: `/${locale}/chat` },
     { icon: <KeyRound size={15} />, label: tNav('agentKeys'), href: `/${locale}/agent-keys` },
   ]
 
