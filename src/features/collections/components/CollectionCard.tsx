@@ -2,7 +2,7 @@ import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { Layers, Star } from 'lucide-react'
+import { Layers, Star, MessageCircle } from 'lucide-react'
 
 export interface CollectionCardProps {
   collection: {
@@ -57,9 +57,21 @@ export const CollectionCard = React.memo(function CollectionCard({
         {collection.description && (
           <p className="mt-1 text-sm text-gray-500 line-clamp-2">{collection.description}</p>
         )}
-        <div className="mt-auto pt-3 text-xs text-gray-400">
-          <Layers size={12} className="inline mr-1" />
-          {t('agents', { count: collection.agent_count })}
+        <div className="mt-auto pt-3 flex items-center justify-between">
+          <span className="text-xs text-gray-400">
+            <Layers size={12} className="inline mr-1" />
+            {t('agents', { count: collection.agent_count })}
+          </span>
+          {collection.slug === 'defi-chat' && (
+            <Link
+              href={`/${locale}/chat`}
+              onClick={e => e.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded-full bg-avax-600 px-3 py-1 text-xs font-semibold text-white hover:bg-avax-700 transition-colors"
+            >
+              <MessageCircle size={11} />
+              Chat DeFi
+            </Link>
+          )}
         </div>
       </div>
     </Link>
