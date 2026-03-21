@@ -19,7 +19,9 @@ Rules:
 - Maximum 5 steps
 - If the question is not about DeFi/crypto, return []
 
-Format: [{"agent_slug":"...","input":"..."},{"agent_slug":"...","pass_output":true}]`
+Format: [{"agent_slug":"...","input":{"key":"value"}},{"agent_slug":"...","pass_output":true}]
+
+IMPORTANT: "input" must be a JSON object (not a string). Example: {"agent_slug":"wasi-chainlink-price","input":{"token":"AVAX"}}`
 
 const SUMMARY_SYSTEM = `You are a DeFi analyst. Summarize the following agent pipeline results in 2-3 clear sentences for a non-technical user. Always include the exact token price in USD if available (e.g. "AVAX is currently $9.49"). Include key numbers (prices, scores, risk ratings, liquidity). Be concise.`
 
@@ -97,7 +99,16 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const limitedSteps = steps.slice(0, 5)
+  // Normalize steps: if input is a JSON string, parse it to object
+  const normalizedSteps = steps.map((s: unknown) => {
+    const step = s as Record<string, unknown>
+    if (typeof step.input === 'string') {
+      try { step.input = JSON.parse(step.input) } catch { /* leave as-is */ }
+    }
+    return step
+  })
+
+  const limitedSteps = normalizedSteps.slice(0, 5)
 
   // Step 2: Forward to compose
   const composeUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'}/api/v1/compose`
