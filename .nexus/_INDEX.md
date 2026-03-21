@@ -91,3 +91,5 @@
 | — | — | WAS-257 | improvement | HU-MAJOR | DEFERRED | — |
 | 081 | 2026-03-20 | WAS-259 | improvement | FAST-FIX | DONE | e77456808 |
 | 082 | 2026-03-20 | WAS-260 | improvement | FAST-FIX | DONE | — |
+| 083 | 2026-03-20 | WAS-258 | improvement | HU-MINOR | DONE | c5fea4a35 |
+| 084 | 2026-03-20 | WAS-259 | improvement | QUALITY | DONE | 6cc359e30 |
