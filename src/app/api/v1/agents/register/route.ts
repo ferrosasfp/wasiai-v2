@@ -148,25 +148,27 @@ async function bootstrapAnonymousCreator(
   if (createError || !newUser?.user) return null
 
   const userId = newUser.user.id
-  const baseUsername = `agent_${uuid.slice(0, 8)}`
 
-  // 2. Insertar creator_profile con username único (hasta 3 intentos)
-  let inserted = false
-  for (const suffix of ['', '_2', '_3', `_${uuid}`]) {
-    const username = baseUsername + suffix
-    const { error } = await serviceClient
+  // 2. creator_profile es creado automáticamente por trigger on_auth_user_created
+  // No se inserta manualmente — el trigger lo hace con username = agent_<uuid_prefix>
+  // Solo verificar que el profile existe (safety net)
+  const { data: profile } = await serviceClient
+    .from('creator_profiles')
+    .select('id')
+    .eq('id', userId)
+    .single()
+
+  if (!profile) {
+    // Trigger no lo creó — insertar manualmente como fallback
+    const { error: profileError } = await serviceClient
       .from('creator_profiles')
-      .insert({ id: userId, username, display_name: 'Agent Publisher' })
-    if (!error) { inserted = true; break }
-    if (!error.message?.includes('unique') && !error.code?.includes('23505')) break // error no-recoverable
-  }
-
-  if (!inserted) {
-    // Rollback auth.users
-    await serviceClient.auth.admin.deleteUser(userId).catch(err =>
-      console.error('[register] bootstrap rollback failed — creator_profile insert', { userId, err })
-    )
-    return null
+      .insert({ id: userId, username: `agent_${uuid.slice(0, 8)}`, display_name: 'Agent Publisher' })
+    if (profileError) {
+      await serviceClient.auth.admin.deleteUser(userId).catch(err =>
+        console.error('[register] bootstrap rollback failed — creator_profile insert', { userId, err })
+      )
+      return null
+    }
   }
 
   return { userId }
