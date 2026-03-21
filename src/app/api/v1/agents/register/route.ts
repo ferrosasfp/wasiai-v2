@@ -80,6 +80,9 @@ const RegisterAgentSchema = z.object({
   // Free trial configuration
   free_trial_enabled: z.boolean().optional().default(false),
   free_trial_limit:   z.number().int().nonnegative().max(100).optional().default(1),
+
+  // Sandbox — opt-in, creator decides
+  sandbox_enabled: z.boolean().optional().default(false),
   output_schema: z.unknown().optional().nullable(),
 
   // WAS-212: Tags semánticos para discovery
@@ -301,6 +304,7 @@ export async function POST(request: NextRequest) {
     tags:          data.tags ?? [],
     free_trial_enabled: data.free_trial_enabled ?? false,
     free_trial_limit:   data.free_trial_limit ?? 1,
+    sandbox_enabled:    data.sandbox_enabled ?? false,
     metadata: {
       registered_via: authMethod,
       framework:      data.framework,
