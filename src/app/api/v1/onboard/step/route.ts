@@ -260,30 +260,54 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
       }
 
       // Create user via Supabase admin
-      const { data: userData, error: createError } = await serviceClient.auth.admin.createUser({
+      let userId: string | null = null
+      let isExistingUser = false
+
+      const { data: newUserData, error: createError } = await serviceClient.auth.admin.createUser({
         email: answer,
         email_confirm: true,
         password: randomBytes(32).toString('hex'),
       })
 
+      if (!createError && newUserData?.user) {
+        userId = newUserData.user.id
+      }
+
       if (createError) {
-        if (
+        const isEmailExists =
           createError.message?.includes('User already registered') ||
           createError.message?.includes('already been registered') ||
           createError.message?.toLowerCase().includes('already exists') ||
+          createError.code === 'email_exists' ||
+          createError.code === 'user_already_exists' ||
           createError.status === 422
-        ) {
-          return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
+
+        if (isEmailExists) {
+          // WAS-259: email ya existe → asociar al creator existente
+          const { data: listData } = await serviceClient.auth.admin.listUsers({ perPage: 1000 })
+          const existing = listData?.users?.find((u) => u.email === answer)
+
+          if (!existing) {
+            return NextResponse.json({ error: 'Failed to resolve existing account' }, { status: 500 })
+          }
+
+          userId = existing.id
+          isExistingUser = true
+        } else {
+          console.error('[onboard/step8] createUser failed', createError)
+          return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
         }
-        console.error('[onboard/step7] createUser failed', createError)
-        return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
+      }
+
+      if (!userId) {
+        return NextResponse.json({ error: 'Failed to obtain user id' }, { status: 500 })
       }
 
       // Generate API key
       const { raw, hash } = generateApiKey()
 
       const { error: keyError } = await serviceClient.from('agent_keys').insert({
-        owner_id: userData.user.id,
+        owner_id: userId,
         name: 'wizard-agent',
         key_hash: hash,
         budget_usdc: 0,
@@ -293,9 +317,11 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
 
       if (keyError) {
         // Compensating: delete user
-        await serviceClient.auth.admin.deleteUser(userData.user.id).catch((e) =>
-          console.error('[onboard/step7] ZOMBIE USER cleanup failed', e),
-        )
+        if (!isExistingUser) {
+          await serviceClient.auth.admin.deleteUser(userId!).catch((e) =>
+            console.error('[onboard/step8] ZOMBIE USER cleanup failed', e),
+          )
+        }
         return NextResponse.json({ error: 'Failed to create agent key' }, { status: 500 })
       }
 
@@ -326,7 +352,7 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           tags: data.tags ?? [],
           status: 'active',
           is_featured: false,
-          creator_id: userData.user.id,
+          creator_id: userId,
           registration_type: 'off_chain',
           mcp_tool_name: slug.replace(/-/g, '_'),
           webhook_secret: webhookSecret,
@@ -343,11 +369,13 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
 
       // F1 fix: agent insert failure is fatal — rollback user+key and return error
       if (agentError || !agent) {
-        console.error('[onboard/step7] agent insert failed — rolling back', agentError)
+        console.error('[onboard/step8] agent insert failed — rolling back', agentError)
         await serviceClient.from('agent_keys').delete().eq('key_hash', hash)
-        await serviceClient.auth.admin.deleteUser(userData.user.id).catch((e) =>
-          console.error('[onboard/step7] ZOMBIE USER cleanup failed', e),
-        )
+        if (!isExistingUser) {
+          await serviceClient.auth.admin.deleteUser(userId!).catch((e) =>
+            console.error('[onboard/step8] ZOMBIE USER cleanup failed', e),
+          )
+        }
         return NextResponse.json({ error: 'Failed to register agent. Please try again.' }, { status: 500 })
       }
 
