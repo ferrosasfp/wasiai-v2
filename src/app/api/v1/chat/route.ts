@@ -156,15 +156,23 @@ export async function POST(req: NextRequest) {
   }
 
   const result = composeResult as {
-    steps?: Array<{ agent_slug: string; cost_usdc: string; status: string }>
     receipts?: Array<{ step: number; agent_slug: string; cost_usdc: string; receipt_signature: string }>
     total_cost_usdc?: string
     pipeline_id?: string
   }
 
+  // Build steps array from receipts (compose returns receipts, not steps array)
+  const steps = (result.receipts ?? []).map(r => ({
+    step:              r.step,
+    agent_slug:        r.agent_slug,
+    cost_usdc:         r.cost_usdc,
+    status:            'success',
+    receipt_signature: r.receipt_signature,
+  }))
+
   return NextResponse.json({
     answer,
-    steps: result.steps ?? [],
+    steps,
     receipts: result.receipts ?? [],
     total_cost_usdc: result.total_cost_usdc ?? '0.000000',
     pipeline_id: result.pipeline_id ?? '',
