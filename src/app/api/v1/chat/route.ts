@@ -90,11 +90,11 @@ Rules:
 - Return ONLY a valid JSON array, no explanation
 - First step MUST have "input" with the extracted parameters as a JSON object (not a string)
 - Subsequent steps use "pass_output": true
-- Maximum 5 steps
+- Maximum 3 steps
 - If the question is not about DeFi/crypto, return []
 - Match agents to what the user is actually asking — don't over-fetch
 - NEVER include an agent if you cannot provide ALL its required fields from the user's question
-- wasi-contract-auditor requires contract_source (Solidity code) — only include it if the user provides actual contract code
+- Use wasi-onchain-analyzer ONLY when user explicitly asks about on-chain data, contract analysis, or wallet activity
 
 Format: [{"agent_slug":"...","input":{"key":"value"}},{"agent_slug":"...","pass_output":true}]
 
