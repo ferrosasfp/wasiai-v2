@@ -229,12 +229,11 @@ export async function POST(request: NextRequest) {
       { status: 422 }
     )
   }
-  const schemaProps = (data.input_schema as Record<string, unknown>).properties as Record<string, unknown> | undefined
-  const hasProps = (schemaProps && Object.keys(schemaProps).length > 0)
-    || (!( data.input_schema as Record<string, unknown>).type && !schemaProps && Object.keys(data.input_schema as object).length > 0)
-  if (!hasProps) {
+  const schemaObj = data.input_schema as Record<string, unknown>
+  const schemaProps = schemaObj.properties as Record<string, unknown> | undefined
+  if (!schemaProps || Object.keys(schemaProps).length === 0) {
     return NextResponse.json(
-      { error: 'input_schema must define at least one property', code: 'invalid_json_schema' },
+      { error: 'input_schema must define at least one property under "properties"', code: 'invalid_json_schema' },
       { status: 422 }
     )
   }
