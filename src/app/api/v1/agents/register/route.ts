@@ -245,9 +245,6 @@ export async function POST(request: NextRequest) {
       process.env.WASIAI_SYSTEM_CREATOR_ID ?? null
     ),
     input_schema:  data.input_schema ?? null,
-    example_input: data.input_schema
-      ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? null)
-      : null,
     output_schema: data.output_schema ?? null,
     tags:          data.tags ?? [],
     metadata: {
@@ -256,6 +253,9 @@ export async function POST(request: NextRequest) {
       version:        data.version,
       erc8004_identity: data.erc8004_identity,
       auto_registered: authMethod !== 'jwt',
+      input_example: data.input_schema
+        ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? undefined)
+        : undefined,
     },
   }
 

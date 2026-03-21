@@ -220,11 +220,13 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
             registration_type: 'off_chain',
             mcp_tool_name: slug.replace(/-/g, '_'),
             webhook_secret: webhookSecret,
-            example_input: data.input_schema
-              ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? '{}')
-              : '{}',
             input_schema: data.input_schema ?? null,
-            metadata: { registered_via: 'onboarding_wizard_agent_key' },
+            metadata: {
+              registered_via: 'onboarding_wizard_agent_key',
+              input_example: data.input_schema
+                ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? undefined)
+                : undefined,
+            },
           })
           .select('id, slug')
           .single()
@@ -328,11 +330,13 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           registration_type: 'off_chain',
           mcp_tool_name: slug.replace(/-/g, '_'),
           webhook_secret: webhookSecret,
-          example_input: data.input_schema
-            ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? '{}')
-            : '{}',
           input_schema: data.input_schema ?? null,
-          metadata: { registered_via: 'onboarding_wizard' },
+          metadata: {
+            registered_via: 'onboarding_wizard',
+            input_example: data.input_schema
+              ? (buildExampleFromSchema(data.input_schema as JsonSchema) ?? undefined)
+              : undefined,
+          },
         })
         .select('id, slug')
         .single()
