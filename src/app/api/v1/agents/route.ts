@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   const category   = searchParams.get('category')
   const agentType  = searchParams.get('agent_type')
-  const q          = searchParams.get('q')
+  const q          = searchParams.get('q') ?? searchParams.get('search')
   const maxPrice   = searchParams.get('max_price')
   const limit      = Math.min(Number(searchParams.get('limit')  ?? 20), 100)
   const offset     = Number(searchParams.get('offset') ?? 0)

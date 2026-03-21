@@ -15,6 +15,7 @@ import { WasiKeyBanner }   from '@/features/agents/components/WasiKeyBanner'
 import Link from 'next/link'
 import { Bot } from 'lucide-react'
 import { UpgradeOnChainButton } from '@/features/agents/components/UpgradeOnChainButton'
+import type { Metadata } from 'next'
 
 // PERF-04: ISR — revalidate detail pages every 5 minutes
 export const revalidate = 300
@@ -23,6 +24,21 @@ const APP_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'
 
 interface Props {
   params: Promise<{ locale: string; slug: string }>
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params
+  const model = await getModelBySlug(slug)
+  if (!model) return { title: 'Agent not found — WasiAI' }
+  return {
+    title: `${model.name} — WasiAI`,
+    description: model.description?.slice(0, 160) ?? `${model.name} on WasiAI marketplace`,
+    openGraph: {
+      title: `${model.name} — WasiAI`,
+      description: model.description?.slice(0, 160) ?? undefined,
+      url: `${APP_URL}/en/models/${model.slug}`,
+    },
+  }
 }
 
 export default async function ModelDetailPage({ params }: Props) {
