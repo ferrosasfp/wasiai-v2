@@ -29,7 +29,7 @@ import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
-import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
+import { getRegisterLimit, getRegisterEmailLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { CHAIN_NAME } from '@/lib/chain'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
 import { createHash, randomBytes } from 'crypto'
@@ -133,9 +133,9 @@ async function resolveCreatorFromEmail(
 }
 
 export async function POST(request: NextRequest) {
-  // ── Rate limiting ─────────────────────────────────────────────────────────
-  const rlHit = await checkRateLimit(getRegisterLimit(), getIdentifier(request))
-  if (rlHit) return rlHit
+  // ── Rate limiting deferred to after validation ────────────────────────────
+  // Only successful DB inserts consume tokens — 422/409 validation failures do not.
+  // Actual check is performed below, after Zod + slug validation.
 
   const supabase = await createClient()
   const serviceClient = createServiceClient()
@@ -268,6 +268,16 @@ export async function POST(request: NextRequest) {
       { error: `Slug '${data.slug}' is already taken. Choose a different slug.` },
       { status: 409 },
     )
+  }
+
+  // ── Rate limiting — only counts real insert attempts (post-validation) ───
+  const rlHit = await checkRateLimit(getRegisterLimit(), getIdentifier(request))
+  if (rlHit) return rlHit
+
+  // Optional: rate limit by creator_email to prevent IP-bypass
+  if (data.creator_email) {
+    const rlEmail = await checkRateLimit(getRegisterEmailLimit(), `email:${data.creator_email}`)
+    if (rlEmail) return rlEmail
   }
 
   // WAS-160b: Determine on-chain registration preference

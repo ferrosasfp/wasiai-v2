@@ -36,7 +36,7 @@ let _upload:   Ratelimit | null = null
 let _search: Ratelimit | null = null
 
 export function getInvokeLimit()   { return _invoke   ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(60, '1 m'),  prefix: 'rl:invoke' }) }
-export function getRegisterLimit() { return _register ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(5,  '1 h'),  prefix: 'rl:register' }) }
+export function getRegisterLimit() { return _register ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(20, '1 h'),  prefix: 'rl:register' }) }
 export function getKeysLimit()     { return _keys     ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(10, '1 h'),  prefix: 'rl:keys' }) }
 export function getUploadLimit()   { return _upload   ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(20, '1 h'),  prefix: 'rl:upload' }) }
 export function getSearchLimit()   { return _search   ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(30, '1 m'),  prefix: 'rl:search' }) }
@@ -137,8 +137,18 @@ let _agentSignup: Ratelimit | null = null
 export function getAgentSignupLimit() {
   return _agentSignup ??= new Ratelimit({
     redis: getRedis(),
-    limiter: Ratelimit.slidingWindow(5, '1 h'),
+    limiter: Ratelimit.slidingWindow(20, '1 h'),
     prefix: 'rl:agent-signup',
+  })
+}
+
+// Rate limit by creator_email — prevents IP-bypass via mobile data / VPN
+let _registerEmail: Ratelimit | null = null
+export function getRegisterEmailLimit() {
+  return _registerEmail ??= new Ratelimit({
+    redis: getRedis(),
+    limiter: Ratelimit.slidingWindow(20, '1 h'),
+    prefix: 'rl:register:email',
   })
 }
 
