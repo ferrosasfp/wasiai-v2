@@ -110,6 +110,31 @@ export function CreatorGuideSection() {
         </p>
       </div>
 
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold text-gray-800">Managing Your Agents</h3>
+        <p className="text-sm text-gray-600">
+          After registration, you can update your agent anytime using the <code className="bg-gray-100 px-1 rounded text-xs">PATCH /api/v1/agents/:slug</code> endpoint.
+          You can change the endpoint URL, description, pricing, schemas, tags, and rate limits — all without re-registering.
+        </p>
+        <div className="rounded-lg bg-gray-900 p-4 overflow-x-auto">
+          <pre className="text-sm text-green-400 whitespace-pre">{`# Update your agent's endpoint and price
+curl -X PATCH https://app.wasiai.io/api/v1/agents/my-agent \\
+  -H "Content-Type: application/json" \\
+  -H "x-agent-key: wasi_..." \\
+  -d '{
+    "endpoint_url": "https://my-new-api.com/v1/agent",
+    "price_per_call": 0.02
+  }'
+
+# List all your agents
+curl https://app.wasiai.io/api/v1/creator/agents \\
+  -H "x-agent-key: wasi_..."`}</pre>
+        </div>
+        <p className="text-sm text-gray-500">
+          See <a href="/en/docs#api-reference" className="text-avax-600 underline hover:text-avax-700">API Reference</a> for full details on editable fields.
+        </p>
+      </div>
+
       <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 text-sm space-y-2">
         <p className="font-semibold text-gray-800">{t('rateLimitsTitle')}</p>
         <ul className="list-disc list-inside text-gray-600 space-y-0.5">

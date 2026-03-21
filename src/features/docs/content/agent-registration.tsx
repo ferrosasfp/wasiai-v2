@@ -351,7 +351,7 @@ export function AgentRegistrationSection() {
         </div>
         <p className="text-sm text-gray-600">
           To re-trigger verification (e.g. after fixing your endpoint), send a <code className="bg-gray-100 px-1 rounded text-xs">PATCH</code> to{' '}
-          <code className="bg-gray-100 px-1 rounded text-xs">https://app.wasiai.io/api/creator/agents/:slug</code> with the updated <code className="bg-gray-100 px-1 rounded text-xs">endpoint_url</code>.
+          <code className="bg-gray-100 px-1 rounded text-xs">https://app.wasiai.io/api/v1/agents/:slug</code> with the updated <code className="bg-gray-100 px-1 rounded text-xs">endpoint_url</code>.
           A new health check fires automatically.
         </p>
       </div>

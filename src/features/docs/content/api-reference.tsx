@@ -141,6 +141,66 @@ export function ApiReferenceSection() {
       />
 
       <EndpointCard
+        method="PATCH"
+        path="/agents/:slug"
+        description="Update an existing agent's metadata, endpoint, pricing, or schemas. Only the agent's creator can edit. Sends only the fields you want to change."
+        auth={true}
+        params={[
+          { name: ':slug', type: 'string', required: true, description: 'Agent slug identifier' },
+        ]}
+        bodyParams={[
+          { name: 'name', type: 'string', required: false, description: 'New display name (3–64 chars)' },
+          { name: 'description', type: 'string', required: false, description: 'Updated description (10–1000 chars)' },
+          { name: 'endpoint_url', type: 'string', required: false, description: 'New HTTPS endpoint URL (validated for SSRF)' },
+          { name: 'category', type: 'string', required: false, description: 'One of: nlp, vision, audio, code, multimodal, data' },
+          { name: 'price_per_call', type: 'number', required: false, description: 'Price in USDC (0.001–100)' },
+          { name: 'tags', type: 'string[]', required: false, description: 'Updated semantic tags' },
+          { name: 'input_schema', type: 'object', required: false, description: 'JSON Schema for accepted input (auto-generates input example)' },
+          { name: 'output_schema', type: 'object', required: false, description: 'JSON Schema for the output format' },
+          { name: 'max_rpm', type: 'number', required: false, description: 'Rate limit: max requests per minute' },
+          { name: 'max_rpd', type: 'number', required: false, description: 'Rate limit: max requests per day' },
+        ]}
+        responseExample={`{
+  "slug": "my-defi-agent",
+  "name": "My DeFi Agent v2",
+  "description": "Updated description",
+  "endpoint_url": "https://my-api.com/v2/agent",
+  "price_per_call": 0.02,
+  "tags": ["defi", "yield"],
+  "input_schema": { "type": "object", "properties": { "token": { "type": "string" } } },
+  "status": "active",
+  "updated_at": "2026-03-20T20:00:00Z"
+}`}
+      />
+
+      <EndpointCard
+        method="GET"
+        path="/creator/agents"
+        description="List all agents owned by the authenticated creator. Use this to check your agents' status, pricing, and call metrics."
+        auth={true}
+        bodyParams={[
+          { name: 'status', type: 'string', required: false, description: 'Filter by status: active or paused' },
+        ]}
+        responseExample={`{
+  "agents": [
+    {
+      "slug": "my-defi-agent",
+      "name": "My DeFi Agent",
+      "status": "active",
+      "category": "defi",
+      "price_per_call": 0.02,
+      "total_calls": 142,
+      "total_revenue": 2.84,
+      "created_at": "2026-01-15T10:00:00Z",
+      "endpoint_url": "https://my-api.com/v1/agent",
+      "tags": ["defi", "yield"]
+    }
+  ],
+  "total": 1
+}`}
+      />
+
+      <EndpointCard
         method="POST"
         path="/agents/register"
         description="Register a new agent on WasiAI. Requires a WasiAI account (JWT) or an Agent Key with creator permissions."

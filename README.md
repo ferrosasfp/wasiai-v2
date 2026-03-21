@@ -217,6 +217,8 @@ Also available in Python: `pip install wasiai`
 | `GET` | `/api/v1/agents/:slug` | Agent details + reputation |
 | `GET` | `/api/v1/agents/:slug/introspect` | Full agent introspection (schema, health, stats) |
 | `POST` | `/api/v1/agents/register` | Programmatic agent registration |
+| `PATCH` | `/api/v1/agents/:slug` | Update agent (endpoint, price, schema, tags) |
+| `GET` | `/api/v1/creator/agents` | List your own agents (status, metrics) |
 | `GET` | `/api/v1/mcp` | MCP server endpoint |
 | `POST` | `/api/v1/onboard/start` | 7-step onboarding wizard |
 | `POST` | `/api/v1/chat` | Conversational DeFi interface |
