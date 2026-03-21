@@ -1,19 +1,26 @@
 /**
  * GET /api/v1/agents/[slug]
  * Returns full details for a single agent by slug.
+ *
+ * PATCH /api/v1/agents/[slug]
+ * Updates editable fields for an agent. Auth: JWT or x-agent-key. WAS-260.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of truth
 
 import { SITE_URL } from '@/lib/constants'
 import { resolveExampleInput } from '@/features/agents/utils/resolveExampleInput'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { metaValidateSchema } from '@/lib/schema-validator'
+import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
+import { z } from 'zod'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-agent-key',
   'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
 }
 
@@ -126,6 +133,181 @@ export async function GET(
     return NextResponse.json(
       { error: 'internal_error', message: 'Service temporarily unavailable' },
       { status: 503, headers: CORS }
+    )
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /api/v1/agents/[slug] — WAS-260
+// ---------------------------------------------------------------------------
+
+const PatchAgentSchema = z.object({
+  name:               z.string().min(1).max(100).optional(),
+  description:        z.string().max(2000).optional(),
+  category:           z.string().max(50).optional(),
+  price_per_call:     z.number().min(0.001).max(100).optional(),
+  endpoint_url:       z.string().url().optional(),
+  tags:               z.array(z.string()).optional(),
+  input_schema:       z.record(z.string(), z.unknown()).optional(),
+  output_schema:      z.record(z.string(), z.unknown()).optional(),
+  max_rpm:            z.number().int().positive().optional(),
+  max_rpd:            z.number().int().positive().optional(),
+  mcp_description:    z.string().max(500).optional(),
+  sandbox_enabled:    z.boolean().optional(),
+  free_trial_enabled: z.boolean().optional(),
+  free_trial_limit:   z.number().int().nonnegative().optional(),
+})
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const PATCH_CORS = {
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-agent-key',
+  }
+
+  try {
+    const { slug } = await params
+    const service = createServiceClient()
+
+    // ── Auth ──────────────────────────────────────────────────────────────
+    let requesterId: string | null = null
+
+    const agentKeyHeader = req.headers.get('x-agent-key')
+    if (agentKeyHeader) {
+      // Lookup agent key → owner_id
+      const { data: keyRow, error: keyErr } = await service
+        .from('agent_keys')
+        .select('owner_id')
+        .eq('key', agentKeyHeader)
+        .single()
+      if (keyErr || !keyRow) {
+        return NextResponse.json(
+          { error: 'unauthorized', message: 'Invalid agent key' },
+          { status: 401, headers: PATCH_CORS }
+        )
+      }
+      requesterId = keyRow.owner_id
+    } else {
+      // JWT via createClient (reads cookies/headers)
+      const supabase = await createClient()
+      const { data: { user }, error: authErr } = await supabase.auth.getUser()
+      if (authErr || !user) {
+        return NextResponse.json(
+          { error: 'unauthorized', message: 'Authentication required' },
+          { status: 401, headers: PATCH_CORS }
+        )
+      }
+      requesterId = user.id
+    }
+
+    // ── Load agent ────────────────────────────────────────────────────────
+    const { data: agent, error: agentErr } = await service
+      .from('agents')
+      .select('id, slug, creator_id, metadata')
+      .eq('slug', slug)
+      .single()
+
+    if (agentErr || !agent) {
+      return NextResponse.json(
+        { error: 'not_found', message: `Agent not found: ${slug}` },
+        { status: 404, headers: PATCH_CORS }
+      )
+    }
+
+    // ── Ownership check ───────────────────────────────────────────────────
+    if (requesterId !== agent.creator_id) {
+      return NextResponse.json(
+        { error: 'forbidden', message: 'You do not own this agent' },
+        { status: 403, headers: PATCH_CORS }
+      )
+    }
+
+    // ── Parse body ────────────────────────────────────────────────────────
+    let rawBody: unknown
+    try {
+      rawBody = await req.json()
+    } catch {
+      return NextResponse.json(
+        { error: 'bad_request', message: 'Invalid JSON body' },
+        { status: 400, headers: PATCH_CORS }
+      )
+    }
+
+    const parsed = PatchAgentSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'validation_error', message: parsed.error.message },
+        { status: 422, headers: PATCH_CORS }
+      )
+    }
+    const fields = parsed.data
+
+    // ── Field validations ─────────────────────────────────────────────────
+    if (fields.endpoint_url !== undefined) {
+      try {
+        await validateEndpointUrlAsync(fields.endpoint_url)
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Invalid endpoint URL'
+        return NextResponse.json(
+          { error: 'validation_error', message: msg },
+          { status: 422, headers: PATCH_CORS }
+        )
+      }
+    }
+
+    if (fields.input_schema !== undefined) {
+      const result = metaValidateSchema(fields.input_schema)
+      if (!result.valid) {
+        return NextResponse.json(
+          { error: 'validation_error', message: result.error ?? 'Invalid input_schema' },
+          { status: 422, headers: PATCH_CORS }
+        )
+      }
+    }
+
+    // ── Build patch ───────────────────────────────────────────────────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const patch: Record<string, any> = { ...fields }
+
+    if (fields.input_schema !== undefined) {
+      const existingMetadata = (agent.metadata as Record<string, unknown>) ?? {}
+      patch.metadata = {
+        ...existingMetadata,
+        input_example: buildExampleFromSchema(fields.input_schema as Parameters<typeof buildExampleFromSchema>[0]),
+      }
+    }
+
+    // ── Update ────────────────────────────────────────────────────────────
+    const { data: updated, error: updateErr } = await service
+      .from('agents')
+      .update(patch)
+      .eq('slug', slug)
+      .select(`
+        id, slug, name, description, category, agent_type, status,
+        price_per_call, cover_image, endpoint_url, tags,
+        input_schema, output_schema, max_rpm, max_rpd, mcp_description,
+        sandbox_enabled, free_trial_enabled, free_trial_limit,
+        metadata, created_at, updated_at
+      `)
+      .single()
+
+    if (updateErr || !updated) {
+      console.error('[agents/slug PATCH] Update error:', updateErr?.message)
+      return NextResponse.json(
+        { error: 'internal_error', message: 'Failed to update agent' },
+        { status: 503, headers: PATCH_CORS }
+      )
+    }
+
+    return NextResponse.json(updated, { status: 200, headers: PATCH_CORS })
+  } catch (err) {
+    console.error('[agents/slug PATCH] Unexpected error:', err)
+    return NextResponse.json(
+      { error: 'internal_error', message: 'Service temporarily unavailable' },
+      { status: 503, headers: PATCH_CORS }
     )
   }
 }
