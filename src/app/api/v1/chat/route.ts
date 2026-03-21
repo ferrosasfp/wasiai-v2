@@ -70,8 +70,13 @@ function buildPlannerPrompt(agents: CollectionAgent[]): string {
   const agentList = agents.map(a => {
     const schema = a.input_schema ?? {}
     const props = (schema.properties as Record<string, unknown> | undefined) ?? {}
+    const required: string[] = Array.isArray(schema.required) ? schema.required as string[] : []
     const propList = Object.entries(props)
-      .map(([k, v]) => `"${k}": "${((v as Record<string, unknown>).type as string) ?? 'string'}"`)
+      .map(([k, v]) => {
+        const type = ((v as Record<string, unknown>).type as string) ?? 'string'
+        const isRequired = required.includes(k)
+        return `"${k}": "${type}"${isRequired ? ' (required)' : ' (optional)'}`
+      })
       .join(', ')
     return `- ${a.slug}: ${a.description ?? a.name} (input: {${propList}})`
   }).join('\n')
@@ -88,6 +93,8 @@ Rules:
 - Maximum 5 steps
 - If the question is not about DeFi/crypto, return []
 - Match agents to what the user is actually asking — don't over-fetch
+- NEVER include an agent if you cannot provide ALL its required fields from the user's question
+- wasi-contract-auditor requires contract_source (Solidity code) — only include it if the user provides actual contract code
 
 Format: [{"agent_slug":"...","input":{"key":"value"}},{"agent_slug":"...","pass_output":true}]
 
