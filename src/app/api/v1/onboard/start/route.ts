@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     request.headers.get('x-real-ip') ??
     'unknown'
 
-  const sessionData = ownerIdFromKey ? { owner_id: ownerIdFromKey } : null
+  const sessionData = ownerIdFromKey ? { owner_id: ownerIdFromKey } : {}
 
   const { data: session, error } = await serviceClient
     .from('onboarding_sessions')

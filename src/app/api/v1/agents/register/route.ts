@@ -220,19 +220,23 @@ export async function POST(request: NextRequest) {
     creatorId = await resolveCreatorFromEmail(serviceClient, data.creator_email)
   }
 
-  // WAS-200: Validar input_schema si existe
-  if (data.input_schema !== undefined && data.input_schema !== null) {
-    const schemaResult = metaValidateSchema(data.input_schema)
-    if (!schemaResult.valid) {
-      const isSSRF = schemaResult.error?.includes('External $ref blocked')
-      return NextResponse.json(
-        {
-          error: schemaResult.error,
-          code:  isSSRF ? 'schema_ssrf_blocked' : 'invalid_json_schema',
-        },
-        { status: 422 }
-      )
-    }
+  // WAS-200: Validar input_schema — requerido y debe tener al menos una propiedad
+  const schemaResult = metaValidateSchema(data.input_schema)
+  if (!schemaResult.valid) {
+    const isSSRF = schemaResult.error?.includes('External $ref blocked')
+    return NextResponse.json(
+      { error: schemaResult.error, code: isSSRF ? 'schema_ssrf_blocked' : 'invalid_json_schema' },
+      { status: 422 }
+    )
+  }
+  const schemaProps = (data.input_schema as Record<string, unknown>).properties as Record<string, unknown> | undefined
+  const hasProps = (schemaProps && Object.keys(schemaProps).length > 0)
+    || (!( data.input_schema as Record<string, unknown>).type && !schemaProps && Object.keys(data.input_schema as object).length > 0)
+  if (!hasProps) {
+    return NextResponse.json(
+      { error: 'input_schema must define at least one property', code: 'invalid_json_schema' },
+      { status: 422 }
+    )
   }
 
   // WAS-202: Validar output_schema si existe
@@ -430,9 +434,12 @@ export async function POST(request: NextRequest) {
       price_per_call: agent.price_per_call,
       invoke_url:     `${SITE_URL}/api/v1/models/${agent.slug}/invoke`,
       marketplace_url: `${SITE_URL}/en/models/${agent.slug}`,
-      status:         agent.status,
+      status:             agent.status,
       on_chain_registered: false,
-      registration_type: (registerOnChain && data.creator_wallet) ? 'pending_onchain' : 'off_chain',
+      registration_type:  (registerOnChain && data.creator_wallet) ? 'pending_onchain' : 'off_chain',
+      free_trial_enabled: agent.free_trial_enabled,
+      free_trial_limit:   agent.free_trial_limit,
+      sandbox_enabled:    agent.sandbox_enabled,
     },
     creator_id: creatorId,
     management_key: managementKey,
