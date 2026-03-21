@@ -21,7 +21,7 @@ Rules:
 
 Format: [{"agent_slug":"...","input":"..."},{"agent_slug":"...","pass_output":true}]`
 
-const SUMMARY_SYSTEM = `You are a DeFi analyst. Summarize the following agent pipeline results in 2-3 clear sentences for a non-technical user. Include key numbers (prices, scores, risk ratings). Be concise.`
+const SUMMARY_SYSTEM = `You are a DeFi analyst. Summarize the following agent pipeline results in 2-3 clear sentences for a non-technical user. Always include the exact token price in USD if available (e.g. "AVAX is currently $9.49"). Include key numbers (prices, scores, risk ratings, liquidity). Be concise.`
 
 export async function POST(req: NextRequest) {
   // Validate API key
