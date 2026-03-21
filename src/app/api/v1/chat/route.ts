@@ -199,11 +199,21 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // 9. Normalize steps: if input is string → JSON.parse
+  // 9. Normalize steps: fix LLM quirks
   const normalizedSteps = steps.map((s: unknown) => {
-    const step = s as Record<string, unknown>
+    const step = { ...(s as Record<string, unknown>) }
+    // If input is string → JSON.parse
     if (typeof step.input === 'string') {
       try { step.input = JSON.parse(step.input) } catch { /* leave as-is */ }
+    }
+    // pass_output and input are mutually exclusive — strip input if pass_output is set
+    if (step.pass_output === true && step.input !== undefined) {
+      delete step.input
+    }
+    // Normalize "agent" → "agent_slug" (some LLMs output wrong key)
+    if (!step.agent_slug && step.agent) {
+      step.agent_slug = step.agent
+      delete step.agent
     }
     return step
   })
