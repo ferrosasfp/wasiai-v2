@@ -133,7 +133,7 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
           {/* HU-4.4: Badge compacto de uptime — pasado como prop desde Server Components */}
           {reputationBadge}
           <div className="flex items-baseline gap-1">
-            <span className="text-sm font-bold text-gray-900">${(model.price_per_call ?? 0).toFixed(2)}</span>
+            <span className="text-sm font-bold text-gray-900">${parseFloat((model.price_per_call ?? 0).toFixed(3))}</span>
             <span className="text-xs text-gray-400">USDC</span>
           </div>
         </div>
