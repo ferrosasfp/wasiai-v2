@@ -6,7 +6,7 @@ import https from 'node:https'
 import { createServiceClient } from '@/lib/supabase/server'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 
-type ProbeStatus = 'active' | 'reviewing'
+type ProbeStatus = 'active' | 'reviewing' | 'draft'
 
 interface HealthCheckResult {
   passed: boolean
@@ -74,13 +74,23 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
           passed: true,
           latency_ms,
         })
-      } else {
+      } else if (res.statusCode && res.statusCode >= 400 && res.statusCode < 500) {
+        // 4xx = endpoint vivo, solo rechaza el input — status reviewing
         await updateAgentHealth(serviceClient, agentId, 'reviewing', {
           passed: false,
           reason: 'http_error',
           status_code: res.statusCode,
-          message: `Endpoint returned HTTP ${res.statusCode}.`,
-          fix: 'Ensure your endpoint returns HTTP 2xx for POST requests.',
+          message: `Endpoint returned HTTP ${res.statusCode} — endpoint is live but requires valid input.`,
+          fix: 'Ensure your endpoint returns HTTP 2xx for valid POST requests.',
+        })
+      } else {
+        // 5xx = error del servidor → draft
+        await updateAgentHealth(serviceClient, agentId, 'draft', {
+          passed: false,
+          reason: 'http_error',
+          status_code: res.statusCode,
+          message: `Endpoint returned HTTP ${res.statusCode} — server error.`,
+          fix: 'Check your server logs. Endpoint must return HTTP 2xx.',
         })
       }
       resolve()
@@ -90,7 +100,7 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
     })
     req.on('error', async (err) => {
       const isTimeout = err.message === 'timeout'
-      await updateAgentHealth(serviceClient, agentId, 'reviewing', {
+      await updateAgentHealth(serviceClient, agentId, 'draft', {
         passed: false,
         reason: isTimeout ? 'timeout' : 'connection_error',
         message: isTimeout

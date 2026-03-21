@@ -32,7 +32,7 @@ import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getRegisterEmailLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { CHAIN_NAME } from '@/lib/chain'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
-import { createHash, randomBytes } from 'crypto'
+import { createHash, randomBytes, randomUUID } from 'crypto'
 import { logger } from '@/lib/logger'
 
 import { SITE_URL } from '@/lib/constants'
@@ -133,6 +133,45 @@ async function resolveCreatorFromEmail(
   return userId
 }
 
+async function bootstrapAnonymousCreator(
+  serviceClient: ReturnType<typeof createServiceClient>
+): Promise<{ userId: string } | null> {
+  const uuid = randomUUID()
+  const syntheticEmail = `agent_${uuid}@bootstrap.wasiai.internal`
+
+  // 1. Crear auth.users
+  const { data: newUser, error: createError } = await serviceClient.auth.admin.createUser({
+    email: syntheticEmail,
+    email_confirm: true,
+    password: randomBytes(32).toString('hex'),
+  })
+  if (createError || !newUser?.user) return null
+
+  const userId = newUser.user.id
+  const baseUsername = `agent_${uuid.slice(0, 8)}`
+
+  // 2. Insertar creator_profile con username único (hasta 3 intentos)
+  let inserted = false
+  for (const suffix of ['', '_2', '_3', `_${uuid}`]) {
+    const username = baseUsername + suffix
+    const { error } = await serviceClient
+      .from('creator_profiles')
+      .insert({ id: userId, username, display_name: 'Agent Publisher' })
+    if (!error) { inserted = true; break }
+    if (!error.message?.includes('unique') && !error.code?.includes('23505')) break // error no-recoverable
+  }
+
+  if (!inserted) {
+    // Rollback auth.users
+    await serviceClient.auth.admin.deleteUser(userId).catch(err =>
+      console.error('[register] bootstrap rollback failed — creator_profile insert', { userId, err })
+    )
+    return null
+  }
+
+  return { userId }
+}
+
 export async function POST(request: NextRequest) {
   // ── Rate limiting deferred to after validation ────────────────────────────
   // Only successful DB inserts consume tokens — 422/409 validation failures do not.
@@ -140,6 +179,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient()
   const serviceClient = createServiceClient()
+  let isBootstrap = false
 
   // ── Auth ─────────────────────────────────────────────────────────────────
   let creatorId: string | null   = null
@@ -284,6 +324,24 @@ export async function POST(request: NextRequest) {
     if (rlEmail) return rlEmail
   }
 
+  // Bootstrap anónimo: open/open_key sin creator_email → generar creator automáticamente
+  if ((authMethod === 'open' || authMethod === 'open_key') && !creatorId && !data.creator_email) {
+    let bootstrapResult: { userId: string } | null = null
+    try {
+      bootstrapResult = await bootstrapAnonymousCreator(serviceClient)
+    } catch (err) {
+      console.error('[register] bootstrapAnonymousCreator threw unexpectedly', err)
+    }
+    if (!bootstrapResult) {
+      return NextResponse.json(
+        { error: 'Registration service temporarily unavailable', code: 'bootstrap_failed' },
+        { status: 503 }
+      )
+    }
+    creatorId = bootstrapResult.userId
+    isBootstrap = true
+  }
+
   // WAS-160b: Determine on-chain registration preference
   const registerOnChain = data.register_on_chain ?? !!data.creator_wallet
 
@@ -343,9 +401,19 @@ export async function POST(request: NextRequest) {
   if (insertError || !agent) {
     // Slug duplicate — Postgres unique constraint
     if (insertError?.message?.includes('unique constraint') || insertError?.code === '23505') {
+      if (isBootstrap && creatorId) {
+        await serviceClient.auth.admin.deleteUser(creatorId).catch(err =>
+          console.error('[register] bootstrap rollback failed — agent insert', { userId: creatorId, err })
+        )
+      }
       return NextResponse.json(
         { error: `Slug '${data.slug}' is already taken. Choose a different slug.` },
         { status: 409 },
+      )
+    }
+    if (isBootstrap && creatorId) {
+      await serviceClient.auth.admin.deleteUser(creatorId).catch(err =>
+        console.error('[register] bootstrap rollback failed — agent insert', { userId: creatorId, err })
       )
     }
     return NextResponse.json(
@@ -375,6 +443,22 @@ export async function POST(request: NextRequest) {
       managementKey = raw  // Only shown once — caller must store it
     } else {
       logger.error('[register] management key insert failed', { keyInsertError })
+      if (isBootstrap && creatorId) {
+        // Delete agent first (it would be orphaned otherwise)
+        try {
+          await serviceClient.from('agents').delete().eq('id', agent.id)
+        } catch (err) {
+          console.error('[register] bootstrap rollback failed — agent delete', { agentId: agent.id, err })
+        }
+        // Then deleteUser (CASCADE limpia creator_profile)
+        await serviceClient.auth.admin.deleteUser(creatorId).catch(err =>
+          console.error('[register] bootstrap rollback failed — key insert', { userId: creatorId, err })
+        )
+        return NextResponse.json(
+          { error: 'Registration service temporarily unavailable', code: 'bootstrap_failed' },
+          { status: 503 }
+        )
+      }
     }
   }
 
@@ -458,5 +542,14 @@ export async function POST(request: NextRequest) {
       ? `GET /api/v1/agents/${agent.slug}/status`
       : undefined,
     docs: 'https://wasiai.io/docs/agents/register',
+    // Bootstrap override — VA AL FINAL, sobreescribe management_key_warning:
+    ...(isBootstrap && managementKey && {
+      management_key_warning: 'Store this key securely. It will NOT be shown again. Recovery: POST /api/v1/agents/{slug}/recover (coming soon).',
+      next_steps: {
+        publish_another_agent: `POST /api/v1/agents/register with header x-agent-key: ${managementKey}`,
+        update_this_agent: `PATCH /api/v1/agents/${data.slug} with header x-agent-key: <your_key>`,
+        docs: 'https://wasiai.io/docs/agents/management-key',
+      },
+    }),
   }, { status: 201 })
 }
