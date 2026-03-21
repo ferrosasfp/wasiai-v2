@@ -18,6 +18,12 @@ Rules:
 - Subsequent steps use "pass_output": true
 - Maximum 5 steps
 - If the question is not about DeFi/crypto, return []
+- ALWAYS use at least 3 agents for any token question. Minimum pipeline for any token:
+  1. wasi-chainlink-price (price data)
+  2. wasi-defi-sentiment (sentiment + scam detection)
+  3. wasi-risk-report (comprehensive risk)
+- For contract/security questions: use wasi-onchain-analyzer + wasi-contract-auditor + wasi-risk-report
+- Never return a pipeline with fewer than 2 agents unless absolutely impossible
 
 Format: [{"agent_slug":"...","input":{"key":"value"}},{"agent_slug":"...","pass_output":true}]
 
