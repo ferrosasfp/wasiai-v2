@@ -46,11 +46,12 @@ interface DepositModalProps {
   keyId:               string
   keyName:             string
   ownerWalletAddress?: string | null   // HU-058: first depositor's wallet
+  spentUsdc?:          number
   onClose:             () => void
   onSuccess:           () => void
 }
 
-function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }: DepositModalProps) {
+function DepositModal({ keyId, keyName, ownerWalletAddress, spentUsdc, onClose, onSuccess }: DepositModalProps) {
   const t = useTranslations('agentKeys')
   const [amount, setAmount]         = useState(10)
   const [status, setStatus]         = useState<'idle' | 'signing' | 'submitting' | 'success' | 'error'>('idle')
@@ -191,7 +192,7 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
 
-        {/* Wallet + Key balance display */}
+        {/* Wallet + Available balance display */}
         <div className="mb-4 grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-green-50 px-3 py-2.5">
             <p className="text-xs text-green-600 font-medium">Tu wallet</p>
@@ -199,10 +200,12 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }
               {walletBalance !== null ? `$${walletBalance.toFixed(4)} USDC` : '—'}
             </p>
           </div>
-          <div className="rounded-xl bg-blue-50 px-3 py-2.5">
-            <p className="text-xs text-blue-600 font-medium">En contrato (key)</p>
-            <p className="text-base font-bold text-blue-800">
-              {keyBalance !== null ? `$${keyBalance.toFixed(4)} USDC` : '—'}
+          <div className="rounded-xl bg-avax-50 px-3 py-2.5">
+            <p className="text-xs text-avax-600 font-medium">Disponible para pipelines</p>
+            <p className="text-base font-bold text-avax-700">
+              {keyBalance !== null
+                ? `$${Math.max(0, keyBalance - (spentUsdc ?? 0)).toFixed(4)} USDC`
+                : '—'}
             </p>
           </div>
         </div>
@@ -693,7 +696,7 @@ export default function AgentKeysPage() {
   }
 
   // Modal state
-  const [depositKey,  setDepositKey]  = useState<{ id: string; name: string; ownerWalletAddress?: string | null } | null>(null)
+  const [depositKey,  setDepositKey]  = useState<{ id: string; name: string; ownerWalletAddress?: string | null; spentUsdc?: number } | null>(null)
   const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
   const [withdrawKey, setWithdrawKey] = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
 
@@ -929,7 +932,7 @@ export default function AgentKeysPage() {
 
                           {/* Add USDC */}
                           <button
-                            onClick={() => setDepositKey({ id: key.id, name: key.name, ownerWalletAddress: key.owner_wallet_address })}
+                            onClick={() => setDepositKey({ id: key.id, name: key.name, ownerWalletAddress: key.owner_wallet_address, spentUsdc: Number(key.spent_usdc) })}
                             className="rounded-lg border border-avax-200 bg-avax-50 px-3 py-1.5 text-xs font-medium text-avax-700 hover:bg-avax-100 transition"
                             title={t('addUsdc')}
                           >
@@ -1033,6 +1036,7 @@ Content-Type: application/json
           keyId={depositKey.id}
           keyName={depositKey.name}
           ownerWalletAddress={depositKey.ownerWalletAddress}
+          spentUsdc={depositKey.spentUsdc}
           onClose={() => setDepositKey(null)}
           onSuccess={() => {
             setDepositKey(null)
