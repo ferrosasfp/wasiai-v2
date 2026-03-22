@@ -73,7 +73,7 @@ export async function releaseLock(client: SupabaseClient): Promise<void> {
 
 export async function getLastIndexedBlock(client: SupabaseClient): Promise<bigint> {
   const val = await getAppSetting(client, LAST_BLOCK_KEY)
-  if (val && !isNaN(Number(val))) return BigInt(val)
+  if (val !== null && !isNaN(Number(val))) return BigInt(val)
   return SEED_BLOCK
 }
 
