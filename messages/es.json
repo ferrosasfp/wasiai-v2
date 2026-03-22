@@ -1148,5 +1148,20 @@
     "errorGeneric": "Algo salió mal. Inténtalo de nuevo.",
     "noAgents": "Solo puedo responder preguntas sobre DeFi y crypto en Avalanche.",
     "summary": "Resumen"
+  },
+  "demo": {
+    "title": "Demo de Agente Autónomo",
+    "subtitle": "Describe un objetivo DeFi — WasiAI descubre y ejecuta los agentes correctos automáticamente.",
+    "apiKeyLabel": "Agent Key",
+    "goalLabel": "Objetivo",
+    "goalPlaceholder": "ej. Analiza el precio, seguridad y riesgo de mercado de AVAX",
+    "run": "Ejecutar Demo",
+    "running": "Ejecutando...",
+    "pipelineRunning": "Pipeline en ejecución",
+    "report": "Reporte",
+    "phases": "Fases del Pipeline",
+    "totalCost": "Costo total",
+    "pipeline": "Pipeline",
+    "errorGeneric": "Algo salió mal. Inténtalo de nuevo."
   }
 }

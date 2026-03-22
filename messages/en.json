@@ -1148,5 +1148,20 @@
     "errorGeneric": "Something went wrong. Please try again.",
     "noAgents": "I can only answer questions about DeFi and crypto on Avalanche.",
     "summary": "Summary"
+  },
+  "demo": {
+    "title": "Autonomous Agent Demo",
+    "subtitle": "Describe a DeFi goal — WasiAI discovers and runs the right agents automatically.",
+    "apiKeyLabel": "Agent Key",
+    "goalLabel": "Goal",
+    "goalPlaceholder": "e.g. Analyze AVAX price, safety, and market risk",
+    "run": "Run Demo",
+    "running": "Running...",
+    "pipelineRunning": "Pipeline running",
+    "report": "Report",
+    "phases": "Pipeline Phases",
+    "totalCost": "Total cost",
+    "pipeline": "Pipeline",
+    "errorGeneric": "Something went wrong. Please try again."
   }
 }
