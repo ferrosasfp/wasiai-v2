@@ -1151,7 +1151,7 @@
   },
   "demo": {
     "title": "Autonomous Agent Demo",
-    "subtitle": "Describe a DeFi goal — WasiAI discovers and runs the right agents automatically.",
+    "subtitle": "Describe a DeFi goal. WasiAI discovers and runs the right agents automatically.",
     "apiKeyLabel": "Agent Key",
     "goalLabel": "Goal",
     "goalPlaceholder": "e.g. Analyze AVAX price, safety, and market risk",

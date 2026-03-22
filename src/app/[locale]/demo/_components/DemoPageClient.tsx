@@ -136,7 +136,6 @@ export function DemoPageClient() {
 
         {/* Goal — segundo */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">{t('goalLabel')}</label>
           <textarea
             value={goal}
             onChange={e => setGoal(e.target.value)}
