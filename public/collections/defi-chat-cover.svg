@@ -1,145 +1,260 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0a0e1a"/>
-      <stop offset="100%" style="stop-color:#0f1729"/>
+      <stop offset="0%" style="stop-color:#06091a"/>
+      <stop offset="60%" style="stop-color:#0d1230"/>
+      <stop offset="100%" style="stop-color:#0a0e20"/>
     </linearGradient>
     <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#E84142"/>
-      <stop offset="100%" style="stop-color:#ff6b6b"/>
+      <stop offset="0%" style="stop-color:#ff3d3d"/>
+      <stop offset="100%" style="stop-color:#E84142"/>
     </linearGradient>
-    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a2035;stop-opacity:1"/>
-      <stop offset="100%" style="stop-color:#111827;stop-opacity:1"/>
+    <linearGradient id="redGradV" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff5555"/>
+      <stop offset="100%" style="stop-color:#c0282a"/>
     </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
-      <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <filter id="softGlow">
-      <feGaussianBlur stdDeviation="20" result="coloredBlur"/>
-      <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <filter id="bigGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="40" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
+    <filter id="nodeGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#E84142;stop-opacity:0.2"/>
+      <stop offset="100%" style="stop-color:#E84142;stop-opacity:0"/>
+    </radialGradient>
+    <radialGradient id="blueGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0"/>
+    </radialGradient>
   </defs>
 
   <!-- Background -->
   <rect width="1200" height="630" fill="url(#bg)"/>
 
-  <!-- Grid lines -->
-  <g stroke="#1e293b" stroke-width="1" opacity="0.5">
-    <line x1="0" y1="105" x2="1200" y2="105"/>
-    <line x1="0" y1="210" x2="1200" y2="210"/>
-    <line x1="0" y1="315" x2="1200" y2="315"/>
-    <line x1="0" y1="420" x2="1200" y2="420"/>
-    <line x1="0" y1="525" x2="1200" y2="525"/>
-    <line x1="150" y1="0" x2="150" y2="630"/>
-    <line x1="300" y1="0" x2="300" y2="630"/>
-    <line x1="450" y1="0" x2="450" y2="630"/>
+  <!-- Subtle grid -->
+  <g stroke="#ffffff" stroke-width="0.5" opacity="0.04">
+    <line x1="0" y1="90" x2="1200" y2="90"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/>
+    <line x1="0" y1="270" x2="1200" y2="270"/>
+    <line x1="0" y1="360" x2="1200" y2="360"/>
+    <line x1="0" y1="450" x2="1200" y2="450"/>
+    <line x1="0" y1="540" x2="1200" y2="540"/>
+    <line x1="120" y1="0" x2="120" y2="630"/>
+    <line x1="240" y1="0" x2="240" y2="630"/>
+    <line x1="360" y1="0" x2="360" y2="630"/>
+    <line x1="480" y1="0" x2="480" y2="630"/>
     <line x1="600" y1="0" x2="600" y2="630"/>
-    <line x1="750" y1="0" x2="750" y2="630"/>
-    <line x1="900" y1="0" x2="900" y2="630"/>
-    <line x1="1050" y1="0" x2="1050" y2="630"/>
+    <line x1="720" y1="0" x2="720" y2="630"/>
+    <line x1="840" y1="0" x2="840" y2="630"/>
+    <line x1="960" y1="0" x2="960" y2="630"/>
+    <line x1="1080" y1="0" x2="1080" y2="630"/>
   </g>
 
-  <!-- Glow orb left -->
-  <circle cx="200" cy="315" r="220" fill="#E84142" opacity="0.06"/>
-  <!-- Glow orb right -->
-  <circle cx="1000" cy="315" r="180" fill="#3b82f6" opacity="0.05"/>
+  <!-- Big ambient glow center -->
+  <ellipse cx="600" cy="280" rx="380" ry="260" fill="url(#centerGlow)"/>
+  <ellipse cx="950" cy="420" rx="220" ry="180" fill="url(#blueGlow)"/>
 
-  <!-- Chart bars (decorative) -->
-  <g opacity="0.25">
-    <rect x="80" y="380" width="30" height="80" rx="3" fill="#E84142"/>
-    <rect x="120" y="340" width="30" height="120" rx="3" fill="#E84142"/>
-    <rect x="160" y="300" width="30" height="160" rx="3" fill="#E84142"/>
-    <rect x="200" y="360" width="30" height="100" rx="3" fill="#E84142"/>
-    <rect x="240" y="310" width="30" height="150" rx="3" fill="#E84142"/>
-    <rect x="280" y="270" width="30" height="190" rx="3" fill="#ff6b6b"/>
+  <!-- ============ AVALANCHE TRIANGLE (large, center) ============ -->
+  <g filter="url(#bigGlow)" transform="translate(600,155) scale(1)">
+    <!-- outer triangle -->
+    <polygon points="0,-130 150,100 -150,100" fill="url(#redGradV)" opacity="0.95"/>
+    <!-- inner cutout -->
+    <polygon points="0,-65 75,50 -75,50" fill="#06091a" opacity="0.85"/>
   </g>
 
-  <!-- Right side chart line -->
-  <polyline points="870,420 920,360 970,380 1020,300 1070,320 1120,260" 
-            stroke="#3b82f6" stroke-width="2.5" fill="none" opacity="0.4"/>
-  <circle cx="870" cy="420" r="4" fill="#3b82f6" opacity="0.5"/>
-  <circle cx="920" cy="360" r="4" fill="#3b82f6" opacity="0.5"/>
-  <circle cx="970" cy="380" r="4" fill="#3b82f6" opacity="0.5"/>
-  <circle cx="1020" cy="300" r="4" fill="#3b82f6" opacity="0.5"/>
-  <circle cx="1070" cy="320" r="4" fill="#3b82f6" opacity="0.5"/>
-  <circle cx="1120" cy="260" r="5" fill="#3b82f6" opacity="0.7"/>
-
-  <!-- Avalanche triangle logo (centered, large) -->
-  <g filter="url(#glow)" transform="translate(540, 60)">
-    <polygon points="60,0 120,104 0,104" fill="url(#redGrad)" opacity="0.95"/>
-    <polygon points="60,20 105,95 15,95" fill="#0a0e1a" opacity="0.6"/>
+  <!-- ============ NODE NETWORK ============ -->
+  <!-- Connecting lines first (behind nodes) -->
+  <!-- Left cluster lines -->
+  <g stroke="#E84142" stroke-width="1" opacity="0.25" stroke-dasharray="4,4">
+    <line x1="600" y1="280" x2="180" y2="200"/>
+    <line x1="600" y1="280" x2="120" y2="360"/>
+    <line x1="600" y1="280" x2="220" y2="470"/>
+    <line x1="180" y1="200" x2="120" y2="360"/>
+    <line x1="120" y1="360" x2="220" y2="470"/>
+  </g>
+  <!-- Right cluster lines -->
+  <g stroke="#3b82f6" stroke-width="1" opacity="0.25" stroke-dasharray="4,4">
+    <line x1="600" y1="280" x2="1020" y2="190"/>
+    <line x1="600" y1="280" x2="1080" y2="360"/>
+    <line x1="600" y1="280" x2="980" y2="470"/>
+    <line x1="1020" y1="190" x2="1080" y2="360"/>
+    <line x1="1080" y1="360" x2="980" y2="470"/>
+  </g>
+  <!-- Top/bottom nodes to center -->
+  <g stroke="#a855f7" stroke-width="1" opacity="0.2" stroke-dasharray="4,4">
+    <line x1="600" y1="280" x2="400" y2="100"/>
+    <line x1="600" y1="280" x2="800" y2="100"/>
+    <line x1="600" y1="280" x2="450" y2="530"/>
+    <line x1="600" y1="280" x2="750" y2="530"/>
   </g>
 
-  <!-- Main title -->
-  <text x="600" y="240" font-family="system-ui, -apple-system, sans-serif" 
-        font-size="52" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">
-    DeFi Collection
-  </text>
+  <!-- ===== CHAIN LINK NODES (left) ===== -->
+  <!-- Node: price feed (red/orange) -->
+  <g filter="url(#nodeGlow)" transform="translate(180,200)">
+    <circle r="38" fill="#0d1230" stroke="#E84142" stroke-width="2"/>
+    <!-- chain link icon simplified -->
+    <path d="M-12,-8 L-4,-8 L-4,8 L-12,8 Z M4,-8 L12,-8 L12,8 L4,8 Z M-4,0 L4,0" 
+          stroke="#E84142" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle r="38" fill="#E84142" opacity="0.06"/>
+  </g>
 
-  <!-- Subtitle -->
-  <text x="600" y="285" font-family="system-ui, -apple-system, sans-serif" 
-        font-size="22" font-weight="400" fill="#94a3b8" text-anchor="middle" letter-spacing="0.5">
-    Powered by Avalanche · WasiAI
-  </text>
+  <!-- Node: sentiment (green) -->
+  <g filter="url(#nodeGlow)" transform="translate(120,360)">
+    <circle r="34" fill="#0d1230" stroke="#22c55e" stroke-width="2"/>
+    <!-- upward arrow -->
+    <polyline points="-10,10 0,-12 10,10" stroke="#22c55e" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="0" y1="-12" x2="0" y2="10" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+    <circle r="34" fill="#22c55e" opacity="0.06"/>
+  </g>
 
-  <!-- Divider line -->
-  <line x1="460" y1="308" x2="740" y2="308" stroke="#E84142" stroke-width="1.5" opacity="0.6"/>
+  <!-- Node: risk (orange) -->
+  <g filter="url(#nodeGlow)" transform="translate(220,470)">
+    <circle r="32" fill="#0d1230" stroke="#f97316" stroke-width="2"/>
+    <!-- shield -->
+    <path d="M0,-14 L12,-8 L12,4 Q12,14 0,18 Q-12,14 -12,4 L-12,-8 Z" 
+          stroke="#f97316" stroke-width="2" fill="none"/>
+    <circle r="32" fill="#f97316" opacity="0.06"/>
+  </g>
 
-  <!-- Agent cards row -->
-  <!-- Card 1 -->
-  <rect x="155" y="340" width="170" height="80" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1"/>
-  <text x="240" y="372" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">⛓️ Chainlink Price</text>
-  <text x="240" y="395" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#E84142" text-anchor="middle">$9.47</text>
-  <text x="240" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">AVAX / USD</text>
+  <!-- ===== CHAIN LINK NODES (right) ===== -->
+  <!-- Node: on-chain (blue) -->
+  <g filter="url(#nodeGlow)" transform="translate(1020,190)">
+    <circle r="38" fill="#0d1230" stroke="#3b82f6" stroke-width="2"/>
+    <!-- blocks icon -->
+    <rect x="-14" y="-14" width="12" height="12" rx="2" stroke="#3b82f6" stroke-width="2" fill="none"/>
+    <rect x="2" y="-14" width="12" height="12" rx="2" stroke="#3b82f6" stroke-width="2" fill="none"/>
+    <rect x="-14" y="2" width="12" height="12" rx="2" stroke="#3b82f6" stroke-width="2" fill="none"/>
+    <rect x="2" y="2" width="12" height="12" rx="2" stroke="#3b82f6" stroke-width="2" fill="none"/>
+    <circle r="38" fill="#3b82f6" opacity="0.06"/>
+  </g>
 
-  <!-- Card 2 -->
-  <rect x="345" y="340" width="170" height="80" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1"/>
-  <text x="430" y="372" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">📊 Sentiment</text>
-  <text x="430" y="395" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#22c55e" text-anchor="middle">SAFE</text>
-  <text x="430" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">Score 80 / 100</text>
+  <!-- Node: auditor (purple) -->
+  <g filter="url(#nodeGlow)" transform="translate(1080,360)">
+    <circle r="34" fill="#0d1230" stroke="#a855f7" stroke-width="2"/>
+    <!-- magnifier -->
+    <circle cx="-3" cy="-3" r="9" stroke="#a855f7" stroke-width="2" fill="none"/>
+    <line x1="4" y1="4" x2="13" y2="13" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round"/>
+    <circle r="34" fill="#a855f7" opacity="0.06"/>
+  </g>
 
-  <!-- Card 3 (center highlight) -->
-  <rect x="515" y="330" width="170" height="95" rx="10" fill="#1a1f35" stroke="#E84142" stroke-width="1.5"/>
-  <text x="600" y="362" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">⚡ Risk Report</text>
-  <text x="600" y="390" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="white" text-anchor="middle">LOW RISK</text>
-  <text x="600" y="408" font-family="system-ui, sans-serif" font-size="10" fill="#E84142" text-anchor="middle">Autonomous Analysis</text>
+  <!-- Node: wallet profiler (cyan) -->
+  <g filter="url(#nodeGlow)" transform="translate(980,470)">
+    <circle r="32" fill="#0d1230" stroke="#06b6d4" stroke-width="2"/>
+    <!-- wallet icon -->
+    <rect x="-14" y="-8" width="28" height="18" rx="3" stroke="#06b6d4" stroke-width="2" fill="none"/>
+    <path d="M-14,-8 L-14,-12 Q-14,-16 -10,-16 L10,-16 Q14,-16 14,-12 L14,-8" 
+          stroke="#06b6d4" stroke-width="2" fill="none"/>
+    <circle cx="8" cy="2" r="2.5" fill="#06b6d4"/>
+    <circle r="32" fill="#06b6d4" opacity="0.06"/>
+  </g>
 
-  <!-- Card 4 -->
-  <rect x="705" y="340" width="170" height="80" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1"/>
-  <text x="790" y="372" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">🔍 On-Chain</text>
-  <text x="790" y="395" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#3b82f6" text-anchor="middle">ACTIVE</text>
-  <text x="790" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">4.2K txns / 24h</text>
+  <!-- ===== TOP / BOTTOM ACCENT NODES ===== -->
+  <g filter="url(#nodeGlow)" transform="translate(400,100)">
+    <circle r="26" fill="#0d1230" stroke="#E84142" stroke-width="1.5" opacity="0.7"/>
+    <!-- lightning bolt -->
+    <polyline points="4,-12 -4,0 4,0 -4,12" stroke="#E84142" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+  </g>
 
-  <!-- Card 5 -->
-  <rect x="875" y="340" width="170" height="80" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1"/>
-  <text x="960" y="372" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">🛡️ Auditor</text>
-  <text x="960" y="395" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#a855f7" text-anchor="middle">SECURE</text>
-  <text x="960" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">No issues found</text>
+  <g filter="url(#nodeGlow)" transform="translate(800,100)">
+    <circle r="26" fill="#0d1230" stroke="#3b82f6" stroke-width="1.5" opacity="0.7"/>
+    <!-- dollar / coin -->
+    <circle r="10" stroke="#3b82f6" stroke-width="2" fill="none" opacity="0.7"/>
+    <line x1="0" y1="-14" x2="0" y2="-10" stroke="#3b82f6" stroke-width="2" opacity="0.7"/>
+    <line x1="0" y1="10" x2="0" y2="14" stroke="#3b82f6" stroke-width="2" opacity="0.7"/>
+  </g>
 
-  <!-- Connector lines between cards -->
-  <line x1="325" y1="380" x2="345" y2="380" stroke="#E84142" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-  <line x1="515" y1="380" x2="515" y2="380" stroke="#E84142" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-  <line x1="685" y1="380" x2="705" y2="380" stroke="#E84142" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-  <line x1="875" y1="380" x2="875" y2="380" stroke="#E84142" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <g filter="url(#nodeGlow)" transform="translate(450,530)">
+    <circle r="22" fill="#0d1230" stroke="#22c55e" stroke-width="1.5" opacity="0.6"/>
+    <!-- check -->
+    <polyline points="-8,0 -2,6 10,-8" stroke="#22c55e" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+  </g>
 
-  <!-- Bottom tagline -->
-  <text x="600" y="490" font-family="system-ui, sans-serif" font-size="14" 
-        fill="#475569" text-anchor="middle" letter-spacing="2">
-    MULTI-AGENT · ON-CHAIN · AVALANCHE
-  </text>
+  <g filter="url(#nodeGlow)" transform="translate(750,530)">
+    <circle r="22" fill="#0d1230" stroke="#a855f7" stroke-width="1.5" opacity="0.6"/>
+    <!-- bars -->
+    <rect x="-9" y="0" width="5" height="8" rx="1" fill="#a855f7" opacity="0.6"/>
+    <rect x="-2" y="-6" width="5" height="14" rx="1" fill="#a855f7" opacity="0.6"/>
+    <rect x="5" y="-10" width="5" height="18" rx="1" fill="#a855f7" opacity="0.6"/>
+  </g>
 
-  <!-- Bottom WasiAI badge -->
-  <rect x="520" y="510" width="160" height="36" rx="18" fill="#E84142" opacity="0.12"/>
-  <text x="600" y="533" font-family="system-ui, sans-serif" font-size="13" 
-        font-weight="600" fill="#E84142" text-anchor="middle" letter-spacing="1">
-    WasiAI
-  </text>
+  <!-- ===== CENTER PULSE RINGS ===== -->
+  <circle cx="600" cy="280" r="55" fill="none" stroke="#E84142" stroke-width="1" opacity="0.15"/>
+  <circle cx="600" cy="280" r="80" fill="none" stroke="#E84142" stroke-width="0.8" opacity="0.1"/>
+  <circle cx="600" cy="280" r="110" fill="none" stroke="#E84142" stroke-width="0.5" opacity="0.06"/>
+
+  <!-- ===== PRICE CHART (bottom right, decorative) ===== -->
+  <g opacity="0.35">
+    <!-- area fill -->
+    <path d="M700,560 L740,490 L780,510 L820,440 L860,460 L900,390 L940,410 L980,360 L1020,370 L1060,310 L1100,330 L1100,580 L700,580 Z"
+          fill="#3b82f6" opacity="0.08"/>
+    <!-- line -->
+    <polyline points="700,560 740,490 780,510 820,440 860,460 900,390 940,410 980,360 1020,370 1060,310 1100,330"
+              stroke="#3b82f6" stroke-width="2" fill="none" stroke-linejoin="round"/>
+    <!-- dots -->
+    <circle cx="820" cy="440" r="3.5" fill="#3b82f6"/>
+    <circle cx="900" cy="390" r="3.5" fill="#3b82f6"/>
+    <circle cx="980" cy="360" r="3.5" fill="#3b82f6"/>
+    <circle cx="1060" cy="310" r="4.5" fill="#3b82f6"/>
+    <circle cx="1100" cy="330" r="3.5" fill="#3b82f6"/>
+  </g>
+
+  <!-- ===== CANDLESTICK CHART (bottom left) ===== -->
+  <g opacity="0.3">
+    <rect x="100" y="480" width="14" height="60" rx="2" fill="#E84142"/>
+    <line x1="107" y1="470" x2="107" y2="480" stroke="#E84142" stroke-width="1.5"/>
+    <line x1="107" y1="540" x2="107" y2="555" stroke="#E84142" stroke-width="1.5"/>
+
+    <rect x="124" y="460" width="14" height="50" rx="2" fill="#22c55e"/>
+    <line x1="131" y1="450" x2="131" y2="460" stroke="#22c55e" stroke-width="1.5"/>
+    <line x1="131" y1="510" x2="131" y2="525" stroke="#22c55e" stroke-width="1.5"/>
+
+    <rect x="148" y="470" width="14" height="45" rx="2" fill="#22c55e"/>
+    <line x1="155" y1="458" x2="155" y2="470" stroke="#22c55e" stroke-width="1.5"/>
+    <line x1="155" y1="515" x2="155" y2="530" stroke="#22c55e" stroke-width="1.5"/>
+
+    <rect x="172" y="455" width="14" height="55" rx="2" fill="#E84142"/>
+    <line x1="179" y1="444" x2="179" y2="455" stroke="#E84142" stroke-width="1.5"/>
+    <line x1="179" y1="510" x2="179" y2="528" stroke="#E84142" stroke-width="1.5"/>
+
+    <rect x="196" y="440" width="14" height="40" rx="2" fill="#22c55e"/>
+    <line x1="203" y1="428" x2="203" y2="440" stroke="#22c55e" stroke-width="1.5"/>
+    <line x1="203" y1="480" x2="203" y2="498" stroke="#22c55e" stroke-width="1.5"/>
+
+    <rect x="220" y="430" width="14" height="50" rx="2" fill="#22c55e"/>
+    <line x1="227" y1="418" x2="227" y2="430" stroke="#22c55e" stroke-width="1.5"/>
+    <line x1="227" y1="480" x2="227" y2="496" stroke="#22c55e" stroke-width="1.5"/>
+  </g>
+
+  <!-- Top right hexagon decorative -->
+  <g opacity="0.12" transform="translate(1100,80)">
+    <polygon points="0,-50 43,-25 43,25 0,50 -43,25 -43,-25" 
+             fill="none" stroke="#E84142" stroke-width="1.5"/>
+    <polygon points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15" 
+             fill="none" stroke="#E84142" stroke-width="1"/>
+  </g>
+
+  <!-- Bottom left hexagon decorative -->
+  <g opacity="0.1" transform="translate(100,560)">
+    <polygon points="0,-40 35,-20 35,20 0,40 -35,20 -35,-20" 
+             fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+  </g>
 </svg>
