@@ -65,13 +65,21 @@ export const CollectionCard = React.memo(function CollectionCard({
             {t('agents', { count: collection.agent_count })}
           </span>
           {collection.slug === 'defi-chat' && (
-            <Link
-              href={`/${locale}/chat`}
-              className="relative z-10 inline-flex items-center gap-1 rounded-full bg-avax-600 px-3 py-1 text-xs font-semibold text-white hover:bg-avax-700 transition-colors"
-            >
-              <MessageCircle size={11} />
-              Chat DeFi
-            </Link>
+            <div className="relative z-10 flex items-center gap-2">
+              <Link
+                href={`/${locale}/chat`}
+                className="inline-flex items-center gap-1 rounded-full bg-avax-600 px-3 py-1 text-xs font-semibold text-white hover:bg-avax-700 transition-colors"
+              >
+                <MessageCircle size={11} />
+                Chat DeFi
+              </Link>
+              <Link
+                href={`/${locale}/demo`}
+                className="inline-flex items-center gap-1 rounded-full border border-avax-500 px-3 py-1 text-xs font-semibold text-avax-600 hover:bg-avax-50 transition-colors"
+              >
+                ⚡ Demo
+              </Link>
+            </div>
           )}
         </div>
       </div>

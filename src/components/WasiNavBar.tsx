@@ -93,7 +93,6 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
   const primaryLinks = [
     { path: '', label: tNav('marketplace') },
     { path: '/collections', label: tNav('collections') },
-    { path: '/demo', label: 'Demo' },
   ]
 
   const secondaryLinksPublic = [
