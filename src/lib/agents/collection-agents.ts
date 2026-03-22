@@ -90,6 +90,8 @@ Rules:
 - Maximum 3 steps
 - If the question is not about DeFi/crypto, return []
 - NEVER include an agent if you cannot provide ALL its required fields
+- Prefer wasi-defi-sentiment over wasi-onchain-analyzer for general analysis/safety/risk questions
+- Use wasi-onchain-analyzer ONLY when the user explicitly asks about wallets, transactions, or on-chain activity
 
 CRITICAL: For any agent that requires "token", extract the token symbol from the user question (e.g. "AVAX", "BTC", "ETH"). Always use the ticker symbol, not the full name.
 
