@@ -225,10 +225,10 @@ export async function POST(request: NextRequest) {
             try {
               const { data: agentRow } = await supabase
                 .from('agents')
-                .select('creator_wallet_address')
+                .select('creator_wallet')
                 .eq('slug', batchSlugs[i])
                 .single()
-              creatorWallet = agentRow?.creator_wallet_address ?? null
+              creatorWallet = agentRow?.creator_wallet ?? null
             } catch { /* skip */ }
           }
           if (creatorWallet) {
