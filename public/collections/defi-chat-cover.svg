@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0e1a"/>
+      <stop offset="100%" style="stop-color:#0f1729"/>
+    </linearGradient>
+    <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E84142"/>
+      <stop offset="100%" style="stop-color:#ff6b6b"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2035;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#111827;stop-opacity:1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="20" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Grid lines -->
+  <g stroke="#1e293b" stroke-width="1" opacity="0.5">
+    <line x1="0" y1="105" x2="1200" y2="105"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="525" x2="1200" y2="525"/>
+    <line x1="150" y1="0" x2="150" y2="630"/>
+    <line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="450" y1="0" x2="450" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="750" y1="0" x2="750" y2="630"/>
+    <line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="1050" y1="0" x2="1050" y2="630"/>
+  </g>
+
+  <!-- Glow orb left -->
+  <circle cx="200" cy="315" r="220" fill="#E84142" opacity="0.06"/>
+  <!-- Glow orb right -->
+  <circle cx="1000" cy="315" r="180" fill="#3b82f6" opacity="0.05"/>
+
+  <!-- Chart bars (decorative) -->
+  <g opacity="0.25">
+    <rect x="80" y="380" width="30" height="80" rx="3" fill="#E84142"/>
+    <rect x="120" y="340" width="30" height="120" rx="3" fill="#E84142"/>
+    <rect x="160" y="300" width="30" height="160" rx="3" fill="#E84142"/>
+    <rect x="200" y="360" width="30" height="100" rx="3" fill="#E84142"/>
+    <rect x="240" y="310" width="30" height="150" rx="3" fill="#E84142"/>
+    <rect x="280" y="270" width="30" height="190" rx="3" fill="#ff6b6b"/>
+  </g>
+
+  <!-- Right side chart line -->
+  <polyline points="870,420 920,360 970,380 1020,300 1070,320 1120,260" 
+            stroke="#3b82f6" stroke-width="2.5" fill="none" opacity="0.4"/>
+  <circle cx="870" cy="420" r="4" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="920" cy="360" r="4" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="970" cy="380" r="4" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="1020" cy="300" r="4" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="1070" cy="320" r="4" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="1120" cy="260" r="5" fill="#3b82f6" opacity="0.7"/>
+
+  <!-- Avalanche triangle logo (centered, large) -->
+  <g filter="url(#glow)" transform="translate(540, 60)">
+    <polygon points="60,0 120,104 0,104" fill="url(#redGrad)" opacity="0.95"/>
+    <polygon points="60,20 105,95 15,95" fill="#0a0e1a" opacity="0.6"/>
+  </g>
+
+  <!-- Main title -->
+  <text x="600" y="240" font-family="system-ui, -apple-system, sans-serif" 
+        font-size="52" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">
+    DeFi Collection
+  </text>
+
+  <!-- Subtitle -->
+  <text x="600" y="285" font-family="system-ui, -apple-system, sans-serif" 
+        font-size="22" font-weight="400" fill="#94a3b8" text-anchor="middle" letter-spacing="0.5">
+    Powered by Avalanche · WasiAI
+  </text>
+
+  <!-- Divider line -->
+  <line x1="460" y1="308" x2="740" y2="308" stroke="#E84142" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- Agent cards row -->
+  <!-- Card 1 -->
+  <rect x="155" y="340" width="170" height="80" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1"/>
+  <text x="240" y="372" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">⛓️ Chainlink Price</text>
+  <text x="240" y="395" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#E84142" text-anchor="middle">$9.47</text>
+  <text x="240" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">AVAX / USD</text>
+
+  <!-- Card 2 -->
+  <rect x="345" y="340" width="170" height="80" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1"/>
+  <text x="430" y="372" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">📊 Sentiment</text>
+  <text x="430" y="395" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#22c55e" text-anchor="middle">SAFE</text>
+  <text x="430" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">Score 80 / 100</text>
+
+  <!-- Card 3 (center highlight) -->
+  <rect x="515" y="330" width="170" height="95" rx="10" fill="#1a1f35" stroke="#E84142" stroke-width="1.5"/>
+  <text x="600" y="362" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">⚡ Risk Report</text>
+  <text x="600" y="390" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="white" text-anchor="middle">LOW RISK</text>
+  <text x="600" y="408" font-family="system-ui, sans-serif" font-size="10" fill="#E84142" text-anchor="middle">Autonomous Analysis</text>
+
+  <!-- Card 4 -->
+  <rect x="705" y="340" width="170" height="80" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1"/>
+  <text x="790" y="372" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">🔍 On-Chain</text>
+  <text x="790" y="395" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#3b82f6" text-anchor="middle">ACTIVE</text>
+  <text x="790" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">4.2K txns / 24h</text>
+
+  <!-- Card 5 -->
+  <rect x="875" y="340" width="170" height="80" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1"/>
+  <text x="960" y="372" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">🛡️ Auditor</text>
+  <text x="960" y="395" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#a855f7" text-anchor="middle">SECURE</text>
+  <text x="960" y="412" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">No issues found</text>
+
+  <!-- Connector lines between cards -->
+  <line x1="325" y1="380" x2="345" y2="380" stroke="#E84142" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <line x1="515" y1="380" x2="515" y2="380" stroke="#E84142" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <line x1="685" y1="380" x2="705" y2="380" stroke="#E84142" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <line x1="875" y1="380" x2="875" y2="380" stroke="#E84142" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+
+  <!-- Bottom tagline -->
+  <text x="600" y="490" font-family="system-ui, sans-serif" font-size="14" 
+        fill="#475569" text-anchor="middle" letter-spacing="2">
+    MULTI-AGENT · ON-CHAIN · AVALANCHE
+  </text>
+
+  <!-- Bottom WasiAI badge -->
+  <rect x="520" y="510" width="160" height="36" rx="18" fill="#E84142" opacity="0.12"/>
+  <text x="600" y="533" font-family="system-ui, sans-serif" font-size="13" 
+        font-weight="600" fill="#E84142" text-anchor="middle" letter-spacing="1">
+    WasiAI
+  </text>
+</svg>
