@@ -626,6 +626,8 @@
     "deposit": {
       "title": "Add USDC to Key",
       "balanceLabel": "Current on-chain balance",
+      "walletBalanceLabel": "Your wallet",
+      "availableLabel": "Available for pipelines",
       "success": "USDC deposited successfully!",
       "done": "Done",
       "amountLabel": "Amount to deposit (USDC)",

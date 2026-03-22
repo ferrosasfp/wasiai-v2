@@ -195,13 +195,13 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, spentUsdc, onClose, 
         {/* Wallet + Available balance display */}
         <div className="mb-4 grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-green-50 px-3 py-2.5">
-            <p className="text-xs text-green-600 font-medium">Tu wallet</p>
+            <p className="text-xs text-green-600 font-medium">{t('deposit.walletBalanceLabel')}</p>
             <p className="text-base font-bold text-green-800">
               {walletBalance !== null ? `$${walletBalance.toFixed(4)} USDC` : '—'}
             </p>
           </div>
           <div className="rounded-xl bg-avax-50 px-3 py-2.5">
-            <p className="text-xs text-avax-600 font-medium">Disponible para pipelines</p>
+            <p className="text-xs text-avax-600 font-medium">{t('deposit.availableLabel')}</p>
             <p className="text-base font-bold text-avax-700">
               {keyBalance !== null
                 ? `$${Math.max(0, keyBalance - (spentUsdc ?? 0)).toFixed(4)} USDC`
