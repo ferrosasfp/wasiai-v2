@@ -108,8 +108,8 @@ export function DemoPageClient() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold mb-1 text-gray-900">{t('title')}</h1>
-      <p className="text-gray-500 mb-6 text-sm">{t('subtitle')}</p>
+      <h1 className="text-2xl font-bold mb-1 text-gray-900 text-center">{t('title')}</h1>
+      <p className="text-gray-500 mb-6 text-sm text-center">{t('subtitle')}</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Agent Key — primero, igual que chat */}
