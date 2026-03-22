@@ -25,9 +25,6 @@ const PHASE_STEPS = [
   { name: 'report',     label: '📝 Generating report...' },
 ]
 
-// Approximate timing per phase (ms) — total ~25s budget
-const PHASE_DURATIONS = [3500, 2000, 16000, 3500]
-
 export function DemoPageClient() {
   const [goal, setGoal] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -36,6 +33,7 @@ export function DemoPageClient() {
   const [result, setResult] = useState<DemoResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activePhaseIdx, setActivePhaseIdx] = useState(-1)
+  const [donePhases, setDonePhases] = useState<number[]>([])
   const timerRefs = useRef<ReturnType<typeof setTimeout>[]>([])
 
   useEffect(() => {
@@ -50,13 +48,31 @@ export function DemoPageClient() {
 
   function startPhaseAnimation() {
     clearTimers()
+    setDonePhases([])
     setActivePhaseIdx(0)
-    let elapsed = 0
-    PHASE_DURATIONS.slice(0, -1).forEach((dur, i) => {
-      elapsed += dur
-      const t = setTimeout(() => setActivePhaseIdx(i + 1), elapsed)
+  }
+
+  // When result arrives, animate remaining phases as done before showing report
+  function finishAnimation(data: DemoResponse) {
+    const total = PHASE_STEPS.length
+    // Mark phases done one by one, 600ms apart
+    for (let i = 0; i < total; i++) {
+      const t = setTimeout(() => {
+        setDonePhases(prev => prev.includes(i) ? prev : [...prev, i])
+        setActivePhaseIdx(i + 1)
+        if (i === total - 1) {
+          // All phases done — show result after short pause
+          const t2 = setTimeout(() => {
+            setActivePhaseIdx(-1)
+            setDonePhases([])
+            setLoading(false)
+            setResult(data)
+          }, 400)
+          timerRefs.current.push(t2)
+        }
+      }, i * 600)
       timerRefs.current.push(t)
-    })
+    }
   }
 
   const handleKeyChange = (val: string) => {
@@ -79,13 +95,15 @@ export function DemoPageClient() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Request failed')
-      setResult(data as DemoResponse)
+      // Don't setResult yet — animate phases finishing first
+      clearTimers()
+      finishAnimation(data as DemoResponse)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
       clearTimers()
       setActivePhaseIdx(-1)
+      setDonePhases([])
       setLoading(false)
+      setError(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -153,9 +171,9 @@ export function DemoPageClient() {
         <div className="mt-6 border rounded-lg p-4 space-y-2 bg-gray-50">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Pipeline running</p>
           {PHASE_STEPS.map((step, i) => {
-            const done = i < activePhaseIdx
-            const active = i === activePhaseIdx
-            const pending = i > activePhaseIdx
+            const done = donePhases.includes(i)
+            const active = i === activePhaseIdx && !done
+            const pending = i > activePhaseIdx && !done
             return (
               <div key={step.name} className={`flex items-center gap-2 text-sm transition-opacity duration-500 ${pending ? 'opacity-30' : 'opacity-100'}`}>
                 {done ? (
