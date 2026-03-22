@@ -144,6 +144,8 @@ export async function POST(req: NextRequest) {
   let composeResult: unknown
   let composeOk = false
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 50000)
     const composeRes = await fetch(composeUrl, {
       method: 'POST',
       headers: {
@@ -151,8 +153,9 @@ export async function POST(req: NextRequest) {
         'x-api-key': apiKey,
       },
       body: JSON.stringify({ steps: limitedSteps }),
+      signal: controller.signal,
     })
-
+    clearTimeout(timeout)
     composeResult = await composeRes.json()
     composeOk = composeRes.ok
   } catch (err) {

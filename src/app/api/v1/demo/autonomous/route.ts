@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   // AC7 — auth
   const apiKey = req.headers.get('x-api-key')
-  if (!apiKey) return NextResponse.json({ error: 'Agent Key required', code: 'missing_key' }, { status: 401 })
+  if (!apiKey?.trim()) return NextResponse.json({ error: 'Agent Key required', code: 'missing_key' }, { status: 401 })
 
   // AC8 — parse + validate goal
   let body: { goal?: unknown }
