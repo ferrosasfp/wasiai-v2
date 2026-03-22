@@ -201,18 +201,18 @@ export async function POST(request: NextRequest) {
           .update({ settled_at: new Date().toISOString() })
           .in('id', batchCallIds)
 
-        // WAS-218: Post-settlement sync — update budget_usdc from on-chain truth
+        // WAS-275: Post-settlement sync — sync budget_usdc and spent_usdc atomically
         try {
           const postSettleBalance = await getKeyBalanceOnChain(keyRow.key_hash)
-          await supabase
-            .from('agent_keys')
-            .update({
-              budget_usdc: postSettleBalance,
-              balance_synced_at: new Date().toISOString(),
-            })
-            .eq('key_hash', keyRow.key_hash)
+          const { error: rpcErr } = await supabase.rpc('sync_key_after_settlement', {
+            p_key_id: keyId,
+            p_call_ids: batchCallIds,
+            p_new_budget: postSettleBalance,
+          })
+          if (rpcErr) throw rpcErr
+          // balance_synced_at se actualiza dentro del RPC — no hace falta UPDATE separado
         } catch (syncErr) {
-          logger.warn('[admin/settlement] post-settlement balance sync failed', { keyId, err: String(syncErr).slice(0, 200) })
+          logger.warn('[admin/settlement] post-settlement sync failed', { keyId, err: String(syncErr).slice(0, 200) })
         }
 
         // Actualizar pending_earnings_usdc en creator_profiles por cada creator
