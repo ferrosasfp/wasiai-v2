@@ -83,16 +83,19 @@ Available agents (ONLY use these):
 ${agentList}
 
 Rules:
-- Return ONLY a valid JSON array, no explanation
-- First step MUST have "input" with the extracted parameters as a JSON object (not a string)
-- Subsequent steps use "pass_output": true
+- Return ONLY a valid JSON array, no explanation, no markdown
+- First step MUST have "input" object with ALL required fields extracted from the user question
+- The field name MUST match exactly what the agent expects (e.g. "token" not "symbol" or "name")
+- Subsequent steps use "pass_output": true (no "input" field)
 - Maximum 3 steps
 - If the question is not about DeFi/crypto, return []
-- Match agents to what the user is actually asking — don't over-fetch
-- NEVER include an agent if you cannot provide ALL its required fields from the user's question
-- Use wasi-onchain-analyzer ONLY when user explicitly asks about on-chain data, contract analysis, or wallet activity
+- NEVER include an agent if you cannot provide ALL its required fields
 
-Format: [{"agent_slug":"...","input":{"key":"value"}},{"agent_slug":"...","pass_output":true}]
+CRITICAL: For any agent that requires "token", extract the token symbol from the user question (e.g. "AVAX", "BTC", "ETH"). Always use the ticker symbol, not the full name.
 
-IMPORTANT: "input" must be a JSON object (not a string). Example: {"agent_slug":"wasi-chainlink-price","input":{"token":"AVAX"}}`
+Example for "Analyze AVAX risk":
+[{"agent_slug":"wasi-chainlink-price","input":{"token":"AVAX"}},{"agent_slug":"wasi-risk-report","pass_output":true}]
+
+Example for "Is AVAX safe?":
+[{"agent_slug":"wasi-defi-sentiment","input":{"token":"AVAX"}}]`
 }
