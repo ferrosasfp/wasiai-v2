@@ -70,7 +70,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'I can only analyze DeFi/crypto topics', code: 'no_agents_matched', phases }, { status: 422 })
   }
   const limitedSteps = filteredSteps.slice(0, 3)
-  phases.push({ name: 'planning', status: 'ok', detail: `${limitedSteps.length} steps` })
+  const agentChain = limitedSteps.map(s => (s as Record<string, unknown>).agent_slug as string).join(' → ')
+  phases.push({ name: 'planning', status: 'ok', detail: agentChain })
 
   // --- Phase: execution ---
   const composeUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app.wasiai.io'}/api/v1/compose`
