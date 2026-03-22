@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   let steps: unknown[]
   try {
     const plannerSystem = buildPlannerPrompt(agents)
-    const plannerRes = await callLLM({ messages: [{ role: 'system', content: plannerSystem }, { role: 'user', content: goal }], temperature: 0, maxTokens: 512 })
+    const plannerRes = await callLLM({ messages: [{ role: 'system', content: plannerSystem }, { role: 'user', content: goal }], temperature: 0, maxTokens: 512, model: 'llama-3.1-8b-instant' })
     const raw = plannerRes.result.trim()
     const match = raw.match(/\[[\s\S]*\]/)
     steps = JSON.parse(match ? match[0] : raw)
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   // --- Phase: report (fail-open) ---
   let report: string
   try {
-    const reportRes = await callLLM({ messages: [{ role: 'system', content: REPORT_SYSTEM }, { role: 'user', content: JSON.stringify(composeResult) }], temperature: 0.3, maxTokens: 400 })
+    const reportRes = await callLLM({ messages: [{ role: 'system', content: REPORT_SYSTEM }, { role: 'user', content: JSON.stringify(composeResult) }], temperature: 0.3, maxTokens: 400, model: 'llama-3.1-8b-instant' })
     report = reportRes.result
     phases.push({ name: 'report', status: 'ok' })
   } catch {
