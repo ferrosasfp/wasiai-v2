@@ -48,6 +48,9 @@ const nextConfig = {
       { protocol: 'https', hostname: 'gateway.pinata.cloud' },
       { protocol: 'https', hostname: '*.ipfs.dweb.link' },
       { protocol: 'https', hostname: 'bdwvrwzvsldephfibmuu.supabase.co' },
+      { protocol: 'https', hostname: 'wasiai-prod.vercel.app' },
+      { protocol: 'https', hostname: 'app.wasiai.io' },
+      { protocol: 'https', hostname: 'caldzjhjgctpgodldqav.supabase.co' },
     ],
   },
   async redirects() {
