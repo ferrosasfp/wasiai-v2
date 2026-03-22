@@ -59,29 +59,29 @@ export const CollectionCard = React.memo(function CollectionCard({
         {collection.description && (
           <p className="mt-1 text-sm text-gray-500 line-clamp-2">{collection.description}</p>
         )}
-        <div className="mt-auto pt-3 flex items-center justify-between">
+        <div className="mt-auto pt-3 flex items-center">
           <span className="text-xs text-gray-400">
             <Layers size={12} className="inline mr-1" />
             {t('agents', { count: collection.agent_count })}
           </span>
-          {collection.slug === 'defi-chat' && (
-            <div className="relative z-10 flex items-center gap-2">
-              <Link
-                href={`/${locale}/chat`}
-                className="inline-flex items-center gap-1 rounded-full bg-avax-600 px-3 py-1 text-xs font-semibold text-white hover:bg-avax-700 transition-colors"
-              >
-                <MessageCircle size={11} />
-                Chat DeFi
-              </Link>
-              <Link
-                href={`/${locale}/demo`}
-                className="inline-flex items-center gap-1 rounded-full border border-avax-500 px-3 py-1 text-xs font-semibold text-avax-600 hover:bg-avax-50 transition-colors"
-              >
-                ⚡ Demo
-              </Link>
-            </div>
-          )}
         </div>
+        {collection.slug === 'defi-chat' && (
+          <div className="relative z-10 flex items-center gap-2 pt-2">
+            <Link
+              href={`/${locale}/chat`}
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-avax-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-avax-700 transition-colors"
+            >
+              <MessageCircle size={11} />
+              Chat DeFi
+            </Link>
+            <Link
+              href={`/${locale}/demo`}
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-avax-500 px-3 py-1.5 text-xs font-semibold text-avax-600 hover:bg-avax-50 transition-colors"
+            >
+              ⚡ Demo
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )
