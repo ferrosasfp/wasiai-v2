@@ -56,18 +56,38 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }
   const [status, setStatus]         = useState<'idle' | 'signing' | 'submitting' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg]     = useState('')
   const [txHash, setTxHash]         = useState('')
-  const [balance, setBalance]       = useState<number | null>(null)
+  const [keyBalance, setKeyBalance]       = useState<number | null>(null)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
   const [depositWarning, setDepositWarning] = useState('')  // HU-058
   const { address, chain } = useWallet()
   const { signTypedData, isReady } = useUnifiedWalletClient()
 
-  // Load current on-chain balance
+  // Load key on-chain balance
   useEffect(() => {
     fetch(`/api/agent-keys/${keyId}/balance`)
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setBalance(d.onChainBalance) })
+      .then(d => { if (d) setKeyBalance(d.onChainBalance) })
       .catch(() => {})
   }, [keyId])
+
+  // Load wallet USDC balance
+  useEffect(() => {
+    if (!address) return
+    const ERC20_BALANCE_OF = '0x70a08231'
+    const paddedAddr = address.replace('0x','').toLowerCase().padStart(64,'0')
+    fetch('https://api.avax.network/ext/bc/C/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc:'2.0', method:'eth_call', id:1,
+        params:[{ to: USDC_ADDRESS, data: ERC20_BALANCE_OF + paddedAddr }, 'latest'] })
+    })
+      .then(r => r.json())
+      .then((d: { result?: string }) => {
+        const raw = d?.result
+        if (raw && raw !== '0x') setWalletBalance(Number(BigInt(raw)) / 1e6)
+      })
+      .catch(() => {})
+  }, [address])
 
   async function handleDeposit() {
     setErrorMsg('')
@@ -171,13 +191,21 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, onClose, onSuccess }
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
 
-        {/* On-chain balance display */}
-        {balance !== null && (
-          <div className="mb-4 rounded-xl bg-blue-50 px-4 py-3">
-            <p className="text-xs text-blue-600 font-medium">{t('deposit.balanceLabel')}</p>
-            <p className="text-lg font-bold text-blue-800">${balance.toFixed(4)} USDC</p>
+        {/* Wallet + Key balance display */}
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-green-50 px-3 py-2.5">
+            <p className="text-xs text-green-600 font-medium">Tu wallet</p>
+            <p className="text-base font-bold text-green-800">
+              {walletBalance !== null ? `$${walletBalance.toFixed(4)} USDC` : '—'}
+            </p>
           </div>
-        )}
+          <div className="rounded-xl bg-blue-50 px-3 py-2.5">
+            <p className="text-xs text-blue-600 font-medium">En contrato (key)</p>
+            <p className="text-base font-bold text-blue-800">
+              {keyBalance !== null ? `$${keyBalance.toFixed(4)} USDC` : '—'}
+            </p>
+          </div>
+        </div>
 
         {status === 'success' ? (
           <div className="space-y-3 text-center">
