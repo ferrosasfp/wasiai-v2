@@ -44,7 +44,7 @@ function getProviders(preferredModel?: string): Provider[] {
       name:   'cerebras',
       url:    'https://api.cerebras.ai/v1/chat/completions',
       apiKey: process.env.CEREBRAS_API_KEY,
-      model:  'llama-3.3-70b',
+      model:  'llama3.1-8b',
     },
     {
       name:   'together',
