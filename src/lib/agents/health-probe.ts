@@ -17,15 +17,65 @@ interface HealthCheckResult {
   fix?: string
 }
 
+/**
+ * Probe a single URL via HTTPS.
+ * Returns { statusCode, latency_ms } or throws on connection error/timeout.
+ */
+function httpsProbe(
+  resolvedIp: string,
+  hostname: string,
+  port: number,
+  path: string,
+  method: 'GET' | 'POST',
+  body?: string,
+  timeoutMs = 5000,
+): Promise<{ statusCode: number; latency_ms: number }> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now()
+    const options = {
+      host:       resolvedIp.includes(':') ? `[${resolvedIp}]` : resolvedIp,
+      port,
+      path,
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Host':         hostname,
+        ...(body ? { 'Content-Length': Buffer.byteLength(body).toString() } : {}),
+      },
+      servername: hostname,
+    }
+    const req = https.request(options, (res) => {
+      res.resume() // drain
+      resolve({ statusCode: res.statusCode ?? 0, latency_ms: Date.now() - start })
+    })
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('timeout')))
+    req.on('error', reject)
+    if (body) req.write(body)
+    req.end()
+  })
+}
+
+/**
+ * Try GET <origin>/health as a fallback when the main endpoint returns 4xx.
+ * Returns true if /health responds 2xx, false otherwise.
+ */
+async function probeHealthEndpoint(endpointUrl: string, resolvedIp: string): Promise<boolean> {
+  try {
+    const urlObj = new URL(endpointUrl)
+    const port = Number(urlObj.port) || 443
+    const { statusCode } = await httpsProbe(resolvedIp, urlObj.hostname, port, '/health', 'GET', undefined, 4000)
+    return statusCode >= 200 && statusCode < 300
+  } catch {
+    return false
+  }
+}
+
 export async function probeEndpoint(endpointUrl: string, agentId: string): Promise<void> {
   // SECURITY_NOTE: SERVICE_ROLE key es necesaria aquí porque el probe corre sin
   // sesión de usuario (fire-and-forget, fuera de cualquier request autenticado).
-  // Necesita escribir en la tabla `agents` para actualizar el health status.
-  // El scope está limitado únicamente a updates en `agents` via `.eq('id', agentId)`.
   const serviceClient = createServiceClient()
 
-  // Step 1: SSRF check — validateEndpointUrlAsync antes de cualquier fetch
-  // Doble validación intencional: anti DNS rebinding entre registro y probe
+  // Step 1: SSRF check
   let resolvedIp: string
   try {
     resolvedIp = await validateEndpointUrlAsync(endpointUrl)
@@ -38,8 +88,6 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
     })
     return
   }
-
-  // Guard: resolvedIp empty means DNS probe unavailable (Edge runtime) — fail-closed
   if (!resolvedIp) {
     await updateAgentHealth(serviceClient, agentId, 'reviewing', {
       passed: false,
@@ -50,162 +98,134 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
     return
   }
 
-  // Step 2: Probe con timeout 5s — formato {"ping":true} compatible con /health existente
-  // Conecta directamente a la IP validada (anti DNS rebinding) con SNI explícito
-  const start = Date.now()
-  await new Promise<void>((resolve) => {
+  // Step 2: POST probe
+  try {
     const urlObj = new URL(endpointUrl)
-    const options = {
-      host: resolvedIp.includes(':') ? `[${resolvedIp}]` : resolvedIp,  // IPv6 requiere brackets
-      port: Number(urlObj.port) || 443,
-      path: urlObj.pathname + urlObj.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Host': urlObj.hostname,  // SNI y routing HTTP correcto
-      },
-      servername: urlObj.hostname, // TLS SNI explícito
+    const port = Number(urlObj.port) || 443
+    const { statusCode, latency_ms } = await httpsProbe(
+      resolvedIp, urlObj.hostname, port,
+      urlObj.pathname + urlObj.search,
+      'POST', JSON.stringify({ ping: true }),
+    )
+
+    if (statusCode >= 200 && statusCode < 300) {
+      await updateAgentHealth(serviceClient, agentId, 'active', { passed: true, latency_ms })
+      return
     }
-    const body = JSON.stringify({ ping: true })
-    const req = https.request(options, async (res) => {
-      const latency_ms = Date.now() - start
-      if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-        await updateAgentHealth(serviceClient, agentId, 'active', {
-          passed: true,
-          latency_ms,
-        })
-      } else if (res.statusCode && res.statusCode >= 400 && res.statusCode < 500) {
-        // 4xx = endpoint vivo, solo rechaza el input — status reviewing
-        await updateAgentHealth(serviceClient, agentId, 'reviewing', {
-          passed: false,
-          reason: 'http_error',
-          status_code: res.statusCode,
-          message: `Endpoint returned HTTP ${res.statusCode} — endpoint is live but requires valid input.`,
-          fix: 'Ensure your endpoint returns HTTP 2xx for valid POST requests.',
-        })
-      } else {
-        // 5xx = error del servidor → reviewing (WAS-277: draft → reviewing)
-        await updateAgentHealth(serviceClient, agentId, 'reviewing', {
-          passed: false,
-          reason: 'http_error',
-          status_code: res.statusCode,
-          message: `Endpoint returned HTTP ${res.statusCode} — server error.`,
-          fix: 'Check your server logs. Endpoint must return HTTP 2xx.',
-        })
+
+    if (statusCode >= 400 && statusCode < 500) {
+      // 4xx — endpoint vivo pero rechaza input. Intentar GET /health como fallback.
+      const healthOk = await probeHealthEndpoint(endpointUrl, resolvedIp)
+      if (healthOk) {
+        await updateAgentHealth(serviceClient, agentId, 'active', { passed: true, latency_ms })
+        return
       }
-      resolve()
-    })
-    req.setTimeout(5000, () => {
-      req.destroy(new Error('timeout'))
-    })
-    req.on('error', async (err) => {
-      const isTimeout = err.message === 'timeout'
       await updateAgentHealth(serviceClient, agentId, 'reviewing', {
         passed: false,
-        reason: isTimeout ? 'timeout' : 'connection_error',
-        message: isTimeout
-          ? 'Endpoint did not respond within 5 seconds.'
-          : 'Could not connect to the endpoint.',
-        fix: 'Verify your endpoint is publicly accessible and responds within 5s.',
+        reason: 'http_error',
+        status_code: statusCode,
+        message: `Endpoint returned HTTP ${statusCode}.`,
+        fix: 'Ensure your endpoint returns HTTP 2xx, or expose a public GET /health endpoint.',
       })
-      resolve()
+      return
+    }
+
+    // 5xx
+    await updateAgentHealth(serviceClient, agentId, 'reviewing', {
+      passed: false,
+      reason: 'http_error',
+      status_code: statusCode,
+      message: `Endpoint returned HTTP ${statusCode} — server error.`,
+      fix: 'Check your server logs. Endpoint must return HTTP 2xx.',
     })
-    req.write(body)
-    req.end()
-  })
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.message === 'timeout'
+    await updateAgentHealth(serviceClient, agentId, 'reviewing', {
+      passed: false,
+      reason: isTimeout ? 'timeout' : 'connection_error',
+      message: isTimeout
+        ? 'Endpoint did not respond within 5 seconds.'
+        : 'Could not connect to the endpoint.',
+      fix: 'Verify your endpoint is publicly accessible and responds within 5s.',
+    })
+  }
 }
 
 /**
  * WAS-277: Synchronous health probe — awaitable from request handlers.
- * Returns probe result instead of writing to DB directly.
- * Caller is responsible for DB update and response.
  */
 export async function probeEndpointSync(endpointUrl: string): Promise<{
   passed: boolean
   status: 'active' | 'reviewing'
   healthCheck: HealthCheckResult
 }> {
-  // Step 1: SSRF check — idéntico a probeEndpoint
+  // Step 1: SSRF check
   let resolvedIp: string
   try {
     resolvedIp = await validateEndpointUrlAsync(endpointUrl)
   } catch {
     return {
-      passed: false,
-      status: 'reviewing',
-      healthCheck: {
-        passed: false,
-        reason: 'dns_rebinding_blocked',
-        message: 'Endpoint URL is not publicly reachable.',
-        fix: 'Use a publicly accessible HTTPS URL.',
-      },
+      passed: false, status: 'reviewing',
+      healthCheck: { passed: false, reason: 'dns_rebinding_blocked', message: 'Endpoint URL is not publicly reachable.', fix: 'Use a publicly accessible HTTPS URL.' },
     }
   }
   if (!resolvedIp) {
     return {
-      passed: false,
-      status: 'reviewing',
-      healthCheck: {
-        passed: false,
-        reason: 'dns_rebinding_blocked',
-        message: 'DNS probe unavailable.',
-        fix: 'Use a publicly accessible HTTPS URL.',
-      },
+      passed: false, status: 'reviewing',
+      healthCheck: { passed: false, reason: 'dns_rebinding_blocked', message: 'DNS probe unavailable.', fix: 'Use a publicly accessible HTTPS URL.' },
     }
   }
 
-  // Step 2: Probe — misma lógica que probeEndpoint pero retorna en lugar de escribir en DB
-  const start = Date.now()  // WAS-277: declarar antes del Promise para capturar latencia
-  return new Promise<{ passed: boolean; status: 'active' | 'reviewing'; healthCheck: HealthCheckResult }>((resolve) => {
+  // Step 2: POST probe
+  try {
     const urlObj = new URL(endpointUrl)
-    // Opciones idénticas a probeEndpoint — conecta a IP validada con SNI explícito (anti DNS rebinding)
-    const options = {
-      host:       resolvedIp.includes(':') ? `[${resolvedIp}]` : resolvedIp,
-      port:       Number(urlObj.port) || 443,
-      path:       urlObj.pathname + urlObj.search,
-      method:     'POST',
-      headers:    {
-        'Content-Type': 'application/json',
-        'Host':         urlObj.hostname,
-      },
-      servername: urlObj.hostname,
+    const port = Number(urlObj.port) || 443
+    const { statusCode, latency_ms } = await httpsProbe(
+      resolvedIp, urlObj.hostname, port,
+      urlObj.pathname + urlObj.search,
+      'POST', JSON.stringify({ ping: true }),
+    )
+
+    if (statusCode >= 200 && statusCode < 300) {
+      return { passed: true, status: 'active', healthCheck: { passed: true, latency_ms } }
     }
-    const body = JSON.stringify({ ping: true })
-    const req = https.request(options, (res) => {
-      const latency_ms = Date.now() - start
-      if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-        resolve({ passed: true, status: 'active', healthCheck: { passed: true, latency_ms } })
-      } else {
-        resolve({
-          passed: false,
-          status: 'reviewing',
-          healthCheck: {
-            passed: false,
-            reason: 'http_error',
-            status_code: res.statusCode,
-            message: `Endpoint returned HTTP ${res.statusCode}.`,
-            fix: 'Ensure your endpoint returns HTTP 2xx for POST requests.',
-          },
-        })
+
+    if (statusCode >= 400 && statusCode < 500) {
+      // 4xx — intentar GET /health como fallback
+      const healthOk = await probeHealthEndpoint(endpointUrl, resolvedIp)
+      if (healthOk) {
+        return { passed: true, status: 'active', healthCheck: { passed: true, latency_ms } }
       }
-    })
-    req.setTimeout(5000, () => req.destroy(new Error('timeout')))
-    req.on('error', (err) => {
-      const isTimeout = err.message === 'timeout'
-      resolve({
-        passed: false,
-        status: 'reviewing',
+      return {
+        passed: false, status: 'reviewing',
         healthCheck: {
-          passed: false,
-          reason: isTimeout ? 'timeout' : 'connection_error',
-          message: isTimeout ? 'Endpoint did not respond within 5 seconds.' : 'Could not connect.',
-          fix: 'Verify your endpoint is publicly accessible.',
+          passed: false, reason: 'http_error', status_code: statusCode,
+          message: `Endpoint returned HTTP ${statusCode}.`,
+          fix: 'Ensure your endpoint returns HTTP 2xx, or expose a public GET /health endpoint.',
         },
-      })
-    })
-    req.write(body)
-    req.end()
-  })
+      }
+    }
+
+    return {
+      passed: false, status: 'reviewing',
+      healthCheck: {
+        passed: false, reason: 'http_error', status_code: statusCode,
+        message: `Endpoint returned HTTP ${statusCode}.`,
+        fix: 'Ensure your endpoint returns HTTP 2xx for POST requests.',
+      },
+    }
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.message === 'timeout'
+    return {
+      passed: false, status: 'reviewing',
+      healthCheck: {
+        passed: false,
+        reason: isTimeout ? 'timeout' : 'connection_error',
+        message: isTimeout ? 'Endpoint did not respond within 5 seconds.' : 'Could not connect.',
+        fix: 'Verify your endpoint is publicly accessible.',
+      },
+    }
+  }
 }
 
 async function updateAgentHealth(
