@@ -564,7 +564,7 @@ export async function POST(
     })
   }
 
-  return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined)
+  return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined, { upstreamFailed: result.status === 'error' })
   } catch (err) {
     logger.error('[invoke] unhandled error', { err })
     // S-10: Never expose raw error details in production
@@ -632,12 +632,10 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   const startMs = Date.now()
   let data: unknown
   let status: 'success' | 'error' = 'success'
+  // WAS-284: hint para mapear el error del upstream al HTTP status correcto en buildResponse
+  let httpStatusHint: 502 | 503 | 504 | undefined = undefined
 
   try {
-    // WAS-73: wrapWithCircuitBreaker handles success/failure counting.
-    // retryWithBackoff handles network-level retries (TypeError/AbortError/TimeoutError).
-    // B-01: HTTP 5xx throws so wrapWithCircuitBreaker calls recordFailure correctly.
-    // HTTP 4xx does NOT throw — caller error, not provider failure.
     const upstream = await wrapWithCircuitBreaker(
       slug,
       async () => {
@@ -652,7 +650,7 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
               } : {}),
             },
             body: JSON.stringify(body),
-            signal: AbortSignal.timeout(10_000), // PERF-02: 10s max, no infinite hangs
+            signal: AbortSignal.timeout(10_000),
           })
         )
         if (!res.ok && res.status >= 500) {
@@ -663,13 +661,31 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
       model.user_id as string
     )
     data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
-    if (!upstream.ok) status = 'error'
+    if (!upstream.ok) {
+      status = 'error'
+      // WAS-284: 4xx no lanza — se detecta aquí, después del wrapper
+      httpStatusHint = 502  // client error del upstream → Bad Gateway
+    }
   } catch (err) {
-    data = { error: 'Upstream unreachable', detail: String(err) }
     status = 'error'
+    // WAS-284: discriminar tipo de error para HTTP status correcto
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      // AbortSignal.timeout() lanza DOMException con name='TimeoutError' en Node.js 18+
+      data = { error: 'Upstream timeout', detail: 'Endpoint did not respond within 10 seconds.' }
+      httpStatusHint = 504
+    } else if (err instanceof Error && /^Upstream HTTP (\d+)$/.test(err.message)) {
+      // Error sintético lanzado por el wrapper para 5xx: 'Upstream HTTP 503' etc.
+      const upstreamStatus = Number(err.message.match(/\d+/)?.[0] ?? 502)
+      data = { error: `Upstream ${upstreamStatus}` }
+      httpStatusHint = upstreamStatus >= 500 ? 503 : 502
+    } else {
+      // Connection error (TypeError ECONNREFUSED, ENOTFOUND, etc.)
+      data = { error: 'Upstream unreachable', detail: String(err) }
+      httpStatusHint = 502
+    }
   }
 
-  return { data, status, latencyMs: Date.now() - startMs }
+  return { data, status, latencyMs: Date.now() - startMs, httpStatusHint }
 }
 
 async function logCall(
@@ -725,12 +741,18 @@ interface PricingInfo {
 
 function buildResponse(
   model: Record<string, unknown>,
-  result: { data: unknown; status: string; latencyMs: number },
+  result: { data: unknown; status: string; latencyMs: number; httpStatusHint?: number },
   txHash?: string,
   receiptSignature?: string,
   pricingInfo?: PricingInfo,
   callId?: string,
+  options?: { upstreamFailed?: boolean },  // WAS-284: true solo en Route B (x402) cuando upstream falla
 ) {
+  // WAS-284: propagar el HTTP status del upstream cuando hay error
+  const httpStatus = result.status === 'error' && result.httpStatusHint
+    ? result.httpStatusHint
+    : 200
+
   return NextResponse.json(
     {
       result: result.data,
@@ -748,13 +770,12 @@ function buildResponse(
         tx_hash: txHash ?? null,
         status: result.status,
         call_id: callId ?? undefined,
+        // WAS-284: upstream_failed = true en Route B cuando el settlement ocurrió pero el upstream falló
+        ...(options?.upstreamFailed ? { upstream_failed: true } : {}),
       },
-      // Cryptographic receipt — lets the caller audit that this call was real.
-      // Verify with: verifyReceipt(receipt, signature) from @/lib/receipts/signReceipt
       receipt: receiptSignature
         ? { signature: receiptSignature }
         : undefined,
-      // AC9: desglose de precios
       pricing: pricingInfo
         ? {
             creator_price:     pricingInfo.creatorPrice,
@@ -764,7 +785,7 @@ function buildResponse(
           }
         : undefined,
     },
-    { headers: X402_CORS_HEADERS },
+    { status: httpStatus, headers: X402_CORS_HEADERS },
   )
 }
 
