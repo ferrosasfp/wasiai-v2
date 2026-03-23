@@ -84,8 +84,8 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
           fix: 'Ensure your endpoint returns HTTP 2xx for valid POST requests.',
         })
       } else {
-        // 5xx = error del servidor → draft
-        await updateAgentHealth(serviceClient, agentId, 'draft', {
+        // 5xx = error del servidor → reviewing (WAS-277: draft → reviewing)
+        await updateAgentHealth(serviceClient, agentId, 'reviewing', {
           passed: false,
           reason: 'http_error',
           status_code: res.statusCode,
@@ -100,7 +100,7 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
     })
     req.on('error', async (err) => {
       const isTimeout = err.message === 'timeout'
-      await updateAgentHealth(serviceClient, agentId, 'draft', {
+      await updateAgentHealth(serviceClient, agentId, 'reviewing', {
         passed: false,
         reason: isTimeout ? 'timeout' : 'connection_error',
         message: isTimeout
@@ -109,6 +109,99 @@ export async function probeEndpoint(endpointUrl: string, agentId: string): Promi
         fix: 'Verify your endpoint is publicly accessible and responds within 5s.',
       })
       resolve()
+    })
+    req.write(body)
+    req.end()
+  })
+}
+
+/**
+ * WAS-277: Synchronous health probe — awaitable from request handlers.
+ * Returns probe result instead of writing to DB directly.
+ * Caller is responsible for DB update and response.
+ */
+export async function probeEndpointSync(endpointUrl: string): Promise<{
+  passed: boolean
+  status: 'active' | 'reviewing'
+  healthCheck: HealthCheckResult
+}> {
+  // Step 1: SSRF check — idéntico a probeEndpoint
+  let resolvedIp: string
+  try {
+    resolvedIp = await validateEndpointUrlAsync(endpointUrl)
+  } catch {
+    return {
+      passed: false,
+      status: 'reviewing',
+      healthCheck: {
+        passed: false,
+        reason: 'dns_rebinding_blocked',
+        message: 'Endpoint URL is not publicly reachable.',
+        fix: 'Use a publicly accessible HTTPS URL.',
+      },
+    }
+  }
+  if (!resolvedIp) {
+    return {
+      passed: false,
+      status: 'reviewing',
+      healthCheck: {
+        passed: false,
+        reason: 'dns_rebinding_blocked',
+        message: 'DNS probe unavailable.',
+        fix: 'Use a publicly accessible HTTPS URL.',
+      },
+    }
+  }
+
+  // Step 2: Probe — misma lógica que probeEndpoint pero retorna en lugar de escribir en DB
+  const start = Date.now()  // WAS-277: declarar antes del Promise para capturar latencia
+  return new Promise<{ passed: boolean; status: 'active' | 'reviewing'; healthCheck: HealthCheckResult }>((resolve) => {
+    const urlObj = new URL(endpointUrl)
+    // Opciones idénticas a probeEndpoint — conecta a IP validada con SNI explícito (anti DNS rebinding)
+    const options = {
+      host:       resolvedIp.includes(':') ? `[${resolvedIp}]` : resolvedIp,
+      port:       Number(urlObj.port) || 443,
+      path:       urlObj.pathname + urlObj.search,
+      method:     'POST',
+      headers:    {
+        'Content-Type': 'application/json',
+        'Host':         urlObj.hostname,
+      },
+      servername: urlObj.hostname,
+    }
+    const body = JSON.stringify({ ping: true })
+    const req = https.request(options, (res) => {
+      const latency_ms = Date.now() - start
+      if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+        resolve({ passed: true, status: 'active', healthCheck: { passed: true, latency_ms } })
+      } else {
+        resolve({
+          passed: false,
+          status: 'reviewing',
+          healthCheck: {
+            passed: false,
+            reason: 'http_error',
+            status_code: res.statusCode,
+            message: `Endpoint returned HTTP ${res.statusCode}.`,
+            fix: 'Ensure your endpoint returns HTTP 2xx for POST requests.',
+          },
+        })
+      }
+    })
+    req.setTimeout(5000, () => req.destroy(new Error('timeout')))
+    req.on('error', (err) => {
+      const isTimeout = err.message === 'timeout'
+      resolve({
+        passed: false,
+        status: 'reviewing',
+        healthCheck: {
+          passed: false,
+          reason: isTimeout ? 'timeout' : 'connection_error',
+          message: isTimeout ? 'Endpoint did not respond within 5 seconds.' : 'Could not connect.',
+          fix: 'Verify your endpoint is publicly accessible.',
+        },
+      })
     })
     req.write(body)
     req.end()

@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
+import { probeEndpointSync } from '@/lib/agents/health-probe'
 import { logger } from '@/lib/logger'
 
 // HU-1.2: 'draft' added to support multi-step publish flow
@@ -49,7 +50,7 @@ export async function PATCH(
   // Ownership check
   const { data: existing } = await serviceClient
     .from('agents')
-    .select('id, creator_id, status, registration_type')
+    .select('id, creator_id, status, registration_type, endpoint_url')
     .eq('slug', slug)
     .single()
 
@@ -73,6 +74,42 @@ export async function PATCH(
     updatePayload.chain_registered_at = new Date().toISOString()
   } else if (result.data.registration_type === 'off_chain') {
     updatePayload.registration_type = 'off_chain'
+  }
+
+  if (result.data.status === 'active') {
+    // WAS-277: Verificar endpoint antes de activar — endpoint_url ya viene del select inicial
+    if (!existing.endpoint_url) {
+      return NextResponse.json(
+        { error: 'endpoint_url is required to activate an agent', code: 'missing_endpoint' },
+        { status: 422 },
+      )
+    }
+
+    const probeResult = await probeEndpointSync(existing.endpoint_url)
+
+    if (!probeResult.passed) {
+      // Guardar resultado del probe en DB (reviewing + health_check actualizado)
+      await serviceClient.from('agents').update({
+        status: 'reviewing',
+        health_check: probeResult.healthCheck,
+        last_checked_at: new Date().toISOString(),
+      }).eq('id', existing.id)
+
+      return NextResponse.json(
+        {
+          error: 'Endpoint health check failed',
+          code: 'endpoint_probe_failed',
+          detail: probeResult.healthCheck.message,
+          fix: probeResult.healthCheck.fix,
+          status: 'reviewing',
+        },
+        { status: 422 },
+      )
+    }
+
+    // Probe passed — incluir health_check en el update
+    updatePayload.health_check = probeResult.healthCheck
+    updatePayload.last_checked_at = new Date().toISOString()
   }
 
   const { error } = await serviceClient
