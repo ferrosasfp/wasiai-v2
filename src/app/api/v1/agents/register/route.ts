@@ -93,6 +93,32 @@ const RegisterAgentSchema = z.object({
   creator_email: z.string().email().optional(),
 })
 
+// WAS-282: Bulk email providers exempt from multi-alias check
+const BULK_EMAIL_PROVIDERS = new Set([
+  'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.es', 'hotmail.co.uk',
+  'outlook.com', 'outlook.es', 'yahoo.com', 'yahoo.es', 'yahoo.co.uk',
+  'icloud.com', 'me.com', 'mac.com', 'proton.me', 'protonmail.com',
+  'live.com', 'msn.com',
+])
+
+async function resolveAccountStatus(
+  email: string,
+  userId: string,
+  svc: ReturnType<typeof createServiceClient>,
+): Promise<'active' | 'pending_review'> {
+  const domain = email.split('@')[1]?.toLowerCase() ?? ''
+  if (!domain || BULK_EMAIL_PROVIDERS.has(domain)) return 'active'
+
+  // WAS-282: excluir el propio userId para evitar falsos positivos (bug off-by-one)
+  const { count: domainCount } = await svc
+    .from('creator_profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('email_domain', domain)
+    .neq('id', userId)
+
+  return (domainCount ?? 0) >= 3 ? 'pending_review' : 'active'
+}
+
 async function resolveCreatorFromEmail(
   serviceClient: ReturnType<typeof createServiceClient>,
   email: string
@@ -128,6 +154,8 @@ async function resolveCreatorFromEmail(
     id: userId,
     username: `${email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase()}_${Date.now()}`,
     display_name: email.split('@')[0],
+    email_domain: email.split('@')[1]?.toLowerCase() ?? null,
+    account_status: await resolveAccountStatus(email, userId, serviceClient),
   }, { onConflict: 'id' })
 
   return userId
@@ -162,7 +190,7 @@ async function bootstrapAnonymousCreator(
     // Trigger no lo creó — insertar manualmente como fallback
     const { error: profileError } = await serviceClient
       .from('creator_profiles')
-      .insert({ id: userId, username: `agent_${uuid.slice(0, 8)}`, display_name: 'Agent Publisher' })
+      .insert({ id: userId, username: `agent_${uuid.slice(0, 8)}`, display_name: 'Agent Publisher', email_domain: 'bootstrap.wasiai.internal', account_status: 'active' })
     if (profileError) {
       await serviceClient.auth.admin.deleteUser(userId).catch(err =>
         console.error('[register] bootstrap rollback failed — creator_profile insert', { userId, err })

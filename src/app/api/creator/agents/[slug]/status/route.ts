@@ -77,6 +77,24 @@ export async function PATCH(
   }
 
   if (result.data.status === 'active') {
+    // WAS-282: block activation if creator account is pending_review
+    const { data: profile } = await serviceClient
+      .from('creator_profiles')
+      .select('account_status')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.account_status === 'pending_review') {
+      return NextResponse.json(
+        {
+          error: 'Account pending review',
+          code: 'account_pending_review',
+          message: 'Your account is under review. Contact support to publish agents.',
+        },
+        { status: 403 },
+      )
+    }
+
     // WAS-277: Verificar endpoint antes de activar — endpoint_url ya viene del select inicial
     if (!existing.endpoint_url) {
       return NextResponse.json(
