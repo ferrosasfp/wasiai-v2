@@ -160,7 +160,7 @@ export async function POST(
     : null
 
   const [{ data: model, error: modelError }, keyRowResult] = await Promise.all([
-    supabase.from('agents').select('id, slug, status, name, endpoint_url, webhook_secret, price_per_call, creator_id, category, input_schema, max_rpd, max_rpm').eq('slug', slug).single(),
+    supabase.from('agents').select('id, slug, status, name, endpoint_url, webhook_secret, price_per_call, creator_id, category, input_schema, max_rpd, max_rpm, free_trial_enabled, free_trial_limit, sandbox_enabled').eq('slug', slug).single(),
     keyHash
       ? supabase
           .from('agent_keys')
@@ -420,10 +420,77 @@ export async function POST(
     return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined)
   }
 
+  // ── 2b. Route C: Free Trial (no payment, no key) ────────────────────────
+  const reqHeaders = Object.fromEntries(request.headers.entries())
+  const paymentHeader = extractPaymentFromHeaders(reqHeaders) as X402PaymentHeader | null
+
+  if (!paymentHeader && model.free_trial_enabled) {
+    // Identify caller: Supabase auth JWT > IP
+    let trialUserId: string | null = null
+    const authHeader = request.headers.get('authorization')
+    if (authHeader?.startsWith('Bearer ') && !authHeader.includes('wasi_')) {
+      // Try Supabase JWT auth
+      const anonSupabase = await createClient()
+      const { data: { user } } = await anonSupabase.auth.getUser(authHeader.replace('Bearer ', ''))
+      if (user) trialUserId = user.id
+    }
+    // Fallback: hash IP for anonymous trials
+    const trialKey = trialUserId ?? `ip:${createHash('sha256').update(getIdentifier(request)).digest('hex').slice(0, 16)}`
+
+    // Check usage
+    const { data: trial } = await supabase
+      .from('agent_trials')
+      .select('id, times_used')
+      .eq('agent_id', model.id)
+      .eq('user_id', trialKey)
+      .single()
+
+    const used = trial?.times_used ?? 0
+    const limit = model.free_trial_limit ?? 5
+
+    if (used < limit) {
+      // Execute free trial call
+      const result = await callUpstream(model, request, slug)
+
+      if (result.status === 'success') {
+        // Upsert trial counter
+        if (trial) {
+          await supabase
+            .from('agent_trials')
+            .update({ times_used: used + 1, used_at: new Date().toISOString() })
+            .eq('id', trial.id)
+        } else {
+          await supabase
+            .from('agent_trials')
+            .insert({ agent_id: model.id, user_id: trialKey, times_used: 1 })
+        }
+      }
+
+      // Log call as free_trial
+      assertPaymentType('free_trial')
+      const { id: callId } = await logCall(supabase, model, 'human', null, null, result, null, slug, null, 'free_trial')
+
+      return NextResponse.json(
+        {
+          result: result.data,
+          meta: {
+            model: model.slug,
+            latency_ms: result.latencyMs,
+            charged: 0,
+            currency: 'USDC',
+            status: result.status,
+            call_id: callId ?? undefined,
+            free_trial: { used: used + (result.status === 'success' ? 1 : 0), limit },
+          },
+        },
+        { status: result.status === 'success' ? 200 : (result.httpStatusHint ?? 502), headers: X402_CORS_HEADERS },
+      )
+    }
+    // Trial exhausted — fall through to 402
+  }
+
   // ── 3. Route B: x402 Payment (WasiAI-native settlement) ────────────────
   // WAS-134: settlePaymentDirectly() covers Fuji + mainnet — no external facilitator/bundler
-  const headers = Object.fromEntries(request.headers.entries())
-  const paymentHeader = extractPaymentFromHeaders(headers) as X402PaymentHeader | null
 
   if (!paymentHeader) {
     // No payment — return 402 with x402 payment instructions
