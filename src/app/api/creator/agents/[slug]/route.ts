@@ -9,6 +9,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { probeEndpoint } from '@/lib/agents/health-probe'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { createModelSchema } from '@/lib/schemas/model.schema'
 import { metaValidateSchema } from '@/lib/schema-validator'
 
@@ -64,6 +65,15 @@ export async function PATCH(
   }
   if (existing.creator_id !== user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // WAS-276: Validate endpoint_url before DB update to block tunnel/dev domains
+  if (result.data.endpoint_url) {
+    try {
+      await validateEndpointUrlAsync(result.data.endpoint_url)
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : 'Invalid endpoint URL' }, { status: 422 })
+    }
   }
 
   const { data: agent, error } = await serviceClient

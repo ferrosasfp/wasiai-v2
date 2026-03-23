@@ -30,6 +30,18 @@ const BLOCKED_HOSTNAMES = [
   'metadata.internal',
 ]
 
+// WAS-276: Block development tunnel domains — these are temporary and not suitable for production
+const BLOCKED_TUNNEL_SUFFIXES = [
+  '.loca.lt',
+  '.ngrok.io',
+  '.ngrok-free.app',
+  '.trycloudflare.com',
+  '.serveo.net',
+  '.localhost.run',
+  '.pagekite.me',
+  '.bore.pub',
+]
+
 const BLOCKED_IPV6_PATTERNS = [
   /^\[?::1\]?$/,
   /^\[?fc[0-9a-f]{2}:/i,
@@ -46,6 +58,8 @@ function isBlockedHost(hostname: string): boolean {
   if (BLOCKED_HOSTNAMES.includes(h)) return true
   if (BLOCKED_IPV4_PREFIXES.some(p => h.startsWith(p))) return true
   if (BLOCKED_IPV6_PATTERNS.some(r => r.test(h))) return true
+  // WAS-276: Block tunnel/development domains
+  if (BLOCKED_TUNNEL_SUFFIXES.some(suffix => h === suffix.slice(1) || h.endsWith(suffix))) return true
   return false
 }
 
@@ -109,7 +123,7 @@ export function validateEndpointUrl(rawUrl: string): void {
   const hostname = url.hostname.toLowerCase()
 
   if (isBlockedHost(hostname)) {
-    throw new Error('Private or internal endpoint URLs are not allowed')
+    throw new Error('Private, internal, or tunnel/development endpoint URLs are not allowed')
   }
 }
 
