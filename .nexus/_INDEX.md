@@ -99,3 +99,42 @@
 | 088 | 2026-03-20 | WAS-260 | feature | HU-MINOR | DONE | 2cfb678b4 |
 | 089 | 2026-03-20 | WAS-264 | feature | HU-MINOR | DONE | 56c54b249 |
 | 090 | 2026-03-20 | WAS-254 | feature | HU-MAJOR | DONE | b4f2e42fe |
+| 091 | 2026-03-21 | WAS-255 | feature | HU-MAJOR | DONE | 31a1788ee |
+| 092 | 2026-03-21 | WAS-259 | fix | HU-MINOR | DONE | 2ad193183 |
+| 093 | 2026-03-21 | MGMT-KEY-A2A | fix | HU-MINOR | DONE | 1bd6b5f0b |
+
+## #092 — Chat DeFi Collection (WAS-CHAT-DEFI-COLLECTION)
+- **Fecha:** 2026-03-21
+- **Commits:** `67b98bb34`, `369de6e6f`
+- **Archivos:** `supabase/migrations/074_defi_chat_collection.sql`, `src/app/api/v1/chat/route.ts`
+- **Descripción:** Planner dinámico desde colección `defi-chat` en BD. Elimina PLANNER_SYSTEM hardcodeado. Cache 60s, filtrado por status=active + input_schema válido, validación de slugs pre-compose.
+- **Status:** DONE ✅
+
+## #093 — Agent Bootstrap Key (WAS-271)
+- **Fecha:** 2026-03-21
+- **Commits:** `bcb9e33f4`, `f96a36cda`
+- **Archivos:** `src/app/api/v1/agents/register/route.ts`, `src/lib/agents/health-probe.ts`, `src/lib/ratelimit.ts`
+- **Descripción:** Bootstrap anónimo en primer registro open — genera auth.users sintético + creator_profile + management_key automáticamente. Fix probe: 4xx=reviewing, 5xx/timeout=draft. Rate limit específico 3/hr para bootstrap.
+- **Status:** DONE ✅
+
+## Validación manual 2026-03-22
+- **WAS-216** — marketplace V2 (batchSelfRegister + settleKeyBatch) → DONE ✅ commits: `b14686778`, `35383ff34`
+- **WAS-217** — Flujo Withdraw con registro on-chain obligatorio → DONE ✅ commits: `c6dd7705f`, `ae20807af`
+- **WAS-218** — On-chain como fuente de verdad para balances de keys → DONE ✅ commit: `45ea30d26`
+- **WAS-223/224** — Pendiente validar
+- **WAS-223/224** (ejecutados como WAS-219/220) — Tipado estricto payment_type + audit inserts agent_calls → DONE ✅ commits: `555b04125`, `6a75366a9` (2026-03-16)
+- **WAS-205** — Zero-Friction Input: dynamic example_input en Sandbox/TryIt → DONE ✅ commit: `6278a8567` (2026-03-15)
+- **WAS-206** — buildExampleFromSchema centralizado + preview en publish form → DONE ✅ commit: `f755ef4d9` (2026-03-15)
+
+## Sprint A — Marketplace Health & Trust (2026-03-23)
+
+| # | Issue Linear | Título | Clasificación | Status | Commit |
+|---|---|---|---|---|---|
+| 094 | WAS-277 | Mensaje 429 mutex más claro | FAST-FIX | DONE ✅ | 59608f70e |
+| 095 | WAS-278 | Bloquear tunnel/dev domains en endpoint_url | HU-MINOR | DONE ✅ | fb3140678 |
+| 096 | WAS-279 | Upstream errors propagan HTTP status correcto | HU-MINOR | DONE ✅ | 159c8b64c |
+| 097 | WAS-280 | Health check síncrono al activar agente | HU-MAJOR | DONE ✅ | f2ecaa792 |
+
+**Backlog Sprint B:** WAS-281 (cron health check), WAS-282 (spam detection), WAS-283 (badge UI)
+**En pausa:** WAS-284 (onboarding gate), WAS-285 (creator_id integrity)
+**Deuda técnica:** guardada en Engram #40
