@@ -121,6 +121,21 @@ export async function GET(request: NextRequest) {
       agents = agents.filter(a => ((a.performance_score as number) ?? 0) >= minPerformance!)
     }
 
+    // WAS-283: enriquecer con health_check y last_checked_at (search_agents RPC no los retorna)
+    if (agents.length > 0) {
+      const slugs = agents.map(a => a.slug as string)
+      const { data: healthData } = await supabase
+        .from('agents')
+        .select('slug, health_check, last_checked_at')
+        .in('slug', slugs)
+      const healthMap = Object.fromEntries((healthData ?? []).map(h => [h.slug, h]))
+      agents = agents.map(a => ({
+        ...a,
+        health_check:    healthMap[a.slug as string]?.health_check    ?? null,
+        last_checked_at: healthMap[a.slug as string]?.last_checked_at ?? null,
+      }))
+    }
+
     return NextResponse.json({
       schema: 'wasiai/agents/v1',
       total:  agents.length,
@@ -139,6 +154,9 @@ export async function GET(request: NextRequest) {
         currency:    'USDC',
         invoke_url:  `${SITE_URL}/api/v1/models/${agent.slug}/invoke`,
         example_input: resolveExampleInput(agent),
+        // WAS-283: health fields en search results
+        health_check:    agent.health_check    ?? null,
+        last_checked_at: agent.last_checked_at ?? null,
       })),
     }, { headers: { 'Access-Control-Allow-Origin': '*' } })
   }
@@ -192,6 +210,9 @@ export async function GET(request: NextRequest) {
         featured:       a.is_featured,
         sandbox_enabled: a.sandbox_enabled ?? true,
         example_input: resolveExampleInput(a as Parameters<typeof resolveExampleInput>[0]),
+        // WAS-283: health fields en slim mode
+        health_check:    (a as Record<string, unknown>).health_check    ?? null,
+        last_checked_at: (a as Record<string, unknown>).last_checked_at ?? null,
       })),
     }, { headers: CORS })
   }
