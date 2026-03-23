@@ -150,13 +150,28 @@ async function resolveCreatorFromEmail(
   if (!userId) return null
 
   // Safety net: asegurar creator_profile existe (trigger lo crea, esto protege edge cases)
-  await serviceClient.from('creator_profiles').upsert({
+  // WAS-282 fix: account_status solo se evalúa en INSERT (perfil nuevo).
+  // En UPDATE (perfil existente) NO sobreescribir — el usuario legítimo no debe degradarse
+  // si cuentas nuevas del mismo dominio se registran después de él.
+  const { data: existingProfile } = await serviceClient
+    .from('creator_profiles')
+    .select('id')
+    .eq('id', userId)
+    .single()
+
+  const profilePayload: Record<string, unknown> = {
     id: userId,
     username: `${email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase()}_${Date.now()}`,
     display_name: email.split('@')[0],
     email_domain: email.split('@')[1]?.toLowerCase() ?? null,
-    account_status: await resolveAccountStatus(email, userId, serviceClient),
-  }, { onConflict: 'id' })
+  }
+
+  // Solo evaluar account_status en perfiles nuevos
+  if (!existingProfile) {
+    profilePayload.account_status = await resolveAccountStatus(email, userId, serviceClient)
+  }
+
+  await serviceClient.from('creator_profiles').upsert(profilePayload, { onConflict: 'id' })
 
   return userId
 }
