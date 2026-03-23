@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  const supabase = createServiceClient()
   const { data: agents, error } = await supabase
     .from('agents')
     .select(`
@@ -37,12 +33,16 @@ export async function GET() {
 
   // Fetch creator profiles for display names
   const creatorIds = [...new Set((agents ?? []).map(a => a.creator_id).filter(Boolean))]
-  const { data: profiles } = await supabase
-    .from('creator_profiles')
-    .select('id, username')
-    .in('id', creatorIds)
+  let profiles: { id: string; username: string }[] = []
+  if (creatorIds.length > 0) {
+    const { data } = await supabase
+      .from('creator_profiles')
+      .select('id, username')
+      .in('id', creatorIds)
+    profiles = data ?? []
+  }
 
-  const profileMap = new Map((profiles ?? []).map(p => [p.id, p.username]))
+  const profileMap = new Map(profiles.map(p => [p.id, p.username]))
 
   const enriched = (agents ?? []).map(a => ({
     ...a,
