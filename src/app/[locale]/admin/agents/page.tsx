@@ -281,11 +281,6 @@ export default function AdminAgentsPage() {
                         {hc.latency_ms}ms
                       </span>
                     )}
-                    {false && (
-                      <span className={`font-mono ${false ? 'text-red-400' : 'text-green-400'}`}>
-                        {null}
-                      </span>
-                    )}
                     {agent.last_checked_at && (
                       <span>{timeAgo(agent.last_checked_at)}</span>
                     )}
@@ -318,8 +313,8 @@ export default function AdminAgentsPage() {
                         <div className="text-white">{agent.last_checked_at ? new Date(agent.last_checked_at).toLocaleString() : '—'}</div>
                       </div>
                       <div>
-                        <span className="text-gray-500 text-xs">HTTP Status</span>
-                        <div className="text-white font-mono">{null ?? '—'}</div>
+                        <span className="text-gray-500 text-xs">Health</span>
+                        <div className={hc?.passed ? 'text-green-400' : 'text-red-400'}>{hc?.passed ? 'Passing' : hc ? 'Failing' : '—'}</div>
                       </div>
                       <div>
                         <span className="text-gray-500 text-xs">Latency</span>
