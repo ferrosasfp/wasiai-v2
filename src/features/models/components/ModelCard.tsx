@@ -7,6 +7,7 @@ import type { Model } from '../types/models.types'
 import { MessageSquare, Eye, Music, Code2, Bot, BarChart2, Flame, BadgeCheck } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { OnChainBadge } from '@/components/badges/OnChainBadge'
+import { HealthBadge } from '@/components/badges/HealthBadge'
 
 const CATEGORY_COLORS: Record<string, string> = {
   nlp:        'bg-blue-100 text-blue-700',
@@ -130,6 +131,11 @@ export const ModelCard = memo(function ModelCard({ model, locale, index = 0, rep
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {/* WAS-283: Badge de salud del endpoint */}
+          <HealthBadge
+            healthCheck={model.health_check ?? null}
+            lastCheckedAt={model.last_checked_at ?? null}
+          />
           {/* HU-4.4: Badge compacto de uptime — pasado como prop desde Server Components */}
           {reputationBadge}
           <div className="flex items-baseline gap-1">

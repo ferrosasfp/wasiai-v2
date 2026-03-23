@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
   if (slim) {
     let slimQuery = supabase
       .from('agents')
-      .select('slug, name, description, category, agent_type, price_per_call, is_featured, mcp_tool_name, sandbox_enabled', { count: 'exact' })
+      .select('slug, name, description, category, agent_type, price_per_call, is_featured, mcp_tool_name, sandbox_enabled, health_check, last_checked_at', { count: 'exact' })
       .eq('status', 'active')
       .order('is_featured', { ascending: false })
       .order('total_calls', { ascending: false })
@@ -211,6 +211,8 @@ export async function GET(request: NextRequest) {
       reputation_score, reputation_count,
       sandbox_enabled,
       performance_score,
+      health_check,
+      last_checked_at,
       is_featured, created_at,
       creator:creator_profiles(
         id, username, display_name, verified, wallet_address
@@ -328,6 +330,10 @@ export async function GET(request: NextRequest) {
 
       // Performance (WAS-213)
       performance_score: agent.performance_score ?? null,
+
+      // Health probe (WAS-283)
+      health_check:    agent.health_check    ?? null,
+      last_checked_at: agent.last_checked_at ?? null,
 
       // Input/Output validation (WAS-200/202)
       example_input: resolveExampleInput(agent),

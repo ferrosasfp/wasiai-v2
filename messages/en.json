@@ -1151,6 +1151,12 @@
     "noAgents": "I can only answer questions about DeFi and crypto on Avalanche.",
     "summary": "Summary"
   },
+  "health_badge": {
+    "online": "Online",
+    "down": "Down",
+    "not_checked": "Not checked",
+    "last_checked": "Last checked {minutes}min ago"
+  },
   "demo": {
     "title": "Autonomous Agent Demo",
     "subtitle": "Describe a DeFi goal. WasiAI discovers and runs the right agents automatically.",

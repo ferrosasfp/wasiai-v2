@@ -68,6 +68,10 @@ export interface Model {
   // WAS-281: contador de fallos consecutivos de health probe
   consecutive_failures: number
 
+  // WAS-283: health probe fields (updated by WAS-277 on activation, WAS-281 cron)
+  health_check:    { passed: boolean; reason?: string; message?: string; latency_ms?: number } | null
+  last_checked_at: string | null
+
   // joined
   creator?: CreatorProfile
 }

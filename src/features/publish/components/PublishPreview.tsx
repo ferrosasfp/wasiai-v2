@@ -68,6 +68,8 @@ export function PublishPreview({
     long_running: false,
     input_schema: null, // WAS-200
     consecutive_failures: 0, // WAS-281
+    health_check: null,      // WAS-283
+    last_checked_at: null,   // WAS-283
   }
 
   return (
