@@ -1,9 +1,24 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
+
+const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '').toLowerCase()
+const OWNER_ADDRESS    = (process.env.NEXT_PUBLIC_WASIAI_OWNER ?? '').toLowerCase()
+const ADMIN_WALLETS = [
+  OPERATOR_ADDRESS,
+  OWNER_ADDRESS,
+  '0x94DCDb84207724A609B17e4838936832EA59B9eD'.toLowerCase(),
+  '0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba'.toLowerCase(),
+].filter(Boolean)
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  const h = await headers()
+  const wallet = (h.get('x-admin-wallet') ?? '').toLowerCase()
+  if (!wallet || !ADMIN_WALLETS.includes(wallet)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const supabase = createServiceClient()
   const { data: agents, error } = await supabase
     .from('agents')

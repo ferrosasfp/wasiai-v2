@@ -89,9 +89,12 @@ export default function AdminAgentsPage() {
   const [actionMsg, setActionMsg] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
+    if (!address) return
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/agents')
+      const res = await fetch('/api/admin/agents', {
+        headers: { 'x-admin-wallet': address },
+      })
       if (res.ok) {
         const data = await res.json() as { summary: Summary; agents: Agent[] }
         setSummary(data.summary)
@@ -100,7 +103,7 @@ export default function AdminAgentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [address])
 
   useEffect(() => { void load() }, [load])
 
@@ -109,7 +112,7 @@ export default function AdminAgentsPage() {
     try {
       const res = await fetch(`/api/admin/agents/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-wallet': address ?? '' },
         body: JSON.stringify(patch),
       })
       if (res.ok) {
