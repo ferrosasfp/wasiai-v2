@@ -270,7 +270,12 @@ export async function POST(
       const acquired = await redis.set(mutexKey, '1', { nx: true, ex: 15 }) // 15s TTL
       if (!acquired) {
         return NextResponse.json(
-          { error: 'Concurrent invocation in progress for this key', code: 'concurrent_invocation' },
+          {
+            error: 'Concurrent invocation in progress for this key',
+            code: 'concurrent_invocation',
+            retry_after_seconds: 5,
+            hint: 'A call is already in progress for this key. Wait and retry.',
+          },
           { status: 429, headers: { 'Retry-After': '5' } }
         )
       }
@@ -282,7 +287,10 @@ export async function POST(
         error: err instanceof Error ? err.message : String(err),
       })
       return NextResponse.json(
-        { error: 'Service temporarily unavailable. Please retry.' },
+        {
+          error: 'Service temporarily unavailable. Please retry.',
+          retry_after_seconds: 5,
+        },
         {
           status: 503,
           headers: { 'Retry-After': '5' },
