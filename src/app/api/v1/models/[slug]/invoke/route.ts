@@ -434,8 +434,22 @@ export async function POST(
       const { data: { user } } = await anonSupabase.auth.getUser(authHeader.replace('Bearer ', ''))
       if (user) trialUserId = user.id
     }
-    // Fallback: hash IP for anonymous trials
-    const trialKey = trialUserId ?? `ip:${createHash('sha256').update(getIdentifier(request)).digest('hex').slice(0, 16)}`
+    // No anonymous trials — require authenticated user to prevent IP rotation abuse
+    if (!trialUserId) {
+      // Fall through to 402 — user must be authenticated for free trial
+      if (!paymentHeader) {
+        return NextResponse.json(
+          {
+            error: 'Authentication required for free trial',
+            code: 'auth_required_for_trial',
+            message: 'Sign up at app.wasiai.io to get free trial access',
+            free_trial: { available: true, limit: model.free_trial_limit ?? 5 },
+          },
+          { status: 401, headers: X402_CORS_HEADERS },
+        )
+      }
+    }
+    const trialKey = trialUserId
 
     // Check usage
     const { data: trial } = await supabase
