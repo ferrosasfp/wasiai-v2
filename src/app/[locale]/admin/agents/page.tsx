@@ -8,9 +8,7 @@ import Link from 'next/link'
 /* ─── Types ─── */
 interface HealthCheck {
   passed:      boolean
-  status_code: number | null
   latency_ms:  number | null
-  checked_at:  string | null
 }
 
 interface Agent {
@@ -24,6 +22,7 @@ interface Agent {
   creator_username:      string | null
   created_at:            string
   updated_at:            string
+  last_checked_at:       string | null
   health_check:          HealthCheck | null
 }
 
@@ -282,13 +281,13 @@ export default function AdminAgentsPage() {
                         {hc.latency_ms}ms
                       </span>
                     )}
-                    {hc?.status_code != null && (
-                      <span className={`font-mono ${hc.status_code >= 400 ? 'text-red-400' : 'text-green-400'}`}>
-                        {hc.status_code}
+                    {false && (
+                      <span className={`font-mono ${false ? 'text-red-400' : 'text-green-400'}`}>
+                        {null}
                       </span>
                     )}
-                    {hc?.checked_at && (
-                      <span>{timeAgo(hc.checked_at)}</span>
+                    {agent.last_checked_at && (
+                      <span>{timeAgo(agent.last_checked_at)}</span>
                     )}
                   </div>
 
@@ -316,11 +315,11 @@ export default function AdminAgentsPage() {
                       </div>
                       <div>
                         <span className="text-gray-500 text-xs">Last Check</span>
-                        <div className="text-white">{hc?.checked_at ? new Date(hc.checked_at).toLocaleString() : '—'}</div>
+                        <div className="text-white">{agent.last_checked_at ? new Date(agent.last_checked_at).toLocaleString() : '—'}</div>
                       </div>
                       <div>
                         <span className="text-gray-500 text-xs">HTTP Status</span>
-                        <div className="text-white font-mono">{hc?.status_code ?? '—'}</div>
+                        <div className="text-white font-mono">{null ?? '—'}</div>
                       </div>
                       <div>
                         <span className="text-gray-500 text-xs">Latency</span>

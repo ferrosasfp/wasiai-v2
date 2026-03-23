@@ -17,12 +17,8 @@ export async function GET() {
       creator_id,
       created_at,
       updated_at,
-      health_check (
-        passed,
-        status_code,
-        latency_ms,
-        checked_at
-      )
+      health_check,
+      last_checked_at
     `)
     .order('status', { ascending: true })
     .order('name', { ascending: true })
