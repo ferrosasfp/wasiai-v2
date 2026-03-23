@@ -67,6 +67,7 @@ export function PublishPreview({
     free_trial_limit: 0,
     long_running: false,
     input_schema: null, // WAS-200
+    consecutive_failures: 0, // WAS-281
   }
 
   return (

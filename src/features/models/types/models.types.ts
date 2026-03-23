@@ -65,6 +65,9 @@ export interface Model {
   // WAS-191: Operational performance score (0-100)
   performance_score?: number | null
 
+  // WAS-281: contador de fallos consecutivos de health probe
+  consecutive_failures: number
+
   // joined
   creator?: CreatorProfile
 }
