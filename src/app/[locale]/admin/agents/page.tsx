@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useWallet } from '@/features/wallet/hooks/useWallet'
-import { RefreshCw, Circle, AlertTriangle, Eye, EyeOff, Ban, ChevronDown, ChevronUp, Search } from 'lucide-react'
+import { RefreshCw, Circle, AlertTriangle, EyeOff, Ban, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import Link from 'next/link'
 
 /* ─── Types ─── */
@@ -129,7 +129,8 @@ export default function AdminAgentsPage() {
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
