@@ -80,6 +80,9 @@
   },
   "auth": {
     "login": "Iniciar Sesión",
+    "signIn": "Iniciar Sesión",
+    "createAccount": "Crear Cuenta",
+    "signInRequired": "Inicia sesión para acceder a esta función.",
     "signup": "Crear Cuenta",
     "signout": "Cerrar Sesión",
     "loginTitle": "Bienvenido de vuelta",
