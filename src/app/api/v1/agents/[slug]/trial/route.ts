@@ -5,7 +5,7 @@
  * HU-3.1: Free Trial
  * Rate limit: 3 req/hour per IP (Upstash sliding window)
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { Ratelimit } from '@upstash/ratelimit'
@@ -15,7 +15,9 @@ import { checkIpLimit } from '@/lib/rate-limit-ip'
 import { assertPaymentType } from '@/lib/validation/payment-type'
 import { logger } from '@/lib/logger'
 
-const BodySchema = z.object({ input: z.string().min(1).max(2000) })
+const LegacyBody = z.object({ input: z.string().min(1).max(2000) })
+const NativeBody = z.record(z.string(), z.unknown()).refine(obj => Object.keys(obj).length > 0, { message: 'Body must not be empty' })
+const BodySchema = z.union([LegacyBody, NativeBody])
 
 // Lazy singleton — 3 req/hour per IP
 let _trialLimit: Ratelimit | null = null
@@ -97,6 +99,9 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser()
   const isAnonymous = !user
 
+  // Detect sandbox early — before Zod validation (AC-6: no body required for sandbox)
+  const isSandbox = req.headers.get('x-sandbox') === 'true'
+
   // 2. Rate limit por IP
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1'
 
@@ -116,21 +121,44 @@ export async function POST(
     if (!success) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
   }
 
-  // 3. Validate body
-  const parsed = BodySchema.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ error: 'invalid_input' }, { status: 400 })
-  const { input } = parsed.data
+  // 3. Validate body (skip when sandbox — no body required)
+  let parsed: ReturnType<typeof BodySchema.safeParse> | null = null
+  if (!isSandbox) {
+    parsed = BodySchema.safeParse(await req.json().catch(() => ({})))
+    if (!parsed.success) return NextResponse.json({ error: 'invalid_input' }, { status: 400 })
+  }
 
   // 4. Buscar agente
   const svc = createServiceClient()
   const { data: agent } = await svc
     .from('agents')
-    .select('id, endpoint_url, name, free_trial_enabled, free_trial_limit, webhook_secret')  // HU-3.3
+    .select('id, endpoint_url, name, free_trial_enabled, free_trial_limit, webhook_secret, sandbox_enabled, metadata')  // HU-3.3
     .eq('slug', slug)
     .eq('status', 'active')
     .single()
 
   if (!agent) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+  // AC-3/AC-4: Sandbox path — before trial check, no upstream call, no counter decrement
+  if (isSandbox && agent.sandbox_enabled) {
+    const meta = agent.metadata as Record<string, unknown> | null
+    const exampleOutput: unknown = meta?.input_example ?? meta?.example_output ?? { message: 'Sandbox mode — no example output configured' }
+    const output = typeof exampleOutput === 'string' ? exampleOutput : JSON.stringify(exampleOutput)
+    after(async () => {
+      try {
+        await svc.from('agent_calls').insert({
+          agent_id: agent.id,
+          status: 'success',
+          latency_ms: 0,
+          is_trial: true,
+          payment_type: 'sandbox',
+          agent_slug: slug,
+          amount_paid: 0,
+        })
+      } catch { /* non-fatal */ }
+    })
+    return NextResponse.json({ output, sandbox: true, latencyMs: 0 })
+  }
 
   // HU-3.3: Guard — creator desactivó el trial
   if (!agent.free_trial_enabled) {
@@ -159,6 +187,12 @@ export async function POST(
     }
   }
 
+  // Determine body to send upstream (AC-2: native body pass-through)
+  const parsedData = parsed!.data as Record<string, unknown>
+  const upstreamBody = 'input' in parsedData && typeof parsedData.input === 'string'
+    ? JSON.stringify({ input: parsedData.input })
+    : JSON.stringify(parsedData)
+
   // 8. Llamar al agente con timeout de 8s
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 8000)
@@ -178,7 +212,7 @@ export async function POST(
     const agentRes = await fetch(agent.endpoint_url as string, {
       method: 'POST',
       headers: reqHeaders,
-      body: JSON.stringify({ input }),
+      body: upstreamBody,
       signal: controller.signal,
     })
     clearTimeout(timeout)
@@ -190,6 +224,7 @@ export async function POST(
     }
 
     // Truncar output a 10KB para evitar respuestas masivas
+    // AC-7: output siempre es string (invariante para AgentTrialPlayground)
     const raw = await agentRes.text()
     output = raw.length > 10240 ? raw.slice(0, 10240) + '\n[Output truncado]' : raw
   } catch (err) {
