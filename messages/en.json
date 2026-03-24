@@ -390,7 +390,9 @@
     "error_timeout": "The agent took too long. Try again later.",
     "error_generic": "The agent encountered an error. It may be temporary.",
     "error_ratelimit": "Too many attempts. Wait a moment.",
-    "success_cta": "Liked it? Use it without limits with an API key."
+    "success_cta": "Liked it? Use it without limits with an API key.",
+    "signUpToTry": "Sign up for a free account to try this agent",
+    "signUpCta": "Create free account →"
   },
   "analytics": {
     "callsChartTitle": "Calls per day (last 30 days)",

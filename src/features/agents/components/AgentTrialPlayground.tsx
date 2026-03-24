@@ -87,7 +87,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
           {t('signUpToTry') ?? 'Sign up for a free account to try this agent'}
         </p>
         <Link
-          href="/auth/login"
+          href="/login"
           className="inline-block bg-[#E84142] text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-[#c73535] transition-colors"
         >
           {t('signUpCta') ?? 'Create free account →'}
