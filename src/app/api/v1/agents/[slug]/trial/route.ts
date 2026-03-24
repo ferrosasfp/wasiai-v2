@@ -199,9 +199,9 @@ export async function POST(
     ? JSON.stringify({ input: parsedData.input })
     : JSON.stringify(parsedData)
 
-  // 8. Llamar al agente con timeout de 8s
+  // 8. Llamar al agente con timeout de 15s (census agents are slow)
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 8000)
+  const timeout = setTimeout(() => controller.abort(), 15000)
   const t0 = Date.now()
   let statusCode = 0
   let output = ''

@@ -37,8 +37,12 @@ interface UseWalletPaymentOptions {
   priceUsdc:   number
 }
 
-function parseInput(raw: string): unknown {
-  try { return JSON.parse(raw) } catch { return raw }
+function buildBody(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw)
+    if (typeof parsed === 'object' && parsed !== null) return JSON.stringify(parsed)
+  } catch { /* not JSON */ }
+  return JSON.stringify({ input: raw })
 }
 
 export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOptions) {
@@ -86,7 +90,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
       probeRes = await fetch(`/api/v1/models/${slug}/invoke`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ input: parseInput(input) }),
+        body:    buildBody(input),
       })
     } catch {
       setErrorMsg('Error de red. Verifica tu conexión e intenta de nuevo.')
@@ -171,7 +175,7 @@ export function useWalletPayment({ slug, input, priceUsdc }: UseWalletPaymentOpt
           'Content-Type': 'application/json',
           'X-PAYMENT':    btoa(JSON.stringify(paymentHeader)),
         },
-        body: JSON.stringify({ input: parseInput(input) }),
+        body: buildBody(input),
       })
 
       const paidData = await paidRes.json() as { result?: string; error?: string; meta?: { tx_hash?: `0x${string}` } }

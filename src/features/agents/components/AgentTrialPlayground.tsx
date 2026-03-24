@@ -50,7 +50,14 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
       const res = await fetch(`/api/v1/agents/${slug}/trial`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: input.trim() }),
+        body: (() => {
+          const trimmed = input.trim()
+          try {
+            const parsed = JSON.parse(trimmed)
+            if (typeof parsed === 'object' && parsed !== null) return JSON.stringify(parsed)
+          } catch { /* not JSON, use legacy format */ }
+          return JSON.stringify({ input: trimmed })
+        })(),
       })
       const data = (await res.json()) as { error?: string; output?: string }
 
