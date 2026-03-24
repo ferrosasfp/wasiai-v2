@@ -5,7 +5,7 @@ import { ModelCallSection } from '@/features/models/components/ModelCallSection'
 import { AgentRating } from '@/features/reputation/components/AgentRating'
 import { PerformanceBadge } from '@/features/reputation/components/PerformanceBadge'
 import { AgentTrialPlayground } from '@/features/agents/components/AgentTrialPlayground'
-import { CodeExamples } from '@/features/models/components/CodeExamples'
+
 import { ReputationMetrics } from '@/features/models/components/ReputationMetrics'
 import { AgentExamplesDisplay } from '@/features/models/components/AgentExamplesDisplay'
 import { createClient } from '@/lib/supabase/server'
@@ -68,7 +68,7 @@ export default async function ModelDetailPage({ params }: Props) {
     registeredWallet = cp?.wallet_address ?? null
   }
 
-  const invokeUrl = `${APP_URL}/api/v1/models/${model.slug}/invoke`
+
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -205,55 +205,22 @@ export default async function ModelDetailPage({ params }: Props) {
               />
             ) : null}
 
-            {/* UX-04: Code Examples auto-generated */}
-            <CodeExamples
-              slug={model.slug}
-              priceUsdc={model.price_per_call > 0 ? model.price_per_call.toString() : null}
-              inputExample={(model.metadata?.input_example as string | null | undefined) ?? model.capabilities?.[0]?.example?.input ?? null}
-              locale={locale}
-            />
-
-            {/* Agent API — both auth methods */}
-            <div className="rounded-2xl bg-gray-900 p-6 text-white">
-              <h2 className="mb-4 font-semibold text-gray-100 flex items-center gap-2"><Bot size={16} /> Agent API</h2>
-
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                {tDetail('optionA')}
-              </p>
-              <pre className="mb-4 overflow-auto rounded-xl bg-black/30 p-4 text-sm text-green-400">{`POST ${invokeUrl}
-x-agent-key: wasi_your_key_here
-Content-Type: application/json
-
-{ "input": "your input" }`}</pre>
-
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                {tDetail('optionB')}
-              </p>
-              <pre className="overflow-auto rounded-xl bg-black/30 p-4 text-sm text-green-400">{`# 1. Probe — receive 402 with payment instructions
-POST ${invokeUrl}
-{ "input": "your input" }
-
-# 2. Pay + retry
-POST ${invokeUrl}
-X-PAYMENT: <x402-eip712-signed-payload>
-{ "input": "your input" }`}</pre>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link
-                  href={`/${locale}/agent-keys`}
-                  className="rounded-xl bg-avax-500 px-4 py-2 text-sm font-semibold hover:bg-avax-400 transition"
-                >
-                  {tDetail('getAgentKey')}
-                </Link>
-                <a
-                  href={`${APP_URL}/api/v1/models/${model.slug}/invoke`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-xl border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-300 hover:border-gray-400 transition"
-                >
-                  {tDetail('modelSpecJson')}
-                </a>
-              </div>
+            {/* CTA: Get API Key + Docs */}
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={`/${locale}/agent-keys`}
+                className="rounded-xl bg-avax-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-avax-400 transition"
+              >
+                {tDetail('getAgentKey')} — {tDetail('getAgentKeyDesc') ?? 'Use this agent programmatically'}
+              </Link>
+              <a
+                href="https://wasiai.io/docs/agents"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:border-gray-400 transition"
+              >
+                API Docs ↗
+              </a>
             </div>
           </div>
 
