@@ -35,7 +35,10 @@ export function PayToCallButton({ model, onSuccess }: PayToCallButtonProps) {
   const tNC = useTranslations('nonCustodial')
   const { disconnect, address } = useWallet()
   const pendingPayRef = useRef(false)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(() => {
+    const ie = model.metadata?.input_example
+    return ie ? String(ie) : ''
+  })
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { startTransition(() => setMounted(true)) }, [])

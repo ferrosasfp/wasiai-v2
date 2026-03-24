@@ -116,7 +116,7 @@ export default async function ModelDetailPage({ params }: Props) {
                     </span>
                   </div>
                   {model.creator && (
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-gray-500 truncate">
                       by <span className="font-medium text-gray-700">@{model.creator.username}</span>
                       {model.creator.verified && <span className="ml-1 text-avax-500">✓</span>}
                     </p>
@@ -297,7 +297,7 @@ X-PAYMENT: <x402-eip712-signed-payload>
                       {model.creator.display_name ?? model.creator.username}
                       {model.creator.verified && <span className="ml-1 text-avax-500">✓</span>}
                     </p>
-                    <p className="text-xs text-gray-500">@{model.creator.username}</p>
+                    <p className="text-xs text-gray-500 truncate">@{model.creator.username}</p>
                   </div>
                 </Link>
                 {model.creator.bio && (
