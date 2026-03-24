@@ -19,7 +19,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
   const t = useTranslations('trial')
   const defaultInput = inputExample ?? buildExampleFromSchema(inputSchema) ?? EXAMPLE_FALLBACK
   const [input, setInput] = useState(defaultInput)
-  const [anonLimitHit, setAnonLimitHit] = useState(false)
+
   // Initialize directly from prop — avoids synchronous setState in effect
   const [state, setState] = useState<TrialState>(() =>
     isAuthenticated ? 'checking' : 'idle'
@@ -56,7 +56,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
 
       if (!res.ok) {
         if (data.error === 'already_used') { setState('used'); return }
-        if (data.error === 'anon_rate_limited') { setAnonLimitHit(true); return }
+        if (data.error === 'anon_rate_limited') { setState('error'); setErrorMsg(t('error_generic')); return }
         if (data.error === 'timeout') { setState('timeout'); return }
         setState('error')
         setErrorMsg(
@@ -76,13 +76,33 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
 
   if (state === 'checking') return null
 
+  // Opción A: sin auth → solo CTA de registro
+  if (!isAuthenticated) {
+    return (
+      <section className="border border-gray-200 rounded-xl p-5 space-y-3 text-center">
+        <span className="text-xs font-semibold bg-[#E84142]/10 text-[#E84142] px-2 py-1 rounded-full">
+          {t('badge')}
+        </span>
+        <p className="text-sm text-gray-600">
+          {t('signUpToTry') ?? 'Sign up for a free account to try this agent'}
+        </p>
+        <Link
+          href="/auth/login"
+          className="inline-block bg-[#E84142] text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-[#c73535] transition-colors"
+        >
+          {t('signUpCta') ?? 'Create free account →'}
+        </Link>
+      </section>
+    )
+  }
+
   return (
     <section className="border border-gray-200 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold bg-[#E84142]/10 text-[#E84142] px-2 py-1 rounded-full">
           {t('badge')}
         </span>
-        {trialsRemaining !== null && state !== 'used' && !anonLimitHit && (
+        {trialsRemaining !== null && state !== 'used' && (
           <span className="text-xs text-gray-400">
             {trialsRemaining}/{trialsLimit} {t('remaining') ?? 'remaining'}
           </span>
@@ -101,20 +121,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
         </div>
       ) : (
         <>
-          {anonLimitHit ? (
-            <div className="space-y-3 text-center">
-              <p className="text-sm text-gray-600 font-medium">
-                Has alcanzado el límite de pruebas gratuitas
-              </p>
-              <Link
-                href="/auth/login"
-                className="inline-block bg-[#E84142] text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-[#c73535] transition-colors"
-              >
-                Crear cuenta gratis →
-              </Link>
-            </div>
-          ) : (
-            <>
+          <>
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
@@ -149,7 +156,6 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
                 </p>
               )}
             </>
-          )}
         </>
       )}
     </section>
