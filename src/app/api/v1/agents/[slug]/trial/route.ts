@@ -139,6 +139,12 @@ export async function POST(
 
   if (!agent) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
+  // Bug #1 fix: si sandbox header presente pero agente no soporta sandbox, parsear body normalmente
+  if (isSandbox && !agent.sandbox_enabled) {
+    parsed = BodySchema.safeParse(await req.json().catch(() => ({})))
+    if (!parsed.success) return NextResponse.json({ error: 'invalid_input' }, { status: 400 })
+  }
+
   // AC-3/AC-4: Sandbox path — before trial check, no upstream call, no counter decrement
   if (isSandbox && agent.sandbox_enabled) {
     const meta = agent.metadata as Record<string, unknown> | null

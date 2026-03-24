@@ -430,7 +430,7 @@ export async function POST(
     const exampleOutput: unknown = meta?.input_example ?? meta?.example_output ?? { message: 'Sandbox mode — no example output configured' }
     after(async () => {
       try {
-        await supabase.from('agent_calls').insert({
+        await createServiceClient().from('agent_calls').insert({
           agent_id: model.id,
           status: 'success',
           latency_ms: 0,
