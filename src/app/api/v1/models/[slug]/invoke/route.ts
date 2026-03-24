@@ -91,8 +91,11 @@ function build402Instructions(model: Record<string, unknown>, priceStr: string, 
     description: `Access to ${model.name as string} on WasiAI`,
     mimeType: 'application/json',
   })
+  const freeTrial = model.free_trial_enabled
+    ? { available: true, endpoint: `/api/v1/agents/${model.slug as string}/trial`, limit: model.free_trial_limit }
+    : undefined
   return NextResponse.json(
-    { x402Version: 1, ...requirements, model: { slug: model.slug, name: model.name, category: model.category }, docs: 'https://wasiai.io/docs/agents#x402' },
+    { x402Version: 1, ...requirements, model: { slug: model.slug, name: model.name, category: model.category }, docs: 'https://wasiai.io/docs/agents#x402', ...(freeTrial ? { free_trial: freeTrial } : {}) },
     { status: 402, headers: { 'Content-Type': 'application/json', ...X402_CORS_HEADERS } },
   )
 }
@@ -160,7 +163,7 @@ export async function POST(
     : null
 
   const [{ data: model, error: modelError }, keyRowResult] = await Promise.all([
-    supabase.from('agents').select('id, slug, status, name, endpoint_url, webhook_secret, price_per_call, creator_id, category, input_schema, max_rpd, max_rpm, free_trial_enabled, free_trial_limit, sandbox_enabled').eq('slug', slug).single(),
+    supabase.from('agents').select('id, slug, status, name, endpoint_url, webhook_secret, price_per_call, creator_id, category, input_schema, max_rpd, max_rpm, free_trial_enabled, free_trial_limit, sandbox_enabled, metadata, capabilities').eq('slug', slug).single(),
     keyHash
       ? supabase
           .from('agent_keys')
@@ -420,91 +423,33 @@ export async function POST(
     return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined)
   }
 
-  // ── 2b. Route C: Free Trial (no payment, no key) ────────────────────────
-  const reqHeaders = Object.fromEntries(request.headers.entries())
-  const paymentHeader = extractPaymentFromHeaders(reqHeaders) as X402PaymentHeader | null
-
-  if (!paymentHeader && model.free_trial_enabled) {
-    // Identify caller: Supabase auth JWT > IP
-    let trialUserId: string | null = null
-    const authHeader = request.headers.get('authorization')
-    if (authHeader?.startsWith('Bearer ') && !authHeader.includes('wasi_')) {
-      // Try Supabase JWT auth
-      const anonSupabase = await createClient()
-      const { data: { user } } = await anonSupabase.auth.getUser(authHeader.replace('Bearer ', ''))
-      if (user) trialUserId = user.id
-    }
-    // No anonymous trials — require authenticated user to prevent IP rotation abuse
-    if (!trialUserId) {
-      // Fall through to 402 — user must be authenticated for free trial
-      if (!paymentHeader) {
-        return NextResponse.json(
-          {
-            error: 'Authentication required for free trial',
-            code: 'auth_required_for_trial',
-            message: 'Sign up at app.wasiai.io to get free trial access',
-            free_trial: { available: true, limit: model.free_trial_limit ?? 5 },
-          },
-          { status: 401, headers: X402_CORS_HEADERS },
-        )
-      }
-    }
-    const trialKey = trialUserId
-
-    // Check usage
-    const { data: trial } = await supabase
-      .from('agent_trials')
-      .select('id, times_used')
-      .eq('agent_id', model.id)
-      .eq('user_id', trialKey)
-      .single()
-
-    const used = trial?.times_used ?? 0
-    const limit = model.free_trial_limit ?? 5
-
-    if (used < limit) {
-      // Execute free trial call
-      const result = await callUpstream(model, request, slug)
-
-      if (result.status === 'success') {
-        // Upsert trial counter
-        if (trial) {
-          await supabase
-            .from('agent_trials')
-            .update({ times_used: used + 1, used_at: new Date().toISOString() })
-            .eq('id', trial.id)
-        } else {
-          await supabase
-            .from('agent_trials')
-            .insert({ agent_id: model.id, user_id: trialKey, times_used: 1 })
-        }
-      }
-
-      // Log call as free_trial
-      assertPaymentType('free_trial')
-      const { id: callId } = await logCall(supabase, model, 'human', null, null, result, null, slug, null, 'free_trial')
-
-      return NextResponse.json(
-        {
-          result: result.data,
-          meta: {
-            model: model.slug,
-            latency_ms: result.latencyMs,
-            charged: 0,
-            currency: 'USDC',
-            status: result.status,
-            call_id: callId ?? undefined,
-            free_trial: { used: used + (result.status === 'success' ? 1 : 0), limit },
-          },
-        },
-        { status: result.status === 'success' ? 200 : (result.httpStatusHint ?? 502), headers: X402_CORS_HEADERS },
-      )
-    }
-    // Trial exhausted — fall through to 402
+  // ── 2b. Sandbox shortcut (AC-5) ─────────────────────────────────────────
+  // Rate limit already applied above. Sandbox never calls upstream, never decrements trial.
+  if (request.headers.get('x-sandbox') === 'true' && model.sandbox_enabled) {
+    const meta = model.metadata as Record<string, unknown> | null
+    const exampleOutput: unknown = meta?.input_example ?? meta?.example_output ?? { message: 'Sandbox mode — no example output configured' }
+    after(async () => {
+      try {
+        await supabase.from('agent_calls').insert({
+          agent_id: model.id,
+          status: 'success',
+          latency_ms: 0,
+          payment_type: 'sandbox',
+          agent_slug: model.slug as string,
+          amount_paid: 0,
+        })
+      } catch { /* non-fatal */ }
+    })
+    return NextResponse.json(
+      { result: exampleOutput, meta: { model: model.slug, sandbox: true, charged: 0 } },
+      { status: 200, headers: X402_CORS_HEADERS },
+    )
   }
 
   // ── 3. Route B: x402 Payment (WasiAI-native settlement) ────────────────
   // WAS-134: settlePaymentDirectly() covers Fuji + mainnet — no external facilitator/bundler
+  const reqHeaders = Object.fromEntries(request.headers.entries())
+  const paymentHeader = extractPaymentFromHeaders(reqHeaders) as X402PaymentHeader | null
 
   if (!paymentHeader) {
     // No payment — return 402 with x402 payment instructions
