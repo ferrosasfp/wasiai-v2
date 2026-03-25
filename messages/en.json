@@ -371,7 +371,7 @@
     },
     "step2": {
       "title": "Publish your first agent",
-      "subtitle": "Your agent on the marketplace in minutes",
+      "subtitle": "Connect your agent to the payment layer in minutes",
       "cta": "Publish agent",
       "skip": "Skip for now"
     },
@@ -417,7 +417,7 @@
     "member_since": "Since {year}",
     "no_agents": "This creator hasn't published any agents yet.",
     "not_found": "Creator not found.",
-    "back_to_marketplace": "← Back to marketplace"
+    "back_to_marketplace": "← Back to agents"
   },
   "docs": {
     "title": "Documentation",
@@ -763,7 +763,7 @@
     "timePlural": "times"
   },
   "modelDetail": {
-    "backToMarketplace": "← Back to marketplace",
+    "backToMarketplace": "← Back to agents",
     "capabilitiesSchema": "Capabilities & Schema",
     "noCapabilities": "No capabilities defined.",
     "featured": "Featured",
@@ -842,7 +842,7 @@
   "transparency": {
     "title": "Transparency",
     "subtitle": "All data read directly from the smart contract. Verifiable on-chain.",
-    "marketplaceStats": "Marketplace Stats",
+    "marketplaceStats": "On-chain Stats",
     "onChainAgents": "On-Chain Agents",
     "agent": "Agent",
     "priceDb": "Price (DB)",
@@ -928,7 +928,7 @@
     "member_since": "Since {year}",
     "no_agents": "This creator hasn't published any agents yet.",
     "not_found": "Creator not found.",
-    "back_to_marketplace": "← Back to marketplace",
+    "back_to_marketplace": "← Back to agents",
     "publishedAgents": "Published agents",
     "noAgents": "This creator hasn't published any agents yet."
   },

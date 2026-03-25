@@ -371,7 +371,7 @@
     },
     "step2": {
       "title": "Publica tu primer agente",
-      "subtitle": "Tu agente en el marketplace en minutos",
+      "subtitle": "Conecta tu agente a la capa de pagos en minutos",
       "cta": "Publicar agente",
       "skip": "Saltar por ahora"
     },
@@ -417,7 +417,7 @@
     "member_since": "Desde {year}",
     "no_agents": "Este creator aún no ha publicado agentes.",
     "not_found": "Creator no encontrado.",
-    "back_to_marketplace": "← Volver al marketplace"
+    "back_to_marketplace": "← Volver a agentes"
   },
   "docs": {
     "title": "Documentacion",
@@ -763,7 +763,7 @@
     "timePlural": "veces"
   },
   "modelDetail": {
-    "backToMarketplace": "← Volver al marketplace",
+    "backToMarketplace": "← Volver a agentes",
     "capabilitiesSchema": "Capacidades y Schema",
     "noCapabilities": "No hay capacidades definidas.",
     "featured": "Destacado",
@@ -842,7 +842,7 @@
   "transparency": {
     "title": "Transparencia",
     "subtitle": "Todos los datos se leen directamente del contrato inteligente. Verificable on-chain.",
-    "marketplaceStats": "Estadísticas del Marketplace",
+    "marketplaceStats": "Estadísticas on-chain",
     "onChainAgents": "Agentes On-Chain",
     "agent": "Agente",
     "priceDb": "Precio (DB)",
@@ -928,7 +928,7 @@
     "member_since": "Desde {year}",
     "no_agents": "Este creator aún no ha publicado agentes.",
     "not_found": "Creator no encontrado.",
-    "back_to_marketplace": "← Volver al marketplace",
+    "back_to_marketplace": "← Volver a agentes",
     "publishedAgents": "Agentes publicados",
     "noAgents": "Este creator aun no ha publicado agentes."
   },
