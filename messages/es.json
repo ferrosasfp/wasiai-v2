@@ -20,31 +20,31 @@
     "viewDetails": "Ver detalles",
     "notFound": "Página no encontrada",
     "notFoundMessage": "La página que buscas no existe.",
-    "goHome": "Ir al marketplace",
+    "goHome": "Ir a WasiAI",
     "tryAgain": "Intentar de nuevo",
     "somethingWentWrong": "Algo salió mal",
     "saving": "Guardando…"
   },
   "home": {
-    "title": "WasiAI — El Marketplace de la Economía Agéntica",
+    "title": "WasiAI — La capa de pagos para agentes IA",
     "subtitle": "Agentes de IA descubren, pagan y llaman agentes de forma autónoma. Pagos x402 nativos en Avalanche.",
-    "badge": "El marketplace para la economía agéntica",
+    "badge": "Infraestructura de pagos para agentes IA",
     "heroTitle": "Publica tu agente de IA.",
     "heroSubtitle": "Cobra automáticamente en USDC.",
-    "heroDescription": "WasiAI es el marketplace donde creators publican agentes de IA y cobran por cada llamada. Los developers encuentran el agente que necesitan y lo integran en minutos.",
+    "heroDescription": "WasiAI es la capa de pagos para agentes IA. Publica tu agente, define un precio por llamada y cobra en USDC automáticamente. Sin facturas, sin intermediarios.",
     "ctaCreator": "Publicar mi agente →",
     "ctaConsumer": "Explorar agentes",
     "hero": {
-      "headline": "El Hogar de los Agentes de IA",
+      "headline": "La capa de pagos para agentes IA",
       "subtitle": {
-        "creator": "Publica tu agente de IA y cobra automáticamente. Sin facturas, sin fricción.",
-        "consumer": "Encuentra el agente que necesitas e intégralo en minutos. Una sola API key."
+        "creator": "Publica tu agente, define un precio por llamada y cobra automáticamente. Sin facturas ni fricción.",
+        "consumer": "Conecta tu agente a la capa de pagos. Paga por llamada, una API key, sin suscripciones."
       },
       "cta": {
         "creator": "Publica tu agente",
         "consumer": "Ver agentes"
       },
-      "tagline": "Powered by Avalanche. Construido para la economía agéntica.",
+      "tagline": "Infraestructura de pagos para agentes IA. Impulsado por Avalanche.",
       "tab": {
         "creator": "Para Creators",
         "consumer": "Para Developers",
@@ -63,8 +63,8 @@
     "noModelsFiltered": "Ningún agente coincide con tus filtros.",
     "clearFilters": "Limpiar filtros",
     "beFirst": "Sé el primero en publicar →",
-    "builtForAgents": "Construido para la Economía Agéntica",
-    "builtSubtitle": "Cualquier agente de IA puede descubrir, pagar y llamar agentes en WasiAI de forma autónoma. x402 nativo. Identidad ERC-8004. Pagos sin gas en Avalanche.",
+    "builtForAgents": "Infraestructura de pagos para agentes IA",
+    "builtSubtitle": "Cualquier agente IA puede llamar a agentes en WasiAI y pagar por llamada de forma autónoma. Pagos x402 nativos. Identidad ERC-8004. Sin gas en Avalanche.",
     "getAgentKey": "Obtener Agent Key →",
     "agentKitDocs": "Docs AgentKit ↗",
     "step1Label": "1. Verificar saldo",
@@ -140,7 +140,7 @@
   },
   "publish": {
     "title": "Publicar un Agente",
-    "subtitle": "Lista tu agente de IA en WasiAI y gana USDC por cada llamada.",
+    "subtitle": "Conecta tu agente a la capa de pagos de WasiAI. Define un precio por llamada y cobra en USDC automáticamente.",
     "coverImage": "Imagen de portada",
     "coverImageHint": "opcional · máx 5MB",
     "slug": "Slug (URL)",
@@ -239,7 +239,7 @@
       "redirecting": "Redirigiendo al dashboard..."
     },
     "pageTitle": "Publicar agente",
-    "pageSubtitle": "Lista tu agente de IA en WasiAI y gana USDC por cada llamada.",
+    "pageSubtitle": "Conecta tu agente a la capa de pagos de WasiAI. Define un precio por llamada y cobra en USDC automáticamente.",
     "draftTitle": "Tienes un borrador sin publicar",
     "draftContinue": "Continuar borrador",
     "draftDiscard": "Descartar",
@@ -571,7 +571,7 @@
     }
   },
   "nav": {
-    "marketplace": "Mercado",
+    "marketplace": "Agentes",
     "dashboard": "Panel",
     "docs": "Docs",
     "publish": "Publicar",

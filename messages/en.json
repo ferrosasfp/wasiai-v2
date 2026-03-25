@@ -20,31 +20,31 @@
     "viewDetails": "View details",
     "notFound": "Page not found",
     "notFoundMessage": "The page you're looking for doesn't exist.",
-    "goHome": "Go to marketplace",
+    "goHome": "Go to WasiAI",
     "tryAgain": "Try again",
     "somethingWentWrong": "Something went wrong",
     "saving": "Saving…"
   },
   "home": {
-    "title": "WasiAI — The Agentic Economy Marketplace",
+    "title": "WasiAI — The payment layer for AI agents",
     "subtitle": "AI agents discover, pay, and call agents autonomously. x402 native payments on Avalanche.",
-    "badge": "The marketplace for the agentic economy",
+    "badge": "Payment infrastructure for AI agents",
     "heroTitle": "Publish your AI agent.",
     "heroSubtitle": "Get paid automatically in USDC.",
-    "heroDescription": "WasiAI is the marketplace where creators publish AI agents and earn per call. Developers find the right agent and integrate it in minutes.",
+    "heroDescription": "WasiAI is the payment layer for AI agents. Publish your agent, set a price per call, and earn in USDC automatically. No invoicing, no middlemen.",
     "ctaCreator": "Publish my agent →",
     "ctaConsumer": "Explore agents",
     "hero": {
-      "headline": "The Home of AI Agents",
+      "headline": "The payment layer for AI agents",
       "subtitle": {
-        "creator": "Publish your AI agent and get paid automatically. No invoicing, no friction.",
-        "consumer": "Find the right AI agent and integrate it in minutes. One API key, that's it."
+        "creator": "Publish your agent, set a price per call, and earn automatically. No invoicing, no friction.",
+        "consumer": "Connect your agent to the payment layer. Pay per call, one API key, no subscriptions."
       },
       "cta": {
         "creator": "Publish your agent",
         "consumer": "Browse agents"
       },
-      "tagline": "Powered by Avalanche. Built for the agentic economy.",
+      "tagline": "Payment infrastructure for AI agents. Powered by Avalanche.",
       "tab": {
         "creator": "For Creators",
         "consumer": "For Developers",
@@ -63,8 +63,8 @@
     "noModelsFiltered": "No agents match your filters.",
     "clearFilters": "Clear filters",
     "beFirst": "Be the first to publish →",
-    "builtForAgents": "Built for the Agentic Economy",
-    "builtSubtitle": "Any AI agent can discover, pay, and call agents on WasiAI autonomously. x402 native. ERC-8004 identity. Gasless payments on Avalanche.",
+    "builtForAgents": "Payment infrastructure for AI agents",
+    "builtSubtitle": "Any AI agent can call agents on WasiAI and pay per call autonomously. x402 native payments. ERC-8004 agent identity. Gasless on Avalanche.",
     "getAgentKey": "Get Agent Key →",
     "agentKitDocs": "AgentKit Docs ↗",
     "step1Label": "1. Check budget",
@@ -140,7 +140,7 @@
   },
   "publish": {
     "title": "Publish an Agent",
-    "subtitle": "List your AI agent on WasiAI and earn USDC per call.",
+    "subtitle": "Connect your agent to WasiAI's payment layer. Set a price per call, earn in USDC automatically.",
     "coverImage": "Cover Image",
     "coverImageHint": "optional · max 5MB",
     "slug": "Slug (URL)",
@@ -239,7 +239,7 @@
       "redirecting": "Redirecting to dashboard..."
     },
     "pageTitle": "Publish Agent",
-    "pageSubtitle": "List your AI agent on WasiAI and earn USDC per call.",
+    "pageSubtitle": "Connect your agent to WasiAI's payment layer. Set a price per call, earn in USDC automatically.",
     "draftTitle": "You have an unpublished draft",
     "draftContinue": "Continue draft",
     "draftDiscard": "Discard",
@@ -571,7 +571,7 @@
     }
   },
   "nav": {
-    "marketplace": "Marketplace",
+    "marketplace": "Agents",
     "dashboard": "Dashboard",
     "docs": "Docs",
     "publish": "Publish",
