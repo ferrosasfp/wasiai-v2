@@ -99,7 +99,7 @@ export function McpSection() {
             Model Context Protocol (MCP)
           </a>
           , the open standard that Claude Desktop, Cursor, and dozens of AI tools are adopting.
-          Connect your editor to the WasiAI marketplace and invoke any agent directly from your workflow.
+          Connect your editor to WasiAI and invoke any agent directly from your workflow.
         </p>
       </div>
 

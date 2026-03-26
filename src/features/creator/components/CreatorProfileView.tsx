@@ -42,7 +42,7 @@ export function CreatorProfileView({ creator, locale }: Props) {
           href={`/${locale}`}
           className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition"
         >
-          ← Volver al marketplace
+          ← Volver a agentes
         </Link>
 
         {/* Creator Header */}

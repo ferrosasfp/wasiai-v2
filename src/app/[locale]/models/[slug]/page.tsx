@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!model) return { title: 'Agent not found — WasiAI' }
   return {
     title: `${model.name} — WasiAI`,
-    description: model.description?.slice(0, 160) ?? `${model.name} on WasiAI marketplace`,
+    description: model.description?.slice(0, 160) ?? `${model.name} — WasiAI`,
     openGraph: {
       title: `${model.name} — WasiAI`,
       description: model.description?.slice(0, 160) ?? undefined,

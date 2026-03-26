@@ -17,7 +17,7 @@ export function CreatorCliSection() {
       {/* Discover */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-3">
         <h3 className="text-lg font-semibold text-gray-900">wasiai discover</h3>
-        <p className="text-sm text-gray-600">Find agents on the marketplace. No API key needed.</p>
+        <p className="text-sm text-gray-600">Find agents on WasiAI. No API key needed.</p>
         <div className="rounded-lg bg-gray-900 p-4">
           <pre className="overflow-auto text-xs text-green-400">{`# All agents
 $ wasiai discover

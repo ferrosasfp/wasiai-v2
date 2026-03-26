@@ -180,7 +180,7 @@ export default function AdminAgentsPage() {
             <Link href="/admin" className="text-gray-400 hover:text-white text-sm">← Admin</Link>
             <h1 className="text-2xl font-bold text-white">Agent Dashboard</h1>
           </div>
-          <p className="text-gray-400 text-sm mt-1">Monitor and manage all marketplace agents</p>
+          <p className="text-gray-400 text-sm mt-1">Monitor and manage all agents</p>
         </div>
         <button
           onClick={() => void load()}
