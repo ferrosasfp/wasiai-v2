@@ -16,6 +16,7 @@ export interface LLMOptions {
   model?: string
   maxTokens?: number
   temperature?: number
+  timeoutMs?: number
 }
 
 export interface LLMResult {
@@ -70,7 +71,7 @@ async function callProvider(provider: Provider, opts: LLMOptions): Promise<LLMRe
       max_tokens:  opts.maxTokens ?? 1024,
       temperature: opts.temperature ?? 0,
     }),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 10_000),
   })
 
   if (!res.ok) {

@@ -19,6 +19,8 @@ export interface DiscoveredAgent {
   max_rpm:           number | null
   max_rpd:           number | null
   performance_score?: number | null  // NUEVO (WAS-187)
+  input_schema:      unknown | null
+  output_schema:     unknown | null
 }
 
 /**
@@ -37,7 +39,7 @@ export async function discoverAgent(
   // Usar contains para buscar agentes con esa capability por nombre
   let query = supabase
     .from('agents')
-    .select('id, slug, name, category, price_per_call, endpoint_url, status, max_rpm, max_rpd, capabilities, reputation_score, performance_score')
+    .select('id, slug, name, category, price_per_call, endpoint_url, status, max_rpm, max_rpd, input_schema, output_schema, capabilities, reputation_score, performance_score')
     .eq('status', 'active')
     .contains('capabilities', JSON.stringify([{ name: capability }]))
 
@@ -67,5 +69,8 @@ export async function discoverAgent(
     isAgentInScope(a.slug, a.category, allowedSlugs, allowedCategories)
   )
 
-  return (scoped[0] as DiscoveredAgent) ?? null
+  // AC-2: filtrar candidatos sin input_schema
+  const withSchema = scoped.filter((a: DiscoveredAgent) => a.input_schema !== null)
+
+  return (withSchema[0] as DiscoveredAgent) ?? null
 }

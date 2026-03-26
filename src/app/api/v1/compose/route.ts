@@ -25,6 +25,8 @@ import { transformStepOutput }       from '@/lib/step-transform'
 // ── Constantes (env-driven, no hardcodes) ────────────────────────────────────
 const MAX_STEPS       = 5
 const STEP_TIMEOUT_MS = parseInt(process.env.COMPOSE_STEP_TIMEOUT_MS?.trim() ?? '8000', 10)
+const _parsedTransformTimeout = parseInt(process.env.COMPOSE_TRANSFORM_TIMEOUT_MS?.trim() ?? '3000', 10)
+const TRANSFORM_TIMEOUT_MS = isNaN(_parsedTransformTimeout) ? 3000 : _parsedTransformTimeout
 
 // ── Wave 2: Clasificador de errores ──────────────────────────────────────────
 /**
@@ -70,6 +72,7 @@ interface ComposeStep {
   input?:         string
   pass_output?:   boolean
   parallel?:      boolean  // HU-5.2: si true, agrupa con steps consecutivos parallel
+  receive_input?: boolean  // recibe lastOutput transformado como stepInput (solo parallel)
 }
 
 interface ComposeRequest {
@@ -95,8 +98,9 @@ interface ComposeResponse {
   total_cost_usdc:    string
   result:             unknown
   receipts:           StepReceipt[]
-  refund_failures?:   string[]  // AC-11: presente solo si hay fallos de refund
-  resumed_from_step?: number    // WAS-204: presente solo en retry mode
+  refund_failures?:    string[]  // AC-11: presente solo si hay fallos de refund
+  resumed_from_step?:  number    // WAS-204: presente solo en retry mode
+  transform_warnings?: Array<{ step: number; reason: string }>
 }
 
 interface PipelineFailedResponse {
@@ -273,6 +277,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           { status: 403 }
         )
       }
+      // AC-1: enforce input_schema required
+      if (!agent.input_schema) {
+        return NextResponse.json(
+          { error: `Agent missing input_schema: ${agent.slug}`, code: 'agent_missing_schema', step: i },
+          { status: 422 }
+        )
+      }
     } else if (step.capability) {
       // Dynamic discovery
       const discovered = await discoverAgent(
@@ -301,6 +312,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             }
           }
           if (fbAgent) {
+            if (!fbAgent.input_schema) {
+              return NextResponse.json(
+                { error: `Fallback agent missing input_schema: ${fbAgent.slug}`, code: 'agent_missing_schema', step: i },
+                { status: 422 }
+              )
+            }
             if (isAgentInScope(fbAgent.slug, fbAgent.category, keyRow.allowed_slugs, keyRow.allowed_categories)) {
               steps[i] = { ...step, agent_slug: step.fallback_slug }
               resolvedSlugs.set(i, step.fallback_slug)
@@ -317,7 +334,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         )
       }
 
-      agentMap.set(discovered.slug, discovered as AgentRow)
+      agentMap.set(discovered.slug, {
+        id:             discovered.id,
+        slug:           discovered.slug,
+        name:           discovered.name,
+        price_per_call: discovered.price_per_call,
+        endpoint_url:   discovered.endpoint_url,
+        status:         discovered.status,
+        category:       discovered.category,
+        max_rpm:        discovered.max_rpm ?? 60,
+        max_rpd:        discovered.max_rpd ?? 1000,
+        input_schema:   discovered.input_schema,
+        output_schema:  discovered.output_schema,
+        webhook_secret: null,  // INTENCIONAL — discoverAgent no trae este campo; logger.warn lo maneja
+      } as AgentRow)
       steps[i] = { ...step, agent_slug: discovered.slug }
       resolvedSlugs.set(i, discovered.slug)
     }
@@ -579,33 +609,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const output = typeof stepOutput === 'string' ? stepOutput : JSON.stringify(stepOutput)
 
-    // WAS-231: Propagar campos clave entre steps. Los outputs tienen estructura { result: {...}, meta: {...} }
-    // — acceder a out.result primero, con fallback a out para retrocompatibilidad.
-    // Bug fix: código anterior accedía out.* (raíz) pero los campos viven en out.result.*.
-    if (stepOutput && typeof stepOutput === 'object') {
-      const top = stepOutput as Record<string, unknown>
-      const src = (top.result && typeof top.result === 'object')
-        ? top.result as Record<string, unknown>
-        : top
+    // AC-5/AC-6: Propagar campos desde output_schema.properties de forma dinámica
+    if (stepOutput && typeof stepOutput === 'object' && agent.output_schema) {
+      const schema = agent.output_schema as Record<string, unknown>
+      const properties = schema.properties
+      if (properties && typeof properties === 'object') {
+        const top = stepOutput as Record<string, unknown>
+        const src = (top.result && typeof top.result === 'object')
+          ? top.result as Record<string, unknown>
+          : top
 
-      // String fields
-      const strFields = ['token_address', 'token_symbol', 'token_name'] as const
-      for (const f of strFields) {
-        if (typeof src[f] === 'string' && src[f]) pipelineCtx[f] = src[f] as string
-      }
-
-      // Number fields
-      const numFields = ['price_usd', 'volatility_7d_pct', 'sentiment_score',
-                         'holder_count', 'contract_age_days', 'top10_concentration_pct',
-                         'bytecode_size', 'risk_score'] as const
-      for (const f of numFields) {
-        if (typeof src[f] === 'number') pipelineCtx[f] = src[f] as number
-      }
-
-      // Boolean fields
-      const boolFields = ['is_verified'] as const
-      for (const f of boolFields) {
-        if (typeof src[f] === 'boolean') pipelineCtx[f] = src[f] as boolean
+        for (const key of Object.keys(properties as Record<string, unknown>)) {
+          if (key === 'input') continue  // AC-5: excluir campo "input"
+          const val = src[key]
+          if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+            pipelineCtx[key] = val
+          }
+        }
       }
     }
     supabase.rpc('increment_agent_stats', { p_agent_id: agent.id, p_amount: agent.price_per_call }).then(undefined, () => {})
@@ -622,6 +642,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Wave 3d: acumular refund_failures del pipeline
   const refundFailures: string[] = []
+  const transformWarnings: Array<{ step: number; reason: string }> = []
 
   try {
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
@@ -643,7 +664,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         } else if (step.pass_output && lastOutput) {
           const nextAgent = agentMap.get(step.agent_slug ?? '')
           if (nextAgent?.input_schema && typeof nextAgent.input_schema === 'object' && nextAgent.input_schema !== null) {
-            stepInput = await transformStepOutput(lastOutput, nextAgent.input_schema as Record<string, unknown>, nextAgent.slug)
+            const txResult = await transformStepOutput(lastOutput, nextAgent.input_schema as Record<string, unknown>, nextAgent.slug, TRANSFORM_TIMEOUT_MS)
+            stepInput = txResult.transformed
+            if (txResult.warning) {
+              transformWarnings.push({ step: globalStepIndex, reason: txResult.warning })
+            }
           } else {
             stepInput = lastOutput  // AC3: no schema → raw passthrough
           }
@@ -730,10 +755,36 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           )
         }
 
+        // AC-11: mutual exclusion check (receive_input + input) - validated at validateSteps, defensive check here
+        // AC-10: pre-check serial — receive_input requires lastOutput, must check BEFORE allSettled
+        for (let gi = 0; gi < group.length; gi++) {
+          const gs = group[gi]
+          if (gs.receive_input === true && lastOutput === null) {
+            return NextResponse.json(
+              { error: `Step ${globalStepIndex + gi}: receive_input requires a previous step output`, code: 'validation_error' },
+              { status: 422 }
+            )
+          }
+        }
+
         const groupStartIndex = globalStepIndex
         const groupResults = await Promise.allSettled(
-          group.map((step, i) => {
-            const stepInput = step.input ?? ''
+          group.map(async (step, i) => {
+            let stepInput: string
+            if (step.receive_input === true && lastOutput !== null) {
+              const nextAgent = agentMap.get(step.agent_slug ?? '')
+              if (nextAgent?.input_schema && typeof nextAgent.input_schema === 'object' && nextAgent.input_schema !== null) {
+                const txResult = await transformStepOutput(lastOutput, nextAgent.input_schema as Record<string, unknown>, nextAgent.slug, TRANSFORM_TIMEOUT_MS)
+                stepInput = txResult.transformed
+                if (txResult.warning) {
+                  transformWarnings.push({ step: globalStepIndex + i, reason: txResult.warning })
+                }
+              } else {
+                stepInput = lastOutput
+              }
+            } else {
+              stepInput = step.input ?? ''
+            }
             return executeStep(step, globalStepIndex + i, stepInput)
           })
         )
@@ -812,6 +863,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       receipts,
       ...(refundFailures.length > 0 && { refund_failures: refundFailures }),
       ...(resumedFromStep !== undefined && { resumed_from_step: resumedFromStep }),
+      ...(transformWarnings.length > 0 && { transform_warnings: transformWarnings }),
     } satisfies ComposeResponse,
     { status: 200 },
   )
@@ -844,7 +896,19 @@ export function validateSteps(steps: unknown): string | null {
     if (i === 0 && s.pass_output === true) {
       return 'Step 0 cannot use pass_output (no previous output exists)'
     }
-    if (!s.pass_output && (s.input === undefined || (typeof s.input === 'string' && s.input.trim() === ''))) {
+
+    // AC-NEW-1: receive_input validations
+    if (s.receive_input === true && s.input !== undefined) {
+      return `Step ${i}: receive_input and input are mutually exclusive`
+    }
+    if (i === 0 && s.receive_input === true) {
+      return 'Step 0 cannot use receive_input (no previous output exists)'
+    }
+    if (s.receive_input === true && !s.parallel) {
+      return `Step ${i}: receive_input is only valid on parallel steps`
+    }
+
+    if (!s.pass_output && !s.receive_input && (s.input === undefined || (typeof s.input === 'string' && s.input.trim() === ''))) {
       return `Step ${i}: input is required when pass_output is false`
     }
   }
