@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCachedGasOverhead } from '@/lib/pricing/overhead'
 
 /**
  * GET /api/v1/agent-keys/me
@@ -41,6 +42,9 @@ export async function GET(request: NextRequest) {
   const remaining = Math.max(0, budget - spent)
   const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0
 
+  const gasCache = await getCachedGasOverhead()
+  const current_gas_fee_usdc = gasCache?.overhead ?? null
+
   return NextResponse.json({
     name: keyRow.name,
     is_active: keyRow.is_active,
@@ -53,6 +57,7 @@ export async function GET(request: NextRequest) {
     identity: keyRow.erc8004_identity ?? null, // ERC-8004 on-chain identity
     allowed_slugs:      keyRow.allowed_slugs ?? null,      // WAS-186 AC-7
     allowed_categories: keyRow.allowed_categories ?? null, // WAS-186 AC-7
+    current_gas_fee_usdc,
     status: !keyRow.is_active
       ? 'inactive'
       : remaining === 0

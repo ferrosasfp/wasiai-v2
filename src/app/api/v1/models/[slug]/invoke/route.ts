@@ -17,7 +17,7 @@ import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits, 
 import { CHAIN_NAME, IS_MAINNET } from '@/lib/chain'
 import { logger } from '@/lib/logger'
 
-import { calcPlatformOverhead } from '@/lib/pricing/overhead'
+import { calcPlatformOverhead, type GasSource } from '@/lib/pricing/overhead'
 import { triggerAgentEvent } from '@/lib/webhooks/triggerAgentEvent'
 
 // x402 recipient = the marketplace contract (it splits 90/10 internally)
@@ -83,7 +83,7 @@ type SettlementResult = { verified: boolean; settled: boolean; transactionHash?:
 /**
  * Returns 402 instructions response (probe / no payment path).
  */
-function build402Instructions(model: Record<string, unknown>, priceStr: string, resourceUrl: string): NextResponse {
+function build402Instructions(model: Record<string, unknown>, priceStr: string, resourceUrl: string, overheadInfo: { overhead: number; gas_source: GasSource }): NextResponse {
   const requirements = buildRequirements({
     amount: priceStr,
     recipient: CONTRACT_ADDRESS,
@@ -95,7 +95,19 @@ function build402Instructions(model: Record<string, unknown>, priceStr: string, 
     ? { available: true, endpoint: `/api/v1/agents/${model.slug as string}/trial`, limit: model.free_trial_limit }
     : undefined
   return NextResponse.json(
-    { x402Version: 1, ...requirements, model: { slug: model.slug, name: model.name, category: model.category }, docs: 'https://wasiai.io/docs/agents#x402', ...(freeTrial ? { free_trial: freeTrial } : {}) },
+    {
+      x402Version: 1,
+      ...requirements,
+      model: { slug: model.slug, name: model.name, category: model.category },
+      docs: 'https://wasiai.io/docs/agents#x402',
+      breakdown: {
+        creator_price: Number(priceStr) - overheadInfo.overhead,
+        gas_fee_usdc: overheadInfo.overhead,
+        total: Number(priceStr),
+        gas_estimated: overheadInfo.gas_source !== 'none',
+      },
+      ...(freeTrial ? { free_trial: freeTrial } : {}),
+    },
     { status: 402, headers: { 'Content-Type': 'application/json', ...X402_CORS_HEADERS } },
   )
 }
@@ -212,7 +224,7 @@ export async function POST(
   // creator_price is a legacy field that may be misconfigured; price_per_call is the source of truth.
   // The 10% platform fee is deducted at withdrawal time by the contract, not here.
   const creatorPrice = Number(model.price_per_call)
-  const { overhead, breakdown, circuitBreaker } = await calcPlatformOverhead(creatorPrice)
+  const { overhead, breakdown, circuitBreaker, gas_source } = await calcPlatformOverhead(creatorPrice)
 
   if (circuitBreaker) {
     return NextResponse.json(
@@ -420,7 +432,7 @@ export async function POST(
       try { await getSharedRedis().del(mutexKey) } catch { /* non-fatal */ }
     }
 
-    return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined)
+    return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown, gas_source }, callId ?? undefined)
   }
 
   // ── 2b. Sandbox shortcut (AC-5) ─────────────────────────────────────────
@@ -454,7 +466,7 @@ export async function POST(
   if (!paymentHeader) {
     // No payment — return 402 with x402 payment instructions
     logger.info('[x402] probe', { slug, ip: getIdentifier(request) })
-    return build402Instructions(model, priceStr, resourceUrl)
+    return build402Instructions(model, priceStr, resourceUrl, { overhead, gas_source })
   }
 
   // ── 5. Verify + Settle (Route B) ───────────────────────────────────────
@@ -590,7 +602,7 @@ export async function POST(
     })
   }
 
-  return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown }, callId ?? undefined, { upstreamFailed: result.status === 'error' })
+  return buildResponse(model, result, settlement.transactionHash, undefined, { creatorPrice, overhead, totalPrice, breakdown, gas_source }, callId ?? undefined, { upstreamFailed: result.status === 'error' })
   } catch (err) {
     logger.error('[invoke] unhandled error', { err })
     // S-10: Never expose raw error details in production
@@ -763,6 +775,7 @@ interface PricingInfo {
   overhead:     number
   totalPrice:   number
   breakdown:    { gas: number }
+  gas_source:   GasSource    // ← NEW
 }
 
 function buildResponse(
@@ -806,7 +819,9 @@ function buildResponse(
         ? {
             creator_price:     pricingInfo.creatorPrice,
             platform_overhead: pricingInfo.overhead,
+            gas_fee_usdc:      pricingInfo.overhead,    // NEW alias
             total:             pricingInfo.totalPrice,
+            gas_source:        pricingInfo.gas_source,  // NEW
             breakdown:         pricingInfo.breakdown,
           }
         : undefined,

@@ -11,6 +11,7 @@ import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'  // HAL-016: single source of truth
 
 import { SITE_URL } from '@/lib/constants'
+import { getCachedGasOverhead } from '@/lib/pricing/overhead'
 import { resolveExampleInput } from '@/features/agents/utils/resolveExampleInput'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { metaValidateSchema } from '@/lib/schema-validator'
@@ -127,7 +128,12 @@ export async function GET(
       error_rate_sample_size: metrics?.error_rate_sample ?? null,
     }
 
-    return NextResponse.json(body, { status: 200, headers: CORS })
+    const gasCache = await getCachedGasOverhead()
+    const estimated_total_cost = gasCache
+      ? Math.round((Number(agent.price_per_call) + gasCache.overhead) * 1_000_000) / 1_000_000
+      : null
+
+    return NextResponse.json({ ...body, estimated_total_cost }, { status: 200, headers: CORS })
   } catch (err) {
     console.error('[agents/slug] Unexpected error:', err)
     return NextResponse.json(
