@@ -116,7 +116,8 @@ export async function callLLM(opts: LLMOptions): Promise<LLMResult> {
       // Extract HTTP status code from error message (e.g. "API error 504: ...")
       const statusMatch = msg.match(/\b([45]\d{2})\b/)
       const status = statusMatch ? parseInt(statusMatch[1], 10) : 0
-      const isRetryable = status === 401 || status === 402 || status === 429 || status >= 500
+      const isRetryable = status === 401 || status === 402 || status === 429 || status >= 500 ||
+        (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError'))
       errors.push(msg)
       if (!isRetryable) {
         // Hard error (bad request, schema error) — no point trying next provider

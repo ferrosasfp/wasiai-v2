@@ -478,6 +478,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     reason:         string
     chargeDecision: ChargeDecision
     refundFailure:  string | null
+    ctxPatch?:      Record<string, string | number | boolean>
   }
 
   async function executeStep(step: ComposeStep, stepIndex: number, stepInput: string): Promise<StepResult> {
@@ -610,6 +611,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const output = typeof stepOutput === 'string' ? stepOutput : JSON.stringify(stepOutput)
 
     // AC-5/AC-6: Propagar campos desde output_schema.properties de forma dinámica
+    let ctxPatch: Record<string, string | number | boolean> | undefined
     if (stepOutput && typeof stepOutput === 'object' && agent.output_schema) {
       const schema = agent.output_schema as Record<string, unknown>
       const properties = schema.properties
@@ -619,13 +621,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           ? top.result as Record<string, unknown>
           : top
 
+        const patch: Record<string, string | number | boolean> = {}
         for (const key of Object.keys(properties as Record<string, unknown>)) {
-          if (key === 'input') continue  // AC-5: excluir campo "input"
+          if (key === 'input') continue
           const val = src[key]
           if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
-            pipelineCtx[key] = val
+            patch[key] = val
           }
         }
+        if (Object.keys(patch).length > 0) ctxPatch = patch
       }
     }
     supabase.rpc('increment_agent_stats', { p_agent_id: agent.id, p_amount: agent.price_per_call }).then(undefined, () => {})
@@ -636,6 +640,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       reason: '',
       chargeDecision: 'charge' as ChargeDecision,
       refundFailure: null,
+      ctxPatch,
       receipt: { step: stepIndex, agent_slug: agent.slug, cost_usdc: agent.price_per_call.toFixed(6), receipt_signature: signature, call_id: callId },
     }
   }
@@ -728,6 +733,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           pushedReceipt.resolved_slug = resolvedSlugs.get(globalStepIndex)
         }
         receipts.push(pushedReceipt)
+        if (result.ctxPatch) Object.assign(pipelineCtx, result.ctxPatch)
         lastOutput = result.output
         // Best-effort: no await, no bloquea el pipeline
         supabase.rpc('append_step_output', {
@@ -755,38 +761,56 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           )
         }
 
-        // AC-11: mutual exclusion check (receive_input + input) - validated at validateSteps, defensive check here
-        // AC-10: pre-check serial — receive_input requires lastOutput, must check BEFORE allSettled
+        // FASE 1: computar y validar inputs para todos los steps del grupo (serial)
+        const precomputedInputs: string[] = []
         for (let gi = 0; gi < group.length; gi++) {
           const gs = group[gi]
-          if (gs.receive_input === true && lastOutput === null) {
+          let gsInput: string
+
+          if (gs.receive_input === true && lastOutput !== null) {
+            const nextAgent = agentMap.get(gs.agent_slug ?? '')!
+            const txResult = await transformStepOutput(
+              lastOutput,
+              nextAgent.input_schema as Record<string, unknown>,
+              nextAgent.slug,
+              TRANSFORM_TIMEOUT_MS,
+            )
+            gsInput = txResult.transformed
+            if (txResult.warning) {
+              transformWarnings.push({ step: globalStepIndex + gi, reason: txResult.warning })
+            }
+          } else if (gs.receive_input === true && lastOutput === null) {
+            // AC-10: pre-check
             return NextResponse.json(
               { error: `Step ${globalStepIndex + gi}: receive_input requires a previous step output`, code: 'validation_error' },
               { status: 422 }
             )
+          } else {
+            gsInput = gs.input ?? ''
           }
+
+          // M-01: validar input contra input_schema ANTES de executeStep (igual que steps secuenciales)
+          const agentForGs = agentMap.get(gs.agent_slug ?? '')!
+          if (agentForGs.input_schema) {
+            const inputToValidate = typeof gsInput === 'string'
+              ? (() => { try { return JSON.parse(gsInput) } catch { return gsInput } })()
+              : gsInput
+            const validErr = validateInput(agentForGs.input_schema, inputToValidate)
+            if (validErr) {
+              return NextResponse.json(
+                { error: validErr, code: 'input_validation_failed', step: globalStepIndex + gi },
+                { status: 422 }
+              )
+            }
+          }
+
+          precomputedInputs.push(gsInput)
         }
 
+        // FASE 2: ejecutar en paralelo con inputs pre-computados (callback síncrono)
         const groupStartIndex = globalStepIndex
         const groupResults = await Promise.allSettled(
-          group.map(async (step, i) => {
-            let stepInput: string
-            if (step.receive_input === true && lastOutput !== null) {
-              const nextAgent = agentMap.get(step.agent_slug ?? '')
-              if (nextAgent?.input_schema && typeof nextAgent.input_schema === 'object' && nextAgent.input_schema !== null) {
-                const txResult = await transformStepOutput(lastOutput, nextAgent.input_schema as Record<string, unknown>, nextAgent.slug, TRANSFORM_TIMEOUT_MS)
-                stepInput = txResult.transformed
-                if (txResult.warning) {
-                  transformWarnings.push({ step: globalStepIndex + i, reason: txResult.warning })
-                }
-              } else {
-                stepInput = lastOutput
-              }
-            } else {
-              stepInput = step.input ?? ''
-            }
-            return executeStep(step, globalStepIndex + i, stepInput)
-          })
+          group.map((step, i) => executeStep(step, globalStepIndex + i, precomputedInputs[i]))
         )
 
         const successResults: string[] = []
@@ -808,6 +832,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             if (gr.status === 'fulfilled' && gr.value.refundFailure) refundFailures.push(gr.value.refundFailure)
             receipts.push({ step: stepIdx, agent_slug: group[i].agent_slug ?? '', cost_usdc: '0.000000', receipt_signature: '', call_id: '' })
             logger.warn('[compose] parallel step failed', { stepIdx, reason })
+          }
+        }
+
+        // Aplicar ctx patches en orden determinístico por índice (no por timing de red)
+        for (let i = 0; i < groupResults.length; i++) {
+          const gr = groupResults[i]
+          if (gr.status === 'fulfilled' && gr.value.status === 'success' && gr.value.ctxPatch) {
+            Object.assign(pipelineCtx, gr.value.ctxPatch)
           }
         }
 
