@@ -4,7 +4,7 @@
 // Patrón: lógica pura extraída directamente (sin importar route.ts con side-effects de env)
 // Covers: validateSteps, groupSteps, parseOutputSafe, transformStepOutput, pipelineCtx
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // ── Mock @/lib/agents/llm BEFORE importing any module that uses it ────────────
 vi.mock('@/lib/agents/llm', () => ({
