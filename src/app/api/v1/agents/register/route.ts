@@ -474,8 +474,9 @@ export async function POST(request: NextRequest) {
   // ── Issue management API key ──────────────────────────────────────────────
   // So the registering agent can update/pause its own listing
   // HAL-002: Use correct columns (owner_id, key_hash) via serviceClient
+  const callerAlreadyHasKey = authMethod === 'jwt' || authMethod === 'agent_key'
   let managementKey: string | null = null
-  if (creatorId) {
+  if (creatorId && !callerAlreadyHasKey) {
     const { raw, hash } = generateApiKey()
     const { error: keyInsertError } = await serviceClient
       .from('agent_keys')
@@ -509,6 +510,9 @@ export async function POST(request: NextRequest) {
         )
       }
     }
+  }
+  if (callerAlreadyHasKey) {
+    logger.info('[register] management key skipped', { authMethod, slug: data.slug })
   }
 
   // ── Register on-chain (non-blocking) — WAS-162: update DB only after tx confirms ──
@@ -575,8 +579,13 @@ export async function POST(request: NextRequest) {
       sandbox_enabled:    agent.sandbox_enabled,
     },
     creator_id: creatorId,
-    management_key: managementKey,
-    management_key_warning: managementKey ? null : 'Management key could not be issued. Contact support@wasiai.io',
+    ...(callerAlreadyHasKey
+      ? { use_existing_key: true, management_key_message: 'Use your existing x-agent-key to manage this agent' }
+      : {
+          management_key: managementKey,
+          management_key_warning: managementKey ? null : 'Management key could not be issued. Contact support@wasiai.io',
+        }
+    ),
     verification: {
       status:  'pending',
       message: 'Your agent is live. WasiAI will verify the endpoint within 24h for the Verified badge.',
