@@ -4,7 +4,7 @@
 // Next.js 14 App Router | createServiceClient | viem v2 | no ethers | no hardcodes
 //
 // Interface: agent_slug + pass_output + parallel (story spec)
-// Rate limit: getComposeLimit() de @/lib/ratelimit (rl:compose, 10/1m)
+// Rate limit: getComposeLimit() de @/lib/ratelimit (rl:compose, configurable/1m, default 30)
 // Receipts: signReceipt() por step de @/lib/receipts/signReceipt
 // DB: agent_calls con pipeline_id + step_index, pipeline_executions para tracking
 

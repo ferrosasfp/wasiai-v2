@@ -41,9 +41,16 @@ export function getKeysLimit()     { return _keys     ??= new Ratelimit({ redis:
 export function getUploadLimit()   { return _upload   ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(20, '1 h'),  prefix: 'rl:upload' }) }
 export function getSearchLimit()   { return _search   ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(30, '1 m'),  prefix: 'rl:search' }) }
 
-// ── Compose rate limiter — HU-5.1
+// ── Compose rate limiter — configurable via COMPOSE_RATE_LIMIT_RPM (default: 30/min)
 let _compose: Ratelimit | null = null
-export function getComposeLimit()  { return _compose  ??= new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(10, '1 m'),  prefix: 'rl:compose' }) }
+export function getComposeLimit() {
+  if (!_compose) {
+    const raw = parseInt(process.env.COMPOSE_RATE_LIMIT_RPM ?? '', 10)
+    const rpm = Number.isFinite(raw) && raw >= 1 ? raw : 30
+    _compose = new Ratelimit({ redis: getRedis(), limiter: Ratelimit.slidingWindow(rpm, '1 m'), prefix: 'rl:compose' })
+  }
+  return _compose
+}
 
 // ── HU-8.4: Creator-configurable rate limits (dynamic, cached by slug:maxValue)
 // SEC-003: Use Map cache to avoid creating new Redis connections per request
