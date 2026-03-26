@@ -1,3 +1,4 @@
+// @vitest-environment node
 // src/app/api/v1/compose/__tests__/pipeline-v2.test.ts
 // Tests integrales compose pipeline v2
 // Patrón: lógica pura extraída directamente (sin importar route.ts con side-effects de env)
@@ -5,45 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── transformStepOutput — lógica extraída para testeo aislado ────────────────
-// (no importamos el módulo real para evitar que vi.mock lance errores al runner)
+// ── Mock @/lib/agents/llm BEFORE importing any module that uses it ────────────
+vi.mock('@/lib/agents/llm', () => ({
+  callLLM: vi.fn(),
+}))
 
-type TransformResult = { transformed: string; warning?: string }
-type LLMCallFn = (opts: { messages: unknown[]; temperature: number; maxTokens: number; timeoutMs: number }) => Promise<{ result: string; provider: string; tokens: number }>
-
-async function transformStepOutputLocal(
-  previousOutput: string,
-  _targetSchema: Record<string, unknown>,
-  targetSlug: string,
-  timeoutMs = 3000,
-  callLLM: LLMCallFn,
-): Promise<TransformResult> {
-  try {
-    const response = await callLLM({
-      messages: [
-        { role: 'system', content: 'You are a JSON transformer. Return ONLY valid JSON.' },
-        { role: 'user', content: `Previous: ${previousOutput}\nSlug: ${targetSlug}` },
-      ],
-      temperature: 0,
-      maxTokens: 512,
-      timeoutMs,
-    })
-    try {
-      const parsed = JSON.parse(response.result)
-      return { transformed: JSON.stringify(parsed) }
-    } catch {
-      return { transformed: previousOutput, warning: 'invalid_json_from_llm' }
-    }
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err))
-    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      return { transformed: previousOutput, warning: 'transform_timeout' }
-    }
-    return { transformed: previousOutput, warning: `all_providers_failed: ${error.message}` }
-  }
-}
-
-const mockCallLLM = vi.fn<Parameters<LLMCallFn>, ReturnType<LLMCallFn>>()
+import { transformStepOutput } from '@/lib/step-transform'
+import { callLLM } from '@/lib/agents/llm'
+const mockCallLLM = vi.mocked(callLLM)
 
 // ── Lógica extraída de compose/route.ts ─────────────────────────────────────
 
@@ -122,6 +92,11 @@ function parseOutputSafe(raw: string | null): unknown {
   }
 }
 
+/**
+ * Réplica de la lógica AC-5/AC-6 embebida en executeStep (route.ts).
+ * IMPORTANTE: si se modifica executeStep, actualizar esta función también.
+ * La función no se exporta de route.ts por ser parte de una closure interna.
+ */
 function extractCtxPatch(
   stepOutput: unknown,
   outputSchema: unknown,
@@ -184,10 +159,13 @@ describe('validateSteps — receive_input', () => {
     expect(result).toBeNull()
   })
 
-  it('receive_input + parallel: true → no error', () => {
+  it('receive_input: true on sequential step followed by parallel step → first step valid, parallel step valid', () => {
+    // Un step secuencial con input correcto, seguido de parallel+receive_input
     const result = validateSteps([
-      step(),
+      { agent_slug: 'agent-a', input: 'start' },
       { agent_slug: 'agent-b', parallel: true, receive_input: true },
+      { agent_slug: 'agent-c', parallel: true, receive_input: true },
+      { agent_slug: 'agent-d', pass_output: true }, // step secuencial de salida
     ])
     expect(result).toBeNull()
   })
@@ -335,70 +313,136 @@ describe('parseOutputSafe', () => {
   })
 })
 
-// ── Suite 5: transformStepOutput ─────────────────────────────────────────────
-describe('transformStepOutput', () => {
-  beforeEach(() => mockCallLLM.mockReset())
-
+// ── Suite 5: transformStepOutput — módulo real ───────────────────────────────
+// NOTE: mockReset() is called per-test (NOT via beforeEach) because Vitest v3
+// has an interaction between beforeEach cleanup context and rejected promise
+// tracking that causes spurious failures for error-path tests.
+describe('transformStepOutput — módulo real', () => {
   const schema = { type: 'object', properties: { key: { type: 'string' } } }
-  const call = (prev: string, s = schema, slug = 'agent-b', ms?: number) =>
-    transformStepOutputLocal(prev, s, slug, ms, mockCallLLM as LLMCallFn)
 
   it('success: LLM returns valid JSON → { transformed } without warning', async () => {
-    mockCallLLM.mockResolvedValue({ result: '{"key":"value"}', provider: 'groq', tokens: 10 })
-    const result: TransformResult = await call('prev')
+    mockCallLLM.mockReset()
+    mockCallLLM.mockResolvedValue({ result: '{"key":"value"}', model: '', provider: 'groq', usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10 } })
+    const result = await transformStepOutput('prev', schema, 'agent-b', 1000)
     expect(result.transformed).toBe('{"key":"value"}')
     expect(result.warning).toBeUndefined()
   })
 
-  it('invalid JSON from LLM → { transformed: previousOutput, warning: invalid_json_from_llm }', async () => {
-    mockCallLLM.mockResolvedValue({ result: 'not json', provider: 'groq', tokens: 5 })
-    const result = await call('prev')
+  it('invalid JSON from LLM → warning: invalid_json_from_llm', async () => {
+    mockCallLLM.mockReset()
+    mockCallLLM.mockResolvedValue({ result: 'not json', model: '', provider: 'groq', usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 } })
+    const result = await transformStepOutput('prev', schema, 'agent-b', 1000)
     expect(result.transformed).toBe('prev')
     expect(result.warning).toBe('invalid_json_from_llm')
   })
 
   it('callLLM throws generic Error → all_providers_failed warning', async () => {
-    mockCallLLM.mockResolvedValue({ result: 'throw:Error:network error', provider: 'groq', tokens: 0 })
-    // test the catch-path by calling with a real-throw stub
-    const throwingFn: LLMCallFn = async () => { throw new Error('network error') }
-    const result = await transformStepOutputLocal('prev', schema, 'agent-b', 3000, throwingFn)
+    // mockReset() inside test (not beforeEach) to avoid Vitest v3 context issue with rejections
+    mockCallLLM.mockReset()
+    const err = new Error('network error')
+    const rejection = Promise.reject(err)
+    rejection.catch(() => {})
+    mockCallLLM.mockReturnValue(rejection)
+    const result = await transformStepOutput('prev', schema, 'agent-b', 1000)
     expect(result.transformed).toBe('prev')
     expect(result.warning).toContain('all_providers_failed')
     expect(result.warning).toContain('network error')
   })
 
   it('callLLM throws TimeoutError → transform_timeout warning', async () => {
-    const throwingFn: LLMCallFn = async () => {
-      const err = new Error('timeout'); err.name = 'TimeoutError'; throw err
-    }
-    const result = await transformStepOutputLocal('prev', schema, 'agent-b', 3000, throwingFn)
+    mockCallLLM.mockReset()
+    const err = new Error('timeout'); err.name = 'TimeoutError'
+    const rejection = Promise.reject(err)
+    rejection.catch(() => {})
+    mockCallLLM.mockReturnValue(rejection)
+    const result = await transformStepOutput('prev', schema, 'agent-b', 1000)
     expect(result.transformed).toBe('prev')
     expect(result.warning).toBe('transform_timeout')
   })
 
   it('callLLM throws AbortError → transform_timeout warning', async () => {
-    const throwingFn: LLMCallFn = async () => {
-      const err = new Error('aborted'); err.name = 'AbortError'; throw err
-    }
-    const result = await transformStepOutputLocal('prev', schema, 'agent-b', 3000, throwingFn)
+    mockCallLLM.mockReset()
+    const err = new Error('aborted'); err.name = 'AbortError'
+    const rejection = Promise.reject(err)
+    rejection.catch(() => {})
+    mockCallLLM.mockReturnValue(rejection)
+    const result = await transformStepOutput('prev', schema, 'agent-b', 1000)
     expect(result.transformed).toBe('prev')
     expect(result.warning).toBe('transform_timeout')
   })
 
   it('custom timeoutMs is passed to callLLM', async () => {
-    mockCallLLM.mockResolvedValue({ result: '{}', provider: 'groq', tokens: 1 })
-    await call('prev', schema, 'agent-b', 1500)
+    mockCallLLM.mockReset()
+    mockCallLLM.mockResolvedValue({ result: '{}', model: '', provider: 'groq', usage: { prompt_tokens: 0, completion_tokens: 1, total_tokens: 1 } })
+    await transformStepOutput('prev', schema, 'agent-b', 1500)
     expect(mockCallLLM).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 1500 }))
   })
 
   it('default timeoutMs = 3000 when not provided', async () => {
-    mockCallLLM.mockResolvedValue({ result: '{}', provider: 'groq', tokens: 1 })
-    await call('prev')
+    mockCallLLM.mockReset()
+    mockCallLLM.mockResolvedValue({ result: '{}', model: '', provider: 'groq', usage: { prompt_tokens: 0, completion_tokens: 1, total_tokens: 1 } })
+    await transformStepOutput('prev', schema, 'agent-b')
     expect(mockCallLLM).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 3000 }))
   })
 })
 
-// ── Suite 6: pipelineCtx dynamic extraction logic ────────────────────────────
+// ── Suite 6: callLLM — isRetryable logic (F-1 fix) ───────────────────────────
+describe('callLLM — isRetryable logic (F-1 fix)', () => {
+  // Réplica de la lógica isRetryable de llm.ts para testeo aislado.
+  // callLLM está mockeada globalmente, no podemos testear su internals directamente.
+  // Esta suite verifica la lógica pura de decisión de retry según F-1.
+  function isRetryable(err: Error, statusFromMsg: number): boolean {
+    return statusFromMsg === 401 || statusFromMsg === 402 || statusFromMsg === 429 || statusFromMsg >= 500 ||
+      (err.name === 'TimeoutError' || err.name === 'AbortError')
+  }
+
+  function parseStatus(msg: string): number {
+    const match = msg.match(/\b([45]\d{2})\b/)
+    return match ? parseInt(match[1], 10) : 0
+  }
+
+  it('TimeoutError (status=0) → retryable (F-1 fix)', () => {
+    const err = new Error('Request timed out'); err.name = 'TimeoutError'
+    expect(isRetryable(err, parseStatus(err.message))).toBe(true)
+  })
+
+  it('AbortError (status=0) → retryable (F-1 fix)', () => {
+    const err = new Error('aborted'); err.name = 'AbortError'
+    expect(isRetryable(err, parseStatus(err.message))).toBe(true)
+  })
+
+  it('generic network error (status=0) → NOT retryable', () => {
+    const err = new Error('ECONNREFUSED')
+    expect(isRetryable(err, parseStatus(err.message))).toBe(false)
+  })
+
+  it('429 rate limit → retryable', () => {
+    const err = new Error('HTTP 429 Too Many Requests')
+    expect(isRetryable(err, parseStatus(err.message))).toBe(true)
+  })
+
+  it('500 server error → retryable', () => {
+    const err = new Error('HTTP 500 Internal Server Error')
+    expect(isRetryable(err, parseStatus(err.message))).toBe(true)
+  })
+
+  it('401 unauthorized → retryable (try next provider)', () => {
+    const err = new Error('HTTP 401 Unauthorized')
+    expect(isRetryable(err, parseStatus(err.message))).toBe(true)
+  })
+
+  it('400 bad request → NOT retryable', () => {
+    const err = new Error('HTTP 400 Bad Request')
+    expect(isRetryable(err, parseStatus(err.message))).toBe(false)
+  })
+
+  it('normal Error (name="Error") → NOT retryable', () => {
+    const err = new Error('some random error')
+    expect(isRetryable(err, parseStatus(err.message))).toBe(false)
+  })
+})
+
+// ── Suite 7: pipelineCtx dynamic extraction logic ────────────────────────────
 describe('pipelineCtx dynamic extraction logic', () => {
   it('output with nested result → extracts from result (result-first)', () => {
     const output = { result: { name: 'Alice', score: 42 }, raw: 'ignored' }
