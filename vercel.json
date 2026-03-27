@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/reputation-batch",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/health-check-agents",
+      "schedule": "0 * * * *"
     }
   ]
 }
