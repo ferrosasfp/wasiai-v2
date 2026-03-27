@@ -160,7 +160,13 @@ export async function POST(req: NextRequest) {
     steps = JSON.parse(match ? match[0] : raw)
     if (!Array.isArray(steps)) throw new Error('not array')
   } catch (err) {
-    phases.push({ name: 'planning', status: 'error', detail: String(err) })
+    // If the LLM returned free text (non-JSON), treat as "no agents matched" — not a server error
+    const detail = String(err)
+    const isParseError = detail.includes('SyntaxError') || detail.includes('not valid JSON') || detail.includes('not array')
+    phases.push({ name: 'planning', status: 'error', detail })
+    if (isParseError) {
+      return NextResponse.json({ error: 'Could not build a pipeline for this goal', code: 'no_agents_matched', phases }, { status: 422 })
+    }
     return NextResponse.json({ error: 'Failed to plan pipeline', code: 'execution_failed', phases }, { status: 500 })
   }
 
