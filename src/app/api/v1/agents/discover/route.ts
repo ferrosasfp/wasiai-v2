@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
 
   const agentsWithExample = filtered.map((a: Record<string, unknown>) => ({
     ...a,
+    input_schema:  a.input_schema  ?? null,
+    output_schema: a.output_schema ?? null,
     example_input: resolveExampleInput(a as Parameters<typeof resolveExampleInput>[0]),
   }))
 
