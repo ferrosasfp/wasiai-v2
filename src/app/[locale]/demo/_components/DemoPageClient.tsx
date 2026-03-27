@@ -88,7 +88,7 @@ export function DemoPageClient() {
     setLoading(true)
     startPhaseAnimation()
     try {
-      const res = await fetch('/api/v1/demo/autonomous', {
+      const res = await fetch('/api/v1/orchestrate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
         body: JSON.stringify({ goal }),
