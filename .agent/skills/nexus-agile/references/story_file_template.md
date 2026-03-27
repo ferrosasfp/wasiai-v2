@@ -68,6 +68,44 @@
 **Patron clave**:
 - [Patrones a seguir]
 
+<!--
+  ARCHITECT: Antes de continuar, responde esta pregunta:
+  ¿Esta HU involucra comunicación entre dos o más componentes?
+  (API ↔ agente, compose ↔ servicio, SDK ↔ endpoint, frontend ↔ API, worker ↔ queue)
+
+  SI  → Incluir la sección "Contrato de Integración" abajo. Es BLOQUEANTE — sin ella Dev no empieza.
+  NO  → Eliminar esta sección completa del story file. No dejar vacía ni con placeholder.
+-->
+
+## Contrato de Integración ⚠️ BLOQUEANTE
+
+> Esta sección es requerida porque esta HU tiene comunicación entre componentes.
+> Dev no puede empezar si algún campo está vacío o dice "[pendiente]".
+
+### [Componente A] → [Componente B]
+
+**Request:**
+```json
+{
+  "campo": "tipo — descripción exacta"
+}
+```
+
+**Response exitoso (2xx):**
+```json
+{
+  "campo": "tipo — descripción exacta"
+}
+```
+
+**Errores:**
+| HTTP | Cuándo |
+|---|---|
+| 400 | [condición exacta] |
+| 502 | [condición exacta] |
+
+> Si hay más pares de componentes → agregar subsección por cada par.
+
 ## Constraint Directives
 
 ### OBLIGATORIO
