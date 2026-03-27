@@ -1,4 +1,7 @@
 -- Migration 078: agregar input_schema y output_schema a discover_agents_v2
+-- DROP necesario porque PostgreSQL no permite cambiar RETURNS TABLE con CREATE OR REPLACE
+DROP FUNCTION IF EXISTS discover_agents_v2(TEXT, NUMERIC, INT);
+
 -- Permite a agentes autónomos conocer el schema de input en un solo roundtrip (A2A discovery).
 
 CREATE OR REPLACE FUNCTION discover_agents_v2(
