@@ -11,11 +11,28 @@
 **Agentes**: Analyst (requisitos) + Architect (arquitectura)
 **Objetivo**: Establecer contexto del proyecto y del codebase antes de procesar la HU.
 
+### ⚠️ PASO 0 — OBLIGATORIO ANTES DE TODO (Anti-Drift)
+
+> **El orquestador y cada sub-agente deben leer `project-context.md` como PRIMER acto, antes de leer el codebase, antes de hacer cualquier análisis.**
+> Violar este paso es el error más costoso del pipeline — lleva a implementar con el stack incorrecto.
+
+Buscar en este orden hasta encontrar:
+1. `.nexus/project-context.md` (ubicación preferida)
+2. `project-context.md` (raíz del proyecto)
+3. `docs/project-context.md`
+
+**Si existe:** leer COMPLETO antes de continuar. El `project-context.md` define:
+- Stack inmutable (framework, DB, librerías) — **NUNCA asumir el stack del código si difiere del project-context**
+- Reglas absolutas (Golden Path) — inviolables
+- Patrones y convenciones del proyecto
+
+**Si NO existe:** ejecutar Bootstrap de Proyecto (ver sección siguiente) antes de continuar.
+
+**Regla anti-drift:** Si el código existente usa un framework/librería diferente al definido en `project-context.md`, reportar el drift al humano ANTES de continuar. No asumir que el código es la fuente de verdad.
+
 ### Proceso
 
-1. **Verificar si existe `project-context.md`**:
-   - **Si existe**: leerlo para conocer stack, arquitectura, comandos, guardrails y exemplars
-   - **Si NO existe**: ejecutar **Bootstrap de Proyecto** (ver seccion siguiente) antes de continuar
+1. **Leer `project-context.md`** (ver Paso 0 arriba — BLOQUEANTE)
 2. **Codebase Grounding inicial**: Explorar la estructura del proyecto con Glob/Grep
 3. **Leer `doc/sdd/_INDEX.md`** para siguiente NNN. Si no existe, crearlo.
 4. **Smart Sizing** — Clasificar la HU:
@@ -473,6 +490,94 @@ Escribir en `doc/sdd/NNN-titulo/validation.md`.
 
 ---
 
+## F5: Release Gate (opcional por proyecto)
+
+**Agente**: QA + Docs
+**Objetivo**: Verificar que el codigo aprobado en F4 esta listo para produccion.
+**Gate**: RELEASE_APPROVED (TL + PO)
+
+> **Cuando aplica**: Proyectos que deployean a produccion (apps web, APIs, servicios).
+> **Cuando NO aplica**: Librerias, paquetes, skills, herramientas internas sin deploy. Configurar en `project-context.md` con `release_gate: false`.
+> **Default**: Si `project-context.md` no lo especifica, F5 aplica.
+
+### Pre-Release Checklist
+
+El AI genera el checklist automaticamente. El humano (TL + PO) verifica y aprueba.
+
+```
+PRE-RELEASE CHECKLIST — HU-NNN
+
+## Staging
+[ ] Codigo deployeado en staging/preview
+[ ] Smoke test en staging exitoso (flujo principal funciona)
+[ ] No hay errores nuevos en logs de staging
+
+## Migraciones
+[ ] Sin migraciones: N/A
+[ ] Con migraciones: migration aplicada en staging sin errores
+[ ] Con migraciones: migration es reversible (down migration existe)
+[ ] Con migraciones: datos existentes no se corrompen post-migration
+
+## Variables de entorno
+[ ] Sin env vars nuevas: N/A
+[ ] Con env vars nuevas: configuradas en TODOS los entornos (staging + prod)
+[ ] Con env vars nuevas: documentadas en project-context.md o .env.example
+[ ] Secrets no estan hardcodeados ni en el repo
+
+## Dependencias
+[ ] Sin deps nuevas: N/A
+[ ] Con deps nuevas: licencia compatible
+[ ] Con deps nuevas: version pinneada (no latest/*)
+[ ] Con deps nuevas: no hay vulnerabilidades conocidas (npm audit / pip audit)
+
+## Rollback
+[ ] Plan de rollback definido: [revert commit / feature flag off / migration down]
+[ ] Rollback testeado o trivial (revert de un commit)
+
+## Contratos / Integraciones
+[ ] Sin cambios de API publica: N/A
+[ ] Con cambios de API: backward compatible o versionado
+[ ] Con cambios de API: consumidores notificados
+[ ] Servicios externos (payments, email, auth providers): testeados en staging
+
+## Comunicacion
+[ ] Changelog entry preparado (si aplica)
+[ ] Stakeholders notificados del deploy (si aplica)
+```
+
+### Proceso F5
+
+1. AI genera el Pre-Release Checklist con items aplicables (marca N/A los que no aplican)
+2. AI verifica automaticamente lo que puede (env vars en repo, deps audit, migration files)
+3. AI presenta checklist al humano con items pendientes de verificacion manual
+4. Humano (TL) verifica staging, migraciones, rollback
+5. Humano (PO) confirma que la feature en staging es lo esperado
+6. Ambos escriben: **RELEASE_APPROVED**
+7. Pipeline avanza a DONE
+
+### Si F5 falla
+
+| Problema | Accion |
+|----------|--------|
+| Staging roto | Volver a F3 — fix + re-deploy staging |
+| Migration falla en staging | Volver a F3 — fix migration |
+| Env var faltante | Configurar env var — no requiere volver a F3 |
+| Rollback no viable | TL decide: agregar rollback plan o aceptar riesgo (documentado) |
+| PO no aprueba en staging | Volver a F3 con feedback especifico del PO |
+
+### Persistencia F5
+
+Agregar al `doc/sdd/NNN-titulo/report.md`:
+```markdown
+## Release Gate
+- Checklist: [PASS/FAIL por item]
+- Aprobado por: [TL] + [PO]
+- Fecha: YYYY-MM-DD
+- Entorno verificado: [staging URL]
+```
+
+---
+
 ## Build + Push + DONE
 
 **Agente**: Docs
@@ -486,6 +591,7 @@ Escribir en `doc/sdd/NNN-titulo/validation.md`.
    - Drift summary
    - AR/CR summary
    - Auto-Blindaje acumulado
+   - **Release Gate status** (si F5 aplica)
 2. Escribir en `doc/sdd/NNN-titulo/report.md`
 3. Actualizar `doc/sdd/_INDEX.md` con status DONE
 4. Cerrar en el issue tracker del proyecto (Linear, GitHub Issues, Jira, o el configurado en `project-context.md`) — mover el issue a Done/Closed
