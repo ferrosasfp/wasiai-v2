@@ -185,6 +185,27 @@ La memoria persistente (Principio 8) compensa la falta de sub-agentes
 
 ---
 
+## ⚠️ Checklist obligatorio antes de lanzar sub-agente F3
+
+El orquestador ejecuta esto ANTES de lanzar cualquier sub-agente Dev:
+
+```
+[ ] ¿Hay otro sub-agente F3 corriendo sobre el mismo directorio?
+    → Si SÍ: esperar a que termine, o crear git worktree separado
+    → git worktree add ../[repo]-[hu-id] -b feat/[hu-id]-titulo
+
+[ ] ¿El branch base es main actualizado?
+    → git checkout main && git pull origin main
+
+[ ] ¿El Story File fue aprobado con SPEC_APPROVED?
+    → Verificar que el gate fue respetado antes de lanzar
+
+[ ] ¿Las env vars necesarias para la HU están configuradas?
+    → Si la HU toca DB, pagos o servicios externos: verificar antes
+```
+
+**Si falla algún check:** resolver antes de lanzar F3. No lanzar sobre entorno roto.
+
 ## Reglas del orquestador
 
 1. **Nunca hace trabajo real** — si el orquestador empieza a generar código o SDDs, es un error de proceso
@@ -192,3 +213,74 @@ La memoria persistente (Principio 8) compensa la falta de sub-agentes
 3. **Falla explícita** — si un sub-agente no entrega el artefacto esperado, el orquestador informa al humano y re-lanza
 4. **Gates en el orquestador** — los gates (HU_APPROVED, SPEC_APPROVED) los maneja el orquestador, no los sub-agentes
 5. **Agnóstico** — el protocolo funciona con cualquier implementación de sub-agentes disponible en el IDE
+
+---
+
+## ⚠️ Auto-Blindaje — F3 Paralelo en Repositorio Compartido
+
+**Fecha:** 2026-04-02 | **Proyecto:** wasiai-a2a | **HUs afectadas:** WKH-6, WKH-7
+
+**Error:** Lanzar 2 sub-agentes F3 en paralelo sobre el mismo directorio de trabajo causa commits mezclados entre branches. Ambos Devs operan sobre el mismo filesystem — los `git add/commit/push` concurrentes contaminan ambos branches con cambios del otro.
+
+**Síntoma:** Branch de WKH-6 contenía commits de WKH-7 y viceversa. El AR detectó scope drift severo.
+
+**Fix aplicado:** Cherry-pick post-hoc para aislar commits por HU. Funciona pero es trabajo extra y arriesgado.
+
+### Regla obligatoria para F3 paralelo:
+
+**OPCIÓN A — Serializar F3 (recomendado por defecto):**
+Nunca lanzar dos sub-agentes F3 simultáneamente sobre el mismo repo. Implementar WKH-X → merge → implementar WKH-Y.
+
+**OPCIÓN B — Git worktrees (si el paralelismo es crítico):**
+Crear un worktree separado por HU antes de lanzar F3:
+```bash
+git worktree add ../wasiai-a2a-wkh-6 -b feat/wkh-6-xxx
+git worktree add ../wasiai-a2a-wkh-7 -b feat/wkh-7-xxx
+```
+Cada sub-agente F3 recibe su propio `cwd` distinto. Al terminar, eliminar worktrees:
+```bash
+git worktree remove ../wasiai-a2a-wkh-6
+git worktree remove ../wasiai-a2a-wkh-7
+```
+
+**El orquestador debe verificar antes de lanzar F3 paralelo:**
+- ¿Hay un único directorio de trabajo compartido? → Serializar
+- ¿Hay worktrees separados preparados? → Puede paralelizar
+
+**Esta regla aplica a cualquier proyecto**, no solo wasiai-a2a.
+
+---
+
+## ⚠️ Auto-Blindaje — Gates saltados por sub-agente one-shot
+
+**Fecha:** 2026-04-04 | **Proyecto:** wasiai-a2a | **HUs afectadas:** WKH-10, WKH-13, WKH-14
+
+**Error:** El orquestador lanzó un sub-agente único con instrucción "pipeline completo F0→DONE". Los sub-agentes en modo `run` (one-shot) no pueden pausar y esperar respuesta humana — saltaron HU_APPROVED y SPEC_APPROVED silenciosamente.
+
+**Síntoma:** El orquestador aprobó los gates él mismo, sin presentar Work Item ni SDD al humano para revisión. Violación directa del principio "El humano decide QUÉ".
+
+### Regla obligatoria para orquestador:
+
+**NUNCA incluir más de un gate en el prompt de un sub-agente.**
+
+El flujo correcto es:
+
+```
+Orquestador lanza sub-agente F0+F1
+  → sub-agente entrega work-item.md
+  → orquestador presenta Work Item al humano
+  → humano escribe HU_APPROVED
+Orquestador lanza sub-agente F2+F2.5
+  → sub-agente entrega sdd.md + story-file.md
+  → orquestador presenta SDD al humano
+  → humano escribe SPEC_APPROVED
+Orquestador lanza sub-agente F3→DONE
+  → sin gates humanos en este tramo (AR, CR, F4 son reviews de agentes)
+```
+
+**Señales de que estás violando esta regla:**
+- El prompt del sub-agente dice "pipeline completo" o "F0→DONE"
+- El prompt del sub-agente dice "esperar HU_APPROVED" (imposible en modo one-shot)
+- El orquestador presenta el resultado final sin haber mostrado Work Item ni SDD al humano
+
+**Fix:** Siempre dividir en mínimo 3 lanzamientos separados: F0+F1 / F2+F2.5 / F3→DONE. El orquestador es el checkpoint humano entre ellos.
