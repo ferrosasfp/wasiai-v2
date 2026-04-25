@@ -22,6 +22,8 @@ import type { IntrospectDepth } from '@/lib/introspect/buildCOB'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { assertPaymentType } from '@/lib/validation/payment-type'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
+// MNR-CR-4: shared with /api/v1/models/[slug]/invoke/route.ts
+import { buildRequirements } from '@/lib/x402/buildRequirements'
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -69,27 +71,6 @@ interface X402PaymentHeader {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function buildRequirements(options: {
-  amount: string
-  recipient: string
-  resource: string
-  description: string
-  mimeType: string
-}) {
-  const atomicAmount = Math.round(parseFloat(options.amount) * 1_000_000).toString()
-  return {
-    scheme: 'exact' as const,
-    network: CHAIN,
-    maxAmountRequired: atomicAmount,
-    resource: options.resource,
-    description: options.description,
-    mimeType: options.mimeType,
-    payTo: options.recipient,
-    maxTimeoutSeconds: 300,
-    asset: USDC_ADDR,
-  }
-}
-
 function build402Response(slug: string, depth: IntrospectDepth): NextResponse {
   const priceStr = INTROSPECT_PRICE[depth].toFixed(6)
   const resourceUrl = `${SITE_URL}/api/v1/agents/${slug}/introspect`
@@ -99,6 +80,8 @@ function build402Response(slug: string, depth: IntrospectDepth): NextResponse {
     resource:    resourceUrl,
     description: `Introspect agent ${slug} (${depth}) on WasiAI`,
     mimeType:    'application/json',
+    network:     CHAIN,
+    asset:       USDC_ADDR,
   })
   return NextResponse.json(
     {

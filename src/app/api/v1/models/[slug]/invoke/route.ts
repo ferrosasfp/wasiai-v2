@@ -33,31 +33,8 @@ import { SITE_URL } from '@/lib/constants'
 import { isAgentInScope } from '@/lib/scope-check'
 import { validateInput } from '@/lib/schema-validator'
 import { assertPaymentType } from '@/lib/validation/payment-type'
-
-/**
- * Build x402 payment requirements manually.
- * Bypasses SDK's getChainByName() which doesn't know 'avalanche-testnet'.
- */
-function buildRequirements(options: {
-  amount: string
-  recipient: string
-  resource: string
-  description: string
-  mimeType: string
-}) {
-  const atomicAmount = Math.round(parseFloat(options.amount) * 1_000_000).toString()
-  return {
-    scheme: 'exact' as const,
-    network: CHAIN,
-    maxAmountRequired: atomicAmount,
-    resource: options.resource,
-    description: options.description,
-    mimeType: options.mimeType,
-    payTo: options.recipient,
-    maxTimeoutSeconds: 300,
-    asset: USDC_ADDR,
-  }
-}
+// MNR-CR-4: shared with /api/v1/agents/[slug]/introspect/route.ts
+import { buildRequirements } from '@/lib/x402/buildRequirements'
 
 // WAS-134: x402 utilities inlineadas — eliminada dependencia de uvd-x402-sdk
 function extractPaymentFromHeaders(headers: Headers | Record<string, string | string[] | undefined>): Record<string, string> | null {
@@ -90,6 +67,8 @@ function build402Instructions(model: Record<string, unknown>, priceStr: string, 
     resource: resourceUrl,
     description: `Access to ${model.name as string} on WasiAI`,
     mimeType: 'application/json',
+    network: CHAIN,
+    asset: USDC_ADDR,
   })
   const freeTrial = model.free_trial_enabled
     ? { available: true, endpoint: `/api/v1/agents/${model.slug as string}/trial`, limit: model.free_trial_limit }

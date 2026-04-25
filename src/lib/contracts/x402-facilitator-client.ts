@@ -44,9 +44,14 @@ export interface SettlePaymentX402Ctx {
   network:      'avalanche' | 'avalanche-testnet'
 }
 
+/**
+ * Successful `/verify` response from the facilitator.
+ *
+ * The facilitator may include additional fields in the body; we only require
+ * `verified: true` and tolerate any extra keys.
+ */
 export interface VerifyResponseOk {
   verified: true
-  // facilitator may include additional fields; we only require `verified`
 }
 
 export interface SettleResponseOk {
@@ -130,6 +135,24 @@ export function mapFacilitatorErrorToSettlementResult(
   return { verified, settled: false, error: `${errorCode}: ${msg}` }
 }
 
+// ─── Type guards (MNR-CR-7) ───────────────────────────────────────────────────
+
+/** Shape guard for a successful `/verify` response body. */
+function isVerifyOk(body: unknown): body is VerifyResponseOk {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { verified?: unknown }).verified === true
+  )
+}
+
+/** Shape guard for a successful `/settle` response body. */
+function isSettleOk(body: unknown): body is SettleResponseOk {
+  if (typeof body !== 'object' || body === null) return false
+  const b = body as { settled?: unknown; transactionHash?: unknown }
+  return b.settled === true && typeof b.transactionHash === 'string'
+}
+
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
 async function postJson<T>(
@@ -148,6 +171,7 @@ async function postJson<T>(
     })
   } catch {
     // timeout / DNS / ECONNREFUSED / abort — DT-G last-but-one row.
+    // MNR-CR-3: code-prefixed error style used consistently across this client.
     return {
       ok: false,
       error: {
@@ -176,8 +200,10 @@ async function postJson<T>(
     }
   }
 
-  // Naive shape guard — full Zod schema would be over-engineering here.
-  if (phase === 'verify' && (body as { verified?: unknown } | null)?.verified !== true) {
+  // MNR-CR-7: named type guards replace inline shape casts.
+  // MNR-CR-3: 'INVALID_PAYLOAD: ...' uses the same code-prefixed style as
+  // mapFacilitatorErrorToSettlementResult — single style across the client.
+  if (phase === 'verify' && !isVerifyOk(body)) {
     return {
       ok: false,
       error: {
@@ -187,10 +213,7 @@ async function postJson<T>(
       },
     }
   }
-  if (
-    phase === 'settle' &&
-    typeof (body as { transactionHash?: unknown } | null)?.transactionHash !== 'string'
-  ) {
+  if (phase === 'settle' && !isSettleOk(body)) {
     return {
       ok: false,
       error: {
