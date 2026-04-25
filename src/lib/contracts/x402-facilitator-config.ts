@@ -12,6 +12,12 @@
  */
 import { logger } from '@/lib/logger'
 
+/**
+ * Module-scope cache. Safe under Node.js single-threaded event loop:
+ * concurrent calls to getFacilitatorUrl() see the first writer's value.
+ * If we ever move to Worker threads / multi-isolate runtimes this
+ * invariant breaks and the cache must be reworked (e.g. AsyncLocalStorage).
+ */
 let cached: string | null | undefined = undefined
 let warnedOnce = false
 

@@ -527,6 +527,17 @@ export async function POST(
     )
   }
 
+  // AC-6: verified:true settled:false → 502 (settle stage failed after verify ok).
+  // MUST happen BEFORE any upstream call / logCall / pending earnings increment —
+  // otherwise the client receives service without a confirmed on-chain payment.
+  if (!settlement.settled) {
+    logger.error('[invoke] payment settle failed after verify ok', { settlement, slug })
+    return NextResponse.json(
+      { error: 'Payment settlement failed', code: 'settle_failed', reason: settlement.error },
+      { status: 502 },
+    )
+  }
+
   // ── 6. Payment valid — validate input then call upstream ─────────────────
   // WAS-200 (moved): Validate input AFTER payment auth — prevent schema info leak
   if (model.input_schema) {

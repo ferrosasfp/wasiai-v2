@@ -22,6 +22,24 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { logger } from '@/lib/logger'
 
+// ─── Helpers (private) ────────────────────────────────────────────────────────
+
+/**
+ * Extracts the canonical error code from a SettlementResult.error string.
+ *
+ * Settlement errors follow the convention `<CODE>: <message>` (e.g.
+ * `"INVALID_SIGNATURE: bad sig"`). For dashboards/alerts we want to group
+ * by the CODE token only, not the full free-form message. Returning just
+ * the prefix before the first `:` keeps log cardinality bounded so that
+ * downstream aggregators (Grafana/Sentry) can build histograms by code.
+ *
+ * @param err - raw error string from SettlementResult.error (may be undefined)
+ * @returns the canonical code prefix, or undefined when err is falsy
+ */
+function extractCode(err: string | undefined): string | undefined {
+  return err?.split(':')[0]
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
@@ -305,7 +323,7 @@ export async function settlePaymentX402(
       settlerType: 'internal',
       durationMs:  Date.now() - start,
       ok:          r.verified && r.settled,
-      errorCode:   r.error,
+      errorCode:   extractCode(r.error),
     })
     return r
   }
@@ -323,7 +341,7 @@ export async function settlePaymentX402(
       facilitatorUrl: url,
       durationMs:     Date.now() - start,
       ok:             false,
-      errorCode:      verifyRes.error.error,
+      errorCode:      extractCode(verifyRes.error.error),
     })
     return verifyRes.error
   }
@@ -337,7 +355,7 @@ export async function settlePaymentX402(
       facilitatorUrl: url,
       durationMs:     Date.now() - start,
       ok:             false,
-      errorCode:      settleRes.error.error,
+      errorCode:      extractCode(settleRes.error.error),
     })
     return settleRes.error // verified:true, settled:false (AC-5)
   }
