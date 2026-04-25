@@ -21,17 +21,72 @@ import {
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { logger } from '@/lib/logger'
+// WAS-V2-1: External facilitator opt-in wrapper deps (section below).
+// Imports moved to top per TS convention; functions remain in the
+// `WAS-V2-1: External facilitator opt-in wrapper` section below.
+import { getFacilitatorUrl } from './x402-facilitator-config'
+import {
+  buildX402V2Envelope,
+  verifyExternal,
+  settleExternal,
+  type SettlePaymentX402Ctx,
+} from './x402-facilitator-client'
+
+export type { SettlePaymentX402Ctx }
 
 // ─── Helpers (private) ────────────────────────────────────────────────────────
 
 /**
- * Extracts the canonical error code from a SettlementResult.error string.
+ * Bounded set of canonical settlement error codes used by the internal path.
  *
- * Settlement errors follow the convention `<CODE>: <message>` (e.g.
- * `"INVALID_SIGNATURE: bad sig"`). For dashboards/alerts we want to group
- * by the CODE token only, not the full free-form message. Returning just
- * the prefix before the first `:` keeps log cardinality bounded so that
- * downstream aggregators (Grafana/Sentry) can build histograms by code.
+ * `settlePaymentDirectly()` (CD-3, append-only) emits free-form `error`
+ * strings — some follow the `CODE: msg` convention, others are sentence-case
+ * ("Authorization expired (...)", "Smart account detected — ..."). To keep
+ * log cardinality bounded for Grafana/Sentry histograms we map the free-form
+ * tail to a single bucket via `normalizeInternalErrorCode()`.
+ */
+const INTERNAL_KNOWN_CODES = [
+  'CHAIN_UNAVAILABLE',
+  'INVALID_SIGNATURE',
+  'INVALID_AMOUNT',
+  'EXPIRED_AUTHORIZATION',
+  'OPERATOR_KEY_MISSING',
+  'TRANSACTION_FAILED',
+  'UNKNOWN',
+] as const
+type InternalErrorCode = (typeof INTERNAL_KNOWN_CODES)[number]
+
+/**
+ * Normalize an internal-path error string to a bounded code from
+ * `INTERNAL_KNOWN_CODES`. Used for log cardinality only — the original
+ * `error` string remains untouched in the returned `SettlementResult`.
+ */
+function normalizeInternalErrorCode(err: string | undefined): InternalErrorCode | undefined {
+  if (!err) return undefined
+  const head = err.split(':')[0]
+  if ((INTERNAL_KNOWN_CODES as readonly string[]).includes(head)) {
+    return head as InternalErrorCode
+  }
+  // Sentence-case mappings emitted by settlePaymentDirectly() (CD-3 untouched).
+  if (/^Authorization expired/i.test(err))                           return 'EXPIRED_AUTHORIZATION'
+  if (/^Authorization not yet valid/i.test(err))                     return 'EXPIRED_AUTHORIZATION'
+  if (/^Insufficient amount/i.test(err))                             return 'INVALID_AMOUNT'
+  if (/^Invalid EIP-712 signature/i.test(err))                       return 'INVALID_SIGNATURE'
+  if (/^Smart account detected/i.test(err))                          return 'INVALID_SIGNATURE'
+  if (/^Transaction reverted/i.test(err))                            return 'TRANSACTION_FAILED'
+  if (/OPERATOR_PRIVATE_KEY/.test(err))                              return 'OPERATOR_KEY_MISSING'
+  return 'UNKNOWN'
+}
+
+/**
+ * Extracts the canonical error code from a SettlementResult.error string
+ * coming from the EXTERNAL facilitator path.
+ *
+ * External errors follow the convention `<CODE>: <message>` (e.g.
+ * `"INVALID_SIGNATURE: bad sig"`) emitted by `mapFacilitatorErrorToSettlementResult`.
+ * Returning just the prefix before the first `:` keeps log cardinality bounded.
+ *
+ * For internal-path results use `normalizeInternalErrorCode()` instead.
  *
  * @param err - raw error string from SettlementResult.error (may be undefined)
  * @returns the canonical code prefix, or undefined when err is falsy
@@ -284,16 +339,7 @@ export async function settlePaymentDirectly(
 
 // ─── WAS-V2-1: External facilitator opt-in wrapper ───────────────────────────
 // CD-3: settlePaymentDirectly above remains intact. This section only appends.
-
-import { getFacilitatorUrl } from './x402-facilitator-config'
-import {
-  buildX402V2Envelope,
-  verifyExternal,
-  settleExternal,
-  type SettlePaymentX402Ctx,
-} from './x402-facilitator-client'
-
-export type { SettlePaymentX402Ctx }
+// (deps imported at top of file per TS convention; re-export kept there too)
 
 /**
  * Settle x402 payment, optionally delegating to external facilitator.
@@ -303,6 +349,13 @@ export type { SettlePaymentX402Ctx }
  * - If X402_FACILITATOR_URL is set → POST /verify then /settle to facilitator
  *   (AC-2/3). Errors mapped to SettlementResult per DT-G.
  *
+ * AC-4: external /verify HTTP 4xx → returns { verified:false, settled:false,
+ *   error:'<CODE>: <msg>' } and skips /settle.
+ * AC-5: external /settle failure after /verify ok → returns { verified:true,
+ *   settled:false, error:'<CODE>: <msg>' } (no re-charge).
+ * AC-6: facilitator unreachable (timeout/DNS/5xx) → returns { verified:false,
+ *   settled:false, error:'CHAIN_UNAVAILABLE: facilitator unreachable' }
+ *   (no fallback to internal — ops rollback by unsetting the env var).
  * AC-10: emits structured log entry with settlerType/durationMs/ok/errorCode.
  * DT-H: uses AbortSignal.timeout(30_000) to bound external HTTP calls.
  * CD-NEW-SDD-1: no client-side idempotency cache — facilitator owns it.
@@ -323,7 +376,7 @@ export async function settlePaymentX402(
       settlerType: 'internal',
       durationMs:  Date.now() - start,
       ok:          r.verified && r.settled,
-      errorCode:   extractCode(r.error),
+      errorCode:   normalizeInternalErrorCode(r.error),
     })
     return r
   }
