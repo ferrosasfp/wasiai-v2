@@ -263,3 +263,97 @@ export async function settlePaymentDirectly(
     return { verified: false, settled: false, error: msg }
   }
 }
+
+// ─── WAS-V2-1: External facilitator opt-in wrapper ───────────────────────────
+// CD-3: settlePaymentDirectly above remains intact. This section only appends.
+
+import { getFacilitatorUrl } from './x402-facilitator-config'
+import {
+  buildX402V2Envelope,
+  verifyExternal,
+  settleExternal,
+  type SettlePaymentX402Ctx,
+} from './x402-facilitator-client'
+
+export type { SettlePaymentX402Ctx }
+
+/**
+ * Settle x402 payment, optionally delegating to external facilitator.
+ *
+ * - If X402_FACILITATOR_URL is unset/malformed → calls settlePaymentDirectly
+ *   (zero regression, AC-1).
+ * - If X402_FACILITATOR_URL is set → POST /verify then /settle to facilitator
+ *   (AC-2/3). Errors mapped to SettlementResult per DT-G.
+ *
+ * AC-10: emits structured log entry with settlerType/durationMs/ok/errorCode.
+ * DT-H: uses AbortSignal.timeout(30_000) to bound external HTTP calls.
+ * CD-NEW-SDD-1: no client-side idempotency cache — facilitator owns it.
+ */
+export async function settlePaymentX402(
+  payload:  X402EVMPayload,
+  required: string,
+  ctx:      SettlePaymentX402Ctx,
+): Promise<SettlementResult> {
+  const start = Date.now()
+  const url = getFacilitatorUrl()
+
+  if (url === null) {
+    const r = await settlePaymentDirectly(payload, required)
+    logger.info('[settler]', {
+      requestId:   ctx.requestId,
+      agentSlug:   ctx.agentSlug,
+      settlerType: 'internal',
+      durationMs:  Date.now() - start,
+      ok:          r.verified && r.settled,
+      errorCode:   r.error,
+    })
+    return r
+  }
+
+  // External path — DT-H: 30s timeout matches internal waitForTransactionReceipt.
+  const envelope = buildX402V2Envelope(payload, ctx)
+  const signal   = AbortSignal.timeout(30_000)
+
+  const verifyRes = await verifyExternal(envelope, url, signal)
+  if (!verifyRes.ok) {
+    logger.info('[settler]', {
+      requestId:      ctx.requestId,
+      agentSlug:      ctx.agentSlug,
+      settlerType:    'external',
+      facilitatorUrl: url,
+      durationMs:     Date.now() - start,
+      ok:             false,
+      errorCode:      verifyRes.error.error,
+    })
+    return verifyRes.error
+  }
+
+  const settleRes = await settleExternal(envelope, url, signal)
+  if (!settleRes.ok) {
+    logger.info('[settler]', {
+      requestId:      ctx.requestId,
+      agentSlug:      ctx.agentSlug,
+      settlerType:    'external',
+      facilitatorUrl: url,
+      durationMs:     Date.now() - start,
+      ok:             false,
+      errorCode:      settleRes.error.error,
+    })
+    return settleRes.error // verified:true, settled:false (AC-5)
+  }
+
+  const result: SettlementResult = {
+    verified:        true,
+    settled:         true,
+    transactionHash: settleRes.body.transactionHash,
+  }
+  logger.info('[settler]', {
+    requestId:      ctx.requestId,
+    agentSlug:      ctx.agentSlug,
+    settlerType:    'external',
+    facilitatorUrl: url,
+    durationMs:     Date.now() - start,
+    ok:             true,
+  })
+  return result
+}

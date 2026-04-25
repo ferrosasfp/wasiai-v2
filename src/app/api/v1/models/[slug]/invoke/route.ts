@@ -9,7 +9,7 @@ const X402_CORS_HEADERS = {
 } as const
 import { keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
 import { signReceipt } from '@/lib/receipts/signReceipt'
-import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
+import { settlePaymentX402, type X402EVMPayload, type SettlePaymentX402Ctx } from '@/lib/contracts/usdcSettler'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitBreaker'
 import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
@@ -134,13 +134,29 @@ interface X402PaymentHeader {
   [key: string]: unknown
 }
 
-async function settleX402(paymentHeader: X402PaymentHeader, _model: Record<string, unknown>, priceStr: string): Promise<SettlementResult | NextResponse> {
+async function settleX402(
+  paymentHeader: X402PaymentHeader,
+  model: Record<string, unknown>,
+  priceStr: string,
+  resourceUrl: string,
+  requestId: string,
+): Promise<SettlementResult | NextResponse> {
   const evmPayload = paymentHeader?.payload as X402EVMPayload | undefined
   if (!evmPayload?.authorization || !evmPayload?.signature) {
     return NextResponse.json({ error: 'Invalid payment header', code: 'payment_invalid' }, { status: 402 })
   }
   const atomicRequired = Math.round(parseFloat(priceStr) * 1_000_000).toString()
-  return settlePaymentDirectly(evmPayload, atomicRequired)
+  // WAS-V2-1: build ctx for the x402 wrapper. Constants reused from module scope (CD-AB-3).
+  const ctx: SettlePaymentX402Ctx = {
+    requestId,
+    agentSlug:    model.slug as string,
+    resourceUrl,
+    atomicAmount: atomicRequired,
+    asset:        USDC_ADDR as `0x${string}`,
+    payTo:        CONTRACT_ADDRESS as `0x${string}`,
+    network:      CHAIN as 'avalanche' | 'avalanche-testnet',
+  }
+  return settlePaymentX402(evmPayload, atomicRequired, ctx)
 }
 
 // WAS-132: recordOnChain() eliminado — Supabase agent_calls es la fuente de verdad.
@@ -471,7 +487,8 @@ export async function POST(
 
   // ── 5. Verify + Settle (Route B) ───────────────────────────────────────
   const settleStart = Date.now()
-  const settlementOrError = await settleX402(paymentHeader, model, priceStr)
+  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID()
+  const settlementOrError = await settleX402(paymentHeader, model, priceStr, resourceUrl, requestId)
 
   // If helper returned a NextResponse (error), return it directly
   if (settlementOrError instanceof NextResponse) {

@@ -70,3 +70,4 @@
 | 068 | 2026-03-08 | Hotfix #068 | claimEarnings explicit creator — fix invalid operator signature | hotfix | mini | DONE | main |
 | 069 | 2026-03-10 | HU-069 | Payment flow mainnet — reemplaza hardcodes Fuji por CHAIN_ID dinámico | bugfix | full | DONE | main |
 | 070 | 2026-03-11 | HU-070 | Auth Guard: Proteger acceso directo a páginas de Creador (/pipelines, etc) | feature | QUALITY | F2 | feat/070-public-private-routes |
+| V2-1 | 2026-04-24 | WAS-V2-1 | External Facilitator Opt-in — x402 settle via wasiai-facilitator (env flag) | refactor | QUALITY | F2.5 ready for F3 | feat/was-v2-1-external-facilitator-optin |

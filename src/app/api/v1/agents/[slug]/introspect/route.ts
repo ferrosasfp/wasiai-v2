@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
-import { settlePaymentDirectly, type X402EVMPayload } from '@/lib/contracts/usdcSettler'
+import { settlePaymentX402, type X402EVMPayload, type SettlePaymentX402Ctx } from '@/lib/contracts/usdcSettler'
 import { logger } from '@/lib/logger'
 import { SITE_URL } from '@/lib/constants'
 import { buildCOB } from '@/lib/introspect/buildCOB'
@@ -357,7 +357,17 @@ export async function POST(
     }
 
     const atomicRequired = Math.round(price * 1_000_000).toString()
-    const settlement = await settlePaymentDirectly(evmPayload, atomicRequired)
+    // WAS-V2-1: ctx for the x402 wrapper (constants reused from module scope per CD-AB-3).
+    const ctx: SettlePaymentX402Ctx = {
+      requestId:    request.headers.get('x-request-id') ?? crypto.randomUUID(),
+      agentSlug:    slug,
+      resourceUrl:  `${SITE_URL}/api/v1/agents/${slug}/introspect`,
+      atomicAmount: atomicRequired,
+      asset:        USDC_ADDR as `0x${string}`,
+      payTo:        CONTRACT_ADDRESS as `0x${string}`,
+      network:      CHAIN as 'avalanche' | 'avalanche-testnet',
+    }
+    const settlement = await settlePaymentX402(evmPayload, atomicRequired, ctx)
 
     if (!settlement.verified) {
       logger.error('[introspect] payment verification failed', { slug, settlement })
