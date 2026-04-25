@@ -18,7 +18,13 @@ export interface X402V2Envelope {
   resource: { url: string; description?: string; mimeType?: string }
   accepted: {
     scheme: 'exact'
-    network: 'avalanche' | 'avalanche-testnet'
+    /**
+     * Canonical x402 v2 network format `eip155:<chainId>`. The facilitator
+     * (wasiai-facilitator) uses Zod `.strict()` and rejects v2's internal
+     * 'avalanche' / 'avalanche-testnet' literals.
+     * Translation happens in `buildX402V2Envelope` via `CHAIN_TO_EIP155`.
+     */
+    network: `eip155:${number}`
     amount: string
     asset: Address
     payTo: Address
@@ -59,6 +65,17 @@ export type ExternalResult<T> =
 
 // ─── Envelope builder (pure) ──────────────────────────────────────────────────
 
+/**
+ * Translate v2's internal chain naming to canonical x402 v2 `eip155:<chainId>` form.
+ * The wasiai-facilitator validates `network` with Zod and rejects anything that
+ * doesn't match `eip155:<id>`. Without this map, the facilitator returns
+ * INVALID_PAYLOAD HTTP 400 on every settle attempt (smoke confirmed 2026-04-25).
+ */
+const CHAIN_TO_EIP155: Record<'avalanche' | 'avalanche-testnet', `eip155:${number}`> = {
+  'avalanche': 'eip155:43114',
+  'avalanche-testnet': 'eip155:43113',
+}
+
 export function buildX402V2Envelope(
   payload: X402EVMPayload,
   ctx: SettlePaymentX402Ctx,
@@ -73,7 +90,7 @@ export function buildX402V2Envelope(
     },
     accepted: {
       scheme: 'exact',
-      network: ctx.network,
+      network: CHAIN_TO_EIP155[ctx.network],
       amount: ctx.atomicAmount,
       asset: ctx.asset,
       payTo: ctx.payTo,

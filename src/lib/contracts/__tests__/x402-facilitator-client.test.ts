@@ -40,7 +40,9 @@ describe('buildX402V2Envelope — CD-NEW-SDD-6', () => {
     expect(env.x402Version).toBe(2)
     expect(env.accepted.extra.assetTransferMethod).toBe('eip3009')
     expect(env.accepted.scheme).toBe('exact')
-    expect(env.accepted.network).toBe('avalanche-testnet')
+    // Hot-fix 2026-04-25: ctx.network='avalanche-testnet' is translated to
+    // canonical x402 v2 'eip155:43113' before sending to facilitator (Zod .strict()).
+    expect(env.accepted.network).toBe('eip155:43113')
     expect(env.accepted.amount).toBe('1000')
     expect(env.accepted.maxTimeoutSeconds).toBe(300)
     expect(env.payload).toBe(payload)
