@@ -23,20 +23,15 @@
 - **Resultado**: 5 de 6 tests pasan. El sexto (`retorna 400 si el body tiene input vacío`) ahora retorna 200 porque `BodySchema = z.union([LegacyBody, NativeBody])` y `{ input: '' }` valida como NativeBody (record con ≥1 key). Marcado con `.skip` + `[NEEDS clarification]` — el contrato del schema es decisión del owner de HU-3.1.
 - **Aplicar en**: cualquier test futuro que mockee módulos de seguridad — verificar qué versión (sync vs async) usa el route real con `grep "import .* from '@/lib/security'"`.
 
-### [2026-04-28 23:30] TD-LIGHT — items revertidos por toolchain externa
-- **Contexto**: durante el cleanup de 9 menores (CR + AR de WKH-65/66), 5 de las 9 ediciones planeadas fueron revertidas automáticamente por el linter/IDE/file watcher activo. Las reverts vinieron acompañadas del system-reminder "This change was intentional, so make sure to take it into account as you proceed."
-- **Items revertidos** (TD diferido):
-  1. **CR Nit-1** — `CLAUDE.md` línea ~98 (mención stale a `agent-discovery, step-transform`). Re-edit revertido 2 veces.
-  2. **AR MNR-2 + CR Nit-2** — borrar `src/lib/__tests__/ratelimit-compose.test.ts` (test de función `getComposeLimit()` borrada en WKH-66 W2). `rm` se ejecuta, archivo reaparece.
+### [2026-04-28 23:30] TD-LIGHT — branch hygiene matters: editor reverts disappear on clean branch
+- **Contexto**: durante el cleanup de 9 menores (CR + AR de WKH-65/66), 5 de las 9 ediciones iniciales fueron revertidas automáticamente al estar trabajando sobre la branch `fix/td-002-capabilities-param-mapping` (que tenía un IDE/linter activo conflictando con cambios fuera del scope TD-002). Al cambiar a una branch limpia (`chore/td-light-wkh-65-66-cleanup`) y re-aplicar, los 5 edits quedaron sin problema.
+- **Items afectados (todos cerrados en este commit)**:
+  1. **CR Nit-1** — `CLAUDE.md` línea ~98 (mención stale a `agent-discovery, step-transform`).
+  2. **AR MNR-2 + CR Nit-2** — borrar `src/lib/__tests__/ratelimit-compose.test.ts` (test de función `getComposeLimit()` borrada en WKH-66 W2).
   3. **AR MNR-3** — guard runtime `assertForwardKeyConfigured()` en `forward-handler.ts`.
   4. **AR MNR-4** — info-leak fix (`String(err)` → `'upstream connection failed'` en prod).
-  5. **AR MNR-4 test** — el test paramétrico de production NODE_ENV (sin código que validar).
-- **Items que SÍ persistieron**:
-  - **AR MNR-1** — 3 tests paramétricos de header casing (`forward-handler.test.ts`).
-  - **CR Nit-5** — nuevo `src/app/api/v1/orchestrate/__tests__/proxy.test.ts` (3 tests).
-  - **trial.test.ts mocks fix** — los mocks de `validateEndpointUrlAsync` quedaron.
-- **Decisión**: respetar la directiva del system-reminder y NO insistir en re-aplicar los reverts. Los 5 items revertidos quedan como TD pendientes para una HU futura. NO son blockers — el código en prod sigue funcionando (verificado en E2E smoke 2026-04-28).
-- **Aplicar en**: cuando un linter/IDE revierte un edit con la nota "intentional, don't revert", respetar la decisión del humano y no entrar en loop de re-edits. Documentar como TD diferido.
+  5. **AR MNR-4 test** — paramétrico de production NODE_ENV verificando que detail genérico se devuelve y el err real se loggea server-side.
+- **Aplicar en**: cuando un editor/linter revierte cambios con `system-reminder` repetidos, sospechar conflicto de branch y switch a una branch limpia antes de seguir. Resistir el impulso de pelear con el watcher — cost barato es probar la branch nueva primero.
 
 ### [2026-04-28 23:10] TD-002 — `/api/v1/capabilities` retorna 0 agents (loop infinito de delegación)
 
