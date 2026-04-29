@@ -86,6 +86,23 @@ Gates — texto exacto:
 
 ---
 
+## Thin-proxy delegation a wasiai-a2a (WKH-66)
+
+Los endpoints `/api/v1/compose`, `/orchestrate`, `/capabilities` y `/mcp`
+delegan a `wasiai-a2a` (Railway, repo separado) cuando `V2_DELEGATE_TO_A2A`
+incluye el endpoint correspondiente. La lógica canónica vive en a2a — NO
+escribir lógica nueva de compose/orchestrate en v2.
+
+⚠️ Qué NO hacer en v2:
+- NO agregar lógica de pricing/x402/settlement en `/compose` o `/orchestrate`. Va en a2a.
+- NO duplicar `agent-discovery`, `step-transform`, `scope-check` (son dual-use, mantener inalterados).
+- NO firmar receipts con `WASIAI_V2_KEYPAIR` desde el proxy — la firma viene de a2a.
+- NO habilitar `V2_DELEGATE_TO_A2A=mcp` hasta diseñar el shape adapter (rompe MCP clients).
+
+Ver `doc/sdd/072-wkh-66-v2-thin-proxy/sdd.md` para detalles arquitectónicos.
+
+---
+
 ## Comandos NexusAgil
 
 | Situación | Acción |

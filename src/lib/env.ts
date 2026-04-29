@@ -56,7 +56,32 @@ const envSchema = z.object({
 
   // Runtime
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-})
+
+  // ── WKH-66: thin-proxy delegation a wasiai-a2a ──────────────────────────
+  /** Base URL del servicio wasiai-a2a en Railway. Sin trailing slash. */
+  WASIAI_A2A_BASE_URL: z.string().url().optional(),
+
+  /** Shared secret entre v2 proxy y a2a forward-key middleware. ≥16 chars. */
+  WASIAI_V2_FORWARD_KEY: z.string().min(16).optional(),
+
+  /**
+   * Comma-separated lista de endpoints delegados a wasiai-a2a.
+   * Valores válidos: 'compose', 'orchestrate', 'capabilities', 'mcp'.
+   * Default vacío = legacy mode (AC-13). Ejemplo: "capabilities,compose"
+   */
+  V2_DELEGATE_TO_A2A: z.string().optional().default(''),
+}).refine(
+  (data) => {
+    const delegated = (data.V2_DELEGATE_TO_A2A ?? '').trim()
+    if (delegated.length === 0) return true
+    return Boolean(data.WASIAI_A2A_BASE_URL) && Boolean(data.WASIAI_V2_FORWARD_KEY)
+  },
+  {
+    message:
+      'V2_DELEGATE_TO_A2A is non-empty but WASIAI_A2A_BASE_URL or WASIAI_V2_FORWARD_KEY is missing',
+    path: ['V2_DELEGATE_TO_A2A'],
+  },
+)
 
 // ── Parse + export ────────────────────────────────────────────────────────────
 
