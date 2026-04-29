@@ -12,6 +12,30 @@ import { env } from '@/lib/env'
 
 const DEFAULT_TIMEOUT_MS = 180_000
 
+/**
+ * TD-LIGHT WKH-65/66 (AR MNR-3): runtime guard.
+ * Si algún endpoint está delegado pero la forward key no está configurada,
+ * fail-fast con error claro en vez de mandar al upstream un header vacío
+ * que el middleware de a2a rechazaría con un 401 críptico.
+ *
+ * Build-phase escape hatch: durante `next build`, env.WASIAI_V2_FORWARD_KEY
+ * puede ser undefined porque createEnvSafe() omite validación strict cuando
+ * NEXT_PHASE === 'phase-production-build' (ver src/lib/env.ts:103-115).
+ * Esto es intencional para que static page generation no rompa el deploy.
+ * El runtime guard de abajo asegura que el primer request post-deploy falle
+ * de forma explícita si la env var nunca se inyectó.
+ */
+function assertForwardKeyConfigured(): string {
+  const key = env.WASIAI_V2_FORWARD_KEY
+  if (!key || key.length === 0) {
+    throw new Error(
+      'WASIAI_V2_FORWARD_KEY is not configured but V2_DELEGATE_TO_A2A includes a delegated endpoint. ' +
+        'Set WASIAI_V2_FORWARD_KEY (>=16 chars, must match a2a side) before enabling delegation.',
+    )
+  }
+  return key
+}
+
 const PASSTHROUGH_HEADERS = [
   'x-payment',
   'payment-signature',
@@ -47,10 +71,14 @@ export async function forwardRequest(
   upstreamUrl: string,
   opts?: ForwardOptions,
 ): Promise<NextResponse> {
+  // AR MNR-3: fail-fast si la forward key no fue inyectada en runtime.
+  const forwardKey = assertForwardKeyConfigured()
   const forwardHeaders: Record<string, string> = {
-    'x-wasiai-forward-key': env.WASIAI_V2_FORWARD_KEY ?? '',
+    'x-wasiai-forward-key': forwardKey,
     'x-wasiai-source': 'v2-proxy',
   }
+  // NextRequest.headers.get() es case-insensitive (subyace fetch Headers spec),
+  // por lo que la whitelist en lowercase matchea cualquier casing del cliente.
   for (const h of PASSTHROUGH_HEADERS) {
     const v = req.headers.get(h)
     if (v) forwardHeaders[h] = v
@@ -109,8 +137,15 @@ export async function forwardRequest(
         { status: 504 },
       )
     }
+    // AR MNR-4: no exponer stack traces / mensajes internos al cliente en prod.
+    // El detalle completo se loggea para Vercel logs; el body devuelto es genérico.
+    console.error('[forward-handler] upstream connection failed:', err)
+    const detail =
+      env.NODE_ENV === 'production'
+        ? 'upstream connection failed'
+        : String(err)
     return NextResponse.json(
-      { error: 'UPSTREAM_ERROR', detail: String(err) },
+      { error: 'UPSTREAM_ERROR', detail },
       { status: 502 },
     )
   } finally {

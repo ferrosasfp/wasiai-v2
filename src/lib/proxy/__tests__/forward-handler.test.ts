@@ -11,6 +11,7 @@ vi.mock('@/lib/env', () => ({
     WASIAI_A2A_BASE_URL: 'http://a2a.local',
     WASIAI_V2_FORWARD_KEY: 'test-forward-key-1234567890abcd',
     V2_DELEGATE_TO_A2A: 'compose,orchestrate,capabilities',
+    NODE_ENV: 'test',
   },
 }))
 
@@ -115,6 +116,24 @@ describe('forwardRequest', () => {
     expect(headers['authorization']).toBe('Bearer foo')
   })
 
+  // AR MNR-1 (TD-LIGHT): el lookup del whitelist usa NextRequest.headers.get
+  // que es case-insensitive por la spec de Fetch Headers. Este test paramétrico
+  // garantiza que cualquier casing del cliente se propaga al upstream con el
+  // nombre canónico (lowercase) que la whitelist usa.
+  it.each([
+    ['lowercase', 'x-payment'],
+    ['TitleCase', 'X-Payment'],
+    ['UPPERCASE', 'X-PAYMENT'],
+  ])('AR MNR-1: header casing %s — x-payment is forwarded regardless of casing', async (_label, headerName) => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('', { status: 200 }) as unknown as Response,
+    )
+    const req = makeReq('POST', { [headerName]: 'sig-from-client' })
+    await forwardRequest(req, 'http://a2a.local/compose')
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+    expect(headers['x-payment']).toBe('sig-from-client')
+  })
+
   it('AC-7: does NOT forward host/origin/cookie', async () => {
     const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response('', { status: 200 }) as unknown as Response,
@@ -208,5 +227,30 @@ describe('forwardRequest', () => {
     const body = (await res.json()) as { error: string; detail: string }
     expect(body.error).toBe('UPSTREAM_ERROR')
     expect(clearSpy).toHaveBeenCalled()
+  })
+
+  // AR MNR-4 (TD-LIGHT): en NODE_ENV=test/dev exponemos String(err) para debug.
+  // En production retornamos detail genérico. Como el módulo env se importa
+  // una sola vez, mutamos el campo NODE_ENV del mock en runtime.
+  it('AR MNR-4: in production NODE_ENV, error detail is generic (no leak)', async () => {
+    const envMod = await import('@/lib/env')
+    const original = envMod.env.NODE_ENV
+    ;(envMod.env as { NODE_ENV: string }).NODE_ENV = 'production'
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      vi.spyOn(global, 'fetch').mockRejectedValue(new Error('ECONNREFUSED 10.0.0.5:6543'))
+      const req = makeReq('POST')
+      const res = await forwardRequest(req, 'http://a2a.local/compose')
+      expect(res.status).toBe(502)
+      const body = (await res.json()) as { error: string; detail: string }
+      expect(body.error).toBe('UPSTREAM_ERROR')
+      expect(body.detail).toBe('upstream connection failed')
+      expect(body.detail).not.toContain('ECONNREFUSED')
+      expect(body.detail).not.toContain('10.0.0.5')
+      expect(consoleSpy).toHaveBeenCalled()
+    } finally {
+      ;(envMod.env as { NODE_ENV: string | undefined }).NODE_ENV = original
+      consoleSpy.mockRestore()
+    }
   })
 })
