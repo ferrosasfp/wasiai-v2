@@ -95,7 +95,8 @@ escribir lógica nueva de compose/orchestrate en v2.
 
 ⚠️ Qué NO hacer en v2:
 - NO agregar lógica de pricing/x402/settlement en `/compose` o `/orchestrate`. Va en a2a.
-- NO duplicar `agent-discovery`, `step-transform`, `scope-check` (son dual-use, mantener inalterados).
+- NO duplicar la lógica de `scope-check` (es dual-use con a2a — mantener inalterado).
+  Nota: `agent-discovery` y `step-transform` fueron eliminados en WKH-66 W2 cuando los handlers legacy de `/compose` y `/orchestrate` se reemplazaron por el thin-proxy. No volver a crearlos en v2.
 - NO firmar receipts con `WASIAI_V2_KEYPAIR` desde el proxy — la firma viene de a2a.
 - NO habilitar `V2_DELEGATE_TO_A2A=mcp` hasta diseñar el shape adapter (rompe MCP clients).
 
