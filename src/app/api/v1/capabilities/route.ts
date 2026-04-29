@@ -7,6 +7,22 @@
  * WKH-66: cuando `V2_DELEGATE_TO_A2A` incluye `capabilities`, este endpoint
  * reenvía a wasiai-a2a `GET /discover` (single source of truth multi-chain).
  * Cuando NO está activo, mantiene el handler legacy v2 (Supabase agents table).
+ *
+ * TD-002 (post WKH-66): el a2a `WasiAI` registry tiene su `discoveryEndpoint`
+ * apuntando a `https://app.wasiai.io/api/v1/capabilities`. Cuando habilitamos
+ * la delegación, esto produce un loop infinito (v2 → a2a → v2 → a2a → ...) que
+ * resuelve con `[]` agents. Para romper el ciclo:
+ *
+ *   1. Si la request lleva `x-agent-key` (auth header de a2a hacia registries)
+ *      y NO lleva `x-wasiai-source: v2-proxy` (i.e. no viene del proxy frontal
+ *      de v2), forzamos el handler legacy. Esto deja a2a leer la lista canonical
+ *      desde la tabla v2 `agents` sin volver a delegar.
+ *   2. Caller externo (curl, app.wasiai.io) sigue delegado → a2a → legacy
+ *      (un sólo hop de proxy, no infinito).
+ *
+ * El fix definitivo es reapuntar la `discoveryEndpoint` del registry a a2a
+ * Railway hacia `/api/v1/agents` (legacy nunca-delegado), o exponer un
+ * `/api/v1/capabilities/legacy`. Mientras tanto este loop-break es zero-risk.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/lib/env'
@@ -15,9 +31,60 @@ import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'
 
+/**
+ * TD-002 loop-detection. Returns `true` when the inbound request looks like
+ * a2a calling back into v2 to read the `WasiAI` registry. The two markers:
+ *
+ *   - `x-agent-key` header is present (a2a's registry auth header).
+ *   - `x-wasiai-source` is NOT `v2-proxy` (those are forwarded by the v2
+ *     proxy itself; an external client never sets it).
+ *
+ * Both checks together avoid false-positives:
+ *   - external curl: no `x-agent-key` → returns false → delegates normally.
+ *   - v2-proxy frontal: sets `x-wasiai-source: v2-proxy` → returns false.
+ *   - a2a registry call: has `x-agent-key`, no `x-wasiai-source` → returns true.
+ */
+function isA2ARegistryCallback(req: NextRequest): boolean {
+  const hasAgentKey = req.headers.get('x-agent-key') !== null
+  const fromV2Proxy = req.headers.get('x-wasiai-source') === 'v2-proxy'
+  return hasAgentKey && !fromV2Proxy
+}
+
+/**
+ * TD-002 param mapping (defense-in-depth). v2 schema uses
+ * `tag` / `max_price` / `min_reputation`; a2a `/discover` uses
+ * `capabilities` / `maxPrice` / `minReputation`. Without translation,
+ * a2a silently ignores these filters and returns the unfiltered set.
+ *
+ * Mutates `searchParams` in place. Idempotent — running it twice is a noop.
+ */
+function translateParamsForA2A(searchParams: URLSearchParams): void {
+  const renames: Array<[string, string]> = [
+    ['tag', 'capabilities'],
+    ['max_price', 'maxPrice'],
+    ['min_reputation', 'minReputation'],
+  ]
+  for (const [v2Name, a2aName] of renames) {
+    const value = searchParams.get(v2Name)
+    if (value !== null && !searchParams.has(a2aName)) {
+      searchParams.set(a2aName, value)
+      searchParams.delete(v2Name)
+    }
+  }
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  // TD-002: break a2a → v2 → a2a recursion.
+  if (isA2ARegistryCallback(req)) {
+    return legacyCapabilities(req)
+  }
   if (isDelegated('capabilities')) {
-    return forwardRequest(req, `${env.WASIAI_A2A_BASE_URL}/discover`)
+    // TD-002: rewrite v2-style query params into a2a's canonical names BEFORE
+    // forwarding, so server-side filters actually apply on the upstream side.
+    const url = new URL(req.url)
+    translateParamsForA2A(url.searchParams)
+    const rewritten = new NextRequest(url.toString(), req)
+    return forwardRequest(rewritten, `${env.WASIAI_A2A_BASE_URL}/discover`)
   }
   return legacyCapabilities(req)
 }
