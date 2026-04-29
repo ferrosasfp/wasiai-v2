@@ -1,12 +1,3 @@
-import { createHash } from 'crypto'
-import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
-import { mcpRequestSchema } from '@/lib/schemas/api.schemas'
-import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
-import { logger } from '@/lib/logger'
-import { getInvokeLimit, checkRateLimit } from '@/lib/ratelimit'
-import { assertPaymentType } from '@/lib/validation/payment-type'
-
 /**
  * WasiAI MCP Server Endpoint
  *
@@ -24,9 +15,44 @@ import { assertPaymentType } from '@/lib/validation/payment-type'
  *   tools/list   → list all active agents as MCP tools
  *   tools/call   → call an agent, deduct from key budget, log call
  *   resources/read → wasiai://catalog — full agent list as JSON
+ *
+ * WKH-66 / ADR-8: la implementación legacy se preserva intacta en este
+ * archivo. El flag `V2_DELEGATE_TO_A2A=mcp` reenvía a wasiai-a2a /mcp,
+ * pero los shapes NO son compatibles (a2a usa JSON-RPC 2.0 + x-mcp-token,
+ * solo expone 4 tools fijos). Habilitar el flag rompe Claude Desktop /
+ * Cursor — default debe quedar OFF para `mcp` (CD-12).
  */
+import { createHash } from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
+import { env } from '@/lib/env'
+import { isDelegated, forwardRequest } from '@/lib/proxy/forward-handler'
+import { createServiceClient } from '@/lib/supabase/server'
+import { mcpRequestSchema } from '@/lib/schemas/api.schemas'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { logger } from '@/lib/logger'
+import { getInvokeLimit, checkRateLimit } from '@/lib/ratelimit'
+import { assertPaymentType } from '@/lib/validation/payment-type'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Public handlers (W4 thin-proxy wrappers) ─────────────────────────────────
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  if (isDelegated('mcp')) {
+    return forwardRequest(req, `${env.WASIAI_A2A_BASE_URL}/mcp`)
+  }
+  return legacyMcpGet()
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (isDelegated('mcp')) {
+    return forwardRequest(req, `${env.WASIAI_A2A_BASE_URL}/mcp`)
+  }
+  return legacyMcpPost(req)
+}
+
+// ── LEGACY ──────────────────────────────────────────────────────────────────
+// Cuerpo intacto del handler v2 original (CD-12). NO modificar — la lógica
+// canónica vive en wasiai-a2a y se activa via V2_DELEGATE_TO_A2A=mcp, pero
+// shape NO compatible con el v2 MCP, por eso el legacy queda como default.
 
 /** Wrap a message as an MCP error content response */
 function mcpError(message: string, status = 200) {
@@ -90,7 +116,7 @@ function buildTools(models: { name: string; slug: string; description: string | 
 
 // ── GET — Server discovery (no auth required) ─────────────────────────────────
 
-export async function GET() {
+async function legacyMcpGet(): Promise<NextResponse> {
   const supabase = createServiceClient()
 
   const { data: models, error } = await supabase
@@ -130,7 +156,7 @@ export async function GET() {
 
 // ── POST — Execute MCP methods ────────────────────────────────────────────────
 
-export async function POST(request: NextRequest) {
+async function legacyMcpPost(request: NextRequest): Promise<NextResponse> {
   const supabase = createServiceClient()
 
   // Parse body

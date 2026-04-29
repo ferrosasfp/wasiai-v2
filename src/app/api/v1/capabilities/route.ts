@@ -1,14 +1,31 @@
 /**
  * GET /api/v1/capabilities
+ *
  * WAS-209: Discovery API enriquecida — machine-readable con schema, pricing y ERC-8004.
  * Reemplaza WAS-208. 100% público — sin auth.
+ *
+ * WKH-66: cuando `V2_DELEGATE_TO_A2A` incluye `capabilities`, este endpoint
+ * reenvía a wasiai-a2a `GET /discover` (single source of truth multi-chain).
+ * Cuando NO está activo, mantiene el handler legacy v2 (Supabase agents table).
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { env } from '@/lib/env'
+import { isDelegated, forwardRequest } from '@/lib/proxy/forward-handler'
 import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  if (isDelegated('capabilities')) {
+    return forwardRequest(req, `${env.WASIAI_A2A_BASE_URL}/discover`)
+  }
+  return legacyCapabilities(req)
+}
+
+// ── Legacy handler ───────────────────────────────────────────────────────────
+// El cuerpo legacy queda inalterado: cuando el flag esté ON el legacy nunca
+// corre. Refactor de la lógica de Supabase queries está fuera de scope WKH-66.
+async function legacyCapabilities(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = request.nextUrl
 
   // AC-9: validate limit
