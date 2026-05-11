@@ -85,6 +85,28 @@ describe('mapFacilitatorErrorToSettlementResult — DT-G', () => {
     expect(r.error).toContain('INVALID_PAYLOAD')
     expect(r.error).toContain('HTTP 500')
   })
+
+  it('CD-12: NONCE_ALREADY_USED is in KNOWN_FACILITATOR_CODES for settle phase', () => {
+    const r = mapFacilitatorErrorToSettlementResult(
+      409,
+      { code: 'NONCE_ALREADY_USED', message: 'consumed' },
+      'settle',
+    )
+    expect(r.verified).toBe(true)
+    expect(r.settled).toBe(false)
+    expect(r.error).toBe('NONCE_ALREADY_USED: consumed')
+  })
+
+  it('CD-12: NONCE_ALREADY_USED at verify phase returns verified=false (verify failed)', () => {
+    const r = mapFacilitatorErrorToSettlementResult(
+      409,
+      { code: 'NONCE_ALREADY_USED', message: 'nonce 0xabc consumed on-chain' },
+      'verify',
+    )
+    expect(r.verified).toBe(false)
+    expect(r.settled).toBe(false)
+    expect(r.error).toMatch(/^NONCE_ALREADY_USED:/)
+  })
 })
 
 describe('verifyExternal — fetch behavior', () => {

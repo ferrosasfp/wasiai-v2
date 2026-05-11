@@ -45,8 +45,111 @@ export function getFacilitatorUrl(): string | null {
   }
 }
 
+// ─── WAS-V2-2: Wasiai-as-primary toggle + chain allowlist ────────────────────
+
+/**
+ * Hardcoded list of chain identifiers (canonical x402 v2 form `eip155:<chainId>`)
+ * that the wasiai-facilitator is authorized to settle on. Forward-compat with
+ * Kite chains (2366/2368); current ctx.network only matches 43113/43114.
+ *
+ * DT-A (humano): immutable list.
+ */
+export const WASIAI_CHAIN_ALLOWLIST: ReadonlySet<string> = new Set([
+  'eip155:2366',
+  'eip155:2368',
+  'eip155:43113',
+  'eip155:43114',
+])
+
+/**
+ * Default URL of the wasiai-facilitator Railway deployment.
+ * Override via WASIAI_FACILITATOR_URL only for staging/testing.
+ * DT-H: never null — fallback default keeps operator surface minimal.
+ */
+const WASIAI_FACILITATOR_DEFAULT_URL =
+  'https://wasiai-facilitator-production.up.railway.app'
+
+// Tri-state caches (same pattern as getFacilitatorUrl).
+let wasiaiPrimaryCached: boolean | undefined = undefined
+let wasiaiPrimaryWarnedOnce = false
+let wasiaiUrlCached: string | undefined = undefined
+let wasiaiUrlWarnedOnce = false
+
+/**
+ * Reads WASIAI_FACILITATOR_AS_PRIMARY env var. Returns true ONLY when
+ * the raw value (trimmed, lowercased) === 'true'. Any other value → false.
+ *
+ * AC-2: malformed value (e.g. 'mAyBe') → returns false + warns ONCE at
+ * first call time. Never throws.
+ *
+ * CD-13: this is the only place the env var is read.
+ */
+export function isWasiaiFacilitatorPrimary(): boolean {
+  if (wasiaiPrimaryCached !== undefined) return wasiaiPrimaryCached
+  const raw = process.env.WASIAI_FACILITATOR_AS_PRIMARY?.trim()
+  if (raw === undefined || raw === '') {
+    wasiaiPrimaryCached = false
+    return false
+  }
+  const lower = raw.toLowerCase()
+  if (lower === 'true') {
+    wasiaiPrimaryCached = true
+    return true
+  }
+  if (lower === 'false') {
+    wasiaiPrimaryCached = false
+    return false
+  }
+  // Malformed.
+  if (!wasiaiPrimaryWarnedOnce) {
+    logger.warn(
+      '[x402-facilitator-config] WASIAI_FACILITATOR_AS_PRIMARY malformed; defaulting to false',
+      { raw_redacted: raw.slice(0, 16) + '...' },
+    )
+    wasiaiPrimaryWarnedOnce = true
+  }
+  wasiaiPrimaryCached = false
+  return false
+}
+
+/**
+ * Returns the wasiai-facilitator URL.
+ * - If WASIAI_FACILITATOR_URL env var is set and a valid URL → returns it (sanitized).
+ * - Else → returns WASIAI_FACILITATOR_DEFAULT_URL.
+ *
+ * DT-H: never returns null — operator surface minimal.
+ */
+export function getWasiaiFacilitatorUrl(): string {
+  if (wasiaiUrlCached !== undefined) return wasiaiUrlCached
+  const raw = process.env.WASIAI_FACILITATOR_URL?.trim()
+  if (!raw) {
+    wasiaiUrlCached = WASIAI_FACILITATOR_DEFAULT_URL
+    return wasiaiUrlCached
+  }
+  try {
+    const url = new URL(raw)
+    wasiaiUrlCached = url.toString().replace(/\/$/, '')
+    return wasiaiUrlCached
+  } catch {
+    if (!wasiaiUrlWarnedOnce) {
+      logger.warn(
+        '[x402-facilitator-config] WASIAI_FACILITATOR_URL malformed; using default',
+        { raw_redacted: raw.slice(0, 16) + '...' },
+      )
+      wasiaiUrlWarnedOnce = true
+    }
+    wasiaiUrlCached = WASIAI_FACILITATOR_DEFAULT_URL
+    return wasiaiUrlCached
+  }
+}
+
 /** Test-only — reset cache between tests. NOT exported in barrel/index. */
 export function __resetFacilitatorUrlCacheForTesting(): void {
   cached = undefined
   warnedOnce = false
+  // WAS-V2-2: also reset the new caches added in this HU.
+  wasiaiPrimaryCached = undefined
+  wasiaiPrimaryWarnedOnce = false
+  wasiaiUrlCached = undefined
+  wasiaiUrlWarnedOnce = false
 }
