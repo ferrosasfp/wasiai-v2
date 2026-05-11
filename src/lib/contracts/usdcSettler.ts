@@ -24,76 +24,11 @@ import { logger } from '@/lib/logger'
 // WAS-V2-1: External facilitator opt-in wrapper deps (section below).
 // Imports moved to top per TS convention; functions remain in the
 // `WAS-V2-1: External facilitator opt-in wrapper` section below.
-import { getFacilitatorUrl } from './x402-facilitator-config'
-import {
-  buildX402V2Envelope,
-  verifyExternal,
-  settleExternal,
-  type SettlePaymentX402Ctx,
-} from './x402-facilitator-client'
+// WAS-V2-2: routing/telemetry delegated to facilitator-router (trySettle).
+import type { SettlePaymentX402Ctx } from './x402-facilitator-client'
+import { trySettle } from './facilitator-router'
 
 export type { SettlePaymentX402Ctx }
-
-// ─── Helpers (private) ────────────────────────────────────────────────────────
-
-/**
- * Bounded set of canonical settlement error codes used by the internal path.
- *
- * `settlePaymentDirectly()` (CD-3, append-only) emits free-form `error`
- * strings — some follow the `CODE: msg` convention, others are sentence-case
- * ("Authorization expired (...)", "Smart account detected — ..."). To keep
- * log cardinality bounded for Grafana/Sentry histograms we map the free-form
- * tail to a single bucket via `normalizeInternalErrorCode()`.
- */
-const INTERNAL_KNOWN_CODES = [
-  'CHAIN_UNAVAILABLE',
-  'INVALID_SIGNATURE',
-  'INVALID_AMOUNT',
-  'EXPIRED_AUTHORIZATION',
-  'OPERATOR_KEY_MISSING',
-  'TRANSACTION_FAILED',
-  'UNKNOWN',
-] as const
-type InternalErrorCode = (typeof INTERNAL_KNOWN_CODES)[number]
-
-/**
- * Normalize an internal-path error string to a bounded code from
- * `INTERNAL_KNOWN_CODES`. Used for log cardinality only — the original
- * `error` string remains untouched in the returned `SettlementResult`.
- */
-function normalizeInternalErrorCode(err: string | undefined): InternalErrorCode | undefined {
-  if (!err) return undefined
-  const head = err.split(':')[0]
-  if ((INTERNAL_KNOWN_CODES as readonly string[]).includes(head)) {
-    return head as InternalErrorCode
-  }
-  // Sentence-case mappings emitted by settlePaymentDirectly() (CD-3 untouched).
-  if (/^Authorization expired/i.test(err))                           return 'EXPIRED_AUTHORIZATION'
-  if (/^Authorization not yet valid/i.test(err))                     return 'EXPIRED_AUTHORIZATION'
-  if (/^Insufficient amount/i.test(err))                             return 'INVALID_AMOUNT'
-  if (/^Invalid EIP-712 signature/i.test(err))                       return 'INVALID_SIGNATURE'
-  if (/^Smart account detected/i.test(err))                          return 'INVALID_SIGNATURE'
-  if (/^Transaction reverted/i.test(err))                            return 'TRANSACTION_FAILED'
-  if (/OPERATOR_PRIVATE_KEY/.test(err))                              return 'OPERATOR_KEY_MISSING'
-  return 'UNKNOWN'
-}
-
-/**
- * Extracts the canonical error code from a SettlementResult.error string
- * coming from the EXTERNAL facilitator path.
- *
- * External errors follow the convention `<CODE>: <message>` (e.g.
- * `"INVALID_SIGNATURE: bad sig"`) emitted by `mapFacilitatorErrorToSettlementResult`.
- * Returning just the prefix before the first `:` keeps log cardinality bounded.
- *
- * For internal-path results use `normalizeInternalErrorCode()` instead.
- *
- * @param err - raw error string from SettlementResult.error (may be undefined)
- * @returns the canonical code prefix, or undefined when err is falsy
- */
-function extractCode(err: string | undefined): string | undefined {
-  return err?.split(':')[0]
-}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -337,94 +272,36 @@ export async function settlePaymentDirectly(
   }
 }
 
-// ─── WAS-V2-1: External facilitator opt-in wrapper ───────────────────────────
-// CD-3: settlePaymentDirectly above remains intact. This section only appends.
-// (deps imported at top of file per TS convention; re-export kept there too)
+// ─── WAS-V2-2: thin delegator to facilitator-router ──────────────────────────
+// CD-3: public signature preserved.
+// CD-14: lines 1-338 of this file are intact; only the body of
+//        settlePaymentX402 below was refactored.
+//
+// Routing/telemetry now lives in facilitator-router.trySettle which decides
+// between wasiai-facilitator (primary, when toggle on), Ultravioleta DAO
+// (fallback) and settlePaymentDirectly (internal baseline). The router emits
+// the single structured `[settler]` log entry (CD-10).
 
 /**
- * Settle x402 payment, optionally delegating to external facilitator.
+ * Settle an x402 payment via the dual facilitator router.
  *
- * - If X402_FACILITATOR_URL is unset/malformed → calls settlePaymentDirectly
- *   (zero regression, AC-1).
- * - If X402_FACILITATOR_URL is set → POST /verify then /settle to facilitator
- *   (AC-2/3). Errors mapped to SettlementResult per DT-G.
+ * Toggle off (WASIAI_FACILITATOR_AS_PRIMARY unset/false): behavior is identical
+ * to WAS-V2-1 baseline — UVD if `X402_FACILITATOR_URL` is set, else
+ * `settlePaymentDirectly` (zero regression, AC-1/AC-14).
  *
- * AC-4: external /verify HTTP 4xx → returns { verified:false, settled:false,
- *   error:'<CODE>: <msg>' } and skips /settle.
- * AC-5: external /settle failure after /verify ok → returns { verified:true,
- *   settled:false, error:'<CODE>: <msg>' } (no re-charge).
- * AC-6: facilitator unreachable (timeout/DNS/5xx) → returns { verified:false,
- *   settled:false, error:'CHAIN_UNAVAILABLE: facilitator unreachable' }
- *   (no fallback to internal — ops rollback by unsetting the env var).
- * AC-10: emits structured log entry with settlerType/durationMs/ok/errorCode.
- * DT-H: uses AbortSignal.timeout(30_000) to bound external HTTP calls.
- * CD-NEW-SDD-1: no client-side idempotency cache — facilitator owns it.
+ * Toggle on + chain in allowlist: wasiai-facilitator tried first, transparent
+ * fallback to UVD on 5xx / timeout / CHAIN_UNAVAILABLE / INVALID_PAYLOAD.
+ * `NONCE_ALREADY_USED` (or HTTP 409) → no fallback (CD-5/AC-10 idempotency).
+ *
+ * Toggle on + chain NOT in allowlist: routes directly to UVD without trying
+ * wasiai (AC-4).
  */
 export async function settlePaymentX402(
   payload:  X402EVMPayload,
   required: string,
   ctx:      SettlePaymentX402Ctx,
 ): Promise<SettlementResult> {
-  const start = Date.now()
-  const url = getFacilitatorUrl()
-
-  if (url === null) {
-    const r = await settlePaymentDirectly(payload, required)
-    logger.info('[settler]', {
-      requestId:   ctx.requestId,
-      agentSlug:   ctx.agentSlug,
-      settlerType: 'internal',
-      durationMs:  Date.now() - start,
-      ok:          r.verified && r.settled,
-      errorCode:   normalizeInternalErrorCode(r.error),
-    })
-    return r
-  }
-
-  // External path — DT-H: 30s timeout matches internal waitForTransactionReceipt.
-  const envelope = buildX402V2Envelope(payload, ctx)
-  const signal   = AbortSignal.timeout(30_000)
-
-  const verifyRes = await verifyExternal(envelope, url, signal)
-  if (!verifyRes.ok) {
-    logger.info('[settler]', {
-      requestId:      ctx.requestId,
-      agentSlug:      ctx.agentSlug,
-      settlerType:    'external',
-      facilitatorUrl: url,
-      durationMs:     Date.now() - start,
-      ok:             false,
-      errorCode:      extractCode(verifyRes.error.error),
-    })
-    return verifyRes.error
-  }
-
-  const settleRes = await settleExternal(envelope, url, signal)
-  if (!settleRes.ok) {
-    logger.info('[settler]', {
-      requestId:      ctx.requestId,
-      agentSlug:      ctx.agentSlug,
-      settlerType:    'external',
-      facilitatorUrl: url,
-      durationMs:     Date.now() - start,
-      ok:             false,
-      errorCode:      extractCode(settleRes.error.error),
-    })
-    return settleRes.error // verified:true, settled:false (AC-5)
-  }
-
-  const result: SettlementResult = {
-    verified:        true,
-    settled:         true,
-    transactionHash: settleRes.body.transactionHash,
-  }
-  logger.info('[settler]', {
-    requestId:      ctx.requestId,
-    agentSlug:      ctx.agentSlug,
-    settlerType:    'external',
-    facilitatorUrl: url,
-    durationMs:     Date.now() - start,
-    ok:             true,
-  })
-  return result
+  // WAS-V2-2: routing/telemetry delegated to facilitator-router.
+  // The router emits the single structured [settler] log (CD-10).
+  return await trySettle(payload, required, ctx)
 }

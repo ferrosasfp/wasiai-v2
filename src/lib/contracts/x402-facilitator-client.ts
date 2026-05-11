@@ -119,6 +119,7 @@ const KNOWN_FACILITATOR_CODES = new Set([
   'RATE_LIMITED',
   'CHAIN_UNAVAILABLE',
   'TRANSACTION_FAILED',
+  'NONCE_ALREADY_USED', // ← WAS-V2-2 CD-12: required for idempotency guard
 ])
 
 export function mapFacilitatorErrorToSettlementResult(

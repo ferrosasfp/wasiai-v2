@@ -24,6 +24,16 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/contracts/x402-facilitator-config', () => ({
   getFacilitatorUrl: vi.fn(),
+  // WAS-V2-2: router consumes these helpers. With toggle-off defaults, the
+  // router preserves WAS-V2-1 baseline behavior (only UVD/internal paths).
+  isWasiaiFacilitatorPrimary: vi.fn(() => false),
+  getWasiaiFacilitatorUrl: vi.fn(() => 'https://wasiai.test'),
+  WASIAI_CHAIN_ALLOWLIST: new Set([
+    'eip155:2366',
+    'eip155:2368',
+    'eip155:43113',
+    'eip155:43114',
+  ]),
   __resetFacilitatorUrlCacheForTesting: vi.fn(),
 }))
 
@@ -194,7 +204,9 @@ describe('settlePaymentX402 — wrapper (W3)', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
 
-  it('AC-10: emits structured log with settlerType + durationMs + ok (internal)', async () => {
+  it('AC-10: emits structured log with facilitatorUsed + durationMs + ok (internal)', async () => {
+    // WAS-V2-2: schema change — router emits `facilitatorUsed` (not `settlerType`).
+    // Behavior (CD-2) is unchanged; only the telemetry key was renamed.
     const { getFacilitatorUrl } = await import('@/lib/contracts/x402-facilitator-config')
     ;(getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue(null)
     const { logger } = await import('@/lib/logger')
@@ -205,16 +217,19 @@ describe('settlePaymentX402 — wrapper (W3)', () => {
     expect(logger.info).toHaveBeenCalledWith(
       '[settler]',
       expect.objectContaining({
-        requestId:   'req-1',
-        agentSlug:   'echo',
-        settlerType: 'internal',
-        ok:          false, // expired auth → not ok
-        durationMs:  expect.any(Number),
+        requestId:       'req-1',
+        agentSlug:       'echo',
+        facilitatorUsed: 'internal',
+        ok:              false, // expired auth → not ok
+        durationMs:      expect.any(Number),
       }),
     )
   })
 
-  it('AC-10: emits structured log with settlerType=external + facilitatorUrl + ok=true', async () => {
+  it('AC-10: emits structured log with facilitatorUsed=ultravioleta + ok=true (external)', async () => {
+    // WAS-V2-2: schema change — router emits `facilitatorUsed: 'ultravioleta'`
+    // (not `settlerType: 'external'` + `facilitatorUrl`). Toggle-off branch
+    // preserves the AC-1 baseline: UVD path is used when configured.
     const { getFacilitatorUrl } = await import('@/lib/contracts/x402-facilitator-config')
     ;(getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue('https://fac.test')
     const { verifyExternal, settleExternal } = await import('@/lib/contracts/x402-facilitator-client')
@@ -231,12 +246,11 @@ describe('settlePaymentX402 — wrapper (W3)', () => {
     expect(logger.info).toHaveBeenCalledWith(
       '[settler]',
       expect.objectContaining({
-        requestId:      'req-1',
-        agentSlug:      'echo',
-        settlerType:    'external',
-        facilitatorUrl: 'https://fac.test',
-        ok:             true,
-        durationMs:     expect.any(Number),
+        requestId:       'req-1',
+        agentSlug:       'echo',
+        facilitatorUsed: 'ultravioleta',
+        ok:              true,
+        durationMs:      expect.any(Number),
       }),
     )
   })

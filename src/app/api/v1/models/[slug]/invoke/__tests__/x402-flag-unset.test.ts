@@ -20,6 +20,16 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/contracts/x402-facilitator-config', () => ({
   getFacilitatorUrl: vi.fn(() => null), // simulate flag unset
+  // WAS-V2-2: router consumes these helpers. Mock them with toggle-off defaults
+  // so behavior matches WAS-V2-1 baseline (delegates to internal settlePaymentDirectly).
+  isWasiaiFacilitatorPrimary: vi.fn(() => false),
+  getWasiaiFacilitatorUrl: vi.fn(() => 'https://wasiai.test'),
+  WASIAI_CHAIN_ALLOWLIST: new Set([
+    'eip155:2366',
+    'eip155:2368',
+    'eip155:43113',
+    'eip155:43114',
+  ]),
   __resetFacilitatorUrlCacheForTesting: vi.fn(),
 }))
 
