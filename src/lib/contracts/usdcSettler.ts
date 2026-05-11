@@ -30,67 +30,6 @@ import { trySettle } from './facilitator-router'
 
 export type { SettlePaymentX402Ctx }
 
-// ─── Helpers (private) ────────────────────────────────────────────────────────
-
-/**
- * Bounded set of canonical settlement error codes used by the internal path.
- *
- * `settlePaymentDirectly()` (CD-3, append-only) emits free-form `error`
- * strings — some follow the `CODE: msg` convention, others are sentence-case
- * ("Authorization expired (...)", "Smart account detected — ..."). To keep
- * log cardinality bounded for Grafana/Sentry histograms we map the free-form
- * tail to a single bucket via `normalizeInternalErrorCode()`.
- */
-const INTERNAL_KNOWN_CODES = [
-  'CHAIN_UNAVAILABLE',
-  'INVALID_SIGNATURE',
-  'INVALID_AMOUNT',
-  'EXPIRED_AUTHORIZATION',
-  'OPERATOR_KEY_MISSING',
-  'TRANSACTION_FAILED',
-  'UNKNOWN',
-] as const
-type InternalErrorCode = (typeof INTERNAL_KNOWN_CODES)[number]
-
-/**
- * Normalize an internal-path error string to a bounded code from
- * `INTERNAL_KNOWN_CODES`. Used for log cardinality only — the original
- * `error` string remains untouched in the returned `SettlementResult`.
- */
-function normalizeInternalErrorCode(err: string | undefined): InternalErrorCode | undefined {
-  if (!err) return undefined
-  const head = err.split(':')[0]
-  if ((INTERNAL_KNOWN_CODES as readonly string[]).includes(head)) {
-    return head as InternalErrorCode
-  }
-  // Sentence-case mappings emitted by settlePaymentDirectly() (CD-3 untouched).
-  if (/^Authorization expired/i.test(err))                           return 'EXPIRED_AUTHORIZATION'
-  if (/^Authorization not yet valid/i.test(err))                     return 'EXPIRED_AUTHORIZATION'
-  if (/^Insufficient amount/i.test(err))                             return 'INVALID_AMOUNT'
-  if (/^Invalid EIP-712 signature/i.test(err))                       return 'INVALID_SIGNATURE'
-  if (/^Smart account detected/i.test(err))                          return 'INVALID_SIGNATURE'
-  if (/^Transaction reverted/i.test(err))                            return 'TRANSACTION_FAILED'
-  if (/OPERATOR_PRIVATE_KEY/.test(err))                              return 'OPERATOR_KEY_MISSING'
-  return 'UNKNOWN'
-}
-
-/**
- * Extracts the canonical error code from a SettlementResult.error string
- * coming from the EXTERNAL facilitator path.
- *
- * External errors follow the convention `<CODE>: <message>` (e.g.
- * `"INVALID_SIGNATURE: bad sig"`) emitted by `mapFacilitatorErrorToSettlementResult`.
- * Returning just the prefix before the first `:` keeps log cardinality bounded.
- *
- * For internal-path results use `normalizeInternalErrorCode()` instead.
- *
- * @param err - raw error string from SettlementResult.error (may be undefined)
- * @returns the canonical code prefix, or undefined when err is falsy
- */
-function extractCode(err: string | undefined): string | undefined {
-  return err?.split(':')[0]
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
