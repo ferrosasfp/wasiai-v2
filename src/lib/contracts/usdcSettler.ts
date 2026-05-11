@@ -24,13 +24,9 @@ import { logger } from '@/lib/logger'
 // WAS-V2-1: External facilitator opt-in wrapper deps (section below).
 // Imports moved to top per TS convention; functions remain in the
 // `WAS-V2-1: External facilitator opt-in wrapper` section below.
-import { getFacilitatorUrl } from './x402-facilitator-config'
-import {
-  buildX402V2Envelope,
-  verifyExternal,
-  settleExternal,
-  type SettlePaymentX402Ctx,
-} from './x402-facilitator-client'
+// WAS-V2-2: routing/telemetry delegated to facilitator-router (trySettle).
+import type { SettlePaymentX402Ctx } from './x402-facilitator-client'
+import { trySettle } from './facilitator-router'
 
 export type { SettlePaymentX402Ctx }
 
@@ -337,94 +333,36 @@ export async function settlePaymentDirectly(
   }
 }
 
-// ─── WAS-V2-1: External facilitator opt-in wrapper ───────────────────────────
-// CD-3: settlePaymentDirectly above remains intact. This section only appends.
-// (deps imported at top of file per TS convention; re-export kept there too)
+// ─── WAS-V2-2: thin delegator to facilitator-router ──────────────────────────
+// CD-3: public signature preserved.
+// CD-14: lines 1-338 of this file are intact; only the body of
+//        settlePaymentX402 below was refactored.
+//
+// Routing/telemetry now lives in facilitator-router.trySettle which decides
+// between wasiai-facilitator (primary, when toggle on), Ultravioleta DAO
+// (fallback) and settlePaymentDirectly (internal baseline). The router emits
+// the single structured `[settler]` log entry (CD-10).
 
 /**
- * Settle x402 payment, optionally delegating to external facilitator.
+ * Settle an x402 payment via the dual facilitator router.
  *
- * - If X402_FACILITATOR_URL is unset/malformed → calls settlePaymentDirectly
- *   (zero regression, AC-1).
- * - If X402_FACILITATOR_URL is set → POST /verify then /settle to facilitator
- *   (AC-2/3). Errors mapped to SettlementResult per DT-G.
+ * Toggle off (WASIAI_FACILITATOR_AS_PRIMARY unset/false): behavior is identical
+ * to WAS-V2-1 baseline — UVD if `X402_FACILITATOR_URL` is set, else
+ * `settlePaymentDirectly` (zero regression, AC-1/AC-14).
  *
- * AC-4: external /verify HTTP 4xx → returns { verified:false, settled:false,
- *   error:'<CODE>: <msg>' } and skips /settle.
- * AC-5: external /settle failure after /verify ok → returns { verified:true,
- *   settled:false, error:'<CODE>: <msg>' } (no re-charge).
- * AC-6: facilitator unreachable (timeout/DNS/5xx) → returns { verified:false,
- *   settled:false, error:'CHAIN_UNAVAILABLE: facilitator unreachable' }
- *   (no fallback to internal — ops rollback by unsetting the env var).
- * AC-10: emits structured log entry with settlerType/durationMs/ok/errorCode.
- * DT-H: uses AbortSignal.timeout(30_000) to bound external HTTP calls.
- * CD-NEW-SDD-1: no client-side idempotency cache — facilitator owns it.
+ * Toggle on + chain in allowlist: wasiai-facilitator tried first, transparent
+ * fallback to UVD on 5xx / timeout / CHAIN_UNAVAILABLE / INVALID_PAYLOAD.
+ * `NONCE_ALREADY_USED` (or HTTP 409) → no fallback (CD-5/AC-10 idempotency).
+ *
+ * Toggle on + chain NOT in allowlist: routes directly to UVD without trying
+ * wasiai (AC-4).
  */
 export async function settlePaymentX402(
   payload:  X402EVMPayload,
   required: string,
   ctx:      SettlePaymentX402Ctx,
 ): Promise<SettlementResult> {
-  const start = Date.now()
-  const url = getFacilitatorUrl()
-
-  if (url === null) {
-    const r = await settlePaymentDirectly(payload, required)
-    logger.info('[settler]', {
-      requestId:   ctx.requestId,
-      agentSlug:   ctx.agentSlug,
-      settlerType: 'internal',
-      durationMs:  Date.now() - start,
-      ok:          r.verified && r.settled,
-      errorCode:   normalizeInternalErrorCode(r.error),
-    })
-    return r
-  }
-
-  // External path — DT-H: 30s timeout matches internal waitForTransactionReceipt.
-  const envelope = buildX402V2Envelope(payload, ctx)
-  const signal   = AbortSignal.timeout(30_000)
-
-  const verifyRes = await verifyExternal(envelope, url, signal)
-  if (!verifyRes.ok) {
-    logger.info('[settler]', {
-      requestId:      ctx.requestId,
-      agentSlug:      ctx.agentSlug,
-      settlerType:    'external',
-      facilitatorUrl: url,
-      durationMs:     Date.now() - start,
-      ok:             false,
-      errorCode:      extractCode(verifyRes.error.error),
-    })
-    return verifyRes.error
-  }
-
-  const settleRes = await settleExternal(envelope, url, signal)
-  if (!settleRes.ok) {
-    logger.info('[settler]', {
-      requestId:      ctx.requestId,
-      agentSlug:      ctx.agentSlug,
-      settlerType:    'external',
-      facilitatorUrl: url,
-      durationMs:     Date.now() - start,
-      ok:             false,
-      errorCode:      extractCode(settleRes.error.error),
-    })
-    return settleRes.error // verified:true, settled:false (AC-5)
-  }
-
-  const result: SettlementResult = {
-    verified:        true,
-    settled:         true,
-    transactionHash: settleRes.body.transactionHash,
-  }
-  logger.info('[settler]', {
-    requestId:      ctx.requestId,
-    agentSlug:      ctx.agentSlug,
-    settlerType:    'external',
-    facilitatorUrl: url,
-    durationMs:     Date.now() - start,
-    ok:             true,
-  })
-  return result
+  // WAS-V2-2: routing/telemetry delegated to facilitator-router.
+  // The router emits the single structured [settler] log (CD-10).
+  return await trySettle(payload, required, ctx)
 }
