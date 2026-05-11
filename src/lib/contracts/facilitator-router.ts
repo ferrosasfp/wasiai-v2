@@ -269,6 +269,10 @@ export async function trySettle(
   }
 
   // CASE C-fail — fall back to UVD (or internal if no UVD URL).
+  // BLQ-MED-1: do NOT propagate the wasiai AbortSignal to the UVD branch.
+  // After a wasiai timeout the signal is already aborted; reusing it would
+  // cause UVD's fetch to abort immediately, defeating the fallback.
+  // runUvdOrInternal mints a fresh AbortSignal.timeout(30_000) per call.
   return await runUvdOrInternal({
     payload,
     required,
@@ -279,7 +283,6 @@ export async function trySettle(
     fallbackReason: wasiaiAttempt.reason,
     wasiaiOutcome: 'fail',
     wasiaiEnvelope: envelope,
-    wasiaiSignal: signal,
   })
 }
 
@@ -296,15 +299,13 @@ interface RunUvdArgs {
   wasiaiOutcome: 'ok' | 'fail' | 'guard' | 'skipped'
   /** Reuse pre-built envelope when falling back from wasiai (avoids rebuild). */
   wasiaiEnvelope?: X402V2Envelope
-  /** Reuse pre-built abort signal when falling back from wasiai. */
-  wasiaiSignal?: AbortSignal
 }
 
 async function runUvdOrInternal(args: RunUvdArgs): Promise<SettlementResult> {
   const {
     payload, required, ctx, uvdUrl, start,
     fallbackTriggered, fallbackReason, wasiaiOutcome,
-    wasiaiEnvelope, wasiaiSignal,
+    wasiaiEnvelope,
   } = args
 
   let attempt: SettleAttempt
@@ -316,7 +317,10 @@ async function runUvdOrInternal(args: RunUvdArgs): Promise<SettlementResult> {
   } else {
     facilitatorUsed = 'ultravioleta'
     const envelope = wasiaiEnvelope ?? buildX402V2Envelope(payload, ctx)
-    const signal = wasiaiSignal ?? AbortSignal.timeout(30_000)
+    // BLQ-MED-1: ALWAYS mint a fresh signal for UVD. Reusing the wasiai signal
+    // is unsafe — if wasiai timed out, the signal is already aborted and
+    // UVD's fetch would abort immediately, breaking the fallback path.
+    const signal = AbortSignal.timeout(30_000)
     attempt = await tryExternal(envelope, uvdUrl, signal)
   }
 

@@ -708,6 +708,77 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     expect(settlerCalls).toHaveLength(1)
   })
 
+  // ─── BLQ-MED-1: UVD must receive a FRESH AbortSignal (not wasiai's) ─────
+
+  it('BLQ-MED-1: wasiai timeout (aborted signal) does NOT propagate to UVD — UVD gets a fresh, non-aborted signal', async () => {
+    vi.useFakeTimers()
+    try {
+      const config = await import('@/lib/contracts/x402-facilitator-config')
+      ;(config.isWasiaiFacilitatorPrimary as ReturnType<typeof vi.fn>).mockReturnValue(true)
+      ;(config.getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue('https://uvd.test')
+
+      const client = await import('@/lib/contracts/x402-facilitator-client')
+
+      // wasiai verifyExternal: simulate a timeout by waiting until the signal
+      // aborts (mirrors real-world fetch behavior under AbortSignal.timeout).
+      ;(client.verifyExternal as ReturnType<typeof vi.fn>).mockImplementationOnce(
+        async (_env: unknown, _url: string, signal: AbortSignal) => {
+          // Resolve once the signal aborts — emulates `await fetch(url, { signal })`
+          // throwing AbortError, which the client maps to CHAIN_UNAVAILABLE.
+          await new Promise<void>((resolve) => {
+            if (signal.aborted) return resolve()
+            signal.addEventListener('abort', () => resolve(), { once: true })
+          })
+          return {
+            ok: false,
+            error: {
+              verified: false,
+              settled: false,
+              error: 'CHAIN_UNAVAILABLE: facilitator unreachable',
+            },
+          }
+        },
+      )
+      // UVD verifyExternal: captures its signal and resolves immediately so
+      // we can assert the signal is fresh and NOT aborted at call time.
+      let uvdReceivedSignal: AbortSignal | undefined
+      ;(client.verifyExternal as ReturnType<typeof vi.fn>).mockImplementationOnce(
+        async (_env: unknown, url: string, signal: AbortSignal) => {
+          uvdReceivedSignal = signal
+          expect(url).toBe('https://uvd.test')
+          expect(signal.aborted).toBe(false)
+          return { ok: true, body: { verified: true } }
+        },
+      )
+      ;(client.settleExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true, body: { settled: true, transactionHash: '0xUVD_AFTER_WASIAI_TIMEOUT' },
+      })
+
+      const { trySettle } = await import('@/lib/contracts/facilitator-router')
+      const promise = trySettle(livePayload, '1000', ctx)
+
+      // Advance past the wasiai 30s timeout so its AbortSignal fires.
+      await vi.advanceTimersByTimeAsync(30_001)
+
+      const r = await promise
+
+      // UVD recovered the payment after wasiai timed out.
+      expect(r.transactionHash).toBe('0xUVD_AFTER_WASIAI_TIMEOUT')
+      // UVD verifyExternal was called with a signal — and that signal is a
+      // different instance from any timed-out wasiai signal (BLQ-MED-1).
+      expect(uvdReceivedSignal).toBeDefined()
+      // Capture wasiai's signal from the first call to prove it's a different
+      // instance from UVD's (i.e. NOT shared).
+      const wasiaiCall = (client.verifyExternal as ReturnType<typeof vi.fn>).mock.calls[0]
+      const wasiaiSignal = wasiaiCall[2] as AbortSignal
+      expect(uvdReceivedSignal).not.toBe(wasiaiSignal)
+      // wasiai's signal is aborted (timeout fired); UVD's must still be live.
+      expect(wasiaiSignal.aborted).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // ─── CD-11 sanity: envelope is built ONCE via buildX402V2Envelope ───────
 
   it('CD-11: router does not mutate or spread envelope keys (delegates to buildX402V2Envelope)', async () => {
