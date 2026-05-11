@@ -58,7 +58,7 @@
 - Status: success
 - Snowtrace: https://testnet.snowtrace.io/tx/0xc6468a87e2f1b1e16d80829c947a9570a0735ff1cc140dcd9b7ca68b6247e1de
 
-### Phase 2 smoke (post-flip, env vars active)
+### Phase 2 smoke (post-flip, env vars active) — synthetic
 - Tx: `0x5ecd1221a71721d52ffac063b04ce2b1cd255377d7c0ca4893d400ae9c9a9d20`
 - Block: 55252065 Avalanche Fuji
 - Amount: 0.001 USDC
@@ -66,6 +66,35 @@
 - Latency: 6.5s (within 30s timeout)
 - Signer: `0xf432baf1315ccdb23e683b95b03fd54dd3e447ba` (operator, gasless pattern validated)
 - Snowtrace: https://testnet.snowtrace.io/tx/0x5ecd1221a71721d52ffac063b04ce2b1cd255377d7c0ca4893d400ae9c9a9d20
+
+### Phase 3 — REAL MARKETPLACE TX (post-flip, mainnet) ⭐ DEFINITIVE EVIDENCE
+Real user-initiated agent inference through wasiai-v2 marketplace UI after the flip.
+
+- Tx: `0xf94d4005e66b65ec6e34aa72b8b88966332f47859bb2038fb3f3d19ca04f614e`
+- Block: **85180214 Avalanche MAINNET (43114)** — NOT testnet
+- Method: `0xe3ee160e` = `transferWithAuthorization` (EIP-3009)
+- Status: success
+- Gas used: 85,708
+- **Signer (gas payer): `0xf432baf1315ccdb23e683b95b03fd54dd3e447ba`** ← OUR wasiai-facilitator operator
+- USDC sender: `0xEbC2C4D6b893C2e0709474746612bd182eFa6523` (demo wallet)
+- USDC recipient: `0x9316E902760f2c37CDA57C8Be01358D890a26276` (agent)
+- Amount: 0.001014 USDC mainnet (real money)
+- Snowtrace: https://snowtrace.io/tx/0xf94d4005e66b65ec6e34aa72b8b88966332f47859bb2038fb3f3d19ca04f614e
+
+### Comparison: pre-flip vs post-flip real marketplace tx
+Same user, same demo wallet, same agent recipient, different facilitator:
+
+| Field | Pre-flip (`0x5fbf570b...`) | Post-flip (`0xf94d4005...`) |
+|-------|---------------------------|------------------------------|
+| Block | 85172275 | 85180214 |
+| Chain | Avalanche mainnet 43114 | Avalanche mainnet 43114 |
+| Gas payer | `0x46140a86...` (Ultravioleta DAO) | `0xf432baf1...` (**our operator**) |
+| USDC sender (client) | `0xEbC2C4D6...` | `0xEbC2C4D6...` (same) |
+| USDC recipient | `0x9316E902...` | `0x9316E902...` (same) |
+| Amount | 0.001029 USDC | 0.001014 USDC |
+| Snowtrace | https://snowtrace.io/tx/0x5fbf570bbc64d477586bb7aeaa71d5e6a1b4f6c540419172ec5b43f2e77733f2 | https://snowtrace.io/tx/0xf94d4005e66b65ec6e34aa72b8b88966332f47859bb2038fb3f3d19ca04f614e |
+
+**The only difference between these two transactions is PR #6 merged and the env var flip.** This proves operational sovereignty achieved on mainnet, verifiable in snowtrace.io.
 
 ---
 
