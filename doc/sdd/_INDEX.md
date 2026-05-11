@@ -72,3 +72,4 @@
 | 070 | 2026-03-11 | HU-070 | Auth Guard: Proteger acceso directo a páginas de Creador (/pipelines, etc) | feature | QUALITY | F2 | feat/070-public-private-routes |
 | V2-1 | 2026-04-24 | WAS-V2-1 | External Facilitator Opt-in — x402 settle via wasiai-facilitator (env flag) | refactor | QUALITY | DONE | feat/was-v2-1-external-facilitator-optin |
 | 072 | 2026-04-28 | WKH-66 | v2 thin-proxy refactor — delegate compose/orchestrate/capabilities/mcp to wasiai-a2a | refactor | QUALITY | DONE | feat/072-wkh-66-v2-thin-proxy ([done-report.md](072-wkh-66-v2-thin-proxy/done-report.md)) |
+| 073 | 2026-05-11 | WAS-V2-2 | wasiai-facilitator as primary x402 settler, Ultravioleta DAO as fallback | refactor | QUALITY | DONE | feat/was-v2-2-wasiai-facilitator-primary ([done-report.md](073-was-v2-2-wasiai-facilitator-primary/done-report.md)) |
