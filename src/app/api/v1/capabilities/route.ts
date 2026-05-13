@@ -118,7 +118,7 @@ async function legacyCapabilities(request: NextRequest): Promise<NextResponse> {
 
   let query = supabase
     .from('agents')
-    .select('id, slug, name, description, category, tags, price_per_call, input_schema, output_schema, reputation_score, total_calls, creator_wallet, created_at')
+    .select('id, slug, name, description, category, tags, price_per_call, input_schema, output_schema, reputation_score, total_calls, creator_wallet, created_at, chain, currency')
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
@@ -178,8 +178,11 @@ async function legacyCapabilities(request: NextRequest): Promise<NextResponse> {
     },
     payment: {
       method:   'x402',
-      asset:    'USDC',
-      chain:    CHAIN_NAME,
+      // WKH-AGENTSHOP-1: prefer per-row chain/currency, fallback to env default.
+      // Allows agents on non-Avalanche chains (e.g. Kite Ozone PYUSD) to be
+      // exposed truthfully in /discover instead of being misrepresented as USDC/avalanche.
+      asset:    (a as Record<string, unknown>).currency as string | undefined ?? 'USDC',
+      chain:    (a as Record<string, unknown>).chain as string | undefined ?? CHAIN_NAME,
       contract: contractAddress,
     },
   }))
