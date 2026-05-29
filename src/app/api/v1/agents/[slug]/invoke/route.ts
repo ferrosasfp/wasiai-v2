@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { handleInvoke } from '@/lib/invoke/handleInvoke'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -61,41 +62,26 @@ export async function POST(
     )
   }
 
-  // Forward the request to the canonical /api/v1/models/[slug]/invoke
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000').trim().replace(/\/$/, '')
-  const invokeUrl = `${siteUrl}/api/v1/models/${encodeURIComponent(slug)}/invoke`
+  // H-5 (WKH-AUDIT-V2): resolver in-process — sin self-call HTTP ni NEXT_PUBLIC_SITE_URL.
+  // handleInvoke autentica leyendo x-agent-key; aquí la key viene en X-API-Key, así que
+  // se clona el request agregando ese header antes de delegar.
+  const fwdHeaders = new Headers(request.headers)
+  fwdHeaders.set('x-agent-key', apiKey)
+  const clonedBody = await request.clone().text()
+  const fwdRequest = new NextRequest(request.url, {
+    method: 'POST',
+    headers: fwdHeaders,
+    body: clonedBody || '{}',
+  })
 
-  let body: string
-  try {
-    body = await request.text()
-  } catch {
-    body = '{}'
-  }
+  const res = await handleInvoke(fwdRequest, slug)
 
-  let upstream: Response
-  try {
-    upstream = await fetch(invokeUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-agent-key':  apiKey,
-      },
-      body: body || '{}',
-      signal: AbortSignal.timeout(30_000),
-    })
-  } catch {
-    return NextResponse.json(
-      { error: 'invoke_proxy_error', message: 'Failed to reach invoke endpoint' },
-      { status: 502, headers: CORS },
-    )
-  }
-
-  const responseText = await upstream.text()
-
-  return new NextResponse(responseText, {
-    status: upstream.status,
+  // Re-emitir respuesta con CORS (mismo shape que hoy)
+  const text = await res.text()
+  return new NextResponse(text, {
+    status: res.status,
     headers: {
-      'Content-Type': upstream.headers.get('Content-Type') ?? 'application/json',
+      'Content-Type': res.headers.get('Content-Type') ?? 'application/json',
       ...CORS,
     },
   })

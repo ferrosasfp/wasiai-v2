@@ -1,24 +1,25 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { headers } from 'next/headers'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 
-const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '').toLowerCase()
-const OWNER_ADDRESS    = (process.env.NEXT_PUBLIC_WASIAI_OWNER ?? '').toLowerCase()
-const ADMIN_WALLETS = [
-  OPERATOR_ADDRESS,
-  OWNER_ADDRESS,
-  '0x94DCDb84207724A609B17e4838936832EA59B9eD'.toLowerCase(),
-  '0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba'.toLowerCase(),
-].filter(Boolean)
+async function verifyAuth(request: NextRequest, action: string) {
+  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr    = request.headers.get('x-admin-timestamp')
+
+  if (!sig || !nonceHdr || !tsHdr) return { ok: false, status: 401, reason: 'Missing admin auth headers' }
+
+  const message: AdminActionMessage = { action, nonce: nonceHdr, timestamp: BigInt(tsHdr) }
+  const { ok, reason } = await verifyAdminSignature(sig, message)
+  return ok ? { ok: true } : { ok: false, status: 401, reason }
+}
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
-  const h = await headers()
-  const wallet = (h.get('x-admin-wallet') ?? '').toLowerCase()
-  if (!wallet || !ADMIN_WALLETS.includes(wallet)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request, 'listAgents')
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status })
+
   const supabase = createServiceClient()
   const { data: agents, error } = await supabase
     .from('agents')

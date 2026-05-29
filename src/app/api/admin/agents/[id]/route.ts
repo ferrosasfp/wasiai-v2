@@ -1,37 +1,44 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { headers } from 'next/headers'
+import { z } from 'zod'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 
-const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '').toLowerCase()
-const OWNER_ADDRESS    = (process.env.NEXT_PUBLIC_WASIAI_OWNER ?? '').toLowerCase()
-const ADMIN_WALLETS = [
-  OPERATOR_ADDRESS,
-  OWNER_ADDRESS,
-  '0x94DCDb84207724A609B17e4838936832EA59B9eD'.toLowerCase(),
-  '0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba'.toLowerCase(),
-].filter(Boolean)
+async function verifyAuth(request: NextRequest, action: string) {
+  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr    = request.headers.get('x-admin-timestamp')
+
+  if (!sig || !nonceHdr || !tsHdr) return { ok: false, status: 401, reason: 'Missing admin auth headers' }
+
+  const message: AdminActionMessage = { action, nonce: nonceHdr, timestamp: BigInt(tsHdr) }
+  const { ok, reason } = await verifyAdminSignature(sig, message)
+  return ok ? { ok: true } : { ok: false, status: 401, reason }
+}
+
+const patchSchema = z.object({
+  status:               z.enum(['active', 'reviewing', 'draft', 'suspended']).optional(),
+  consecutive_failures: z.number().int().optional(),
+}).strict()
 
 export const dynamic = 'force-dynamic'
 
 /** PATCH /api/admin/agents/:id — update agent status */
 export async function PATCH(
-  req: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const h = await headers()
-  const wallet = (h.get('x-admin-wallet') ?? '').toLowerCase()
-  if (!wallet || !ADMIN_WALLETS.includes(wallet)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await verifyAuth(request, 'updateAgent')
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status })
 
   const { id } = await params
   const supabase = createServiceClient()
-  const body = await req.json() as { status?: string; consecutive_failures?: number }
 
-  const allowed = ['active', 'reviewing', 'draft', 'suspended']
-  if (body.status && !allowed.includes(body.status)) {
-    return NextResponse.json({ error: `Invalid status. Allowed: ${allowed.join(', ')}` }, { status: 400 })
+  const raw = await request.json().catch(() => null)
+  const parsed = patchSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid body', detail: parsed.error.flatten() }, { status: 400 })
   }
+  const body = parsed.data
 
   const update: Record<string, unknown> = {}
   if (body.status !== undefined) update.status = body.status

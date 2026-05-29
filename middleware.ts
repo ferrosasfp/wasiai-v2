@@ -64,7 +64,8 @@ export async function middleware(request: NextRequest) {
   const routePathname = request.nextUrl.pathname
   const locale = extractLocaleFromPath(routePathname) ?? routing.defaultLocale
   const pathWithoutLocale = stripLocale(routePathname, locale)
-  console.log('[Middleware Run] Path:', routePathname, 'strip:', pathWithoutLocale, 'hasUser:', !!user)
+  const isDev = process.env.NODE_ENV === 'development'
+  if (isDev) console.log('[Middleware Run] Path:', routePathname, 'strip:', pathWithoutLocale, 'hasUser:', !!user)
 
   // WAS-139: /creator/[username] es público — solo proteger rutas de gestión
   const isProtectedRoute =
@@ -72,7 +73,8 @@ export async function middleware(request: NextRequest) {
     routePathname.includes('/creator/agents') ||
     routePathname.includes('/publish') ||
     routePathname.includes('/agent-keys') ||
-    routePathname.includes('/pipelines')
+    routePathname.includes('/pipelines') ||
+    routePathname.includes('/admin')
 
   const isAuthRoute = pathWithoutLocale.startsWith('/login') ||
     pathWithoutLocale.startsWith('/signup')
@@ -103,7 +105,6 @@ export async function middleware(request: NextRequest) {
   // Usa Web Crypto API (disponible en Edge Runtime — no depende de Node.js crypto)
   const nonceBytes = crypto.getRandomValues(new Uint8Array(16))
   const nonce = btoa(String.fromCharCode(...Array.from(nonceBytes)))
-  const isDev = process.env.NODE_ENV === 'development'
 
   const csp = [
     "default-src 'self'",

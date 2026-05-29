@@ -7,7 +7,7 @@ const withNextIntl = createNextIntlPlugin()
 const cspDirectives = [
   "default-src 'self'",
   // Next.js requires unsafe-inline for styles and inline scripts in pages
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live",
+  "script-src 'self' https://vercel.live",
   "style-src 'self' 'unsafe-inline'",
   // Supabase, Avalanche RPCs, Sentry, WalletConnect, IPFS gateways
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.avalanche.network https://*.avax.network https://api.avax.network https://api.avax-test.network https://*.sentry.io https://*.walletconnect.com wss://*.walletconnect.com https://explorer-api.walletconnect.com https://*.mypinata.cloud https://gateway.pinata.cloud",
