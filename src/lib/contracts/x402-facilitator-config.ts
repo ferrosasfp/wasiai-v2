@@ -74,6 +74,11 @@ let wasiaiPrimaryCached: boolean | undefined = undefined
 let wasiaiPrimaryWarnedOnce = false
 let wasiaiUrlCached: string | undefined = undefined
 let wasiaiUrlWarnedOnce = false
+// WAS-V2-INT: tri-state cache for the wasiai-facilitator API key.
+//   undefined → not yet read
+//   null      → unset OR empty (graceful — header simply not sent)
+//   string    → trimmed, non-empty key
+let wasiaiApiKeyCached: string | null | undefined = undefined
 
 /**
  * Reads WASIAI_FACILITATOR_AS_PRIMARY env var. Returns true ONLY when
@@ -143,6 +148,29 @@ export function getWasiaiFacilitatorUrl(): string {
   }
 }
 
+/**
+ * WAS-V2-INT: Reads FACILITATOR_API_KEY env var (shared bearer token expected
+ * by wasiai-facilitator on /verify + /settle).
+ *
+ * Returns null when unset OR empty (graceful — caller omits the Authorization
+ * header). Returns the trimmed key otherwise. Never throws, never reads at
+ * module level (lazy), mirroring getFacilitatorUrl's tri-state pattern.
+ *
+ * SECURITY: this key is sent ONLY to the wasiai-facilitator branch (CASE C in
+ * facilitator-router). It MUST NEVER be threaded into the UVD branch
+ * (getFacilitatorUrl) nor the internal direct path — UVD is a third-party.
+ */
+export function getWasiaiFacilitatorApiKey(): string | null {
+  if (wasiaiApiKeyCached !== undefined) return wasiaiApiKeyCached
+  const raw = process.env.FACILITATOR_API_KEY?.trim()
+  if (!raw) {
+    wasiaiApiKeyCached = null
+    return null
+  }
+  wasiaiApiKeyCached = raw
+  return wasiaiApiKeyCached
+}
+
 /** Test-only — reset cache between tests. NOT exported in barrel/index. */
 export function __resetFacilitatorUrlCacheForTesting(): void {
   cached = undefined
@@ -152,4 +180,6 @@ export function __resetFacilitatorUrlCacheForTesting(): void {
   wasiaiPrimaryWarnedOnce = false
   wasiaiUrlCached = undefined
   wasiaiUrlWarnedOnce = false
+  // WAS-V2-INT: reset the API key cache too.
+  wasiaiApiKeyCached = undefined
 }

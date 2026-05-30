@@ -161,12 +161,20 @@ async function postJson<T>(
   envelope: X402V2Envelope,
   signal: AbortSignal,
   phase: 'verify' | 'settle',
+  apiKey?: string,
 ): Promise<ExternalResult<T>> {
+  // WAS-V2-INT: DI'd by the caller. The router threads this ONLY for the
+  // wasiai-facilitator branch — never for UVD (third-party) nor internal.
+  // When absent, no Authorization header is sent (graceful).
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`
+  }
   let res: Response
   try {
     res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(envelope),
       signal,
     })
@@ -232,14 +240,16 @@ export function verifyExternal(
   envelope: X402V2Envelope,
   facilitatorUrl: string,
   signal: AbortSignal,
+  apiKey?: string,
 ): Promise<ExternalResult<VerifyResponseOk>> {
-  return postJson<VerifyResponseOk>(`${facilitatorUrl}/verify`, envelope, signal, 'verify')
+  return postJson<VerifyResponseOk>(`${facilitatorUrl}/verify`, envelope, signal, 'verify', apiKey)
 }
 
 export function settleExternal(
   envelope: X402V2Envelope,
   facilitatorUrl: string,
   signal: AbortSignal,
+  apiKey?: string,
 ): Promise<ExternalResult<SettleResponseOk>> {
-  return postJson<SettleResponseOk>(`${facilitatorUrl}/settle`, envelope, signal, 'settle')
+  return postJson<SettleResponseOk>(`${facilitatorUrl}/settle`, envelope, signal, 'settle', apiKey)
 }

@@ -70,6 +70,16 @@ const envSchema = z.object({
    * Default vacío = legacy mode (AC-13). Ejemplo: "capabilities,compose"
    */
   V2_DELEGATE_TO_A2A: z.string().optional().default(''),
+
+  // ── WAS-V2-INT: bearer token para wasiai-facilitator /verify + /settle ───
+  /**
+   * Shared API key que el wasiai-facilitator exige como
+   * `Authorization: Bearer <FACILITATOR_API_KEY>` en /verify y /settle.
+   * OPCIONAL: si está ausente el cliente NO manda el header (graceful, no
+   * rompe boot ni el path UVD/internal). Se envía SOLO al wasiai-facilitator,
+   * NUNCA a UVD (tercero) ni al settler interno.
+   */
+  FACILITATOR_API_KEY: z.string().optional(),
 }).refine(
   (data) => {
     const delegated = (data.V2_DELEGATE_TO_A2A ?? '').trim()

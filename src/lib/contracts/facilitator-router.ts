@@ -23,6 +23,7 @@ import {
   getFacilitatorUrl,
   isWasiaiFacilitatorPrimary,
   getWasiaiFacilitatorUrl,
+  getWasiaiFacilitatorApiKey,
   WASIAI_CHAIN_ALLOWLIST,
 } from './x402-facilitator-config'
 import {
@@ -120,18 +121,23 @@ function classifyFacilitatorError(result: SettlementResult): SettleAttempt {
  * outcome bucket already classified.
  *
  * CD-11: envelope is passed by reference; no spread, no mutation.
+ *
+ * WAS-V2-INT: `apiKey` is propagated to the client as the Authorization bearer.
+ * It is passed ONLY by the wasiai branch (CASE C). The UVD branch calls this
+ * with apiKey omitted (undefined) so UVD — a third-party — never receives it.
  */
 async function tryExternal(
   envelope: X402V2Envelope,
   url: string,
   signal: AbortSignal,
+  apiKey?: string,
 ): Promise<SettleAttempt> {
-  const verifyRes = await verifyExternal(envelope, url, signal)
+  const verifyRes = await verifyExternal(envelope, url, signal, apiKey)
   if (!verifyRes.ok) {
     return classifyFacilitatorError(verifyRes.error)
   }
 
-  const settleRes = await settleExternal(envelope, url, signal)
+  const settleRes = await settleExternal(envelope, url, signal, apiKey)
   if (!settleRes.ok) {
     return classifyFacilitatorError(settleRes.error)
   }
@@ -229,10 +235,14 @@ export async function trySettle(
 
   // CASE C — try wasiai first.
   const wasiaiUrl = getWasiaiFacilitatorUrl()
+  // WAS-V2-INT: bearer key for the wasiai-facilitator ONLY. null when env unset
+  // (graceful — no header). Threaded exclusively through this wasiai branch;
+  // the UVD branch in runUvdOrInternal never receives it.
+  const wasiaiApiKey = getWasiaiFacilitatorApiKey() ?? undefined
   const envelope = buildX402V2Envelope(payload, ctx)
   const signal = AbortSignal.timeout(30_000)
 
-  const wasiaiAttempt = await tryExternal(envelope, wasiaiUrl, signal)
+  const wasiaiAttempt = await tryExternal(envelope, wasiaiUrl, signal, wasiaiApiKey)
 
   if (wasiaiAttempt.outcome === 'ok') {
     emitLog({
@@ -321,6 +331,9 @@ async function runUvdOrInternal(args: RunUvdArgs): Promise<SettlementResult> {
     // is unsafe — if wasiai timed out, the signal is already aborted and
     // UVD's fetch would abort immediately, breaking the fallback path.
     const signal = AbortSignal.timeout(30_000)
+    // WAS-V2-INT: NO apiKey arg here. UVD is a third-party facilitator and must
+    // NEVER receive FACILITATOR_API_KEY (the wasiai-facilitator bearer). The
+    // 4th param is intentionally omitted → undefined → no Authorization header.
     attempt = await tryExternal(envelope, uvdUrl, signal)
   }
 
