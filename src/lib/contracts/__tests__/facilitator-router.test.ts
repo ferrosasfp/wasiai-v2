@@ -25,6 +25,9 @@ vi.mock('@/lib/contracts/x402-facilitator-config', () => ({
   getFacilitatorUrl:                    vi.fn(),
   isWasiaiFacilitatorPrimary:           vi.fn(),
   getWasiaiFacilitatorUrl:              vi.fn(() => 'https://wasiai.test'),
+  // WAS-V2-INT: default null → wasiai branch threads apiKey=undefined unless a
+  // test overrides this mock. UVD branch never receives any key (separate arg).
+  getWasiaiFacilitatorApiKey:           vi.fn(() => null),
   WASIAI_CHAIN_ALLOWLIST:               new Set([
     'eip155:2366',
     'eip155:2368',
@@ -110,11 +113,12 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     expect(r).toEqual({ verified: true, settled: true, transactionHash: '0xUVD' })
     // wasiai NEVER called → verifyExternal called exactly once (with UVD URL).
     expect(client.verifyExternal).toHaveBeenCalledTimes(1)
+    // WAS-V2-INT: UVD branch calls with apiKey omitted → 4th arg undefined.
     expect(client.verifyExternal).toHaveBeenCalledWith(
-      expect.anything(), 'https://uvd.test', expect.any(AbortSignal),
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
     )
     expect(client.settleExternal).toHaveBeenCalledWith(
-      expect.anything(), 'https://uvd.test', expect.any(AbortSignal),
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
     )
   })
 
@@ -137,7 +141,7 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     expect(r.transactionHash).toBe('0xUVD2')
     expect(client.verifyExternal).toHaveBeenCalledTimes(1)
     expect(client.verifyExternal).toHaveBeenCalledWith(
-      expect.anything(), 'https://uvd.test', expect.any(AbortSignal),
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
     )
   })
 
@@ -162,7 +166,7 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
 
     expect(r.transactionHash).toBe('0xUVD3')
     expect(client.verifyExternal).toHaveBeenCalledWith(
-      expect.anything(), 'https://uvd.test', expect.any(AbortSignal),
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
     )
   })
 
@@ -212,7 +216,7 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     // Router never invokes wasiai when primary === false.
     expect(client.verifyExternal).toHaveBeenCalledTimes(1)
     expect(client.verifyExternal).toHaveBeenCalledWith(
-      expect.anything(), 'https://uvd.test', expect.any(AbortSignal),
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
     )
   })
 
@@ -251,7 +255,7 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
 
     expect(r.transactionHash).toBe('0xWASIAI')
     expect(client.verifyExternal).toHaveBeenNthCalledWith(
-      1, expect.anything(), 'https://wasiai.test', expect.any(AbortSignal),
+      1, expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), undefined,
     )
   })
 
@@ -273,7 +277,7 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
 
     expect(r.transactionHash).toBe('0xWASIAI_MAINNET')
     expect(client.verifyExternal).toHaveBeenNthCalledWith(
-      1, expect.anything(), 'https://wasiai.test', expect.any(AbortSignal),
+      1, expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), undefined,
     )
   })
 
@@ -308,7 +312,7 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     // wasiai NEVER invoked.
     expect(client.verifyExternal).toHaveBeenCalledTimes(1)
     expect(client.verifyExternal).toHaveBeenCalledWith(
-      expect.anything(), 'https://uvd.test', expect.any(AbortSignal),
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
     )
     // debug log for chain bypass.
     expect(logger.debug).toHaveBeenCalledWith(
@@ -341,11 +345,12 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     // Exactly ONE verify + ONE settle call (against wasiai only).
     expect(client.verifyExternal).toHaveBeenCalledTimes(1)
     expect(client.settleExternal).toHaveBeenCalledTimes(1)
+    // WAS-V2-INT: default apiKey mock = null → wasiai branch threads undefined.
     expect(client.verifyExternal).toHaveBeenCalledWith(
-      expect.anything(), 'https://wasiai.test', expect.any(AbortSignal),
+      expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), undefined,
     )
     expect(client.settleExternal).toHaveBeenCalledWith(
-      expect.anything(), 'https://wasiai.test', expect.any(AbortSignal),
+      expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), undefined,
     )
   })
 
@@ -376,10 +381,10 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     expect(r.transactionHash).toBe('0xUVD_RECOVERED')
     expect(client.verifyExternal).toHaveBeenCalledTimes(2)
     expect(client.verifyExternal).toHaveBeenNthCalledWith(
-      1, expect.anything(), 'https://wasiai.test', expect.any(AbortSignal),
+      1, expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), undefined,
     )
     expect(client.verifyExternal).toHaveBeenNthCalledWith(
-      2, expect.anything(), 'https://uvd.test', expect.any(AbortSignal),
+      2, expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
     )
     expect(logger.info).toHaveBeenCalledWith(
       '[settler]',
@@ -802,5 +807,127 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     const envelope = verifyCall[0] as Record<string, unknown>
     expect(Object.keys(envelope)).toEqual(['x402Version', 'resource', 'accepted', 'payload'])
     expect((envelope as { x402Version: number }).x402Version).toBe(2)
+  })
+
+  // ─── WAS-V2-INT: FACILITATOR_API_KEY threading (wasiai ONLY, never UVD) ──
+
+  it('AC-1: when FACILITATOR_API_KEY set, wasiai verify+settle receive it as 4th arg', async () => {
+    const config = await import('@/lib/contracts/x402-facilitator-config')
+    ;(config.isWasiaiFacilitatorPrimary as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    ;(config.getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue('https://uvd.test')
+    ;(config.getWasiaiFacilitatorApiKey as ReturnType<typeof vi.fn>).mockReturnValue('sk-wasiai-key')
+
+    const client = await import('@/lib/contracts/x402-facilitator-client')
+    ;(client.verifyExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, body: { verified: true },
+    })
+    ;(client.settleExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, body: { settled: true, transactionHash: '0xWASIAI_AUTH' },
+    })
+
+    const { trySettle } = await import('@/lib/contracts/facilitator-router')
+    await trySettle(livePayload, '1000', ctx)
+
+    // wasiai branch threads the key as the 4th positional arg.
+    expect(client.verifyExternal).toHaveBeenCalledWith(
+      expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), 'sk-wasiai-key',
+    )
+    expect(client.settleExternal).toHaveBeenCalledWith(
+      expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), 'sk-wasiai-key',
+    )
+  })
+
+  it('AC-1 CRITICAL: on fallback, UVD NEVER receives FACILITATOR_API_KEY (4th arg undefined)', async () => {
+    const config = await import('@/lib/contracts/x402-facilitator-config')
+    ;(config.isWasiaiFacilitatorPrimary as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    ;(config.getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue('https://uvd.test')
+    ;(config.getWasiaiFacilitatorApiKey as ReturnType<typeof vi.fn>).mockReturnValue('sk-wasiai-key')
+
+    const client = await import('@/lib/contracts/x402-facilitator-client')
+    // wasiai verify fails (5xx) → fallback to UVD.
+    ;(client.verifyExternal as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { verified: false, settled: false, error: 'SIMULATION_FAILED: boom' },
+      })
+      .mockResolvedValueOnce({ ok: true, body: { verified: true } })
+    ;(client.settleExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, body: { settled: true, transactionHash: '0xUVD_NO_AUTH' },
+    })
+
+    const { trySettle } = await import('@/lib/contracts/facilitator-router')
+    const r = await trySettle(livePayload, '1000', ctx)
+
+    expect(r.transactionHash).toBe('0xUVD_NO_AUTH')
+    // wasiai (1st verify call) got the key.
+    expect((client.verifyExternal as ReturnType<typeof vi.fn>).mock.calls[0]).toEqual([
+      expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), 'sk-wasiai-key',
+    ])
+    // UVD (2nd verify call) did NOT — key MUST be undefined for the third-party.
+    expect((client.verifyExternal as ReturnType<typeof vi.fn>).mock.calls[1]).toEqual([
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
+    ])
+    // UVD settle also never receives the key.
+    expect(client.settleExternal).toHaveBeenCalledWith(
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
+    )
+    // The key string must NEVER appear in any UVD-targeted call.
+    const uvdCalls = [
+      ...(client.verifyExternal as ReturnType<typeof vi.fn>).mock.calls,
+      ...(client.settleExternal as ReturnType<typeof vi.fn>).mock.calls,
+    ].filter((c) => c[1] === 'https://uvd.test')
+    for (const c of uvdCalls) {
+      expect(c[3]).toBeUndefined()
+    }
+  })
+
+  it('AC-1: toggle OFF (UVD-exclusive) NEVER passes the key even when env is set', async () => {
+    const config = await import('@/lib/contracts/x402-facilitator-config')
+    ;(config.isWasiaiFacilitatorPrimary as ReturnType<typeof vi.fn>).mockReturnValue(false)
+    ;(config.getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue('https://uvd.test')
+    ;(config.getWasiaiFacilitatorApiKey as ReturnType<typeof vi.fn>).mockReturnValue('sk-wasiai-key')
+
+    const client = await import('@/lib/contracts/x402-facilitator-client')
+    ;(client.verifyExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, body: { verified: true },
+    })
+    ;(client.settleExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, body: { settled: true, transactionHash: '0xUVD_TOGGLE_OFF' },
+    })
+
+    const { trySettle } = await import('@/lib/contracts/facilitator-router')
+    await trySettle(livePayload, '1000', ctx)
+
+    // getWasiaiFacilitatorApiKey is not even consulted on the UVD-exclusive path,
+    // and UVD calls carry undefined as the 4th arg.
+    expect(client.verifyExternal).toHaveBeenCalledWith(
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
+    )
+    expect(client.settleExternal).toHaveBeenCalledWith(
+      expect.anything(), 'https://uvd.test', expect.any(AbortSignal), undefined,
+    )
+  })
+
+  it('AC-2: FACILITATOR_API_KEY unset (null) → wasiai 4th arg undefined (no header)', async () => {
+    const config = await import('@/lib/contracts/x402-facilitator-config')
+    ;(config.isWasiaiFacilitatorPrimary as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    ;(config.getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue('https://uvd.test')
+    ;(config.getWasiaiFacilitatorApiKey as ReturnType<typeof vi.fn>).mockReturnValue(null)
+
+    const client = await import('@/lib/contracts/x402-facilitator-client')
+    ;(client.verifyExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, body: { verified: true },
+    })
+    ;(client.settleExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, body: { settled: true, transactionHash: '0xWASIAI_NO_KEY' },
+    })
+
+    const { trySettle } = await import('@/lib/contracts/facilitator-router')
+    await trySettle(livePayload, '1000', ctx)
+
+    // null ?? undefined → undefined threaded to wasiai (graceful, no header).
+    expect(client.verifyExternal).toHaveBeenCalledWith(
+      expect.anything(), 'https://wasiai.test', expect.any(AbortSignal), undefined,
+    )
   })
 })

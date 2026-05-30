@@ -144,3 +144,45 @@ describe('getWasiaiFacilitatorUrl — WAS-V2-2 W0', () => {
     expect(logger.warn).toHaveBeenCalledTimes(1)
   })
 })
+
+// ─── WAS-V2-INT — getWasiaiFacilitatorApiKey ─────────────────────────────────
+
+describe('getWasiaiFacilitatorApiKey — WAS-V2-INT', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    delete process.env.FACILITATOR_API_KEY
+  })
+
+  it('AC-2: returns null when env var unset (graceful — no header)', async () => {
+    const { getWasiaiFacilitatorApiKey } = await import('@/lib/contracts/x402-facilitator-config')
+    expect(getWasiaiFacilitatorApiKey()).toBeNull()
+  })
+
+  it('AC-2: returns null when env var is empty/whitespace', async () => {
+    process.env.FACILITATOR_API_KEY = '   '
+    const { getWasiaiFacilitatorApiKey } = await import('@/lib/contracts/x402-facilitator-config')
+    expect(getWasiaiFacilitatorApiKey()).toBeNull()
+  })
+
+  it('AC-3: returns trimmed key when env var set', async () => {
+    process.env.FACILITATOR_API_KEY = '  sk-secret-123  '
+    const { getWasiaiFacilitatorApiKey } = await import('@/lib/contracts/x402-facilitator-config')
+    expect(getWasiaiFacilitatorApiKey()).toBe('sk-secret-123')
+  })
+
+  it('AC-3: caches result across calls (no re-read of env)', async () => {
+    process.env.FACILITATOR_API_KEY = 'first-key'
+    const { getWasiaiFacilitatorApiKey } = await import('@/lib/contracts/x402-facilitator-config')
+    const a = getWasiaiFacilitatorApiKey()
+    process.env.FACILITATOR_API_KEY = 'second-key' // mutate after first call
+    const b = getWasiaiFacilitatorApiKey()
+    expect(a).toBe('first-key')
+    expect(b).toBe('first-key') // cached
+  })
+
+  it('AC-3: never throws (no module-level read)', async () => {
+    const mod = await import('@/lib/contracts/x402-facilitator-config')
+    expect(() => mod.getWasiaiFacilitatorApiKey()).not.toThrow()
+  })
+})

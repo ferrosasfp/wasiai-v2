@@ -231,3 +231,69 @@ describe('settleExternal — fetch behavior', () => {
     expect(call[0]).toBe('https://fac.test/settle')
   })
 })
+
+// ─── WAS-V2-INT — Authorization Bearer header threading ──────────────────────
+
+describe('Authorization header (WAS-V2-INT)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function headersOf(): Record<string, string> {
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    const init = call[1] as RequestInit
+    return init.headers as Record<string, string>
+  }
+
+  it('AC-1: verifyExternal sends Authorization: Bearer <key> when apiKey provided', async () => {
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, status: 200, json: async () => ({ verified: true }),
+    } as unknown as Response)
+    const env = buildX402V2Envelope(payload, ctx)
+    await verifyExternal(env, 'https://wasiai.test', AbortSignal.timeout(1000), 'sk-secret')
+    const headers = headersOf()
+    expect(headers['Authorization']).toBe('Bearer sk-secret')
+    expect(headers['Content-Type']).toBe('application/json')
+  })
+
+  it('AC-1: settleExternal sends Authorization: Bearer <key> when apiKey provided', async () => {
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, status: 200, json: async () => ({ settled: true, transactionHash: '0xabc' }),
+    } as unknown as Response)
+    const env = buildX402V2Envelope(payload, ctx)
+    await settleExternal(env, 'https://wasiai.test', AbortSignal.timeout(1000), 'sk-secret')
+    expect(headersOf()['Authorization']).toBe('Bearer sk-secret')
+  })
+
+  it('AC-2: verifyExternal does NOT send Authorization when apiKey omitted', async () => {
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, status: 200, json: async () => ({ verified: true }),
+    } as unknown as Response)
+    const env = buildX402V2Envelope(payload, ctx)
+    await verifyExternal(env, 'https://uvd.test', AbortSignal.timeout(1000))
+    const headers = headersOf()
+    expect('Authorization' in headers).toBe(false)
+    expect(headers['Content-Type']).toBe('application/json')
+  })
+
+  it('AC-2: settleExternal does NOT send Authorization when apiKey omitted (UVD path)', async () => {
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, status: 200, json: async () => ({ settled: true, transactionHash: '0xabc' }),
+    } as unknown as Response)
+    const env = buildX402V2Envelope(payload, ctx)
+    await settleExternal(env, 'https://uvd.test', AbortSignal.timeout(1000))
+    expect('Authorization' in headersOf()).toBe(false)
+  })
+
+  it('AC-2: empty-string apiKey is treated as absent (no header)', async () => {
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, status: 200, json: async () => ({ verified: true }),
+    } as unknown as Response)
+    const env = buildX402V2Envelope(payload, ctx)
+    await verifyExternal(env, 'https://uvd.test', AbortSignal.timeout(1000), '')
+    expect('Authorization' in headersOf()).toBe(false)
+  })
+})
