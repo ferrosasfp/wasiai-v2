@@ -640,7 +640,7 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   let data: unknown
   let status: 'success' | 'error' = 'success'
   // WAS-284: hint para mapear el error del upstream al HTTP status correcto en buildResponse
-  let httpStatusHint: 502 | 503 | 504 | undefined = undefined
+  let httpStatusHint: 422 | 502 | 503 | 504 | undefined = undefined
 
   try {
     const upstream = await wrapWithCircuitBreaker(
@@ -667,11 +667,32 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
       },
       model.user_id as string
     )
-    data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
-    if (!upstream.ok) {
+    if (upstream.ok) {
+      data = await upstream.json()
+    } else {
       status = 'error'
-      // WAS-284: 4xx no lanza — se detecta aquí, después del wrapper
-      httpStatusHint = 502  // client error del upstream → Bad Gateway
+      // a3: un 4xx del upstream es un error de INPUT del caller (ej. el agente
+      // rechaza el body por validación), NO un Bad Gateway. Lo propagamos como
+      // 422 con el detalle real del agente (no enmascarado como 502), para que
+      // el caller sepa QUÉ corregir. 5xx del upstream sí es 502 (el wrapper ya
+      // lanza para >=500, así que acá normalmente es 4xx).
+      let detail: unknown
+      try {
+        detail = await upstream.json()
+      } catch {
+        try {
+          detail = (await upstream.text()).slice(0, 300)
+        } catch {
+          /* body ilegible */
+        }
+      }
+      data = {
+        error: `Upstream ${upstream.status}`,
+        upstream_status: upstream.status,
+        ...(detail !== undefined ? { detail } : {}),
+      }
+      httpStatusHint =
+        upstream.status >= 400 && upstream.status < 500 ? 422 : 502
     }
   } catch (err) {
     status = 'error'
