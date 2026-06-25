@@ -15,6 +15,7 @@ import { privateKeyToAccount }            from 'viem/accounts'
 import { avalancheFuji, avalanche }       from 'viem/chains'
 import { randomBytes }                    from 'crypto'
 import { getKeysLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
+import { toAtomic, fromAtomic }            from '@/lib/money/usdc'
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrf(req)
@@ -41,13 +42,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No wallet_address configured for this creator' }, { status: 400 })
   }
 
-  const pendingUsdc = Number(profile.pending_earnings_usdc ?? 0)
-  if (pendingUsdc <= 0) {
+  // V4 (KEY_BALANCE_MISMATCH): derivar el monto atómico directo del valor canónico de DB
+  // (numeric(20,6), llega como string) vía toAtomic, sin round-trip por float. Math.round(
+  // pendingUsdc * 1e6) podía diferir 1 unidad si pendingUsdc venía de sumas float.
+  const pendingRaw    = profile.pending_earnings_usdc ?? 0
+  const grossAtomicBn = toAtomic(pendingRaw as string | number)
+  if (grossAtomicBn <= 0n) {
     return NextResponse.json({ error: 'No pending earnings to claim' }, { status: 400 })
   }
 
-  // 3. Compute grossAmountAtomics (6 decimals)
-  const grossAmountAtomics = Math.round(pendingUsdc * 1_000_000)
+  // 3. Compute grossAmountAtomics (6 decimals) — number es exacto (cabe en double a 6 dec).
+  const grossAmountAtomics = Number(grossAtomicBn)
+  const pendingUsdc        = Number(fromAtomic(grossAtomicBn)) // valor canónico para audit/respuesta
 
   // 4. Generate nonce and deadline (1 hour from now)
   const nonce    = `0x${randomBytes(32).toString('hex')}` as `0x${string}`
@@ -91,7 +97,7 @@ export async function POST(req: NextRequest) {
       primaryType: 'ClaimEarnings',
       message: {
         creator:     profile.wallet_address as `0x${string}`,
-        grossAmount: BigInt(grossAmountAtomics),
+        grossAmount: grossAtomicBn,
         deadline,
         nonce,
       },

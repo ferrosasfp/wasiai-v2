@@ -19,6 +19,7 @@ import { logger } from '@/lib/logger'
 
 import { calcPlatformOverhead, type GasSource } from '@/lib/pricing/overhead'
 import { triggerAgentEvent } from '@/lib/webhooks/triggerAgentEvent'
+import { toAtomic, fromAtomic } from '@/lib/money/usdc'
 
 // x402 recipient = the marketplace contract (it splits 90/10 internally)
 const CONTRACT_ADDRESS = process.env.MARKETPLACE_CONTRACT_ADDRESS ?? ''
@@ -232,8 +233,14 @@ export async function handleInvoke(request: NextRequest, slug: string): Promise<
     )
   }
 
-  const totalPrice = Math.round((creatorPrice + overhead) * 1_000_000) / 1_000_000
-  const priceStr   = totalPrice.toFixed(6)
+  // V4 (KEY_BALANCE_MISMATCH): el precio total se canoniza en micro-USDC enteros
+  // (creator + overhead sumados en atomic) y se deriva tanto el number como el wire
+  // string del MISMO valor atómico. Así totalPrice (cobro/budget) y priceStr (x402)
+  // no pueden divergir por redondeo de float. El wire x402 sigue usando el string
+  // de 6 decimales — shape intacto.
+  const totalAtomic = toAtomic(creatorPrice) + toAtomic(overhead)
+  const priceStr    = fromAtomic(totalAtomic)        // canónico 6-dec para x402
+  const totalPrice  = Number(priceStr)               // exacto a 6 decimales
   const resourceUrl = `${SITE_URL}/api/v1/models/${slug}/invoke`
 
   // ── 2. Route A: Agent Key (budget-based) ─────────────────────────────────

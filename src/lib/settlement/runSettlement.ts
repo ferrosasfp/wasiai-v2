@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { settleKeyBatchOnChain, getPlatformFeeBps } from '@/lib/contracts/marketplaceClient'
 import { PENDING_WALLET_SENTINEL } from '@/lib/settlement/immediateSettlement'
 import { logger } from '@/lib/logger'
+import { toAtomic, fromAtomic, feeSplit, sumAtomic } from '@/lib/money/usdc'
 
 const BATCH_SIZE_LIMIT = 500
 
@@ -113,7 +114,8 @@ async function _runSettlementPipeline(supabase: SupabaseClient): Promise<{
       fallback: process.env.PLATFORM_FEE_BPS ?? '1000',
     })
   }
-  const platformFeeBps = onChainFeeBps ?? Number(process.env.PLATFORM_FEE_BPS ?? '1000')
+  // feeSplit exige un entero en [0, 10000]; bps siempre es entero, pero floored por defensa.
+  const platformFeeBps = Math.floor(onChainFeeBps ?? Number(process.env.PLATFORM_FEE_BPS ?? '1000'))
 
   // 2. Agrupar por key_id
   const byKey = new Map<string, typeof unsettledCalls>()
@@ -161,18 +163,24 @@ async function _runSettlementPipeline(supabase: SupabaseClient): Promise<{
       if (noWalletCalls.length > 0) {
         const now = new Date().toISOString()
 
-        const pendingByCreator = new Map<string, number>()
+        // V4 (KEY_BALANCE_MISMATCH): acumular en micro-USDC enteros (bigint) para
+        // no arrastrar drift de float al sumar montos pequeños por creator.
+        const pendingByCreator = new Map<string, bigint>()
         for (const call of noWalletCalls) {
           const info = slugCreatorMap.get(call.agent_slug ?? '')
           if (!info) continue
-          pendingByCreator.set(info.creatorId, (pendingByCreator.get(info.creatorId) ?? 0) + Number(call.amount_paid))
+          pendingByCreator.set(
+            info.creatorId,
+            (pendingByCreator.get(info.creatorId) ?? 0n) + toAtomic(call.amount_paid as string | number),
+          )
         }
 
-        for (const [creatorId, amount] of pendingByCreator.entries()) {
+        for (const [creatorId, atomic] of pendingByCreator.entries()) {
           try {
             await supabase.rpc('increment_pending_earnings', {
               p_user_id: creatorId,
-              p_amount:  amount,
+              // fromAtomic produce el string canónico 6-dec; Number() es exacto a 6 decimales.
+              p_amount:  Number(fromAtomic(atomic)),
             })
           } catch (err) {
             logger.error('[runSettlement] increment_pending_earnings failed', { creatorId, err })
@@ -203,7 +211,11 @@ async function _runSettlementPipeline(supabase: SupabaseClient): Promise<{
         const amounts = validCalls.map(c => Number(c.amount_paid))
         const callIds = validCalls.map(c => c.id)
 
-        const totalUsdc = amounts.reduce((a, b) => a + b, 0)
+        // V4 (KEY_BALANCE_MISMATCH): sumar en micro-USDC enteros (= sum(toUSDCAtomics(a_i)))
+        // en vez de floats. Esto es exactamente lo que el contrato escrowa on-chain,
+        // así el total off-chain cierra contra el escrow sin drift binario.
+        const totalAtomic = sumAtomic(validCalls.map(c => c.amount_paid as string | number))
+        const totalUsdc   = fromAtomic(totalAtomic) // string 6-dec canónico para numeric(20,6)
 
         const { data: batchRecord } = await supabase
           .from('key_batch_settlements')
@@ -238,22 +250,25 @@ async function _runSettlementPipeline(supabase: SupabaseClient): Promise<{
 
           // SDD #17: Sync pending_earnings_usdc for wallet creators after on-chain settlement.
           // Contract split 90/10 already happened in settleKeyBatch — increment DB by creator share only.
-          const earningsByCreator = new Map<string, number>()
+          // V4 (KEY_BALANCE_MISMATCH): fee y creatorShare se calculan en micro-USDC enteros vía
+          // feeSplit (fee floor, creator recibe el resto) y se acumulan como bigint. Sin esto, el
+          // `amount * platformFeeBps / 10_000` en float driftea respecto al split entero on-chain.
+          const earningsByCreator = new Map<string, bigint>()
           for (const call of validCalls) {
             const info = slugCreatorMap.get(call.agent_slug ?? '')
             if (!info) continue
-            const amount      = Number(call.amount_paid)
-            const creatorShare = amount - (amount * platformFeeBps / 10_000)
-            earningsByCreator.set(info.creatorId, (earningsByCreator.get(info.creatorId) ?? 0) + creatorShare)
+            const amountAtomic = toAtomic(call.amount_paid as string | number)
+            const { creator }  = feeSplit(amountAtomic, platformFeeBps)
+            earningsByCreator.set(info.creatorId, (earningsByCreator.get(info.creatorId) ?? 0n) + creator)
           }
 
-          for (const [creatorId, amount] of earningsByCreator.entries()) {
+          for (const [creatorId, atomic] of earningsByCreator.entries()) {
             try {
               await supabase.rpc('increment_pending_earnings', {
                 p_user_id: creatorId,
-                p_amount:  Math.round(amount * 1_000_000) / 1_000_000, // USDC 6-decimal precision
+                p_amount:  Number(fromAtomic(atomic)), // canónico 6-dec, exacto a 6 decimales
               })
-              logger.info('[runSettlement] synced earnings for wallet creator', { creatorId, amount })
+              logger.info('[runSettlement] synced earnings for wallet creator', { creatorId, amount: fromAtomic(atomic) })
             } catch (err) {
               // Non-blocking: settlement already recorded. Log and continue.
               logger.error('[runSettlement] increment_pending_earnings failed (wallet creator)', { creatorId, err })
