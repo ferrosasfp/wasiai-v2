@@ -170,25 +170,50 @@ describe('facilitator-router — WAS-V2-2 W1 (trySettle)', () => {
     )
   })
 
-  it('AC-1 backward-compat: toggle off + UVD URL unset falls back to internal settlePaymentDirectly', async () => {
+  it('FUND-LOSS FIX: toggle off + UVD URL unset FAILS CLOSED (no internal settle, payTo-less path removed)', async () => {
     const config = await import('@/lib/contracts/x402-facilitator-config')
     ;(config.isWasiaiFacilitatorPrimary as ReturnType<typeof vi.fn>).mockReturnValue(false)
     ;(config.getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue(null)
 
     const settler = await import('@/lib/contracts/usdcSettler')
-    const internalResult: SettlementResult = {
-      verified: true, settled: true, transactionHash: '0xINTERNAL',
-    }
-    ;(settler.settlePaymentDirectly as ReturnType<typeof vi.fn>).mockResolvedValueOnce(internalResult)
-
     const client = await import('@/lib/contracts/x402-facilitator-client')
     const { trySettle } = await import('@/lib/contracts/facilitator-router')
     const r = await trySettle(livePayload, '1000', ctx)
 
-    expect(r).toEqual(internalResult)
-    expect(settler.settlePaymentDirectly).toHaveBeenCalledTimes(1)
-    expect(settler.settlePaymentDirectly).toHaveBeenCalledWith(livePayload, '1000')
+    // Fail-closed: NOT settled, error surfaced. The legacy internal
+    // settlePaymentDirectly (which settled without validating payTo) is gone.
+    expect(r.settled).toBe(false)
+    expect(r.verified).toBe(false)
+    expect(r.error).toMatch(/^NO_FACILITATOR_AVAILABLE:/)
+    // settlePaymentDirectly MUST NOT be invoked by the router anymore.
+    expect(settler.settlePaymentDirectly).not.toHaveBeenCalled()
+    // No external facilitator was reachable either.
     expect(client.verifyExternal).not.toHaveBeenCalled()
+    expect(client.settleExternal).not.toHaveBeenCalled()
+  })
+
+  it('FUND-LOSS FIX: toggle ON + wasiai fails + no UVD URL FAILS CLOSED (never settles without payTo)', async () => {
+    const config = await import('@/lib/contracts/x402-facilitator-config')
+    ;(config.isWasiaiFacilitatorPrimary as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    ;(config.getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue(null) // no UVD fallback
+
+    const client = await import('@/lib/contracts/x402-facilitator-client')
+    // wasiai verify fails (5xx) → would fall back, but there is no UVD URL.
+    ;(client.verifyExternal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      error: { verified: false, settled: false, error: 'SIMULATION_FAILED: boom' },
+    })
+
+    const settler = await import('@/lib/contracts/usdcSettler')
+    const { trySettle } = await import('@/lib/contracts/facilitator-router')
+    const r = await trySettle(livePayload, '1000', ctx)
+
+    // Fail-closed: error, never settled. No payTo-less internal settle path exists.
+    expect(r.settled).toBe(false)
+    expect(r.verified).toBe(false)
+    expect(r.error).toMatch(/^NO_FACILITATOR_AVAILABLE:/)
+    // wasiai was tried (verify), but no settle ran anywhere.
+    expect(settler.settlePaymentDirectly).not.toHaveBeenCalled()
     expect(client.settleExternal).not.toHaveBeenCalled()
   })
 

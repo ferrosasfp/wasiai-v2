@@ -2,8 +2,20 @@
  * WAS-V2-2: Dual facilitator router.
  *
  * Routes x402 settlements between wasiai-facilitator (primary, when toggle on)
- * and Ultravioleta DAO (fallback). Internal `settlePaymentDirectly` is used only
- * when toggle off AND no UVD URL configured (preserves WAS-V2-1 baseline).
+ * and Ultravioleta DAO (fallback). Both are external facilitators that validate
+ * `payTo` server-side before executing the on-chain transfer.
+ *
+ * FUND-LOSS FIX: the legacy internal `settlePaymentDirectly` fallback was
+ * REMOVED. That path settled on-chain locally WITHOUT validating that
+ * `authorization.to === payTo` (it never received `payTo`), so any signed
+ * authorization could be drained to an arbitrary recipient. When no external
+ * facilitator is reachable the router now FAILS CLOSED (returns an error
+ * SettlementResult) instead of settling without a payTo check. The standalone
+ * `settlePaymentDirectly` is still used by the listing-fee route, which
+ * validates `authorization.to === TREASURY_ADDRESS` at the route layer.
+ *
+ * Invariant: NO settlement path in this router executes a transfer without a
+ * payTo validation performed by the external facilitator.
  *
  * Pure module — no module-level caches (delegates to x402-facilitator-config).
  * Emits exactly ONE `logger.info('[settler]', ...)` per settlement (CD-10).
@@ -34,7 +46,6 @@ import {
   type X402V2Envelope,
 } from './x402-facilitator-client'
 import {
-  settlePaymentDirectly,
   type X402EVMPayload,
   type SettlementResult,
 } from './usdcSettler'
@@ -152,48 +163,32 @@ async function tryExternal(
   }
 }
 
-/**
- * Attempt settlement via the internal direct path (settlePaymentDirectly).
- * Used when no UVD URL is configured (toggle off + X402_FACILITATOR_URL unset),
- * preserving WAS-V2-1 baseline behavior.
- */
-async function tryInternal(
-  payload: X402EVMPayload,
-  required: string,
-): Promise<SettleAttempt> {
-  const result = await settlePaymentDirectly(payload, required)
-  if (result.verified && result.settled) {
-    return { outcome: 'ok', result }
-  }
-  // Internal path doesn't use facilitator codes; classify by extractCode if present.
-  const code = extractCode(result.error) ?? 'UNKNOWN'
-  return {
-    outcome: 'fail',
-    result,
-    reason: 'wasiai_5xx', // unused for internal — chosen as a neutral default
-    code,
-  }
-}
-
 // ─── Public surface ───────────────────────────────────────────────────────────
 
 /**
- * Route an x402 settlement to wasiai-facilitator (primary), Ultravioleta DAO
- * (fallback) or internal settlePaymentDirectly (baseline), emitting exactly
- * ONE structured log entry (CD-10) at the end.
+ * Route an x402 settlement to wasiai-facilitator (primary) or Ultravioleta DAO
+ * (fallback), emitting exactly ONE structured log entry (CD-10) at the end.
  *
  * Decision tree (mirrors Story §6 W1.1):
- *   - toggle off → UVD if URL configured else internal.
- *   - toggle on + chain not in allowlist → UVD if URL configured else internal.
+ *   - toggle off → UVD if URL configured else FAIL CLOSED.
+ *   - toggle on + chain not in allowlist → UVD if URL configured else FAIL CLOSED.
  *   - toggle on + chain in allowlist →
  *       wasiai first
  *         ok    → return
  *         guard → return (no fallback, CD-5)
- *         fail  → fall back to UVD (or internal if no UVD URL)
+ *         fail  → fall back to UVD (or FAIL CLOSED if no UVD URL)
+ *
+ * FUND-LOSS FIX: "FAIL CLOSED" replaces the former internal settlePaymentDirectly
+ * fallback, which settled on-chain without validating `payTo`.
  */
 export async function trySettle(
   payload: X402EVMPayload,
-  required: string,
+  // FUND-LOSS FIX: `required` (atomic amount) was only consumed by the removed
+  // internal settlePaymentDirectly fallback. External facilitators enforce the
+  // required amount + payTo server-side, so the router no longer needs it.
+  // Kept in the signature to preserve the public settlePaymentX402 → trySettle
+  // contract (CD-3).
+  _required: string,
   ctx: SettlePaymentX402Ctx,
 ): Promise<SettlementResult> {
   const start = Date.now()
@@ -204,7 +199,6 @@ export async function trySettle(
   if (!primary) {
     return await runUvdOrInternal({
       payload,
-      required,
       ctx,
       uvdUrl,
       start,
@@ -223,7 +217,6 @@ export async function trySettle(
     })
     return await runUvdOrInternal({
       payload,
-      required,
       ctx,
       uvdUrl,
       start,
@@ -278,14 +271,13 @@ export async function trySettle(
     return wasiaiAttempt.result
   }
 
-  // CASE C-fail — fall back to UVD (or internal if no UVD URL).
+  // CASE C-fail — fall back to UVD (or FAIL CLOSED if no UVD URL).
   // BLQ-MED-1: do NOT propagate the wasiai AbortSignal to the UVD branch.
   // After a wasiai timeout the signal is already aborted; reusing it would
   // cause UVD's fetch to abort immediately, defeating the fallback.
   // runUvdOrInternal mints a fresh AbortSignal.timeout(30_000) per call.
   return await runUvdOrInternal({
     payload,
-    required,
     ctx,
     uvdUrl,
     start,
@@ -300,7 +292,6 @@ export async function trySettle(
 
 interface RunUvdArgs {
   payload: X402EVMPayload
-  required: string
   ctx: SettlePaymentX402Ctx
   uvdUrl: string | null
   start: number
@@ -313,7 +304,7 @@ interface RunUvdArgs {
 
 async function runUvdOrInternal(args: RunUvdArgs): Promise<SettlementResult> {
   const {
-    payload, required, ctx, uvdUrl, start,
+    payload, ctx, uvdUrl, start,
     fallbackTriggered, fallbackReason, wasiaiOutcome,
     wasiaiEnvelope,
   } = args
@@ -322,8 +313,20 @@ async function runUvdOrInternal(args: RunUvdArgs): Promise<SettlementResult> {
   let facilitatorUsed: FacilitatorUsed
 
   if (uvdUrl === null) {
+    // FUND-LOSS FIX: FAIL CLOSED. There is no external facilitator to validate
+    // payTo, and the legacy internal settlePaymentDirectly path (which settled
+    // without a payTo check) was removed. NEVER settle here — return an error.
     facilitatorUsed = 'internal'
-    attempt = await tryInternal(payload, required)
+    attempt = {
+      outcome: 'fail',
+      result: {
+        verified: false,
+        settled: false,
+        error: 'NO_FACILITATOR_AVAILABLE: no facilitator available',
+      },
+      reason: 'wasiai_unreachable',
+      code: 'NO_FACILITATOR_AVAILABLE',
+    }
   } else {
     facilitatorUsed = 'ultravioleta'
     const envelope = wasiaiEnvelope ?? buildX402V2Envelope(payload, ctx)

@@ -94,17 +94,19 @@ describe('settlePaymentX402 — wrapper (W3)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('AC-1/AC-7: flag unset → invokes settlePaymentDirectly path; fetch NOT called', async () => {
+  it('FUND-LOSS FIX: flag unset + no facilitator → FAILS CLOSED (no internal settle); fetch NOT called', async () => {
     const { getFacilitatorUrl } = await import('@/lib/contracts/x402-facilitator-config')
     ;(getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue(null)
     const { settlePaymentX402 } = await import('@/lib/contracts/usdcSettler')
 
-    const r = await settlePaymentX402(expiredPayload, '1000', ctx)
+    const r = await settlePaymentX402(livePayload, '1000', ctx)
 
-    // settlePaymentDirectly ran (we know because we got its early-return shape)
+    // Fail-closed: no facilitator reachable → error, never settled. The legacy
+    // internal settlePaymentDirectly path (settled without payTo check) is gone,
+    // so we never even reach the on-chain logic (no fetch / no external client).
     expect(r.verified).toBe(false)
     expect(r.settled).toBe(false)
-    expect(r.error).toContain('Authorization expired')
+    expect(r.error).toMatch(/^NO_FACILITATOR_AVAILABLE:/)
     expect(globalThis.fetch).not.toHaveBeenCalled()
     const { verifyExternal, settleExternal } = await import('@/lib/contracts/x402-facilitator-client')
     expect(verifyExternal).not.toHaveBeenCalled()
@@ -190,16 +192,17 @@ describe('settlePaymentX402 — wrapper (W3)', () => {
     expect(settleExternal).not.toHaveBeenCalled()
   })
 
-  it('CD-NEW-SDD-4: flag malformed (config returns null) → falls back to internal path', async () => {
+  it('CD-NEW-SDD-4: flag malformed (config returns null) → FAILS CLOSED (no internal path)', async () => {
     const { getFacilitatorUrl } = await import('@/lib/contracts/x402-facilitator-config')
     ;(getFacilitatorUrl as ReturnType<typeof vi.fn>).mockReturnValue(null)
     const { verifyExternal } = await import('@/lib/contracts/x402-facilitator-client')
 
     const { settlePaymentX402 } = await import('@/lib/contracts/usdcSettler')
-    const r = await settlePaymentX402(expiredPayload, '1000', ctx)
+    const r = await settlePaymentX402(livePayload, '1000', ctx)
 
-    // internal path returned its early-return shape; external never invoked.
-    expect(r.error).toContain('Authorization expired')
+    // No facilitator URL → fail-closed (the internal payTo-less settle was removed).
+    expect(r.settled).toBe(false)
+    expect(r.error).toMatch(/^NO_FACILITATOR_AVAILABLE:/)
     expect(verifyExternal).not.toHaveBeenCalled()
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
