@@ -183,26 +183,6 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
       // Agent-key flow: insert agent directly without email step
       const isAgentKeyFlow = typeof data.owner_id === 'string' && data.owner_id.length > 0
       if (isAgentKeyFlow) {
-        // V9 (audit 2026-06-25): claim the terminal step ATOMICALLY before any
-        // side-effect. Two concurrent retries of step 7 would otherwise both
-        // pass the status!=='completed' guard and each create a key + agent
-        // (double registration). claim_onboard_step is a row-locked CAS: exactly
-        // one request wins; the loser returns an idempotent 409 here.
-        const { data: claimed, error: claimError } = await serviceClient.rpc('claim_onboard_step', {
-          p_session_id: session_id,
-          p_step:       step,
-        })
-        if (claimError) {
-          console.error('[onboard/step7] claim_onboard_step failed', claimError)
-          return NextResponse.json({ error: 'Failed to process step' }, { status: 500 })
-        }
-        if (claimed === false) {
-          return NextResponse.json(
-            { error: 'This step is already being processed or has completed.' },
-            { status: 409 },
-          )
-        }
-
         const name = String(data.name ?? 'Unnamed Agent')
         let slug = generateSlug(name)
         const { data: existing } = await serviceClient.from('agents').select('id').eq('slug', slug).single()
@@ -220,8 +200,6 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           is_active: true,
         })
         if (keyError) {
-          // V9: release the step lock so the user can retry this step.
-          await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
           return NextResponse.json({ error: 'Failed to create agent key' }, { status: 500 })
         }
 
@@ -258,8 +236,6 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
         if (agentError || !agent) {
           // Rollback: ONLY delete the new key — NEVER deleteUser
           await serviceClient.from('agent_keys').delete().eq('key_hash', hash)
-          // V9: release the step lock so the user can retry this step.
-          await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
           return NextResponse.json({ error: 'Failed to register agent. Please try again.' }, { status: 500 })
         }
 
@@ -283,26 +259,6 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (typeof answer !== 'string' || !emailRegex.test(answer)) {
         return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
-      }
-
-      // V9 (audit 2026-06-25): claim the terminal step ATOMICALLY before any
-      // side-effect (createUser + key + agent). Two concurrent retries of step 8
-      // would otherwise both pass the status!=='completed' guard and each create
-      // a user/key/agent (double registration). claim_onboard_step is a
-      // row-locked CAS: exactly one request wins; the loser returns 409 here.
-      const { data: claimed8, error: claimError8 } = await serviceClient.rpc('claim_onboard_step', {
-        p_session_id: session_id,
-        p_step:       step,
-      })
-      if (claimError8) {
-        console.error('[onboard/step8] claim_onboard_step failed', claimError8)
-        return NextResponse.json({ error: 'Failed to process step' }, { status: 500 })
-      }
-      if (claimed8 === false) {
-        return NextResponse.json(
-          { error: 'This step is already being processed or has completed.' },
-          { status: 409 },
-        )
       }
 
       // Create user via Supabase admin
@@ -334,7 +290,6 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           const existing = listData?.users?.find((u) => u.email === answer)
 
           if (!existing) {
-            await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
             return NextResponse.json({ error: 'Failed to resolve existing account' }, { status: 500 })
           }
 
@@ -342,13 +297,11 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           isExistingUser = true
         } else {
           console.error('[onboard/step8] createUser failed', createError)
-          await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
           return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
         }
       }
 
       if (!userId) {
-        await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
         return NextResponse.json({ error: 'Failed to obtain user id' }, { status: 500 })
       }
 
@@ -371,8 +324,6 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
             console.error('[onboard/step8] ZOMBIE USER cleanup failed', e),
           )
         }
-        // V9: release the step lock so the user can retry this step.
-        await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
         return NextResponse.json({ error: 'Failed to create agent key' }, { status: 500 })
       }
 
@@ -428,8 +379,6 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
             console.error('[onboard/step8] ZOMBIE USER cleanup failed', e),
           )
         }
-        // V9: release the step lock so the user can retry this step.
-        await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
         return NextResponse.json({ error: 'Failed to register agent. Please try again.' }, { status: 500 })
       }
 
