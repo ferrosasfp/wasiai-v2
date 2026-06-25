@@ -74,6 +74,22 @@ const TRANSFER_WITH_AUTH_ABI = [
   },
 ] as const
 
+// Plain ERC-20 transfer ABI — used for refunds (operator wallet → payer).
+// A refund moves USDC FROM the operator's own balance, so no EIP-3009
+// authorization is involved (that flow needs the caller's signature).
+const ERC20_TRANSFER_ABI = [
+  {
+    name:    'transfer',
+    type:    'function',
+    inputs:  [
+      { name: 'to',    type: 'address' },
+      { name: 'value', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
 // EIP-3009 typed data types
 const TRANSFER_TYPES = {
   TransferWithAuthorization: [
@@ -307,4 +323,70 @@ export async function settlePaymentX402(
   // WAS-V2-2: routing/telemetry delegated to facilitator-router.
   // The router emits the single structured [settler] log (CD-10).
   return await trySettle(payload, required, ctx)
+}
+
+// ─── V6: USDC refund transfer (operator wallet → payer) ──────────────────────
+
+export interface TransferUsdcResult {
+  success: boolean
+  transactionHash?: string
+  error?: string
+}
+
+/**
+ * V6: Plain ERC-20 USDC transfer from the operator wallet to `to`.
+ *
+ * Used to refund a caller when an x402 settlement landed on-chain (USDC left the
+ * caller's wallet) but the upstream agent failed (caller got no service). The
+ * operator wallet pays the USDC out of its own balance + the gas.
+ *
+ * Unlike settlePaymentDirectly (which uses EIP-3009 transferWithAuthorization and
+ * needs the caller's signature), a refund moves the operator's own funds, so a
+ * plain ERC-20 transfer is the correct primitive.
+ *
+ * @param to            recipient (the original payer = authorization.from)
+ * @param atomicAmount  amount in atomic micro-USDC units as a string (e.g. "120000")
+ */
+export async function transferUsdc(
+  to:           string,
+  atomicAmount: string,
+): Promise<TransferUsdcResult> {
+  try {
+    if (BigInt(atomicAmount) <= 0n) {
+      return { success: false, error: `Invalid refund amount: ${atomicAmount}` }
+    }
+
+    const pkRaw = process.env.OPERATOR_PRIVATE_KEY
+    if (!pkRaw) throw new Error('OPERATOR_PRIVATE_KEY not set')
+    const pkHex   = pkRaw.trim().replace(/^0x/i, '')
+    const account = privateKeyToAccount(`0x${pkHex}` as `0x${string}`)
+    const chain   = IS_FUJI ? avalancheFuji : avalanche
+    const rpcUrl  = RPC[CHAIN_ID] ?? ''
+
+    const usdcAddress = USDC_ADDR[CHAIN_ID]
+    if (!usdcAddress) throw new Error(`No USDC address configured for chain ${CHAIN_ID}`)
+
+    const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
+    const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
+
+    const txHash = await walletClient.writeContract({
+      address:      usdcAddress,
+      abi:          ERC20_TRANSFER_ABI,
+      functionName: 'transfer',
+      args:         [to as Address, BigInt(atomicAmount)],
+    })
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 30_000 })
+
+    if (receipt.status !== 'success') {
+      return { success: false, error: `Refund transaction reverted (${txHash})` }
+    }
+
+    logger.info('[settler] USDC refund confirmed', { txHash, to })
+    return { success: true, transactionHash: txHash }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.error('[settler] refund transfer error', { msg, to })
+    return { success: false, error: msg }
+  }
 }

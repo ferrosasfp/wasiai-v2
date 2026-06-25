@@ -586,23 +586,64 @@ export async function handleInvoke(request: NextRequest, slug: string): Promise<
 
   // S6-01: Fire-and-forget — registrar failure "cobro sin servicio"
   if (settlement.settled && result.status !== 'success') {
+    // V6: el caller pagó on-chain (settle OK) pero el upstream falló → no recibió
+    // servicio. Registramos la obligación de refund (procesada async por el cron) y
+    // el settlement_failure (auditoría). El payer = authorization.from; el monto a
+    // devolver = lo que el caller PAGÓ on-chain (auth.value, atómico) — es decir el
+    // total settled (creator_price + overhead), no solo el creator_price: el caller
+    // no recibió nada y el creator NO cobró (earnings solo en success), así que no
+    // hay nada que descontarle al creator.
+    const refundAuth = (paymentHeader?.payload as X402EVMPayload | undefined)?.authorization
+    const settledTxHash = settlement.transactionHash ?? 'unknown'
+    const refundErrorReason = (typeof result.data === 'string' ? result.data : JSON.stringify(result.data ?? 'upstream_error')).slice(0, 500)
+
     after(async () => {
+      // 1. Registrar la obligación de refund (idempotente por UNIQUE(settlement_tx_hash)).
+      // Solo si tenemos un tx_hash real y la dirección del payer — sin ellos el
+      // procesador no podría devolver nada de forma segura.
+      if (settledTxHash !== 'unknown' && refundAuth?.from && refundAuth?.value) {
+        try {
+          // settled amount = lo que el caller pagó on-chain (atómico → string 6-dec).
+          const refundAmount = fromAtomic(BigInt(refundAuth.value))
+          const res = await supabase.from('refunds').insert({
+            settlement_tx_hash: settledTxHash,
+            payer_address:      refundAuth.from,
+            amount_usdc:        refundAmount,
+            agent_slug:         slug,
+            agent_call_id:      callId ?? null,
+            status:             'pending',
+          })
+          // 23505 = unique_violation on settlement_tx_hash → refund ya registrado
+          // (anti doble-refund). No es un error: idempotencia esperada.
+          if (res.error && (res.error as { code?: string }).code !== '23505') {
+            logger.error('[invoke] refund insert DB error', { err: res.error.message, txHash: settledTxHash, slug })
+          } else if (!res.error) {
+            logger.warn('[invoke] refund registered (settle-OK + upstream-fail)', { slug, txHash: settledTxHash, payer: refundAuth.from, amount: refundAmount })
+          }
+        } catch (err: unknown) {
+          logger.error('[invoke] refund insert failed', { err: String(err).slice(0, 200), txHash: settledTxHash, slug })
+        }
+      } else {
+        logger.error('[invoke] refund NOT registered — missing tx_hash or payer', { slug, txHash: settledTxHash, hasPayer: !!refundAuth?.from })
+      }
+
+      // 2. settlement_failures (auditoría — comportamiento S6-01 intacto).
       try {
         const res = await supabase.from('settlement_failures').insert({
-          settlement_tx_hash: settlement.transactionHash ?? 'unknown',
+          settlement_tx_hash: settledTxHash,
           agent_slug: slug,
           amount_usdc: model.price_per_call,
-          caller_wallet: null,
-          error_reason: (typeof result.data === 'string' ? result.data : JSON.stringify(result.data ?? 'upstream_error')).slice(0, 500),
+          caller_wallet: refundAuth?.from ?? null,
+          error_reason: refundErrorReason,
           agent_call_id: callId ?? null,
         })
         if (res.error) {
-          logger.error('[invoke] settlement_failure insert DB error', { err: res.error.message, txHash: settlement.transactionHash, slug })
+          logger.error('[invoke] settlement_failure insert DB error', { err: res.error.message, txHash: settledTxHash, slug })
         } else {
-          logger.warn('[invoke] settlement_failure recorded', { slug, txHash: settlement.transactionHash })
+          logger.warn('[invoke] settlement_failure recorded', { slug, txHash: settledTxHash })
         }
       } catch (err: unknown) {
-        logger.error('[invoke] settlement_failure insert failed', { err: String(err).slice(0, 200), txHash: settlement.transactionHash, slug })
+        logger.error('[invoke] settlement_failure insert failed', { err: String(err).slice(0, 200), txHash: settledTxHash, slug })
       }
     })
   }
