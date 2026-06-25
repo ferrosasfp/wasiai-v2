@@ -10,7 +10,7 @@ export const X402_CORS_HEADERS = {
 import { keyHashToBytes32 } from '@/lib/contracts/marketplaceClient'
 import { signReceipt } from '@/lib/receipts/signReceipt'
 import { settlePaymentX402, type X402EVMPayload, type SettlePaymentX402Ctx } from '@/lib/contracts/usdcSettler'
-import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { fetchPinned, EndpointValidationError } from '@/lib/security/fetchPinned'
 import { getState, wrapWithCircuitBreaker } from '@/lib/circuit-breaker/CircuitBreaker'
 import { retryWithBackoff } from '@/lib/circuit-breaker/retryWithBackoff'
 import { getInvokeLimit, getIdentifier, checkRateLimit, checkCreatorRateLimits, getSharedRedis } from '@/lib/ratelimit'
@@ -648,35 +648,34 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
   let body: Record<string, unknown> = {}
   try { body = await request.json() } catch { /* empty body ok */ }
 
-  // SEC-01: Validate endpoint URL to prevent SSRF
-  try {
-    await validateEndpointUrlAsync(model.endpoint_url as string)
-  } catch (err) {
-    return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error' as const, latencyMs: 0 }
-  }
-
   const startMs = Date.now()
   let data: unknown
   let status: 'success' | 'error' = 'success'
   // WAS-284: hint para mapear el error del upstream al HTTP status correcto en buildResponse
   let httpStatusHint: 422 | 502 | 503 | 504 | undefined = undefined
 
+  // V3: pinned fetch — validateEndpointUrlAsync resolves+validates the IP and
+  // fetchPinned connects to THAT IP (no DNS re-resolution), closing the
+  // DNS-rebinding TOCTOU that could leak `webhook_secret` to an internal host.
+  const upstreamBody = JSON.stringify(body)
+  const upstreamHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((model.webhook_secret as string | null) ? {
+      'Authorization': `Bearer ${model.webhook_secret}`,
+      'X-WasiAI-Agent-Id': model.id as string,
+    } : {}),
+  }
+
   try {
     const upstream = await wrapWithCircuitBreaker(
       slug,
       async () => {
         const res = await retryWithBackoff(
-          () => fetch(model.endpoint_url as string, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...((model.webhook_secret as string | null) ? {
-                'Authorization': `Bearer ${model.webhook_secret}`,
-                'X-WasiAI-Agent-Id': model.id as string,
-              } : {}),
-            },
-            body: JSON.stringify(body),
-            signal: AbortSignal.timeout(10_000),
+          () => fetchPinned(model.endpoint_url as string, {
+            method:    'POST',
+            headers:   upstreamHeaders,
+            body:      upstreamBody,
+            timeoutMs: 10_000,
           })
         )
         if (!res.ok && res.status >= 500) {
@@ -715,8 +714,13 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
     }
   } catch (err) {
     status = 'error'
+    // V3: SSRF/DNS-rebinding rejection from fetchPinned → invalid endpoint, not a
+    // transient upstream failure. The bearer secret was NOT sent.
+    if (err instanceof EndpointValidationError) {
+      data = { error: 'Invalid model endpoint', detail: String(err) }
+      httpStatusHint = 502
     // WAS-284: discriminar tipo de error para HTTP status correcto
-    if (err instanceof DOMException && err.name === 'TimeoutError') {
+    } else if (err instanceof DOMException && err.name === 'TimeoutError') {
       // AbortSignal.timeout() lanza DOMException con name='TimeoutError' en Node.js 18+
       data = { error: 'Upstream timeout', detail: 'Endpoint did not respond within 10 seconds.' }
       httpStatusHint = 504

@@ -19,7 +19,7 @@ import { logger } from '@/lib/logger'
 import { SITE_URL } from '@/lib/constants'
 import { buildCOB } from '@/lib/introspect/buildCOB'
 import type { IntrospectDepth } from '@/lib/introspect/buildCOB'
-import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { fetchPinned, EndpointValidationError } from '@/lib/security/fetchPinned'
 import { assertPaymentType } from '@/lib/validation/payment-type'
 import { getInvokeLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 // MNR-CR-4: shared with /api/v1/models/[slug]/invoke/route.ts
@@ -141,18 +141,14 @@ async function callUpstreamIntrospect(
   model: Record<string, unknown>,
   body: IntrospectRequest,
 ): Promise<{ data: unknown; status: 'success' | 'error'; latencyMs: number; timedOut: boolean }> {
-  // SEC-01: Validate endpoint URL to prevent SSRF
-  try {
-    await validateEndpointUrlAsync(model.endpoint_url as string)
-  } catch (err) {
-    return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error', latencyMs: 0, timedOut: false }
-  }
-
   const timeoutMs = Math.min(body.timeout_ms ?? 5000, 30_000)
   const startMs = Date.now()
 
   try {
-    const res = await fetch(model.endpoint_url as string, {
+    // V3: pinned fetch — connects to the validated IP (no DNS re-resolution),
+    // preventing a DNS-rebinding TOCTOU from leaking `webhook_secret` to an
+    // internal host. SSRF validation happens inside fetchPinned.
+    const res = await fetchPinned(model.endpoint_url as string, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -161,8 +157,8 @@ async function callUpstreamIntrospect(
           'X-WasiAI-Agent-Id': model.id as string,
         } : {}),
       },
-      body: JSON.stringify({ ...body, __introspect: true }),
-      signal: AbortSignal.timeout(timeoutMs),
+      body:      JSON.stringify({ ...body, __introspect: true }),
+      timeoutMs,
     })
 
     const latencyMs = Date.now() - startMs
@@ -170,6 +166,10 @@ async function callUpstreamIntrospect(
     return { data, status: res.ok ? 'success' : 'error', latencyMs, timedOut: false }
   } catch (err) {
     const latencyMs = Date.now() - startMs
+    // V3: SSRF/DNS-rebinding rejection → invalid endpoint (bearer NOT sent).
+    if (err instanceof EndpointValidationError) {
+      return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error', latencyMs: 0, timedOut: false }
+    }
     const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
     return {
       data: { error: timedOut ? 'Upstream timeout' : 'Upstream unreachable', detail: String(err) },

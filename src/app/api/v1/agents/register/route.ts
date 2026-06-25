@@ -23,7 +23,7 @@
  *     (manual review or automated health check)
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { probeEndpoint } from '@/lib/agents/health-probe'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
@@ -516,13 +516,20 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Register on-chain (non-blocking) — WAS-162: update DB only after tx confirms ──
+  // V14 (audit 2026-06-25): run via after() so the runtime keeps the work alive
+  // until it resolves — a floating .then().catch() can be killed on Vercel before
+  // the on-chain confirmation + DB update completes (lost update).
   if (registerOnChain && data.creator_wallet) {
-    registerAgentOnChain({
-      slug:             data.slug,
-      pricePerCallUSDC: data.price_per_call,
-      creatorWallet:    data.creator_wallet,
-    })
-      .then(async (txHash) => {
+    const onChainCreatorWallet = data.creator_wallet
+    const onChainSlug          = data.slug
+    const onChainPrice         = data.price_per_call
+    after(async () => {
+      try {
+        const txHash = await registerAgentOnChain({
+          slug:             onChainSlug,
+          pricePerCallUSDC: onChainPrice,
+          creatorWallet:    onChainCreatorWallet,
+        })
         if (txHash) {
           await serviceClient
             .from('agents')
@@ -532,10 +539,12 @@ export async function POST(request: NextRequest) {
               chain_registered_at: new Date().toISOString(),
             })
             .eq('id', agent.id)
-          logger.info('[register] on-chain confirmed, DB updated', { slug: data.slug, txHash })
+          logger.info('[register] on-chain confirmed, DB updated', { slug: onChainSlug, txHash })
         }
-      })
-      .catch(err => logger.error('[register] on-chain failed, agent stays off_chain', { err }))
+      } catch (err) {
+        logger.error('[register] on-chain failed, agent stays off_chain', { err })
+      }
+    })
   }
 
   // WAS-215: Async health check — only for non-JWT auth (agent_key / open)
@@ -545,9 +554,15 @@ export async function POST(request: NextRequest) {
       await serviceClient.from('agents')
         .update({ health_check: { pending: true } })
         .eq('id', agent.id)
-      // Fire-and-forget — never awaited
-      probeEndpoint(agent.endpoint_url, agent.id).catch(err =>
-        console.error('[register] probe failed silently', { agentId: agent.id, err: String(err) })
+      // V14 (audit 2026-06-25): run the health probe via after() so the runtime
+      // keeps it alive post-response — a bare fire-and-forget can be killed on
+      // Vercel before the probe + status update resolve.
+      const probeEndpointUrl = agent.endpoint_url
+      const probeAgentId     = agent.id
+      after(() =>
+        probeEndpoint(probeEndpointUrl, probeAgentId).catch(err =>
+          console.error('[register] probe failed silently', { agentId: probeAgentId, err: String(err) })
+        )
       )
     } else {
       // AC8: no endpoint_url → draft

@@ -2,7 +2,9 @@
  * POST /api/creator/withdraw
  *
  * HU-067: Retiro via voucher EIP-712. El creator ya ejecutó claimEarnings() on-chain.
- * Este endpoint verifica el evento EarningsClaimed y pone pending_earnings_usdc = 0.
+ * Este endpoint verifica el evento EarningsClaimed y decrementa pending_earnings_usdc
+ * en exactamente el monto verificado on-chain (V7: no resetea a 0 para no borrar
+ * earnings acumulados entre la firma del voucher y el claim).
  *
  * HAL-025: Solo retorna éxito tras verificar el evento en el receipt.
  */
@@ -142,11 +144,15 @@ export async function POST(req: NextRequest) {
     logger.warn('[creator/withdraw] realAmount decode failed, using 0', { decodeErr })
   }
 
-  // 9. Poner pending_earnings_usdc = 0 en Supabase
+  // 9. V7 (audit 2026-06-25): decrementar EXACTAMENTE el monto verificado on-chain
+  // (realAmount = grossAmount del evento), no resetear a 0. Atómico vía RPC para
+  // no pisar earnings acumulados entre la firma del voucher (T0) y el claim (T1).
+  // El RPC usa GREATEST(.. , 0) → nunca queda negativo.
   const { error: updateError } = await serviceClient
-    .from('creator_profiles')
-    .update({ pending_earnings_usdc: 0 })
-    .eq('id', user.id)
+    .rpc('decrement_pending_earnings', {
+      p_user_id: user.id,
+      p_amount:  realAmount,
+    })
 
   if (updateError) {
     logger.error('[creator/withdraw] DB update failed after verified on-chain claim', {
