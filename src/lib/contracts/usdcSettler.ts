@@ -356,6 +356,19 @@ export async function transferUsdc(
       return { success: false, error: `Invalid refund amount: ${atomicAmount}` }
     }
 
+    // Defense-in-depth (audit 2026-06-25 B2): cap the max amount this primitive
+    // can move out of the operator wallet. transferUsdc is a raw "transfer from
+    // operator" primitive — today the only caller passes a small, on-chain-bounded
+    // refund amount, but capping here ensures a future misuse cannot drain funds.
+    // Configurable via MAX_OPERATOR_TRANSFER_USDC (whole USDC units, e.g. "100").
+    // Default: 100 USDC. Refunds are cents, so they pass with huge margin.
+    const maxUsdc = Number(process.env.MAX_OPERATOR_TRANSFER_USDC ?? 100)
+    const maxAtomic = BigInt(Math.floor(maxUsdc * 1_000_000)) // USDC has 6 decimals
+    if (BigInt(atomicAmount) > maxAtomic) {
+      logger.warn('[settler] refund transfer exceeds max cap', { to, atomicAmount, maxAtomic: maxAtomic.toString() })
+      return { success: false, error: 'amount exceeds max transfer cap' }
+    }
+
     const pkRaw = process.env.OPERATOR_PRIVATE_KEY
     if (!pkRaw) throw new Error('OPERATOR_PRIVATE_KEY not set')
     const pkHex   = pkRaw.trim().replace(/^0x/i, '')

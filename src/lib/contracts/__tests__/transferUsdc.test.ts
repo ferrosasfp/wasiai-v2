@@ -37,4 +37,43 @@ describe('transferUsdc — guards', () => {
       if (prev !== undefined) process.env.OPERATOR_PRIVATE_KEY = prev
     }
   })
+
+  // B2 (audit 2026-06-25) — max transfer cap (defense-in-depth).
+  it('rejects an amount over the max transfer cap without touching the chain', async () => {
+    const prevMax = process.env.MAX_OPERATOR_TRANSFER_USDC
+    const prevPk = process.env.OPERATOR_PRIVATE_KEY
+    process.env.MAX_OPERATOR_TRANSFER_USDC = '100' // 100 USDC = 100_000_000 atomic
+    // PK present so we prove the cap (not the PK guard) is what rejects.
+    process.env.OPERATOR_PRIVATE_KEY = '0x' + '1'.repeat(64)
+    try {
+      // 101 USDC = 101_000_000 atomic > cap
+      const res = await transferUsdc('0x' + '1'.repeat(40), '101000000')
+      expect(res.success).toBe(false)
+      expect(res.error).toBe('amount exceeds max transfer cap')
+    } finally {
+      if (prevMax !== undefined) process.env.MAX_OPERATOR_TRANSFER_USDC = prevMax
+      else delete process.env.MAX_OPERATOR_TRANSFER_USDC
+      if (prevPk !== undefined) process.env.OPERATOR_PRIVATE_KEY = prevPk
+      else delete process.env.OPERATOR_PRIVATE_KEY
+    }
+  })
+
+  it('lets an amount within the cap proceed past the cap guard', async () => {
+    const prevMax = process.env.MAX_OPERATOR_TRANSFER_USDC
+    const prevPk = process.env.OPERATOR_PRIVATE_KEY
+    process.env.MAX_OPERATOR_TRANSFER_USDC = '100'
+    delete process.env.OPERATOR_PRIVATE_KEY // next guard after the cap
+    try {
+      // A typical cents-level refund (0.12 USDC) is well under the cap.
+      const res = await transferUsdc('0x' + '1'.repeat(40), '120000')
+      expect(res.success).toBe(false)
+      // It got PAST the cap guard and hit the PK guard, proving the cap allowed it.
+      expect(res.error).toContain('OPERATOR_PRIVATE_KEY')
+      expect(res.error).not.toContain('max transfer cap')
+    } finally {
+      if (prevMax !== undefined) process.env.MAX_OPERATOR_TRANSFER_USDC = prevMax
+      else delete process.env.MAX_OPERATOR_TRANSFER_USDC
+      if (prevPk !== undefined) process.env.OPERATOR_PRIVATE_KEY = prevPk
+    }
+  })
 })
