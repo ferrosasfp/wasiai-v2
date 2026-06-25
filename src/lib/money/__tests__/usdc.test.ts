@@ -156,4 +156,17 @@ describe('NO-DRIFT: integer summation vs float', () => {
     expect(feeAtomic + creatorAtomic).toBe(totalAtomic)
     expect(totalAtomic).toBe(sumAtomic(inputs))
   })
+
+  it('FP-2: immediateSettlement audit total is exact (fromAtomic(sumAtomic(...)))', () => {
+    // Mirrors immediateSettlement.ts: total_usdc written for a settled key batch.
+    // amount_paid arrives from the DB as numeric(20,6) decimal strings.
+    // 0.1 has no exact binary representation — summing it in float drifts.
+    const batch = Array.from({ length: 3 }, () => ({ amount_paid: '0.100000' }))
+    const totalUsd = fromAtomic(sumAtomic(batch.map(c => c.amount_paid)))
+    expect(totalUsd).toBe('0.300000') // exact integer total, no IEEE-754 drift
+
+    // Float path drifts on the same inputs (0.1 + 0.1 + 0.1 !== 0.3).
+    const floatTotal = batch.map(c => Number(c.amount_paid)).reduce((a, b) => a + b, 0)
+    expect(floatTotal).not.toBe(0.3) // 0.30000000000000004
+  })
 })

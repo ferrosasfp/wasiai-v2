@@ -12,6 +12,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
 import { logger } from '@/lib/logger'
+import { sumAtomic, fromAtomic } from '@/lib/money/usdc'
 
 /** Sentinel used by settle-key-batches cron when creator has no wallet */
 export const PENDING_WALLET_SENTINEL = 'PENDING_WALLET'
@@ -106,7 +107,10 @@ export async function triggerImmediateSettlement(userId: string): Promise<void> 
         const slugs    = batch.map(c => c.agent_slug as string)
         const amounts  = batch.map(c => Number(c.amount_paid))
         const callIds  = batch.map(c => c.id)
-        const totalUsd = amounts.reduce((a, b) => a + b, 0)
+        // FP-2 (audit 2026-06-25): sum the audit total in atomic micro-USDC to
+        // avoid IEEE-754 drift (consistent with V4 KEY_BALANCE_MISMATCH fix).
+        // amounts (number[]) is still passed as-is to the on-chain call below.
+        const totalUsd = fromAtomic(sumAtomic(batch.map(c => c.amount_paid as string)))
 
         // Create batch record
         const { data: batchRecord } = await supabase

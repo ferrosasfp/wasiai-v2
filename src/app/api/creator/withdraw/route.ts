@@ -62,20 +62,7 @@ export async function POST(req: NextRequest) {
     : process.env.NEXT_PUBLIC_RPC_TESTNET
   )?.trim() || undefined
 
-  // NG-V02: Check idempotencia BEFORE any RPC call
   const serviceClient = createServiceClient()
-  const { data: existingWithdrawal } = await serviceClient
-    .from('creator_withdrawals')
-    .select('id')
-    .eq('tx_hash', parsed.data.txHash)
-    .maybeSingle()
-
-  if (existingWithdrawal) {
-    return NextResponse.json(
-      { error: 'This transaction has already been processed', txHash: parsed.data.txHash },
-      { status: 409 },
-    )
-  }
 
   const pub = createPublicClient({
     chain:     chainId === 43114 ? avalanche : avalancheFuji,
@@ -144,19 +131,25 @@ export async function POST(req: NextRequest) {
     logger.warn('[creator/withdraw] realAmount decode failed, using 0', { decodeErr })
   }
 
-  // 9. V7 (audit 2026-06-25): decrementar EXACTAMENTE el monto verificado on-chain
-  // (realAmount = grossAmount del evento), no resetear a 0. Atómico vía RPC para
-  // no pisar earnings acumulados entre la firma del voucher (T0) y el claim (T1).
-  // El RPC usa GREATEST(.. , 0) → nunca queda negativo.
-  const { error: updateError } = await serviceClient
-    .rpc('decrement_pending_earnings', {
+  // 9. FP-1 (audit 2026-06-25): registro + decremento ATÓMICO e IDEMPOTENTE en
+  // una sola RPC transaccional. El INSERT ... ON CONFLICT (tx_hash) DO NOTHING es
+  // la única fuente de verdad de idempotencia: solo la fila que realmente inserta
+  // decrementa. Dos POST concurrentes con el mismo txHash → uno inserta+decrementa,
+  // el otro recibe false y NO decrementa (cierra el double-decrement por race que
+  // tenía el viejo flujo SELECT-check → decrement → INSERT fire-and-forget).
+  //
+  // V7: se decrementa EXACTAMENTE el monto verificado on-chain (realAmount =
+  // grossAmount del evento), no se resetea a 0. El RPC clampa con GREATEST(.., 0).
+  const { data: processed, error: rpcError } = await serviceClient
+    .rpc('record_withdrawal_and_decrement', {
       p_user_id: user.id,
+      p_tx_hash: parsed.data.txHash,
       p_amount:  realAmount,
     })
 
-  if (updateError) {
+  if (rpcError) {
     logger.error('[creator/withdraw] DB update failed after verified on-chain claim', {
-      txHash: parsed.data.txHash, updateError,
+      txHash: parsed.data.txHash, rpcError,
     })
     return NextResponse.json({
       ok:        true,
@@ -165,13 +158,14 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // NG-V02: Register txHash to prevent double-processing
-  serviceClient
-    .from('creator_withdrawals')
-    .insert({ creator_id: user.id, tx_hash: parsed.data.txHash, amount_usdc: realAmount })
-    .then(({ error }) => {
-      if (error) logger.warn('[creator/withdraw] txHash log insert failed (non-fatal)', { error })
-    })
+  // processed === false → este txHash ya estaba registrado (duplicado) → ya
+  // procesado. Mismo comportamiento que daba el check de idempotencia previo (409).
+  if (processed === false) {
+    return NextResponse.json(
+      { error: 'This transaction has already been processed', txHash: parsed.data.txHash },
+      { status: 409 },
+    )
+  }
 
   logger.info('[creator/withdraw] EarningsClaimed verified', {
     txHash: parsed.data.txHash, realAmount, walletAddress,
