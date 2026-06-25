@@ -16,6 +16,20 @@ import { getPublicClient }   from '@/shared/lib/web3/client'
 const CACHE_KEY = 'wasiai:gas:v1'
 const CACHE_TTL = 60  // segundos
 
+// El circuit breaker (gas > creatorPrice → 503) solo tiene sentido en mainnet
+// (43114), donde el gas es un costo REAL en USD. En testnet (Fuji 43113, etc.) el
+// gas se paga en AVAX de testnet (valor 0), pero el cálculo usa el precio de AVAX
+// *mainnet* (Chainlink/CoinGecko) — un artefacto que inflaba el overhead (~$0.05) y
+// abría el breaker para agentes baratos, devolviéndoles 503. Mantenemos el overhead
+// calculado (transparencia de gas intacta) pero NO abrimos el breaker en testnet.
+const MAINNET_CHAIN_ID = 43114
+
+// Per-call (no module-level) para que sea controlable por env en tests y refleje
+// la cadena vigente. El gas real solo existe en mainnet (43114).
+function isMainnet(): boolean {
+  return Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113) === MAINNET_CHAIN_ID
+}
+
 export type GasSource = 'redis' | 'chainlink' | 'coingecko' | 'env_fallback' | 'none'
 
 export interface OverheadResult {
@@ -34,7 +48,8 @@ export async function calcPlatformOverhead(creatorPrice: number): Promise<Overhe
       return {
         overhead:       cached,
         breakdown:      { gas: cached },
-        circuitBreaker: cached > creatorPrice,
+        // Breaker solo en mainnet (en testnet el gas no es costo real).
+        circuitBreaker: isMainnet() && cached > creatorPrice,
         cached:         true,
         gas_source:     'redis',
       }
@@ -57,7 +72,8 @@ export async function calcPlatformOverhead(creatorPrice: number): Promise<Overhe
     return {
       overhead:       gas,
       breakdown:      { gas },
-      circuitBreaker: gas > creatorPrice,
+      // Breaker solo en mainnet (en testnet el gas no es costo real).
+      circuitBreaker: isMainnet() && gas > creatorPrice,
       cached:         false,
       gas_source:     source,
     }

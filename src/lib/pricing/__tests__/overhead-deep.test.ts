@@ -192,19 +192,26 @@ describe('calcPlatformOverhead — edge cases', () => {
     expect(result.overhead).toBe(0)
   })
 
-  it('11. circuitBreaker con creatorPrice = 0 → true (gas > 0)', async () => {
-    mockRedisGet.mockResolvedValueOnce(null)
-    mockChainlinkFeed.mockResolvedValueOnce({ price_usd: 25 })
-    mockRedisSet.mockResolvedValueOnce('OK')
+  it('11. circuitBreaker con creatorPrice = 0 → true (gas > 0, mainnet)', async () => {
+    const prev = process.env.NEXT_PUBLIC_CHAIN_ID
+    process.env.NEXT_PUBLIC_CHAIN_ID = '43114'  // mainnet: el breaker solo aplica acá
+    try {
+      mockRedisGet.mockResolvedValueOnce(null)
+      mockChainlinkFeed.mockResolvedValueOnce({ price_usd: 25 })
+      mockRedisSet.mockResolvedValueOnce('OK')
 
-    const result = await calcPlatformOverhead(0) // creatorPrice = 0
+      const result = await calcPlatformOverhead(0) // creatorPrice = 0
 
-    // gas > 0, so circuitBreaker should be true
-    if (result.overhead > 0) {
-      expect(result.circuitBreaker).toBe(true)
-    } else {
-      // if gas is somehow 0 (e.g., gasPrice was 0), circuitBreaker is false
-      expect(result.circuitBreaker).toBe(false)
+      // gas > 0, so circuitBreaker should be true
+      if (result.overhead > 0) {
+        expect(result.circuitBreaker).toBe(true)
+      } else {
+        // if gas is somehow 0 (e.g., gasPrice was 0), circuitBreaker is false
+        expect(result.circuitBreaker).toBe(false)
+      }
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_CHAIN_ID
+      else process.env.NEXT_PUBLIC_CHAIN_ID = prev
     }
   })
 

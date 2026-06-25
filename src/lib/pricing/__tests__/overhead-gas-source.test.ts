@@ -100,12 +100,36 @@ describe('calcPlatformOverhead', () => {
     expect(result.circuitBreaker).toBe(false)
   })
 
-  it('circuitBreaker: true when gas > creatorPrice', async () => {
-    mockRedisGet.mockResolvedValueOnce(0.05)  // gas = 0.05
+  it('circuitBreaker: true when gas > creatorPrice (mainnet)', async () => {
+    const prev = process.env.NEXT_PUBLIC_CHAIN_ID
+    process.env.NEXT_PUBLIC_CHAIN_ID = '43114'  // mainnet: gas es costo real
+    try {
+      mockRedisGet.mockResolvedValueOnce(0.05)  // gas = 0.05
 
-    const result = await calcPlatformOverhead(0.001)  // creatorPrice = 0.001
+      const result = await calcPlatformOverhead(0.001)  // creatorPrice = 0.001
 
-    expect(result.circuitBreaker).toBe(true)
+      expect(result.circuitBreaker).toBe(true)
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_CHAIN_ID
+      else process.env.NEXT_PUBLIC_CHAIN_ID = prev
+    }
+  })
+
+  it('circuitBreaker: false on testnet even when gas > creatorPrice', async () => {
+    const prev = process.env.NEXT_PUBLIC_CHAIN_ID
+    process.env.NEXT_PUBLIC_CHAIN_ID = '43113'  // testnet: gas sin valor real
+    try {
+      mockRedisGet.mockResolvedValueOnce(0.05)  // gas = 0.05 > price
+
+      const result = await calcPlatformOverhead(0.001)
+
+      // overhead se mantiene (transparencia) pero el breaker NO abre en testnet
+      expect(result.overhead).toBe(0.05)
+      expect(result.circuitBreaker).toBe(false)
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_CHAIN_ID
+      else process.env.NEXT_PUBLIC_CHAIN_ID = prev
+    }
   })
 
   it('circuitBreaker: false when gas <= creatorPrice', async () => {
