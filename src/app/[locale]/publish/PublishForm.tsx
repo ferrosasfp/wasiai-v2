@@ -16,18 +16,18 @@ import { Step3Technical } from '@/components/publish/Step3Technical'
 // Type for agent data from DB (when loading a draft)
 interface AgentDraft {
   slug: string
-  name?: string
-  description?: string
-  category?: string
-  price_per_call?: number
+  name?: string | undefined
+  description?: string | undefined
+  category?: string | undefined
+  price_per_call?: number | undefined
   capabilities?: unknown
-  endpoint_url?: string
-  cover_image?: string | null
+  endpoint_url?: string | undefined
+  cover_image?: string | null | undefined
 }
 
 interface Props {
   initialDraft: AgentDraft | null
-  from?: string  // 'onboarding' para redirect correcto al publicar
+  from?: string | undefined  // 'onboarding' para redirect correcto al publicar
 }
 
 // FormData allows schema fields + extra form-only fields

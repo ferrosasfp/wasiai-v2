@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { error }
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     // Log to console in dev; replace with Sentry.captureException(error, { extra: info }) in prod
     console.error('[ErrorBoundary] caught:', error, info.componentStack)
   }
@@ -43,7 +43,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.setState({ error: null })
   }
 
-  render() {
+  override render() {
     const { error } = this.state
     const { children, fallback } = this.props
 

@@ -7,8 +7,8 @@ import { useTranslations } from 'next-intl'
 import { useAgentSearch, type AgentSearchResult } from '../hooks/useAgentSearch'
 
 interface SearchBarProps {
-  defaultValue?: string
-  category?:     string
+  defaultValue?: string | undefined
+  category?:     string | undefined
   placeholder?:  string
   mode?:         'server' | 'client'
   onResults?:    (results: import('../hooks/useAgentSearch').AgentSearchResult[]) => void

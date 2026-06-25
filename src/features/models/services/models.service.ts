@@ -11,10 +11,10 @@ export async function getModels({
   limit = 12,
   offset = 0,
 }: {
-  category?: ModelCategory
-  search?: string
-  agent_type?: AgentTypeFilter | string
-  max_price?: number
+  category?: ModelCategory | undefined
+  search?: string | undefined
+  agent_type?: AgentTypeFilter | string | undefined
+  max_price?: number | undefined
   limit?: number
   offset?: number
 } = {}): Promise<{ models: Model[]; total: number }> {

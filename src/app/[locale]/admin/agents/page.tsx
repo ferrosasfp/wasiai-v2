@@ -53,7 +53,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft
+  // invariant: STATUS_CONFIG.draft is a statically-defined key
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft!
   const Icon = cfg.icon
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${cfg.bg} ${cfg.color}`}>

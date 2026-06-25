@@ -28,13 +28,16 @@ export function CodeBlock({ tabs }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
 
   const current = tabs[activeTab]
-  const highlighted = hljs.highlight(current.code, { language: current.language }).value
 
   async function handleCopy() {
+    if (!current) return
     await navigator.clipboard.writeText(current.code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  if (!current) return null
+  const highlighted = hljs.highlight(current.code, { language: current.language }).value
 
   return (
     <div className="rounded-xl overflow-hidden border border-gray-800 bg-[#0d1117] text-sm">

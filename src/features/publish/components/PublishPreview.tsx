@@ -7,13 +7,13 @@ import type { Model } from '@/features/models/types/models.types'
 interface PublishPreviewProps {
   locale: string
   formData: {
-    name?: string
-    description?: string
-    category?: string
-    price_per_call?: number
-    agent_type?: string
-    cover_image?: string | null
-    slug?: string
+    name?: string | undefined
+    description?: string | undefined
+    category?: string | undefined
+    price_per_call?: number | undefined
+    agent_type?: string | undefined
+    cover_image?: string | null | undefined
+    slug?: string | undefined
   }
   previewLabel: string   // "Vista previa" (i18n, resuelto desde PublishForm)
   showLabel: string      // "Ver preview" (mobile)

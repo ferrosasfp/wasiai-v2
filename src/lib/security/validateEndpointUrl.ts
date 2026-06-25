@@ -80,8 +80,9 @@ async function validateResolvedIPs(hostname: string): Promise<string> {
       }
     }
     // Return the first resolved IP for use by callers (e.g. DNS rebinding protection via direct IP connect)
-    if (addresses.length > 0) {
-      return addresses[0].address
+    const first = addresses[0]
+    if (first) {
+      return first.address
     }
     throw new Error(`No addresses resolved for hostname: ${hostname}`)
   } catch (err) {

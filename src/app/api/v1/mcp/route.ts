@@ -74,7 +74,9 @@ async function callUpstreamMcp(
   try {
     await validateEndpointUrlAsync(endpointUrl)
   } catch (err) {
-    return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error', latencyMs: 0 }
+    // V10: don't echo the raw validation error (may include internal IP/host).
+    logger.warn('[mcp] endpoint validation failed', { err: String(err) })
+    return { data: { error: 'Invalid model endpoint' }, status: 'error', latencyMs: 0 }
   }
 
   const startMs = Date.now()
@@ -94,7 +96,9 @@ async function callUpstreamMcp(
     const data = upstream.ok ? await upstream.json() : { error: `Upstream ${upstream.status}` }
     return { data, status: upstream.ok ? 'success' : 'error', latencyMs: Date.now() - startMs }
   } catch (err) {
-    return { data: { error: 'Upstream unreachable', detail: String(err) }, status: 'error', latencyMs: Date.now() - startMs }
+    // V10: don't echo the raw fetch error (may include internal host/IP).
+    logger.warn('[mcp] upstream unreachable', { err: String(err) })
+    return { data: { error: 'Upstream unreachable' }, status: 'error', latencyMs: Date.now() - startMs }
   }
 }
 

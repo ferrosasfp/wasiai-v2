@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createPublicClient, http } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
+import { jsonError } from '@/lib/api/jsonError'
 
 
 // Chain-agnostic: usa las mismas vars que el resto del sistema
@@ -66,6 +67,6 @@ export async function GET() {
       chain:                  IS_MAINNET ? 'mainnet' : 'fuji',
     })
   } catch (err) {
-    return NextResponse.json({ error: 'Contract read failed', detail: String(err).slice(0, 200) }, { status: 500 })
+    return jsonError('read_failed', 'Contract read failed', 500, { logDetail: err })
   }
 }

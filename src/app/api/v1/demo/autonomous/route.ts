@@ -9,7 +9,7 @@ const REPORT_SYSTEM = `You are a DeFi analyst generating an autonomous agent rep
 interface Phase {
   name: 'discovery' | 'planning' | 'execution' | 'report'
   status: 'ok' | 'error'
-  detail?: string
+  detail?: string | undefined
 }
 
 export async function POST(req: NextRequest) {

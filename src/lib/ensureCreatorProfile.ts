@@ -22,7 +22,7 @@ export async function ensureCreatorProfile(
 
   // Build username from email
   const email = user.email ?? ''
-  let username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  let username = (email.split('@')[0] ?? '').toLowerCase().replace(/[^a-z0-9_]/g, '_')
   if (!username) username = `user_${user.id.slice(0, 8)}`
 
   // Ensure uniqueness

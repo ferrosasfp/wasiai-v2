@@ -235,8 +235,11 @@ export async function settlePaymentDirectly(
     const vRaw = parseInt(sig.slice(130, 132), 16)
     const v = vRaw < 27 ? vRaw + 27 : vRaw
 
+    const usdcAddress = USDC_ADDR[CHAIN_ID]
+    if (!usdcAddress) throw new Error(`No USDC address configured for chain ${CHAIN_ID}`)
+
     const txHash = await walletClient.writeContract({
-      address:      USDC_ADDR[CHAIN_ID],
+      address:      usdcAddress,
       abi:          TRANSFER_WITH_AUTH_ABI,
       functionName: 'transferWithAuthorization',
       args: [

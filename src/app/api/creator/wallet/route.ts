@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { validateCsrf } from '@/lib/security/csrf'
 import { triggerImmediateSettlement } from '@/lib/settlement/immediateSettlement'
 import { logger } from '@/lib/logger'
+import { jsonError } from '@/lib/api/jsonError'
 
 export async function POST(req: NextRequest) {
   // S-02: CSRF protection — validate request origin
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     .update({ wallet_address })
     .eq('id', user.id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to update wallet address', 500, { logDetail: error })
 
   // Fire-and-forget: settle accumulated pending earnings now that wallet is set.
   // Non-fatal — wallet is already saved. Cron diario resuelve si falla.

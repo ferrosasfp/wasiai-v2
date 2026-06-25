@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   // 5. Generate and insert agent key (budget_usdc: 0 — agent must fund manually)
   const { raw, hash } = generateApiKey()
-  const emailLocalPart = email.split('@')[0].slice(0, 50)
+  const emailLocalPart = (email.split('@')[0] ?? email).slice(0, 50)
 
   const { error: keyError } = await serviceClient.from('agent_keys').insert({
     owner_id: data.user.id,

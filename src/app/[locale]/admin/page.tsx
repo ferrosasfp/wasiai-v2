@@ -228,6 +228,7 @@ export default function AdminPage() {
     try {
       const accounts = await win.ethereum.request({ method: 'eth_requestAccounts' }) as string[]
       const from = accounts[0]
+      if (!from) { setDrainMsg('❌ No se pudo obtener la cuenta'); return }
       const chainHex = await win.ethereum.request({ method: 'eth_chainId' }) as string
       if (parseInt(chainHex, 16) !== 43113) { setDrainMsg('❌ Cambia a Fuji (chain 43113)'); return }
 

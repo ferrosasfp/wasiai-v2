@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
+import { jsonError } from '@/lib/api/jsonError'
 
 async function verifyAuth(request: NextRequest, action: string) {
   const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request, 'listAgents')
-  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status })
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 401 })
 
   const supabase = createServiceClient()
   const { data: agents, error } = await supabase
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     .order('name', { ascending: true })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('read_failed', 'Failed to list agents', 500, { logDetail: error })
   }
 
   // Fetch creator profiles for display names

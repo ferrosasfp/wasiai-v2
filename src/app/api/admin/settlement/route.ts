@@ -3,6 +3,7 @@ import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verif
 import { createServiceClient } from '@/lib/supabase/server'
 import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
 import { logger } from '@/lib/logger'
+import { jsonError } from '@/lib/api/jsonError'
 
 type SettlementAction = 'run' | 'toggle'
 type SettlementMode   = 'vercel' | 'chainlink'
@@ -69,8 +70,7 @@ export async function POST(request: NextRequest) {
       .eq('key', 'settlement_mode')
 
     if (error) {
-      logger.error('[admin/settlement] toggle failed', { error })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return jsonError('db_error', 'Failed to toggle settlement mode', 500, { logDetail: error })
     }
 
     logger.info('[admin/settlement] mode toggled', { mode })
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
             } catch { /* skip */ }
           }
           if (creatorWallet) {
-            const net = batchAmounts[i] * (1 - PLATFORM_FEE_BPS / 10000)
+            const net = (batchAmounts[i] ?? 0) * (1 - PLATFORM_FEE_BPS / 10000)
             earningsByCreator.set(creatorWallet, (earningsByCreator.get(creatorWallet) ?? 0) + net)
           }
         }
@@ -289,13 +289,6 @@ export async function POST(request: NextRequest) {
       results,
     })
   } catch (err) {
-    const detail = err instanceof Error
-      ? err.message
-      : (typeof err === 'object' ? JSON.stringify(err) : String(err))
-    logger.error('[admin/settlement] run failed', { err: detail })
-    return NextResponse.json(
-      { error: 'Settlement failed', detail: detail.slice(0, 500) },
-      { status: 500 },
-    )
+    return jsonError('settlement_failed', 'Settlement failed', 500, { logDetail: err })
   }
 }

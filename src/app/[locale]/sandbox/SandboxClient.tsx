@@ -82,8 +82,9 @@ export function SandboxClient({ userId }: { userId: string | null }) {
         const data = await res.json() as { agents?: AgentOption[]; data?: AgentOption[] }
         const list: AgentOption[] = data.agents ?? data.data ?? []
         setAgents(list)
-        if (list.length > 0 && !selectedSlug) {
-          const firstSlug = list[0].slug
+        const first = list[0]
+        if (first && !selectedSlug) {
+          const firstSlug = first.slug
           setSelectedSlug(firstSlug)
           void fetchExampleInput(firstSlug)
         }

@@ -269,11 +269,13 @@ export function WebhooksPanel() {
               </div>
 
               {/* Deliveries expandibles */}
-              {expandedId === wh.id && (
+              {expandedId === wh.id && (() => {
+                const deliveries = deliveriesMap[wh.id]
+                return (
                 <div className="ml-12 rounded-xl border border-gray-100 bg-gray-50 overflow-hidden">
-                  {!deliveriesMap[wh.id] ? (
+                  {!deliveries ? (
                     <p className="p-3 text-xs text-gray-400">Cargando...</p>
-                  ) : deliveriesMap[wh.id].length === 0 ? (
+                  ) : deliveries.length === 0 ? (
                     <p className="p-3 text-xs text-gray-400">Sin deliveries registradas.</p>
                   ) : (
                     <table className="w-full text-xs">
@@ -287,7 +289,7 @@ export function WebhooksPanel() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {deliveriesMap[wh.id].map(d => (
+                        {deliveries.map(d => (
                           <tr key={d.id} className="hover:bg-gray-50">
                             <td className="px-3 py-2 font-mono">{d.event}</td>
                             <td className="px-3 py-2 text-center">
@@ -310,7 +312,8 @@ export function WebhooksPanel() {
                     </table>
                   )}
                 </div>
-              )}
+                )
+              })()}
             </div>
           ))}
         </div>

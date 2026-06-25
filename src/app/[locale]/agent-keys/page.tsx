@@ -45,8 +45,8 @@ const MARKETPLACE_ADDRESS = CHAIN_ID === 43114
 interface DepositModalProps {
   keyId:               string
   keyName:             string
-  ownerWalletAddress?: string | null   // HU-058: first depositor's wallet
-  spentUsdc?:          number
+  ownerWalletAddress?: string | null | undefined   // HU-058: first depositor's wallet
+  spentUsdc?:          number | undefined
   onClose:             () => void
   onSuccess:           () => void
 }
@@ -696,7 +696,7 @@ export default function AgentKeysPage() {
   }
 
   // Modal state
-  const [depositKey,  setDepositKey]  = useState<{ id: string; name: string; ownerWalletAddress?: string | null; spentUsdc?: number } | null>(null)
+  const [depositKey,  setDepositKey]  = useState<{ id: string; name: string; ownerWalletAddress?: string | null | undefined; spentUsdc?: number | undefined } | null>(null)
   const [closeKey,    setCloseKey]    = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
   const [withdrawKey, setWithdrawKey] = useState<{ id: string; name: string; balance: number; keyHash: string } | null>(null)
 

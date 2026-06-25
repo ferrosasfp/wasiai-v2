@@ -16,7 +16,7 @@ interface ActionSheetProps {
   open: boolean
   onClose: () => void
   items: ActionSheetItem[]
-  title?: string
+  title?: string | undefined
 }
 
 export function ActionSheet({ open, onClose, items, title }: ActionSheetProps) {

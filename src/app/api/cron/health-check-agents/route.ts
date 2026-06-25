@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { probeEndpointSync } from '@/lib/agents/health-probe'
 import { logger } from '@/lib/logger'
+import { jsonError } from '@/lib/api/jsonError'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120  // Consistent with other crons in this repo (reconcile-onchain, etc.)
@@ -37,8 +38,7 @@ export async function GET(req: Request) {
     .limit(BATCH_SIZE)
 
   if (error) {
-    logger.error('[health-cron] Failed to fetch agents', { error: error.message })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('read_failed', 'Failed to fetch agents', 500, { logDetail: error })
   }
 
   let checked = 0, passed = 0, failed = 0, reactivated = 0

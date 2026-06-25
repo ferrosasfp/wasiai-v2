@@ -13,7 +13,7 @@ const addressSchema = z.string().refine(
 export async function linkWallet(walletAddress: string) {
     const validated = addressSchema.safeParse(walletAddress)
     if (!validated.success) {
-        return { error: validated.error.issues[0].message }
+        return { error: validated.error.issues[0]?.message ?? 'Validation failed' }
     }
 
     const supabase = await createClient()
@@ -100,7 +100,7 @@ export async function unlinkWallet() {
 export async function saveSmartAccount(smartAccountAddress: string) {
     const validated = addressSchema.safeParse(smartAccountAddress)
     if (!validated.success) {
-        return { error: validated.error.issues[0].message }
+        return { error: validated.error.issues[0]?.message ?? 'Validation failed' }
     }
 
     const supabase = await createClient()

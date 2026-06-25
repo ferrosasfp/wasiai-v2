@@ -59,6 +59,7 @@ export async function GET() {
 
   results.forEach((result, idx) => {
     const slug = slugs[idx]
+    if (!slug) return
     if (result.status === 'fulfilled') {
       if (result.value === true) {
         registered.push(slug)

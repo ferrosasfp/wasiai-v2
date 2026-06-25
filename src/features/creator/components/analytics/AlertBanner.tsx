@@ -17,10 +17,10 @@ interface Props {
 function resolveAlertMessage(message: string, t: ReturnType<typeof useTranslations<'analytics'>>) {
   // Backend encodes as "i18n.key:agentName"
   if (message.startsWith('analytics.alertHighError:')) {
-    return t('alertHighError', { name: message.split(':')[1] })
+    return t('alertHighError', { name: message.split(':')[1] ?? '' })
   }
   if (message.startsWith('analytics.alertNoActivity:')) {
-    return t('alertNoActivity', { name: message.split(':')[1] })
+    return t('alertNoActivity', { name: message.split(':')[1] ?? '' })
   }
   return message
 }

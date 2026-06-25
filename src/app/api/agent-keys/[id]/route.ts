@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { jsonError } from '@/lib/api/jsonError'
 
 // PATCH /api/agent-keys/[id] — desactivar clave (sin on-chain)
 export async function PATCH(
@@ -37,7 +38,7 @@ export async function PATCH(
     .select('id, is_active')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to update agent key', 500, { logDetail: error })
 
   return NextResponse.json(updated)
 }

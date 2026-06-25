@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { jsonError } from '@/lib/api/jsonError'
 
 export async function GET() {
   const supabase = await createClient()
@@ -14,7 +15,7 @@ export async function GET() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to list webhooks', 500, { logDetail: error })
   return NextResponse.json({ webhooks: data })
 }
 
@@ -54,6 +55,6 @@ export async function POST(req: NextRequest) {
     .select('id, url, events, is_active, created_at')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to create webhook', 500, { logDetail: error })
   return NextResponse.json({ webhook, secret: generatedSecret }, { status: 201 })
 }

@@ -16,23 +16,23 @@ export type PaymentFlowState =
 export interface PaymentFlowContext {
   state: PaymentFlowState
   /** Dirección hex de la wallet conectada (undefined si no hay) */
-  address?: `0x${string}`
+  address?: `0x${string}` | undefined
   /** chainId actual de la wallet */
-  chainId?: number
+  chainId?: number | undefined
   /** Nombre legible de la red actual */
-  chainName?: string
+  chainName?: string | undefined
   /** Balance USDC en unidades USDC (decimales ya aplicados, ej: 12.5) */
-  usdcBalance?: number
+  usdcBalance?: number | undefined
   /** true si el balance alcanza para pagar el modelo */
   hasEnoughBalance: boolean
   /** true solo si EIP-3009 falló por motivo técnico (no por rechazo del usuario) */
   fallbackAvailable: boolean
   /** Resultado de la invocación al modelo (texto del agente) */
-  result?: string
+  result?: string | undefined
   /** Hash de la tx on-chain (EIP-3009 o approve) */
-  txHash?: `0x${string}`
+  txHash?: `0x${string}` | undefined
   /** Mensaje de error legible para mostrar al usuario */
-  errorMessage?: string
+  errorMessage?: string | undefined
 }
 
 export interface EIP712AuthorizationPayload {

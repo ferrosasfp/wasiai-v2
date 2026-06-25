@@ -5,6 +5,7 @@ import { validateCsrf } from '@/lib/security/csrf'
 import { ensureCreatorProfile } from '@/lib/ensureCreatorProfile'
 // A-07: Use shared schema to keep client/server validation in sync
 import { createModelSchema } from '@/lib/schemas/model.schema'
+import { jsonError } from '@/lib/api/jsonError'
 
 export async function POST(request: NextRequest) {
   // S-02: CSRF protection
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     try {
       validateEndpointUrl(result.data.endpoint_url)
     } catch (err) {
-      return NextResponse.json({ error: String(err) }, { status: 422 })
+      return jsonError('invalid_endpoint_url', 'Endpoint URL is not allowed', 422, { logDetail: err })
     }
   }
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
         { status: 409 },
       )
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('db_error', 'Failed to create agent', 500, { logDetail: error })
   }
 
   // HU-1.2: registerAgentOnChain moved to PATCH /status when status → 'active'
@@ -113,7 +114,7 @@ export async function PATCH(request: NextRequest) {
     .select('slug, max_rpm, max_rpd')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to update agent', 500, { logDetail: error })
   if (!data) return NextResponse.json({ error: 'Agent not found or not owned by you' }, { status: 404 })
 
   return NextResponse.json(data, { status: 200 })

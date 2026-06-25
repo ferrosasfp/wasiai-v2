@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
+import { jsonError } from '@/lib/api/jsonError'
 
 async function verifyAuth(request: NextRequest, action: string) {
   const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
@@ -28,7 +29,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = await verifyAuth(request, 'updateAgent')
-  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status })
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 401 })
 
   const { id } = await params
   const supabase = createServiceClient()
@@ -52,7 +53,7 @@ export async function PATCH(
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('db_error', 'Failed to update agent', 500, { logDetail: error })
   }
 
   return NextResponse.json(data)

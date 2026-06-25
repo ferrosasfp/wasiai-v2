@@ -117,7 +117,7 @@ async function logCall(
   keyId?: string | null,
   agentSlug?: string | null,
   nonce?: string | null,
-): Promise<{ id?: string }> {
+): Promise<{ id?: string | undefined }> {
   assertPaymentType('api_key')
   const [insertResult] = await Promise.all([
     supabase.from('agent_calls').insert({
@@ -168,11 +168,15 @@ async function callUpstreamIntrospect(
     const latencyMs = Date.now() - startMs
     // V3: SSRF/DNS-rebinding rejection → invalid endpoint (bearer NOT sent).
     if (err instanceof EndpointValidationError) {
-      return { data: { error: 'Invalid model endpoint', detail: String(err) }, status: 'error', latencyMs: 0, timedOut: false }
+      // V10: don't echo the raw validation error (may include internal IP/host).
+      logger.warn('[introspect] endpoint validation failed', { err: String(err) })
+      return { data: { error: 'Invalid model endpoint' }, status: 'error', latencyMs: 0, timedOut: false }
     }
     const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+    // V10: don't echo the raw fetch error (may include internal host/IP).
+    logger.warn('[introspect] upstream error', { err: String(err), timedOut })
     return {
-      data: { error: timedOut ? 'Upstream timeout' : 'Upstream unreachable', detail: String(err) },
+      data: { error: timedOut ? 'Upstream timeout' : 'Upstream unreachable' },
       status: 'error',
       latencyMs,
       timedOut,

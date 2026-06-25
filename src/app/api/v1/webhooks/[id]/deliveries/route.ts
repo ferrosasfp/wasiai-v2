@@ -1,6 +1,7 @@
 // src/app/api/v1/webhooks/[id]/deliveries/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { jsonError } from '@/lib/api/jsonError'
 
 export async function GET(
   _req: NextRequest,
@@ -28,6 +29,6 @@ export async function GET(
     .order('delivered_at', { ascending: false })
     .limit(10)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to load deliveries', 500, { logDetail: error })
   return NextResponse.json({ deliveries })
 }

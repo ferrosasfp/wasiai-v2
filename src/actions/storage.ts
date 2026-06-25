@@ -51,7 +51,7 @@ export async function uploadFile(formData: FormData) {
   })
 
   if (!fileValidation.success) {
-    return { error: fileValidation.error.issues[0].message }
+    return { error: fileValidation.error.issues[0]?.message ?? 'Validation failed' }
   }
 
   // Parse and validate metadata
@@ -105,7 +105,7 @@ export async function deleteFile(cid: string) {
   const cidValidation = cidSchema.safeParse(cid)
 
   if (!cidValidation.success) {
-    return { error: cidValidation.error.issues[0].message }
+    return { error: cidValidation.error.issues[0]?.message ?? 'Validation failed' }
   }
 
   // T-01: Verify ownership before deleting
@@ -161,7 +161,7 @@ export async function getFileUrl(cid: string) {
   const cidValidation = cidSchema.safeParse(cid)
 
   if (!cidValidation.success) {
-    return { error: cidValidation.error.issues[0].message }
+    return { error: cidValidation.error.issues[0]?.message ?? 'Validation failed' }
   }
 
   try {

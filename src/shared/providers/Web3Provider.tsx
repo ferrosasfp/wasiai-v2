@@ -24,7 +24,7 @@ class Web3ErrorBoundary extends Component<Props, ErrorBoundaryState> {
     return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('[Web3Provider] Error caught:', error, errorInfo)
   }
 
@@ -32,7 +32,7 @@ class Web3ErrorBoundary extends Component<Props, ErrorBoundaryState> {
     this.setState({ hasError: false, error: null })
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
         <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">

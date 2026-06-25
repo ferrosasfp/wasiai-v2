@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit, getIdentifier } from '@/lib/ratelimit'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import { jsonError } from '@/lib/api/jsonError'
 
 // 10 req/min per user — separate limiter for profile PATCH
 let _profileLimit: Ratelimit | null = null
@@ -69,7 +70,7 @@ export async function PATCH(req: NextRequest) {
     .update(updates)
     .eq('id', user.id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to update profile', 500, { logDetail: error })
 
   return NextResponse.json({ ok: true })
 }

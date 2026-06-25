@@ -44,7 +44,7 @@ function extractPaymentFromHeaders(headers: Headers | Record<string, string | st
     : Object.entries(headers)
   for (const [key, value] of entries) {
     if (typeof value === 'string') normalized[key.toLowerCase()] = value
-    else if (Array.isArray(value) && value.length > 0) normalized[key.toLowerCase()] = value[0]
+    else if (Array.isArray(value) && value[0] !== undefined) normalized[key.toLowerCase()] = value[0]
   }
   const payment = normalized['x-payment'] ?? normalized['payment-signature'] ?? null
   if (!payment) return null
@@ -717,7 +717,10 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
     // V3: SSRF/DNS-rebinding rejection from fetchPinned → invalid endpoint, not a
     // transient upstream failure. The bearer secret was NOT sent.
     if (err instanceof EndpointValidationError) {
-      data = { error: 'Invalid model endpoint', detail: String(err) }
+      // V10: do not echo the raw validation error (may include the resolved
+      // internal IP/host) back to the client — log it server-side instead.
+      logger.warn('[invoke] endpoint validation failed', { err: String(err), slug })
+      data = { error: 'Invalid model endpoint' }
       httpStatusHint = 502
     // WAS-284: discriminar tipo de error para HTTP status correcto
     } else if (err instanceof DOMException && err.name === 'TimeoutError') {
@@ -731,7 +734,9 @@ async function callUpstream(model: Record<string, unknown>, request: NextRequest
       httpStatusHint = upstreamStatus >= 500 ? 503 : 502
     } else {
       // Connection error (TypeError ECONNREFUSED, ENOTFOUND, etc.)
-      data = { error: 'Upstream unreachable', detail: String(err) }
+      // V10: the raw error can contain the internal host/IP — log it, don't echo.
+      logger.warn('[invoke] upstream unreachable', { err: String(err), slug })
+      data = { error: 'Upstream unreachable' }
       httpStatusHint = 502
     }
   }
@@ -750,7 +755,7 @@ async function logCall(
   agentSlug?: string | null,
   nonce?: string | null,
   paymentType?: string,
-): Promise<{ id?: string; error?: { code: string } }> {
+): Promise<{ id?: string | undefined; error?: { code: string } }> {
   // PERF-06: supabase is already resolved — no redundant await
   const [insertResult] = await Promise.all([
     supabase.from('agent_calls').insert({
@@ -793,7 +798,7 @@ interface PricingInfo {
 
 function buildResponse(
   model: Record<string, unknown>,
-  result: { data: unknown; status: string; latencyMs: number; httpStatusHint?: number },
+  result: { data: unknown; status: string; latencyMs: number; httpStatusHint?: number | undefined },
   txHash?: string,
   receiptSignature?: string,
   pricingInfo?: PricingInfo,

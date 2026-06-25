@@ -5,8 +5,8 @@ import type { Model } from '../types/models.types'
 import { Search } from 'lucide-react'
 
 interface EmptySearchStateProps {
-  search?: string
-  category?: string
+  search?: string | undefined
+  category?: string | undefined
   locale: string
   suggestedModels: Model[]
   clearHref: string
@@ -14,7 +14,7 @@ interface EmptySearchStateProps {
   texts: {
     noResults: string       // "No encontramos agentes para 'X'"
     suggestion: string      // "Prueba con otras palabras..."
-    alsoTryClearCategory?: string
+    alsoTryClearCategory?: string | undefined
     viewAll: string         // "Ver todos los agentes"
     popularAgents: string   // "Agentes populares"
   }

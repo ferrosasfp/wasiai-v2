@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
+import { jsonError } from '@/lib/api/jsonError'
 
 async function requireAdmin(request: NextRequest): Promise<{ ok: true } | NextResponse> {
   const body = await request.clone().json().catch(() => null)
@@ -36,7 +37,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     .eq('collection_id', id)
     .order('sort_order')
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('read_failed', 'Failed to list collection agents', 500, { logDetail: error })
   return NextResponse.json(data ?? [])
 }
 
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'Agent already in collection' }, { status: 409 })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('db_error', 'Failed to add agent to collection', 500, { logDetail: error })
   }
 
   return NextResponse.json({ ok: true }, { status: 201 })
@@ -100,7 +101,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     .eq('collection_id', id)
     .eq('agent_id', parsed.data.agent_id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to remove agent from collection', 500, { logDetail: error })
   return NextResponse.json({ ok: true })
 }
 
@@ -137,7 +138,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
   const results = await Promise.all(updates)
   const failed = results.find(r => r.error)
-  if (failed?.error) return NextResponse.json({ error: failed.error.message }, { status: 500 })
+  if (failed?.error) return jsonError('db_error', 'Failed to reorder collection agents', 500, { logDetail: failed.error })
 
   return NextResponse.json({ ok: true })
 }

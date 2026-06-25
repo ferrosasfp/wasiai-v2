@@ -6,6 +6,7 @@ import { randomBytes } from 'crypto'
 import { CHAIN_NAME } from '@/lib/chain'
 import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
 import { metaValidateSchema } from '@/lib/schema-validator'
+import { jsonError } from '@/lib/api/jsonError'
 
 type JsonSchema = Parameters<typeof buildExampleFromSchema>[0]
 
@@ -74,7 +75,7 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
       try {
         await validateEndpointUrlAsync(answer)
       } catch (err) {
-        return NextResponse.json({ error: String(err) }, { status: 400 })
+        return jsonError('invalid_endpoint_url', 'Onboarding step failed', 400, { logDetail: err })
       }
       // Inline ping
       let pingOk = false

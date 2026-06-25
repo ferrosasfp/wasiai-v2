@@ -45,8 +45,10 @@ const MAX_STEPS = 5
 // ── Validación client-side ────────────────────────────────────────────────────
 function validateStepsClient(steps: LocalStep[], tFn: (k: string, v?: Record<string, string | number | Date>) => string): string | null {
   for (let i = 0; i < steps.length; i++) {
-    if (!steps[i].agent_slug) return `Step ${i + 1}: select an agent.`
-    if (!steps[i].pass_output && !steps[i].input?.trim()) {
+    const step = steps[i]
+    if (!step) continue
+    if (!step.agent_slug) return `Step ${i + 1}: select an agent.`
+    if (!step.pass_output && !step.input?.trim()) {
       return tFn('stepValidation', { n: i + 1 })
     }
   }

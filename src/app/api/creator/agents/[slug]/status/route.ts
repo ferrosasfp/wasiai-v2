@@ -13,6 +13,7 @@ import { validateCsrf } from '@/lib/security/csrf'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { probeEndpointSync } from '@/lib/agents/health-probe'
 import { logger } from '@/lib/logger'
+import { jsonError } from '@/lib/api/jsonError'
 
 // HU-1.2: 'draft' added to support multi-step publish flow
 const statusSchema = z.object({
@@ -135,7 +136,7 @@ export async function PATCH(
     .update(updatePayload)
     .eq('id', existing.id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to update agent status', 500, { logDetail: error })
 
   // WAS-160b: Only fire-and-forget registerAgentOnChain for legacy flow (no client-side tx)
   // If registration_type was explicitly set, the client already handled on-chain registration

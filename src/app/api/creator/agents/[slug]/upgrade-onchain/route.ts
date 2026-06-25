@@ -11,6 +11,7 @@ import { validateCsrf } from '@/lib/security/csrf'
 import { createPublicClient, http, decodeEventLog, keccak256, toHex } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { logger } from '@/lib/logger'
+import { jsonError } from '@/lib/api/jsonError'
 import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
 import { getRegisterLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 
@@ -168,8 +169,9 @@ export async function POST(
     .eq('id', existing.id)
 
   if (error) {
-    logger.error('[upgrade-onchain] DB update failed', { slug, error: error.message })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('db_error', 'Failed to upgrade agent on-chain', 500, {
+      logDetail: { slug, error },
+    })
   }
 
   logger.info('[upgrade-onchain] Agent upgraded', { slug })

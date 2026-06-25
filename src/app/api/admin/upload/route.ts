@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { jsonError } from '@/lib/api/jsonError'
 
 export async function POST(request: NextRequest) {
   // Auth: require logged-in user
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     .upload(fileName, file, { contentType: file.type, upsert: false })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('upload_failed', 'Failed to upload file', 500, { logDetail: error })
   }
 
   const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName)

@@ -2,6 +2,7 @@
 // HU-4.3: PATCH + DELETE para ejemplos individuales
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { jsonError } from '@/lib/api/jsonError'
 
 // PATCH — editar ejemplo
 export async function PATCH(
@@ -43,7 +44,7 @@ export async function PATCH(
     .select()
     .maybeSingle()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to update example', 500, { logDetail: error })
   if (!data)  return NextResponse.json({ error: 'Not found or forbidden' }, { status: 404 })
   return NextResponse.json({ example: data })
 }
@@ -65,7 +66,7 @@ export async function DELETE(
     .eq('agent_id', agentId)
     .eq('creator_id', user.id)  // doble check de ownership + RLS
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to delete example', 500, { logDetail: error })
   if (count === 0) return NextResponse.json({ error: 'Not found or forbidden' }, { status: 404 })
   return NextResponse.json({ success: true })
 }

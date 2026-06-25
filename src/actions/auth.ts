@@ -42,7 +42,7 @@ export async function login(formData: FormData) {
     })
 
     if (!validatedFields.success) {
-        return { error: validatedFields.error.issues[0].message }
+        return { error: validatedFields.error.issues[0]?.message ?? 'Validation failed' }
     }
 
     const { email, password, locale } = validatedFields.data
@@ -69,7 +69,7 @@ export async function signup(formData: FormData) {
     })
 
     if (!validatedFields.success) {
-        return { error: validatedFields.error.issues[0].message }
+        return { error: validatedFields.error.issues[0]?.message ?? 'Validation failed' }
     }
 
     const { email, password, locale } = validatedFields.data
@@ -106,7 +106,7 @@ export async function resetPassword(formData: FormData) {
     })
 
     if (!validatedFields.success) {
-        return { error: validatedFields.error.issues[0].message }
+        return { error: validatedFields.error.issues[0]?.message ?? 'Validation failed' }
     }
 
     const { email } = validatedFields.data
@@ -130,7 +130,7 @@ export async function updatePassword(formData: FormData) {
     })
 
     if (!validatedFields.success) {
-        return { error: validatedFields.error.issues[0].message }
+        return { error: validatedFields.error.issues[0]?.message ?? 'Validation failed' }
     }
 
     const { password, locale } = validatedFields.data
@@ -152,7 +152,7 @@ export async function updateProfile(formData: FormData) {
     })
 
     if (!validatedFields.success) {
-        return { error: validatedFields.error.issues[0].message }
+        return { error: validatedFields.error.issues[0]?.message ?? 'Validation failed' }
     }
 
     const { full_name } = validatedFields.data

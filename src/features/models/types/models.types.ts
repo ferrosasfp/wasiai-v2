@@ -73,7 +73,7 @@ export interface Model {
   last_checked_at: string | null
 
   // joined
-  creator?: CreatorProfile
+  creator?: CreatorProfile | undefined
 }
 
 /** Alias for semantic clarity in agent-focused code */

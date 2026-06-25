@@ -46,8 +46,9 @@ export function TryIt() {
       .then((data) => {
         const list: Agent[] = Array.isArray(data) ? data : (data.agents ?? [])
         setAgents(list)
-        if (list.length > 0) {
-          const firstSlug = list[0].slug
+        const first = list[0]
+        if (first) {
+          const firstSlug = first.slug
           setSlug((prev) => prev || firstSlug)
           void fetchAndSetPayload(firstSlug)
         }

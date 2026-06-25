@@ -99,7 +99,7 @@ export async function forwardRequest(
     const upstream = await fetch(finalUrl, {
       method: req.method,
       headers: forwardHeaders,
-      body,
+      ...(body !== undefined ? { body } : {}),
       signal: controller.signal,
       redirect: 'manual',
     })

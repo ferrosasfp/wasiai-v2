@@ -28,9 +28,9 @@ export async function callGroq({
   temperature = 0.3,
 }: {
   messages: GroqMessage[]
-  model?: string
-  maxTokens?: number
-  temperature?: number
+  model?: string | undefined
+  maxTokens?: number | undefined
+  temperature?: number | undefined
 }): Promise<GroqResponse> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) throw new Error('GROQ_API_KEY not configured')

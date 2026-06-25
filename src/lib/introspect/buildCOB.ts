@@ -31,7 +31,7 @@ export interface BuildCOBOptions {
   upstreamData:    unknown       // raw response from upstream
   latencyMs:       number
   truncated:       boolean
-  truncatedReason?: string
+  truncatedReason?: string | undefined
   erc8004Identity: string
 }
 

@@ -25,6 +25,7 @@
 
 import { NextRequest, NextResponse, after } from 'next/server'
 import { probeEndpoint } from '@/lib/agents/health-probe'
+import { jsonError } from '@/lib/api/jsonError'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
@@ -161,7 +162,7 @@ async function resolveCreatorFromEmail(
 
   const profilePayload: Record<string, unknown> = {
     id: userId,
-    username: `${email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase()}_${Date.now()}`,
+    username: `${(email.split('@')[0] ?? email).replace(/[^a-z0-9_]/gi, '_').toLowerCase()}_${Date.now()}`,
     display_name: email.split('@')[0],
     email_domain: email.split('@')[1]?.toLowerCase() ?? null,
   }
@@ -341,7 +342,7 @@ export async function POST(request: NextRequest) {
     try {
       await validateEndpointUrlAsync(data.endpoint_url)
     } catch (err) {
-      return NextResponse.json({ error: String(err) }, { status: 422 })
+      return jsonError('invalid_endpoint_url', 'Endpoint URL is not allowed', 422, { logDetail: err })
     }
   }
 

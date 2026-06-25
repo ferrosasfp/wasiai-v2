@@ -50,6 +50,7 @@ async function syncKeysOnChain(keys: AgentKey[]): Promise<KeyWithMeta[]> {
     for (let j = 0; j < batch.length; j++) {
       const key = batch[j]
       const result = settled[j]
+      if (!key || !result) continue
       if (result.status === 'fulfilled') {
         const syncedAtStr = new Date().toISOString()
         results.set(key.id, { budget_usdc: result.value.balance, balance_synced_at: syncedAtStr, stale: false })

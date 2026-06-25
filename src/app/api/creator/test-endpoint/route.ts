@@ -8,6 +8,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { jsonError } from '@/lib/api/jsonError'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { checkRateLimit, getIdentifier } from '@/lib/ratelimit'
 import { Ratelimit } from '@upstash/ratelimit'
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
   try {
     await validateEndpointUrlAsync(endpoint_url)
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 400 })
+    return jsonError('invalid_endpoint_url', 'Endpoint URL is not allowed', 400, { logDetail: err })
   }
 
   // Probe the endpoint

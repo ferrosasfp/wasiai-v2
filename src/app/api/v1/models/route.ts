@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { ModelCategory } from '@/features/models/types/models.types'
+import { jsonError } from '@/lib/api/jsonError'
 
 import { SITE_URL } from '@/lib/constants'
 
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
   if (search) query = query.ilike('name', `%${search}%`)
 
   const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to load models', 500, { logDetail: error })
 
   const models = (data ?? []).map(m => ({
     ...m,

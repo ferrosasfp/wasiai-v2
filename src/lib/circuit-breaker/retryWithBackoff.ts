@@ -24,7 +24,8 @@ export async function retryWithBackoff<T>(
 ): Promise<T> {
   let lastErr: unknown
   for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
-    if (i > 0) await sleep(RETRY_DELAYS_MS[i])
+    const delay = RETRY_DELAYS_MS[i]
+    if (i > 0 && delay !== undefined) await sleep(delay)
     try {
       return await fn()
     } catch (err) {

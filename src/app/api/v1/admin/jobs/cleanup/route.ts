@@ -14,6 +14,7 @@ import {
   verifyAdminSignature,
   type AdminActionMessage,
 } from '@/lib/admin/verifyAdminSignature'
+import { jsonError } from '@/lib/api/jsonError'
 
 export async function POST(req: NextRequest) {
   // Verificar firma EIP-712 del admin
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     .select('id')
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('db_error', 'Failed to clean up jobs', 500, { logDetail: error })
   }
 
   return NextResponse.json({ cleaned: data?.length ?? 0 })

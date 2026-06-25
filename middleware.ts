@@ -8,7 +8,7 @@ const intlMiddleware = createIntlMiddleware(routing)
 function extractLocaleFromPath(pathname: string): string | null {
   const segments = pathname.split('/')
   const possibleLocale = segments[1]
-  if (routing.locales.includes(possibleLocale as typeof routing.locales[number])) {
+  if (possibleLocale && routing.locales.includes(possibleLocale as typeof routing.locales[number])) {
     return possibleLocale
   }
   return null

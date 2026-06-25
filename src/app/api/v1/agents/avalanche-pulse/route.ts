@@ -5,6 +5,7 @@
  * Output: { price, change_24h, sentiment, summary, recommendation }
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonError } from '@/lib/api/jsonError'
 
 const COINGECKO = 'https://api.coingecko.com/api/v3'
 
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
       JOE: 'joe', PNG: 'pangolin', QI: 'benqi',
     }
 
-    const coinId = symbolMap[symbol] || symbolMap['AVAX']
+    const coinId = symbolMap[symbol] || symbolMap['AVAX'] || 'avalanche-2'
     const sym = Object.keys(symbolMap).find(k => symbolMap[k] === coinId) || symbol
 
     // Fetch price from CoinGecko
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       network: 'avalanche-testnet',
     })
   } catch (err) {
-    return NextResponse.json({ error: 'Invalid input', detail: String(err) }, { status: 400 })
+    return jsonError('invalid_input', 'Invalid input', 400, { logDetail: err })
   }
 }
 

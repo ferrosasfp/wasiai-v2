@@ -257,7 +257,7 @@ export default async function ModelDetailPage({ params }: Props) {
                   className="flex items-center gap-3 group"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-avax-100 text-base font-bold text-avax-600 shrink-0 group-hover:bg-avax-200 transition">
-                    {(model.creator.display_name ?? model.creator.username)[0].toUpperCase()}
+                    {((model.creator.display_name ?? model.creator.username)[0] ?? '').toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-gray-800 group-hover:text-avax-600 truncate transition">

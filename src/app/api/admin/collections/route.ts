@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
+import { jsonError } from '@/lib/api/jsonError'
 
 async function requireAdmin(request: NextRequest): Promise<{ ok: true } | NextResponse> {
   const body = await request.clone().json().catch(() => null)
@@ -29,7 +30,7 @@ export async function GET() {
     .select('*, collection_agents(agent_id)')
     .order('sort_order')
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('read_failed', 'Failed to list collections', 500, { logDetail: error })
 
   const collections = (data ?? []).map(c => ({
     ...c,
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'Slug already exists' }, { status: 409 })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonError('db_error', 'Failed to create collection', 500, { logDetail: error })
   }
 
   return NextResponse.json(data, { status: 201 })
@@ -110,7 +111,7 @@ export async function PUT(request: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to update collection', 500, { logDetail: error })
   return NextResponse.json(data)
 }
 
@@ -130,6 +131,6 @@ export async function DELETE(request: NextRequest) {
   const supabase = createServiceClient()
   const { error } = await supabase.from('collections').delete().eq('id', parsed.data.id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to delete collection', 500, { logDetail: error })
   return NextResponse.json({ ok: true })
 }

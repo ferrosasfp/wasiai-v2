@@ -181,10 +181,14 @@ export function AdminCollections() {
     const swapIdx = index + direction
     if (swapIdx < 0 || swapIdx >= newAgents.length) return
 
+    const a = newAgents[index]
+    const b = newAgents[swapIdx]
+    if (!a || !b) return
+
     // Swap sort_orders
-    const temp = newAgents[index].sort_order
-    newAgents[index] = { ...newAgents[index], sort_order: newAgents[swapIdx].sort_order }
-    newAgents[swapIdx] = { ...newAgents[swapIdx], sort_order: temp }
+    const temp = a.sort_order
+    newAgents[index] = { ...a, sort_order: b.sort_order }
+    newAgents[swapIdx] = { ...b, sort_order: temp }
     newAgents.sort((a, b) => a.sort_order - b.sort_order)
     setCollectionAgents(newAgents)
 

@@ -2,6 +2,7 @@
 // HU-4.3: CRUD de ejemplos input/output para agentes
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { jsonError } from '@/lib/api/jsonError'
 
 // GET — listar ejemplos del agente (solo el creator dueño)
 export async function GET(
@@ -29,7 +30,7 @@ export async function GET(
     .eq('agent_id', agentId)
     .order('created_at', { ascending: true })  // AC-4: orden de creación
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to list examples', 500, { logDetail: error })
   return NextResponse.json({ examples: data })
 }
 
@@ -80,7 +81,7 @@ export async function POST(
     p_label:      label?.trim() ?? null,
   })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to create example', 500, { logDetail: error })
   if (!data) {
     return NextResponse.json(
       { error: 'Maximum 5 examples per agent' },

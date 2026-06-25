@@ -23,8 +23,8 @@ export function useUnifiedWalletClient() {
       address: Address
       abi: Abi
       functionName: string
-      args?: readonly unknown[]
-      chainId?: number
+      args?: readonly unknown[] | undefined
+      chainId?: number | undefined
     }): Promise<Hash> => {
       if (!wagmiWalletClient) throw new Error('Wallet not connected')
 

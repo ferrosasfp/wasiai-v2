@@ -4,7 +4,7 @@ import { explorerTx } from '@/lib/chain'
 interface FallbackApproveFlowProps {
   amountUsdc:   number
   approveState: 'idle' | 'approving' | 'done'
-  txHash?:      `0x${string}`
+  txHash?:      `0x${string}` | undefined
   onConfirm:    () => void
   onCancel:     () => void
 }

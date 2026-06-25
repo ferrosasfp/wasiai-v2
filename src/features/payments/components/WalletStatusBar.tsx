@@ -7,9 +7,9 @@ import type { PaymentFlowState } from '../types/payment-flow.types'
 
 interface WalletStatusBarProps {
   flowState:     PaymentFlowState
-  address?:      `0x${string}`
-  chainName?:    string
-  usdcBalance?:  number
+  address?:      `0x${string}` | undefined
+  chainName?:    string | undefined
+  usdcBalance?:  number | undefined
   priceUsdc:     number
   onSwitchChain: () => void   // DEBE ser handler de onClick, no llamar sola
   onConnect:     () => void

@@ -12,6 +12,7 @@ import { validateCsrf } from '@/lib/security/csrf'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { createModelSchema } from '@/lib/schemas/model.schema'
 import { metaValidateSchema } from '@/lib/schema-validator'
+import { jsonError } from '@/lib/api/jsonError'
 
 
 // ── PATCH — update agent fields ──────────────────────────────────────────────
@@ -83,7 +84,7 @@ export async function PATCH(
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return jsonError('db_error', 'Failed to update agent', 500, { logDetail: error })
 
   // WAS-215: Re-verify endpoint when endpoint_url changes
   if (result.data.endpoint_url) {
@@ -149,14 +150,14 @@ export async function DELETE(
       .from('agents')
       .update({ status: 'deleted', updated_at: new Date().toISOString() })
       .eq('id', existing.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return jsonError('db_error', 'Failed to delete agent', 500, { logDetail: error })
   } else {
     // Hard-delete: no associated calls, safe to remove
     const { error } = await serviceClient
       .from('agents')
       .delete()
       .eq('id', existing.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return jsonError('db_error', 'Failed to delete agent', 500, { logDetail: error })
   }
 
   return NextResponse.json({ ok: true })

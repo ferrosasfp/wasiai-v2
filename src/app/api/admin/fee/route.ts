@@ -5,6 +5,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
 import { logger } from '@/lib/logger'
+import { jsonError } from '@/lib/api/jsonError'
 
 const CONTRACT_ADDRESS = (process.env.MARKETPLACE_CONTRACT_ADDRESS ?? '') as `0x${string}`
 
@@ -60,8 +61,7 @@ export async function GET() {
       executeAfter:        ts ? new Date(Number(ts) * 1000).toISOString() : null,
     })
   } catch (err) {
-    logger.error('[admin/fee] GET error', { err })
-    return NextResponse.json({ error: 'Read failed', detail: String(err).slice(0, 300) }, { status: 500 })
+    return jsonError('read_failed', 'Failed to read fee state', 500, { logDetail: err })
   }
 }
 
@@ -72,7 +72,7 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   const auth = await verifyAuth(request, 'proposeFee')
-  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status })
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 401 })
 
   let bps: number
   try {
@@ -97,8 +97,7 @@ export async function POST(request: NextRequest) {
     logger.info('[admin/fee] proposeFee tx', { txHash, bps })
     return NextResponse.json({ ok: true, txHash, bps, note: 'Fee proposed. Execute after 48h via PUT /api/admin/fee' })
   } catch (err) {
-    logger.error('[admin/fee] POST error', { err })
-    return NextResponse.json({ error: 'Transaction failed', detail: String(err).slice(0, 300) }, { status: 500 })
+    return jsonError('tx_failed', 'Transaction failed', 500, { logDetail: err })
   }
 }
 
@@ -108,7 +107,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   const auth = await verifyAuth(request, 'executeFee')
-  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status })
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 401 })
 
   if (!CONTRACT_ADDRESS) return NextResponse.json({ error: 'Contract not configured' }, { status: 503 })
 
@@ -121,8 +120,7 @@ export async function PUT(request: NextRequest) {
     logger.info('[admin/fee] executeFee tx', { txHash })
     return NextResponse.json({ ok: true, txHash })
   } catch (err) {
-    logger.error('[admin/fee] PUT error', { err })
-    return NextResponse.json({ error: 'Transaction failed', detail: String(err).slice(0, 300) }, { status: 500 })
+    return jsonError('tx_failed', 'Transaction failed', 500, { logDetail: err })
   }
 }
 
@@ -132,7 +130,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   const auth = await verifyAuth(request, 'cancelFee')
-  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status })
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 401 })
 
   if (!CONTRACT_ADDRESS) return NextResponse.json({ error: 'Contract not configured' }, { status: 503 })
 
@@ -145,7 +143,6 @@ export async function DELETE(request: NextRequest) {
     logger.info('[admin/fee] cancelFee tx', { txHash })
     return NextResponse.json({ ok: true, txHash })
   } catch (err) {
-    logger.error('[admin/fee] DELETE error', { err })
-    return NextResponse.json({ error: 'Transaction failed', detail: String(err).slice(0, 300) }, { status: 500 })
+    return jsonError('tx_failed', 'Transaction failed', 500, { logDetail: err })
   }
 }
