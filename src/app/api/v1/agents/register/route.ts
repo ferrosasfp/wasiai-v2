@@ -275,11 +275,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Creator profile not found' }, { status: 400 })
     }
     creatorId = ownerProfile.id
-  } else if (regKey === process.env.OPEN_REGISTRATION_KEY) {
+  } else if (
+    // V5 (audit 2026-06-25): fail-CLOSED. Solo se acepta x-register-key si la env
+    // está configurada Y coincide. Se eliminó la rama "fully open" (la AUSENCIA de
+    // OPEN_REGISTRATION_KEY abría el registro anónimo = vector SSRF/spam) y el edge
+    // `undefined === undefined` (sin env + sin header) que también caía en open_key.
+    // Flujos legítimos intactos: JWT y x-agent-key se resuelven antes; el onboarding
+    // de la UI inserta directo (no usa este endpoint).
+    process.env.OPEN_REGISTRATION_KEY &&
+    regKey === process.env.OPEN_REGISTRATION_KEY
+  ) {
     authMethod = 'open_key'
-  } else if (!process.env.OPEN_REGISTRATION_KEY) {
-    // No key configured = fully open registration
-    authMethod = 'open'
   } else {
     return NextResponse.json(
       { error: 'Authentication required. Use Authorization: Bearer <jwt>, x-agent-key, or x-register-key.' },
