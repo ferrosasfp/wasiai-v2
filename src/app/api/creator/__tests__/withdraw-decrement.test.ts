@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   withdrawalsMaybeSingle: vi.fn(),
   withdrawalsInsert:      vi.fn(),
   getTransactionReceipt:  vi.fn(),
+  voucherUpdate:          vi.fn(),
 }))
 
 // topic0 = keccak256("EarningsClaimed(address,uint256,uint256,uint256,bytes32)")
@@ -100,13 +101,25 @@ beforeEach(() => {
   // inserted+decremented (first time for this txHash).
   mocks.serviceRpc.mockResolvedValue({ data: true, error: null })
 
-  mocks.serviceFrom.mockImplementation(() => {
+  // M2: the voucher claim-mark is a chained .update().eq('creator_id').eq('status').
+  // Capture the payload and resolve OK by default.
+  mocks.voucherUpdate.mockResolvedValue({ error: null })
+
+  mocks.serviceFrom.mockImplementation((table: string) => {
+    if (table === 'creator_withdrawal_vouchers') {
+      // .update(payload).eq(...).eq(...) → thenable on the 2nd .eq()
+      return {
+        update: (payload: unknown) => ({
+          eq: () => ({ eq: () => mocks.voucherUpdate(payload) }),
+        }),
+      }
+    }
     // creator_withdrawals SELECT/INSERT and the creator_profiles UPDATE now live
     // inside the RPC — the route should NOT touch these tables directly anymore.
     return {
       select: () => ({ eq: () => ({ maybeSingle: mocks.withdrawalsMaybeSingle }) }),
       insert: mocks.withdrawalsInsert,
-      update: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+      update: () => ({ eq: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }) }),
     }
   })
 })
@@ -192,5 +205,45 @@ describe('FP-1 — atomic RPC closes the double-decrement race', () => {
     const body = await res.json()
     expect(body.error).toMatch(/already been processed/i)
     expect(body.txHash).toBe(VALID_TX)
+  })
+})
+
+describe('M2 — successful withdraw frees the voucher slot (status → claimed)', () => {
+  beforeEach(() => {
+    mocks.getTransactionReceipt.mockResolvedValue({
+      status: 'success',
+      logs:   [earningsClaimedLog(5_000_000n)],
+    })
+  })
+
+  it("marks the creator's pending voucher 'claimed' after a verified on-chain claim", async () => {
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(200)
+
+    // The voucher row is updated to 'claimed' for this creator/txHash so the M1
+    // one-pending-per-creator slot is released immediately (no 1h lockout).
+    expect(mocks.voucherUpdate).toHaveBeenCalledTimes(1)
+    const payload = mocks.voucherUpdate.mock.calls[0][0]
+    expect(payload).toMatchObject({ status: 'claimed', tx_hash: VALID_TX })
+    expect(payload.claimed_at).toBeDefined()
+  })
+
+  it('still returns 200 (best-effort) when the voucher claim-mark fails', async () => {
+    mocks.voucherUpdate.mockResolvedValue({ error: { message: 'update failed' } })
+
+    const res = await POST(makeRequest())
+    // A failed slot-release must NEVER fail an already-verified on-chain claim.
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+  })
+
+  it('does NOT mark a voucher claimed when the txHash was a duplicate (409)', async () => {
+    mocks.serviceRpc.mockResolvedValue({ data: false, error: null })
+
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(409)
+    // No real claim happened → no slot to release.
+    expect(mocks.voucherUpdate).not.toHaveBeenCalled()
   })
 })

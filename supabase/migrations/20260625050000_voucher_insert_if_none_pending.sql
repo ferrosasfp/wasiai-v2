@@ -17,10 +17,28 @@
 -- Postgres, so two concurrent requests can never both insert: exactly one wins,
 -- the other inserts 0 rows and is rejected (409) by the route BEFORE signing.
 --
+-- M1 (fix-pack): the INSERT ... SELECT ... WHERE NOT EXISTS is NOT a structural
+-- guarantee under READ COMMITTED. Two concurrent requests each insert a NEW row,
+-- so they never collide on a shared row — both can pass the NOT EXISTS predicate
+-- and insert 2 pending vouchers → 2 valid signatures → possible double-withdraw.
+-- The structural fix is a PARTIAL UNIQUE INDEX: at most one 'pending' voucher per
+-- creator can physically exist. The 2nd concurrent INSERT then fails on the index
+-- (unique_violation), which the function below catches and maps to false — the
+-- exact same "already pending" outcome the route turns into a 409.
+--
+-- Valid: creator_withdrawal_vouchers has a `status` column (043_withdrawal_vouchers).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_voucher_one_pending_per_creator
+  ON creator_withdrawal_vouchers (creator_id)
+  WHERE status = 'pending';
+
 -- deadline is a unix epoch (BIGINT) exactly as the route stores it
 -- (Number(deadline) = floor(now/1000) + 3600). "vigent" = deadline > now epoch.
 -- Columns mirror EXACTLY what the route inserts today into
 -- creator_withdrawal_vouchers.
+--
+-- M3 (fix-pack): SET search_path is pinned (SECURITY DEFINER hardening) so an
+-- attacker cannot shadow `creator_withdrawal_vouchers`/`now()` via a malicious
+-- search_path and divert the insert.
 CREATE OR REPLACE FUNCTION insert_voucher_if_none_pending(
   p_creator_id     UUID,
   p_wallet_address TEXT,
@@ -30,10 +48,14 @@ CREATE OR REPLACE FUNCTION insert_voucher_if_none_pending(
 ) RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_inserted INT;
 BEGIN
+  -- NOTE: the WHERE NOT EXISTS still rejects expired/stale pending rows cheaply
+  -- without raising; the partial unique index is the hard structural backstop for
+  -- the concurrent case (two live inserts racing on a fresh, non-expired slot).
   INSERT INTO creator_withdrawal_vouchers (
     creator_id, wallet_address, gross_amount_usdc, nonce, deadline, status
   )
@@ -50,5 +72,11 @@ BEGIN
 
   -- 0 rows → a pending, non-expired voucher already exists → reject (do NOT sign).
   RETURN v_inserted > 0;
+EXCEPTION
+  -- M1: the 2nd of two concurrent inserts lost the race on
+  -- uq_voucher_one_pending_per_creator → another pending voucher now exists →
+  -- same outcome as the NOT EXISTS path: reject. Resolves the race as 409, not 500.
+  WHEN unique_violation THEN
+    RETURN false;
 END;
 $$;

@@ -167,6 +167,28 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // M2 (fix-pack): release the voucher slot. The withdraw succeeded on-chain, but
+  // nothing ever transitions the pending voucher out of 'pending' → with the M1
+  // partial unique index (one pending per creator) the creator would stay locked
+  // out of new vouchers until the 1h deadline even though they already cashed out.
+  // Mark the creator's pending voucher(s) 'claimed' so the slot frees immediately.
+  // Best-effort: a failure here must NOT fail an already-verified on-chain claim.
+  // There is at most one pending voucher per creator (M1), so no nonce match needed.
+  try {
+    const { error: voucherErr } = await serviceClient
+      .from('creator_withdrawal_vouchers')
+      .update({ status: 'claimed', tx_hash: parsed.data.txHash, claimed_at: new Date().toISOString() })
+      .eq('creator_id', user.id)
+      .eq('status', 'pending')
+    if (voucherErr) {
+      logger.warn('[creator/withdraw] voucher claim mark failed (slot may stay locked until expiry)', {
+        txHash: parsed.data.txHash, voucherErr,
+      })
+    }
+  } catch (voucherCatch) {
+    logger.warn('[creator/withdraw] voucher claim mark threw', { voucherCatch })
+  }
+
   logger.info('[creator/withdraw] EarningsClaimed verified', {
     txHash: parsed.data.txHash, realAmount, walletAddress,
   })

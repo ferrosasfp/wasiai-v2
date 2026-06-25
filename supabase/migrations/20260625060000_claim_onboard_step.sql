@@ -27,12 +27,14 @@ ALTER TABLE onboarding_sessions
 -- Claim the terminal step for exactly one concurrent request.
 -- A lock is considered stale after 60s (covers a winner that crashed mid-flight)
 -- so a legitimate retry is never permanently blocked.
+-- M3 (fix-pack): SET search_path pinned (SECURITY DEFINER hardening).
 CREATE OR REPLACE FUNCTION claim_onboard_step(
   p_session_id UUID,
   p_step       INT
 ) RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_status   TEXT;
@@ -68,11 +70,13 @@ END;
 $$;
 
 -- Release the lock so the user can retry when the winner's side-effects fail.
+-- M3 (fix-pack): SET search_path pinned (SECURITY DEFINER hardening).
 CREATE OR REPLACE FUNCTION release_onboard_step_claim(
   p_session_id UUID
 ) RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   UPDATE onboarding_sessions
