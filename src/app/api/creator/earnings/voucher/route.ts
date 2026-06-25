@@ -59,6 +59,43 @@ export async function POST(req: NextRequest) {
   const nonce    = `0x${randomBytes(32).toString('hex')}` as `0x${string}`
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600)
 
+  // V8 (audit 2026-06-25): reserve the voucher slot ATOMICALLY *before* signing.
+  // A creator with pending earnings could otherwise request two vouchers within
+  // the 10/hour rate-limit window; both would read the same pending balance and
+  // both get a valid signature with distinct nonces, allowing a ~2x withdrawal
+  // if the contract holds enough USDC. insert_voucher_if_none_pending does an
+  // atomic INSERT ... WHERE NOT EXISTS(pending, non-expired voucher for this
+  // creator): exactly one of two concurrent requests inserts; the loser gets
+  // false and is rejected here BEFORE any signature is produced.
+  //
+  // Limitation (documented): the withdraw flow does NOT mark a voucher
+  // 'claimed' — it verifies the on-chain EarningsClaimed event by tx_hash only.
+  // So a vigent voucher is released by its deadline (1h expiry), not by consume.
+  // This closes the "two vigent vouchers at once" case; a single voucher still
+  // serializes claims for up to 1 hour.
+  const { data: reserved, error: reserveError } = await supabase.rpc(
+    'insert_voucher_if_none_pending',
+    {
+      p_creator_id:     user.id,
+      p_wallet_address: profile.wallet_address,
+      p_gross_amount:   pendingUsdc,
+      p_nonce:          nonce,
+      p_deadline:       Number(deadline),
+    },
+  )
+
+  if (reserveError) {
+    logger.error('[voucher] slot reservation RPC failed', { error: reserveError })
+    return NextResponse.json({ error: 'Failed to reserve voucher' }, { status: 500 })
+  }
+
+  if (reserved === false) {
+    return NextResponse.json(
+      { error: 'A pending withdrawal voucher already exists. Claim it or wait for it to expire before requesting another.' },
+      { status: 409 },
+    )
+  }
+
   // 5. Sign EIP-712 voucher with operator key
   const rawKey = process.env.OPERATOR_PRIVATE_KEY?.replace(/\n/g, '').trim() ?? ''
   const privKey = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`
@@ -109,21 +146,11 @@ export async function POST(req: NextRequest) {
 
   logger.info('[voucher] signed', { walletAddress: profile.wallet_address, grossAmountAtomics })
 
-  // NG-V01: Audit trail — register voucher in DB (non-fatal)
-  supabase
-    .from('creator_withdrawal_vouchers')
-    .insert({
-      creator_id:        user.id,
-      wallet_address:    profile.wallet_address,
-      gross_amount_usdc: pendingUsdc,
-      nonce,
-      deadline:          Number(deadline),
-      status:            'pending',
-    })
-    .then(({ error }) => {
-      if (error) logger.warn('[voucher] DB audit trail insert failed (non-fatal)', { error })
-    })
-
+  // V8: the audit row was already inserted atomically by
+  // insert_voucher_if_none_pending (it doubles as the concurrency gate), so the
+  // previous fire-and-forget INSERT is gone. If signing had failed above the
+  // reserved row stays 'pending' and blocks new vouchers until its 1h deadline —
+  // fail-safe: it can never over-issue, only briefly delay a retry.
   return NextResponse.json({
     grossAmountAtomics,
     grossAmountUsdc: pendingUsdc,
