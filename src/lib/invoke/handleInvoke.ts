@@ -308,126 +308,145 @@ export async function handleInvoke(request: NextRequest, slug: string): Promise<
       )
     }
 
-    // NG-008: Pre-flight soft check for user-friendly error (non-atomic, for UX only)
-    const remaining = Number(keyRow.budget_usdc) - Number(keyRow.spent_usdc)
-    if (remaining < totalPrice) {
-      return NextResponse.json(
-        {
-          error: 'Agent key budget exhausted',
-          code: 'budget_exceeded',
-          budget: keyRow.budget_usdc,
-          spent: keyRow.spent_usdc,
-          remaining,
-          needed: totalPrice,
-          action: 'Top up your agent key budget at /en/agent-keys',
-        },
-        {
-          status: 402,
-          headers: { 'Retry-After': '0' }, // A2A-10: refill and retry immediately
-        },
-      )
-    }
-
-    // WAS-200 (moved): Validate input AFTER auth — prevent schema info leak to unauthed callers
-    if (model.input_schema) {
-      let inputVal: unknown
-      try {
-        const rawBody = await request.clone().json()
-        inputVal = rawBody.input ?? rawBody
-      } catch {
-        return NextResponse.json({ error: 'Invalid JSON body', code: 'invalid_body' }, { status: 400 })
-      }
-      const validErr = validateInput(model.input_schema as Record<string, unknown>, inputVal)
-      if (validErr) {
+    // V11 (audit 2026-06-25): try/finally — el mutex per-key SIEMPRE se libera,
+    // incluso si algo lanza entre la adquisición y el return feliz. Sin esto un
+    // throw dejaba el mutex colgado hasta el TTL (15s) bloqueando a la key.
+    try {
+      // NG-008: Pre-flight soft check for user-friendly error (non-atomic, for UX only)
+      const remaining = Number(keyRow.budget_usdc) - Number(keyRow.spent_usdc)
+      if (remaining < totalPrice) {
         return NextResponse.json(
-          { error: 'Input validation failed', code: 'input_invalid', details: [validErr] },
-          { status: 422 },
+          {
+            error: 'Agent key budget exhausted',
+            code: 'budget_exceeded',
+            budget: keyRow.budget_usdc,
+            spent: keyRow.spent_usdc,
+            remaining,
+            needed: totalPrice,
+            action: 'Top up your agent key budget at /en/agent-keys',
+          },
+          {
+            status: 402,
+            headers: { 'Retry-After': '0' }, // A2A-10: refill and retry immediately
+          },
         )
       }
-    }
 
-    const result = await callUpstream(model, request, slug)
+      // WAS-200 (moved): Validate input AFTER auth — prevent schema info leak to unauthed callers
+      if (model.input_schema) {
+        let inputVal: unknown
+        try {
+          const rawBody = await request.clone().json()
+          inputVal = rawBody.input ?? rawBody
+        } catch {
+          return NextResponse.json({ error: 'Invalid JSON body', code: 'invalid_body' }, { status: 400 })
+        }
+        const validErr = validateInput(model.input_schema as Record<string, unknown>, inputVal)
+        if (validErr) {
+          return NextResponse.json(
+            { error: 'Input validation failed', code: 'input_invalid', details: [validErr] },
+            { status: 422 },
+          )
+        }
+      }
 
-    // Track receipt signature (non-fatal if it fails)
-    let receiptSignature: string | null = null
-    let callId: string | null = null
+      const result = await callUpstream(model, request, slug)
 
-    if (result.status === 'success') {
-      // 1. Log call to DB first to get the call ID
-      assertPaymentType('api_key')
-      const { id: insertedId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug, null, 'api_key')
-      callId = insertedId ?? null
-      // HAL-027: Mismo timestamp para receipt y called_at — auditoría consistente
-      const receiptTimestamp = Math.floor(Date.now() / 1000)
+      // Track receipt signature (non-fatal if it fails)
+      let receiptSignature: string | null = null
+      let callId: string | null = null
 
-      // 2. Sign a cryptographic receipt for the caller to audit
-      if (callId && keyRow.key_hash) {
-        receiptSignature = await signReceipt({
-          keyId:      keyHashToBytes32(keyRow.key_hash),
-          callId,
-          agentSlug:  slug,
-          amountUsdc: creatorPrice,   // receipt certifica lo que va al creator, NO totalPrice
-          timestamp:  receiptTimestamp,
-        }).catch(err => {
-          logger.warn('[invoke] signReceipt failed (non-fatal)', { err: String(err).slice(0, 200) })
-          return null
+      if (result.status === 'success') {
+        // V2 (audit 2026-06-25): cobrar ANTES de logear/firmar/responder.
+        // Si dos llamadas concurrentes pasan el soft check, solo una podrá
+        // decrementar el balance (atomic en DB). Si el débito devuelve false
+        // (budget drenado por concurrencia) NO logueamos una call cobrada ni
+        // firmamos un receipt de un cobro que no ocurrió → 402.
+        assertPaymentType('api_key')
+        const { data: deducted } = await supabase.rpc('check_and_deduct_budget', {
+          p_key_id: keyRow.id,
+          p_amount: totalPrice,
         })
+        if (!deducted) {
+          // Race condition: otro request cobró primero — no cobrar dos veces ni
+          // emitir receipt firmado. La call upstream ya ocurrió, pero el caller
+          // no fue cobrado, así que devolvemos 402 (refill y reintentar).
+          logger.warn('[invoke] check_and_deduct_budget failed (concurrent call drained budget)', { keyId: keyRow.id })
+          return NextResponse.json(
+            {
+              error: 'Agent key budget exhausted',
+              code: 'budget_exceeded',
+              action: 'Top up your agent key budget at /en/agent-keys',
+            },
+            {
+              status: 402,
+              headers: { 'Retry-After': '0' },
+            },
+          )
+        }
 
-        // 3. Save signature to DB (best effort)
-        if (receiptSignature) {
-          // Best-effort: save receipt signature in background
-          after(async () => {
-            try {
-              await supabase
-                .from('agent_calls')
-                .update({ receipt_signature: receiptSignature })
-                .eq('id', callId)
-            } catch (err) {
-              logger.warn('[invoke] receipt_signature update failed', { err, slug })
-            }
+        // 1. Log call to DB (cobro ya confirmado) to get the call ID
+        const { id: insertedId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug, null, 'api_key')
+        callId = insertedId ?? null
+        // HAL-027: Mismo timestamp para receipt y called_at — auditoría consistente
+        const receiptTimestamp = Math.floor(Date.now() / 1000)
+
+        // 2. Sign a cryptographic receipt for the caller to audit
+        if (callId && keyRow.key_hash) {
+          receiptSignature = await signReceipt({
+            keyId:      keyHashToBytes32(keyRow.key_hash),
+            callId,
+            agentSlug:  slug,
+            amountUsdc: creatorPrice,   // receipt certifica lo que va al creator, NO totalPrice
+            timestamp:  receiptTimestamp,
+          }).catch(err => {
+            logger.warn('[invoke] signReceipt failed (non-fatal)', { err: String(err).slice(0, 200) })
+            return null
           })
+
+          // 3. Save signature to DB (best effort)
+          if (receiptSignature) {
+            // Best-effort: save receipt signature in background
+            after(async () => {
+              try {
+                await supabase
+                  .from('agent_calls')
+                  .update({ receipt_signature: receiptSignature })
+                  .eq('id', callId)
+              } catch (err) {
+                logger.warn('[invoke] receipt_signature update failed', { err, slug })
+              }
+            })
+          }
         }
+      } else {
+        // Log failed call (no receipt needed) — capture id for call_id exposure
+        assertPaymentType('api_key')
+        const { id: errCallId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug, null, 'api_key')
+        callId = errCallId ?? null
       }
 
-      // 4. NG-008: Atomic check+deduct — previene race condition TOCTOU
-      // Si dos llamadas concurrentes pasan el soft check de arriba, solo una
-      // podrá decrementar el balance (la otra recibirá false y el cobro se revierte)
-      const { data: deducted } = await supabase.rpc('check_and_deduct_budget', {
-        p_key_id: keyRow.id,
-        p_amount: totalPrice,
-      })
-      if (!deducted) {
-        // Race condition: otro request cobró primero — no cobrar dos veces
-        logger.warn('[invoke] check_and_deduct_budget failed (concurrent call drained budget)', { keyId: keyRow.id })
-        // La llamada ya fue exitosa — logearla sin cobro para auditoría
+      // WAS-74: Fire-and-forget webhook trigger — never await, never blocks TTFB
+      if (model.creator_id) {
+        void triggerAgentEvent(
+          result.status === 'success' ? 'agent.invoked' : 'agent.error',
+          model.id as string,
+          model.creator_id as string,
+          {
+            slug: slug as string,
+            status: result.status,
+            latency_ms: result.latencyMs,
+          }
+        ).catch(() => { /* non-fatal */ })
       }
-    } else {
-      // Log failed call (no receipt needed) — capture id for call_id exposure
-      assertPaymentType('api_key')
-      const { id: errCallId } = await logCall(supabase, model, 'agent', null, null, result, keyRow.id, slug, null, 'api_key')
-      callId = errCallId ?? null
-    }
 
-    // WAS-74: Fire-and-forget webhook trigger — never await, never blocks TTFB
-    if (model.creator_id) {
-      void triggerAgentEvent(
-        result.status === 'success' ? 'agent.invoked' : 'agent.error',
-        model.id as string,
-        model.creator_id as string,
-        {
-          slug: slug as string,
-          status: result.status,
-          latency_ms: result.latencyMs,
-        }
-      ).catch(() => { /* non-fatal */ })
+      return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown, gas_source }, callId ?? undefined)
+    } finally {
+      // NA-203 + V11: liberar mutex pase lo que pase (return feliz, early return o throw)
+      if (keyMutexAcquired) {
+        try { await getSharedRedis().del(mutexKey) } catch { /* non-fatal */ }
+      }
     }
-
-    // NA-203: Liberar mutex antes de retornar
-    if (keyMutexAcquired) {
-      try { await getSharedRedis().del(mutexKey) } catch { /* non-fatal */ }
-    }
-
-    return buildResponse(model, result, undefined, receiptSignature ?? undefined, { creatorPrice, overhead, totalPrice, breakdown, gas_source }, callId ?? undefined)
   }
 
   // ── 2b. Sandbox shortcut (AC-5) ─────────────────────────────────────────

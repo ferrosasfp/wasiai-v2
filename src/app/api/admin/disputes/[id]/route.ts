@@ -4,6 +4,7 @@
  * Auth: Authorization: Bearer ADMIN_SECRET
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 
@@ -12,8 +13,18 @@ const VALID_STATUSES = ['approved', 'rejected'] as const
 function checkAdminAuth(req: Request): boolean {
   const adminSecret = process.env.ADMIN_SECRET
   if (!adminSecret) return false
-  const authHeader = req.headers.get('authorization')
-  return authHeader === `Bearer ${adminSecret}`
+  const authHeader = req.headers.get('authorization') ?? ''
+  const expected = `Bearer ${adminSecret}`
+  // V13 (audit 2026-06-25): comparación constant-time para evitar timing side-channel.
+  // Guard de longitud previa (timingSafeEqual exige buffers de igual tamaño).
+  const a = Buffer.from(authHeader)
+  const b = Buffer.from(expected)
+  if (a.length !== b.length) return false
+  try {
+    return timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
 }
 
 export async function PATCH(

@@ -33,7 +33,9 @@ export default function ErrorPage({ error, reset }: Props) {
           {t('somethingWentWrong')}
         </h1>
         <p className="mt-2 text-sm text-gray-600">
-          {error.message || t('error')}
+          {/* V15 (audit 2026-06-25): gatear por entorno como ErrorBoundary.tsx —
+              en prod no exponer error.message (puede filtrar detalles internos). */}
+          {process.env.NODE_ENV === 'development' ? (error.message || t('error')) : t('error')}
         </p>
         <button
           type="button"

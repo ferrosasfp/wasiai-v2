@@ -274,12 +274,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Creator profile not found' }, { status: 400 })
     }
     creatorId = ownerProfile.id
-  } else if (regKey === process.env.OPEN_REGISTRATION_KEY) {
+  } else if (process.env.OPEN_REGISTRATION_KEY && regKey === process.env.OPEN_REGISTRATION_KEY) {
     authMethod = 'open_key'
-  } else if (!process.env.OPEN_REGISTRATION_KEY) {
-    // No key configured = fully open registration
-    authMethod = 'open'
   } else {
+    // V5 (audit 2026-06-25): fail-closed. La AUSENCIA de OPEN_REGISTRATION_KEY ya
+    // NO abre registro anónimo. Sin un método de auth válido (JWT, agent-key o
+    // register-key correcta) se rechaza con 401.
     return NextResponse.json(
       { error: 'Authentication required. Use Authorization: Bearer <jwt>, x-agent-key, or x-register-key.' },
       { status: 401 },
