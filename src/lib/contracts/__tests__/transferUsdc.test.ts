@@ -5,10 +5,30 @@
  * mocked at the boundary). Here we assert the cheap guards that run before any
  * RPC / wallet setup.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
+// V6 robustness: mock viem so we can drive writeContract / waitForTransactionReceipt
+// to exercise the submit-vs-confirm boundary (txHash preservation on timeout).
+const viemMocks = vi.hoisted(() => ({
+  writeContract: vi.fn(),
+  waitForTransactionReceipt: vi.fn(),
+}))
+
+vi.mock('viem', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('viem')>()
+  return {
+    ...actual,
+    createWalletClient: vi.fn(() => ({ writeContract: viemMocks.writeContract })),
+    createPublicClient: vi.fn(() => ({ waitForTransactionReceipt: viemMocks.waitForTransactionReceipt })),
+    http: vi.fn(() => ({})),
+  }
+})
+vi.mock('viem/accounts', () => ({
+  privateKeyToAccount: vi.fn(() => ({ address: '0x' + '2'.repeat(40) })),
 }))
 
 import { transferUsdc } from '../usdcSettler'
@@ -75,5 +95,63 @@ describe('transferUsdc — guards', () => {
       else delete process.env.MAX_OPERATOR_TRANSFER_USDC
       if (prevPk !== undefined) process.env.OPERATOR_PRIVATE_KEY = prevPk
     }
+  })
+})
+
+// V6 robustness — submit-vs-confirm boundary: a txHash already obtained from
+// writeContract must NEVER be discarded if confirmation later fails.
+describe('transferUsdc — tx hash preservation (submit vs confirm)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.NEXT_PUBLIC_CHAIN_ID = '43113'
+    process.env.OPERATOR_PRIVATE_KEY = '0x' + '1'.repeat(64)
+    delete process.env.MAX_OPERATOR_TRANSFER_USDC
+  })
+
+  it('writeContract OK + waitForReceipt THROW (timeout) → returns the hash with unconfirmed:true', async () => {
+    viemMocks.writeContract.mockResolvedValue('0xsubmittedhash')
+    viemMocks.waitForTransactionReceipt.mockRejectedValue(new Error('Timed out while waiting for transaction receipt'))
+
+    const res = await transferUsdc('0x' + '1'.repeat(40), '120000')
+
+    expect(res.success).toBe(false)
+    expect(res.transactionHash).toBe('0xsubmittedhash') // NOT lost
+    expect(res.unconfirmed).toBe(true)
+    expect(res.error).toContain('receipt unconfirmed')
+  })
+
+  it('writeContract THROW (never submitted) → no transactionHash, no unconfirmed flag', async () => {
+    viemMocks.writeContract.mockRejectedValue(new Error('nonce too low'))
+
+    const res = await transferUsdc('0x' + '1'.repeat(40), '120000')
+
+    expect(res.success).toBe(false)
+    expect(res.transactionHash).toBeUndefined()
+    expect(res.unconfirmed).toBeUndefined()
+    expect(res.error).toContain('nonce too low')
+    expect(viemMocks.waitForTransactionReceipt).not.toHaveBeenCalled()
+  })
+
+  it('receipt status reverted → success:false with the hash in the error', async () => {
+    viemMocks.writeContract.mockResolvedValue('0xrevertedhash')
+    viemMocks.waitForTransactionReceipt.mockResolvedValue({ status: 'reverted' })
+
+    const res = await transferUsdc('0x' + '1'.repeat(40), '120000')
+
+    expect(res.success).toBe(false)
+    expect(res.transactionHash).toBe('0xrevertedhash')
+    expect(res.error).toContain('0xrevertedhash')
+    expect(res.unconfirmed).toBeUndefined() // a revert is definitive, not "unconfirmed"
+  })
+
+  it('happy path: writeContract OK + receipt success → success:true with the hash', async () => {
+    viemMocks.writeContract.mockResolvedValue('0xconfirmedhash')
+    viemMocks.waitForTransactionReceipt.mockResolvedValue({ status: 'success' })
+
+    const res = await transferUsdc('0x' + '1'.repeat(40), '120000')
+
+    expect(res.success).toBe(true)
+    expect(res.transactionHash).toBe('0xconfirmedhash')
+    expect(res.unconfirmed).toBeUndefined()
   })
 })

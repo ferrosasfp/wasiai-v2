@@ -190,3 +190,42 @@ describe('runRefunds — fail-safe', () => {
     expect(db.get('refund-1')!.status).toBe('failed')
   })
 })
+
+describe('runRefunds — submitted-but-unconfirmed (anti double-refund on slow chain)', () => {
+  it('transfer unconfirmed (success:false + transactionHash) → failed WITH refund_tx_hash, warn logged, not re-paid', async () => {
+    // The tx was broadcast but the receipt timed out: success:false but the hash
+    // is present. The row must be failed BUT keep the tx_hash for reconciliation.
+    mocks.transferUsdc.mockResolvedValue({
+      success: false,
+      transactionHash: '0xsubmittedbutunconfirmed',
+      error: 'receipt unconfirmed: Timed out',
+      unconfirmed: true,
+    })
+    const { client, db } = makeFakeSupabase([row()])
+
+    const res = await runRefunds(client)
+
+    // Not counted as a successful refund, never marked done.
+    expect(res.refunded).toBe(0)
+    const persisted = db.get('refund-1')!
+    expect(persisted.status).toBe('failed')
+    // KEY: the tx hash is persisted (not null) so requeue can verify on-chain first.
+    expect((persisted as unknown as { refund_tx_hash: string }).refund_tx_hash).toBe('0xsubmittedbutunconfirmed')
+    // Surfaced in the result so callers/reconciliation see the hash too.
+    expect(res.results[0]).toMatchObject({ id: 'refund-1', refundTxHash: '0xsubmittedbutunconfirmed' })
+    // No second transfer attempt within this run.
+    expect(mocks.transferUsdc).toHaveBeenCalledTimes(1)
+  })
+
+  it('genuine fail (success:false, no transactionHash) → failed with NULL refund_tx_hash (requeueable)', async () => {
+    mocks.transferUsdc.mockResolvedValue({ success: false, error: 'insufficient funds' })
+    const { client, db } = makeFakeSupabase([row()])
+
+    await runRefunds(client)
+
+    const persisted = db.get('refund-1')!
+    expect(persisted.status).toBe('failed')
+    // No tx hash recorded → safe to requeue (never submitted).
+    expect((persisted as unknown as { refund_tx_hash?: string }).refund_tx_hash).toBeUndefined()
+  })
+})

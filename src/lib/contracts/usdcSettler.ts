@@ -331,6 +331,14 @@ export interface TransferUsdcResult {
   success: boolean
   transactionHash?: string
   error?: string
+  /**
+   * V6 robustness: true when the on-chain tx was submitted (txHash exists) but
+   * its receipt could NOT be confirmed (e.g. waitForTransactionReceipt timed out
+   * on a slow chain). The tx may still have landed — the caller MUST verify
+   * on-chain before any retry to avoid a double-refund. `transactionHash` is
+   * always populated when this is true.
+   */
+  unconfirmed?: boolean
 }
 
 /**
@@ -351,6 +359,12 @@ export async function transferUsdc(
   to:           string,
   atomicAmount: string,
 ): Promise<TransferUsdcResult> {
+  // V6 robustness: declared OUTSIDE the try so the catch can still surface a
+  // txHash that was already obtained from writeContract. If a later step (e.g.
+  // waitForTransactionReceipt) throws/times out AFTER the tx was submitted, we
+  // must NOT discard the hash — losing it would erase the on-chain evidence of a
+  // possibly-paid refund and risk a double-refund on requeue.
+  let submittedTxHash: `0x${string}` | undefined
   try {
     if (BigInt(atomicAmount) <= 0n) {
       return { success: false, error: `Invalid refund amount: ${atomicAmount}` }
@@ -388,18 +402,29 @@ export async function transferUsdc(
       functionName: 'transfer',
       args:         [to as Address, BigInt(atomicAmount)],
     })
+    // Tx is now submitted. Record the hash where the catch can see it so a later
+    // receipt timeout cannot lose it.
+    submittedTxHash = txHash
 
     const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 30_000 })
 
     if (receipt.status !== 'success') {
-      return { success: false, error: `Refund transaction reverted (${txHash})` }
+      // Tx landed but reverted on-chain — definitively failed, hash kept for evidence.
+      return { success: false, transactionHash: txHash, error: `Refund transaction reverted (${txHash})` }
     }
 
     logger.info('[settler] USDC refund confirmed', { txHash, to })
     return { success: true, transactionHash: txHash }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    logger.error('[settler] refund transfer error', { msg, to })
+    logger.error('[settler] refund transfer error', { msg, to, submittedTxHash })
+    // If the tx was already submitted before the throw (e.g. receipt timeout on a
+    // slow chain), surface the hash + unconfirmed flag. The tx may have landed —
+    // the caller must verify on-chain before any retry. Only when no tx was ever
+    // submitted (writeContract itself threw) do we return without a hash.
+    if (submittedTxHash) {
+      return { success: false, transactionHash: submittedTxHash, error: `receipt unconfirmed: ${msg}`, unconfirmed: true }
+    }
     return { success: false, error: msg }
   }
 }

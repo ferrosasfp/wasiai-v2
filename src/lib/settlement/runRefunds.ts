@@ -37,8 +37,19 @@ export interface RunRefundsResult {
  *      after the on-chain transfer is confirmed.
  *
  * FAIL-SAFE: if the transfer fails (or throws), the row is left in 'failed'
- * (never 'done' without an on-chain tx_hash). A failed refund can be requeued
- * to 'pending' for retry by an operator; we never mark done without confirmation.
+ * (never 'done' without a confirmed on-chain transfer). Two distinct failed
+ * shapes exist and they are NOT interchangeable for requeue:
+ *
+ *   - failed WITH refund_tx_hash set  → the tx WAS submitted on-chain but its
+ *     receipt could not be confirmed (slow chain / timeout) OR it reverted. It
+ *     may have actually landed. An operator MUST verify this hash on-chain
+ *     BEFORE any requeue — re-paying a tx that confirmed is a DOUBLE-REFUND.
+ *   - failed WITHOUT refund_tx_hash (null) → the tx was NEVER submitted (a guard
+ *     or writeContract threw before broadcast). Safe to requeue to 'pending'.
+ *
+ * The status CHECK constraint only allows pending/processing/done/failed, so we
+ * encode "submitted-but-unconfirmed" as failed+txHash rather than a new status
+ * (no migration required).
  *
  * @param supabase SupabaseClient with service role (created by the caller).
  */
@@ -100,8 +111,26 @@ export async function runRefunds(supabase: SupabaseClient): Promise<RunRefundsRe
         refunded += 1
         results.push({ id: row.id, refundTxHash: transfer.transactionHash })
         logger.info('[runRefunds] refund paid', { id: row.id, payer: row.payer_address, amount: row.amount_usdc, refundTxHash: transfer.transactionHash })
+      } else if (transfer.transactionHash) {
+        // SUBMITTED-BUT-UNCONFIRMED: the tx WAS broadcast (hash present) but the
+        // receipt was not confirmed (timeout) or it reverted. Mark 'failed' BUT
+        // persist the tx_hash so reconciliation / any requeue can verify on-chain
+        // BEFORE re-paying. This is the double-refund guard for slow chains.
+        await supabase
+          .from('refunds')
+          .update({
+            status:         'failed',
+            refund_tx_hash: transfer.transactionHash,
+            error_reason:   (transfer.error ?? 'transfer_unconfirmed').slice(0, 500),
+            processed_at:   new Date().toISOString(),
+          })
+          .eq('id', row.id)
+
+        results.push({ id: row.id, refundTxHash: transfer.transactionHash, error: transfer.error ?? 'transfer_unconfirmed' })
+        logger.warn('[runRefunds] refund submitted but receipt unconfirmed — verify on-chain before any requeue', { id: row.id, txHash: transfer.transactionHash })
       } else {
-        // FAIL-SAFE: transfer not confirmed → mark failed for retry, never done.
+        // GENUINE FAIL: tx was never submitted (guard/writeContract threw). No
+        // tx_hash → safe to requeue to 'pending' for a clean retry.
         await supabase
           .from('refunds')
           .update({
