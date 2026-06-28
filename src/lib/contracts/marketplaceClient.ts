@@ -9,8 +9,11 @@
  *  OPERATOR_PRIVATE_KEY              → backend wallet private key (operator role)
  *  MARKETPLACE_CONTRACT_ADDRESS      → deployed contract address
  *  NEXT_PUBLIC_RPC_MAINNET           → Avalanche RPC
+ *
+ * Holds OPERATOR_PRIVATE_KEY — server-only so a client import fails at build time.
  */
 
+import 'server-only'
 import { createWalletClient, createPublicClient, http, type Address } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji } from 'viem/chains'

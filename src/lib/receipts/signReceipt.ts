@@ -1,3 +1,5 @@
+// Holds the operator signing key — server-only so it can never enter a browser bundle.
+import 'server-only'
 import { privateKeyToAccount } from 'viem/accounts'
 import { keccak256, encodePacked, toBytes } from 'viem'
 import { recoverMessageAddress } from 'viem'
