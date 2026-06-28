@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       .is('settled_at', null)
       .neq('status', 'error')
       .or('payment_type.neq.api_key,agent_slug.is.null')
-    console.debug(`[settlement] Excluding ${excluded ?? 0} calls (non api_key or no slug)`)
+    logger.debug('[settlement] excluding non-api_key / no-slug calls', { excluded: excluded ?? 0 })
 
     // Pre-verificar qué slugs están registrados on-chain
     const uniqueSlugs = [...new Set(pendingCalls.map(c => c.agent_slug as string))]

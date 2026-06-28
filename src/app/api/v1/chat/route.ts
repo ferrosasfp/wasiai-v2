@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callLLM } from '@/lib/agents/llm'
 import { CollectionAgent, getCollectionAgents, buildPlannerPrompt } from '@/lib/agents/collection-agents'
+import { logger } from '@/lib/logger'
 
 export const maxDuration = 60
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
   try {
     agents = await getCollectionAgents()
   } catch (err) {
-    console.error('[chat] getCollectionAgents error:', err)
+    logger.error('[chat] getCollectionAgents error', { err })
     return NextResponse.json(
       { error: 'Chat service temporarily unavailable', code: 'chat_unavailable' },
       { status: 503 }
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
       maxTokens: 512,
     })
   } catch (err) {
-    console.error('[chat] planner LLM error:', err)
+    logger.error('[chat] planner LLM error', { err })
     return NextResponse.json(
       { error: 'Failed to interpret question', code: 'compose_failed' },
       { status: 500 }
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
     composeResult = await composeRes.json()
     composeOk = composeRes.ok
   } catch (err) {
-    console.error('[chat] compose fetch error:', err)
+    logger.error('[chat] compose fetch error', { err })
     return NextResponse.json(
       { error: 'Pipeline execution failed', code: 'compose_failed' },
       { status: 502 }
@@ -193,7 +194,7 @@ export async function POST(req: NextRequest) {
     })
     answer = summaryResponse.result
   } catch (err) {
-    console.error('[chat] summary LLM error (fail-open):', err)
+    logger.error('[chat] summary LLM error (fail-open)', { err })
     answer = JSON.stringify(composeResult)
   }
 

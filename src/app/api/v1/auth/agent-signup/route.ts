@@ -5,6 +5,7 @@ import { getAgentSignupLimit, getIdentifier, checkRateLimit } from '@/lib/rateli
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { env } from '@/lib/env'
+import { logger } from '@/lib/logger'
 
 const AgentSignupSchema = z.object({
   email: z.string().email('Invalid email format'),
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
     }
-    console.error('[agent-signup] createUser failed', { message: createError.message })
+    logger.error('[agent-signup] createUser failed', { message: createError.message })
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
   }
 
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
     // Compensating transaction: delete user to avoid orphaned accounts
     const { error: deleteError } = await serviceClient.auth.admin.deleteUser(data.user.id)
     if (deleteError) {
-      console.error('[agent-signup] ZOMBIE USER: deleteUser failed after keyError', {
+      logger.error('[agent-signup] ZOMBIE USER: deleteUser failed after keyError', {
         userId: data.user.id,
         deleteError: deleteError.message,
       })

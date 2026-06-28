@@ -8,6 +8,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { probeEndpoint } from '@/lib/agents/health-probe'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 import { validateCsrf } from '@/lib/security/csrf'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { createModelSchema } from '@/lib/schemas/model.schema'
@@ -98,7 +99,7 @@ export async function PATCH(
         .update({ health_check: { pending: true }, status: 'reviewing' })
         .eq('id', existing.id)
       probeEndpoint(result.data.endpoint_url, existing.id).catch(err =>
-        console.error('[patch-agent] re-probe failed silently', { agentId: existing.id, err: String(err) })
+        logger.error('[patch-agent] re-probe failed silently', { agentId: existing.id, err: String(err) })
       )
     }
   }

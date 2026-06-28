@@ -17,6 +17,7 @@ import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { metaValidateSchema } from '@/lib/schema-validator'
 import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -54,7 +55,7 @@ export async function GET(
 
     // Error de Supabase (red, auth, etc.) → 503
     if (error && error.code !== 'PGRST116') {
-      console.error('[agents/slug] Supabase error:', error.message)
+      logger.error('[agents/slug] Supabase error', { detail: error.message })
       return NextResponse.json(
         { error: 'internal_error', message: 'Service temporarily unavailable' },
         { status: 503, headers: CORS }
@@ -136,7 +137,7 @@ export async function GET(
 
     return NextResponse.json({ ...body, estimated_total_cost }, { status: 200, headers: CORS })
   } catch (err) {
-    console.error('[agents/slug] Unexpected error:', err)
+    logger.error('[agents/slug] Unexpected error', { err })
     return NextResponse.json(
       { error: 'internal_error', message: 'Service temporarily unavailable' },
       { status: 503, headers: CORS }
@@ -305,7 +306,7 @@ export async function PATCH(
       .single()
 
     if (updateErr || !updated) {
-      console.error('[agents/slug PATCH] Update error:', updateErr?.message)
+      logger.error('[agents/slug PATCH] Update error', { detail: updateErr?.message })
       return NextResponse.json(
         { error: 'internal_error', message: 'Failed to update agent' },
         { status: 503, headers: PATCH_CORS }
@@ -314,7 +315,7 @@ export async function PATCH(
 
     return NextResponse.json(updated, { status: 200, headers: PATCH_CORS })
   } catch (err) {
-    console.error('[agents/slug PATCH] Unexpected error:', err)
+    logger.error('[agents/slug PATCH] Unexpected error', { err })
     return NextResponse.json(
       { error: 'internal_error', message: 'Service temporarily unavailable' },
       { status: 503, headers: PATCH_CORS }

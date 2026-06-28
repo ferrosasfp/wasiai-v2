@@ -7,6 +7,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { resolveExampleInput } from '@/features/agents/utils/resolveExampleInput'
+import { logger } from '@/lib/logger'
 
 const discoverSchema = z.object({
   category:   z.string().optional(),
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (error) {
-      console.error('[agents/discover] Supabase RPC error:', error.message)
+      logger.error('[agents/discover] Supabase RPC error', { detail: error.message })
       return NextResponse.json(
         { error: 'internal_error', message: 'Service temporarily unavailable' },
         { status: 503, headers: CORS }
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     agents = data
   } catch (err) {
-    console.error('[agents/discover] Unexpected error:', err)
+    logger.error('[agents/discover] Unexpected error', { err })
     return NextResponse.json(
       { error: 'internal_error', message: 'Service temporarily unavailable' },
       { status: 503, headers: CORS }

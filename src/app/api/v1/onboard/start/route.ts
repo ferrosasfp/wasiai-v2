@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getAgentSignupLimit, getIdentifier } from '@/lib/ratelimit'
 import { createHash } from 'crypto'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   // Rate limit: 5/hour per IP
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error || !session) {
-    console.error('[onboard/start] insert failed', error)
+    logger.error('[onboard/start] insert failed', { error })
     return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
   }
 
