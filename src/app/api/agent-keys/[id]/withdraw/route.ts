@@ -68,11 +68,12 @@ export async function POST(
 
   // 5. Public client para leer receipt
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
+  const rpcUrl = chainId === 43114
+    ? (process.env.NEXT_PUBLIC_RPC_MAINNET ?? 'https://api.avax.network/ext/bc/C/rpc')
+    : (process.env.NEXT_PUBLIC_RPC_TESTNET ?? 'https://api.avax-test.network/ext/bc/C/rpc')
   const pub = createPublicClient({
     chain:     chainId === 43114 ? avalanche : avalancheFuji,
-    transport: http(chainId === 43114
-      ? 'https://api.avax.network/ext/bc/C/rpc'
-      : 'https://api.avax-test.network/ext/bc/C/rpc'),
+    transport: http(rpcUrl),
   })
 
   // 6. Leer receipt + verificar status (retry hasta 3 veces con delay)

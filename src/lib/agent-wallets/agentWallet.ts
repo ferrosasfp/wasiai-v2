@@ -44,10 +44,14 @@ function decrypt(b64: string): string {
   return decipher.update(ct).toString('utf8') + decipher.final('utf8')
 }
 
+// ── RPC endpoint (Fuji testnet) ───────────────────────────────────────────────
+// Env-overridable; default mirrors the fallback used in admin/treasury/route.ts.
+const FUJI_RPC_URL = process.env.NEXT_PUBLIC_RPC_TESTNET ?? 'https://api.avax-test.network/ext/bc/C/rpc'
+
 // ── Public client Fuji ────────────────────────────────────────────────────────
 const publicClient = createPublicClient({
   chain: avalancheFuji,
-  transport: http('https://api.avax-test.network/ext/bc/C/rpc'),
+  transport: http(FUJI_RPC_URL),
 })
 
 // ── Core functions ────────────────────────────────────────────────────────────
@@ -160,7 +164,7 @@ export async function getAgentWalletClient(agentId: string) {
   return createWalletClient({
     account,
     chain:     avalancheFuji,
-    transport: http('https://api.avax-test.network/ext/bc/C/rpc'),
+    transport: http(FUJI_RPC_URL),
   })
 }
 

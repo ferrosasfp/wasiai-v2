@@ -83,7 +83,18 @@ export async function POST(request: NextRequest) {
     const {
       getKeyBalanceOnChain,
       isAgentRegisteredOnChain,
+      getPlatformFeeBps,
     } = await import('@/lib/contracts/marketplaceClient')
+
+    // Platform fee bps: prefer on-chain truth (same source settleKeyBatch splits by),
+    // fall back to PLATFORM_FEE_BPS env (default 1000 = 10%). Mirrors runSettlement.ts.
+    const onChainFeeBps = await getPlatformFeeBps()
+    if (onChainFeeBps === null) {
+      logger.warn('[admin/settlement] getPlatformFeeBps failed — using fallback', {
+        fallback: process.env.PLATFORM_FEE_BPS ?? '1000',
+      })
+    }
+    const PLATFORM_FEE_BPS = Math.floor(onChainFeeBps ?? Number(process.env.PLATFORM_FEE_BPS ?? '1000'))
 
     const { data: pendingCalls, error: fetchError } = await supabase
       .from('agent_calls')
@@ -216,8 +227,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Actualizar pending_earnings_usdc en creator_profiles por cada creator
-        // Calcular earnings por creator (85% del total, después de 15% platform fee)
-        const PLATFORM_FEE_BPS = 1500 // 15%
+        // Calcular earnings por creator (net = total - platform fee). El fee bps
+        // sale de PLATFORM_FEE_BPS (on-chain / env, default 1000 = 10%) calculado arriba.
         const earningsByCreator = new Map<string, number>()
         for (let i = 0; i < batchSlugs.length; i++) {
           let creatorWallet: string | null = null
