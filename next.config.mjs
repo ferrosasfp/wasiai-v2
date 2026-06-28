@@ -32,6 +32,18 @@ const securityHeaders = [
   { key: 'Content-Security-Policy',   value: cspDirectives },
 ]
 
+// Derive the Supabase image hostname from NEXT_PUBLIC_SUPABASE_URL instead of
+// hardcoding project refs. Falls back to the wildcard *.supabase.co if unset.
+function supabaseImageHost() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!url) return '*.supabase.co'
+  try {
+    return new URL(url).hostname
+  } catch {
+    return '*.supabase.co'
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -47,10 +59,9 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.mypinata.cloud' },
       { protocol: 'https', hostname: 'gateway.pinata.cloud' },
       { protocol: 'https', hostname: '*.ipfs.dweb.link' },
-      { protocol: 'https', hostname: 'bdwvrwzvsldephfibmuu.supabase.co' },
+      { protocol: 'https', hostname: supabaseImageHost() },
       { protocol: 'https', hostname: 'wasiai-prod.vercel.app' },
       { protocol: 'https', hostname: 'app.wasiai.io' },
-      { protocol: 'https', hostname: 'caldzjhjgctpgodldqav.supabase.co' },
     ],
   },
   async redirects() {

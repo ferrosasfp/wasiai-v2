@@ -5,8 +5,8 @@ import { avalancheFuji, avalanche } from 'viem/chains'
 const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
 const chain = CHAIN_ID === 43114 ? avalanche : avalancheFuji
 const RPC_URL = CHAIN_ID === 43114
-  ? 'https://api.avax.network/ext/bc/C/rpc'
-  : 'https://api.avax-test.network/ext/bc/C/rpc'
+  ? (process.env.NEXT_PUBLIC_RPC_MAINNET ?? 'https://api.avax.network/ext/bc/C/rpc')
+  : (process.env.NEXT_PUBLIC_RPC_TESTNET ?? 'https://api.avax-test.network/ext/bc/C/rpc')
 const USDC_ADDRESS = (CHAIN_ID === 43114
   ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
   : '0x5425890298aed601595a70AB815c96711a31Bc65') as `0x${string}`
