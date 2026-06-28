@@ -1,0 +1,37 @@
+name: ci
+
+# Real CI gate: enforces typecheck, lint and the unit/integration test suite on
+# every pull request and on push to main/master. This complements e2e.yml
+# (Playwright against the deployed app) — it does not replace it. Runs WITHOUT
+# secrets or a live database; tests that need external services are expected to
+# be skip-gated, not hard-failed.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
