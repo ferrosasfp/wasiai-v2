@@ -76,9 +76,10 @@ export async function GET(
       error_rate_7d:     number | null
       error_rate_sample: number | null
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const metricsQuery = supabase.rpc('get_agent_percentile_metrics', { p_agent_id: agent.id }) as any
-    const { data: metrics }: { data: AgentPercentileMetrics | null } = await metricsQuery.single()
+    const { data: metricsRaw } = await supabase
+      .rpc('get_agent_percentile_metrics', { p_agent_id: agent.id })
+      .single()
+    const metrics = metricsRaw as AgentPercentileMetrics | null
 
     const contractAddress = getMarketplaceAddress(CHAIN_ID)
 
