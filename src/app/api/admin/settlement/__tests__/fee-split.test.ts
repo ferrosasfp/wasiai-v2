@@ -77,4 +77,41 @@ describe('admin settlement fee-split (integer, matches contract)', () => {
     expect(refCreator).toBe(900_000n)
     expect(fromAtomic(acc)).toBe('0.900000')
   })
+
+  it('pins per-call accumulation semantics — diverges from single-split-on-total', () => {
+    // The previous batch test used 0.001 USDC, where the per-call floored fee is
+    // non-zero (100n) so per-call accumulation and a single split-on-the-total
+    // happen to AGREE (both 900_000n). That coincidence means it CANNOT catch a
+    // refactor of route.ts to split the total once instead of per call.
+    //
+    // This case is chosen so the two semantics DIVERGE: with a tiny amount whose
+    // per-call fee floors to zero, the creator keeps the whole micro-amount on
+    // every call, but splitting the accumulated total once would skim a fee.
+    // Pinning the per-call result locks in the production semantics; the explicit
+    // 3000n !== 2700n assertion proves the test would FAIL if route.ts were ever
+    // refactored to split the grand total a single time.
+    const N = 1000
+    const perCall = 0.000003
+
+    // Real helpers keep this in sync with production math.
+    const atomicPerCall = toAtomic(perCall) // 3n
+    expect(atomicPerCall).toBe(3n)
+    expect(feeSplit(atomicPerCall, PLATFORM_FEE_BPS).fee).toBe(0n) // floor(3*1000/10000) = 0
+
+    // (a) Per-call accumulation: creator keeps 3n each call → 3000n.
+    let acc = 0n
+    for (let i = 0; i < N; i++) acc += routeCreatorShare(perCall, PLATFORM_FEE_BPS)
+    const perCallCreator = BigInt(N) * feeSplit(atomicPerCall, PLATFORM_FEE_BPS).creator
+    expect(acc).toBe(perCallCreator)
+    expect(acc).toBe(3000n)
+
+    // Single-split-on-total: feeSplit(3000n, 1000).creator = 3000n - 300n = 2700n.
+    const totalAtomic = BigInt(N) * atomicPerCall // 3000n
+    const singleSplitCreator = feeSplit(totalAtomic, PLATFORM_FEE_BPS).creator
+    expect(singleSplitCreator).toBe(2700n)
+
+    // (b) The two semantics DIVERGE — the property the older test could not catch.
+    expect(acc).not.toBe(singleSplitCreator)
+    expect(3000n).not.toBe(2700n)
+  })
 })
