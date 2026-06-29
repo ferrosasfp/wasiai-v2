@@ -17,6 +17,7 @@ import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { metaValidateSchema } from '@/lib/schema-validator'
 import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -54,7 +55,7 @@ export async function GET(
 
     // Error de Supabase (red, auth, etc.) → 503
     if (error && error.code !== 'PGRST116') {
-      console.error('[agents/slug] Supabase error:', error.message)
+      logger.error('[agents/slug] Supabase error', { detail: error.message })
       return NextResponse.json(
         { error: 'internal_error', message: 'Service temporarily unavailable' },
         { status: 503, headers: CORS }
@@ -76,9 +77,10 @@ export async function GET(
       error_rate_7d:     number | null
       error_rate_sample: number | null
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const metricsQuery = supabase.rpc('get_agent_percentile_metrics', { p_agent_id: agent.id }) as any
-    const { data: metrics }: { data: AgentPercentileMetrics | null } = await metricsQuery.single()
+    const { data: metricsRaw } = await supabase
+      .rpc('get_agent_percentile_metrics', { p_agent_id: agent.id })
+      .single()
+    const metrics = metricsRaw as AgentPercentileMetrics | null
 
     const contractAddress = getMarketplaceAddress(CHAIN_ID)
 
@@ -135,7 +137,7 @@ export async function GET(
 
     return NextResponse.json({ ...body, estimated_total_cost }, { status: 200, headers: CORS })
   } catch (err) {
-    console.error('[agents/slug] Unexpected error:', err)
+    logger.error('[agents/slug] Unexpected error', { err })
     return NextResponse.json(
       { error: 'internal_error', message: 'Service temporarily unavailable' },
       { status: 503, headers: CORS }
@@ -304,7 +306,7 @@ export async function PATCH(
       .single()
 
     if (updateErr || !updated) {
-      console.error('[agents/slug PATCH] Update error:', updateErr?.message)
+      logger.error('[agents/slug PATCH] Update error', { detail: updateErr?.message })
       return NextResponse.json(
         { error: 'internal_error', message: 'Failed to update agent' },
         { status: 503, headers: PATCH_CORS }
@@ -313,7 +315,7 @@ export async function PATCH(
 
     return NextResponse.json(updated, { status: 200, headers: PATCH_CORS })
   } catch (err) {
-    console.error('[agents/slug PATCH] Unexpected error:', err)
+    logger.error('[agents/slug PATCH] Unexpected error', { err })
     return NextResponse.json(
       { error: 'internal_error', message: 'Service temporarily unavailable' },
       { status: 503, headers: PATCH_CORS }

@@ -7,6 +7,7 @@ import { CHAIN_NAME } from '@/lib/chain'
 import { buildExampleFromSchema } from '@/features/agents/utils/buildExampleFromSchema'
 import { metaValidateSchema } from '@/lib/schema-validator'
 import { jsonError } from '@/lib/api/jsonError'
+import { logger } from '@/lib/logger'
 
 type JsonSchema = Parameters<typeof buildExampleFromSchema>[0]
 
@@ -112,7 +113,7 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
         .eq('is_active', true)
 
       if (dbError) {
-        console.error('[onboard/step4] agent_categories query failed', dbError)
+        logger.error('[onboard/step4] agent_categories query failed', { dbError })
         return NextResponse.json(
           { error: 'Unable to load categories. Please try again later.' },
           { status: 503 }
@@ -193,7 +194,7 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           p_step:       step,
         })
         if (claimError) {
-          console.error('[onboard/step7] claim_onboard_step failed', claimError)
+          logger.error('[onboard/step7] claim_onboard_step failed', { claimError })
           return NextResponse.json({ error: 'Failed to process step' }, { status: 500 })
         }
         if (claimed === false) {
@@ -295,7 +296,7 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
         p_step:       step,
       })
       if (claimError8) {
-        console.error('[onboard/step8] claim_onboard_step failed', claimError8)
+        logger.error('[onboard/step8] claim_onboard_step failed', { claimError: claimError8 })
         return NextResponse.json({ error: 'Failed to process step' }, { status: 500 })
       }
       if (claimed8 === false) {
@@ -341,7 +342,7 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           userId = existing.id
           isExistingUser = true
         } else {
-          console.error('[onboard/step8] createUser failed', createError)
+          logger.error('[onboard/step8] createUser failed', { createError })
           await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
           return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
         }
@@ -368,7 +369,7 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
         // Compensating: delete user
         if (!isExistingUser) {
           await serviceClient.auth.admin.deleteUser(userId!).catch((e) =>
-            console.error('[onboard/step8] ZOMBIE USER cleanup failed', e),
+            logger.error('[onboard/step8] ZOMBIE USER cleanup failed', { err: e }),
           )
         }
         // V9: release the step lock so the user can retry this step.
@@ -421,11 +422,11 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
 
       // F1 fix: agent insert failure is fatal — rollback user+key and return error
       if (agentError || !agent) {
-        console.error('[onboard/step8] agent insert failed — rolling back', agentError)
+        logger.error('[onboard/step8] agent insert failed — rolling back', { agentError })
         await serviceClient.from('agent_keys').delete().eq('key_hash', hash)
         if (!isExistingUser) {
           await serviceClient.auth.admin.deleteUser(userId!).catch((e) =>
-            console.error('[onboard/step8] ZOMBIE USER cleanup failed', e),
+            logger.error('[onboard/step8] ZOMBIE USER cleanup failed', { err: e }),
           )
         }
         // V9: release the step lock so the user can retry this step.

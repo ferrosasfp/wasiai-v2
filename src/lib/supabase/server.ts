@@ -1,3 +1,5 @@
+// Builds the service-role Supabase client (bypasses RLS) — server-only.
+import 'server-only'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'

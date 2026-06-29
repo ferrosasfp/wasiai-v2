@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   getAgentSignupLimit: vi.fn(),
   generateApiKey: vi.fn(),
   agentSignupKey: undefined as string | undefined,
+  loggerError: vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -52,6 +53,10 @@ vi.mock('@/lib/env', () => ({
 
 vi.mock('@/features/agent-api/services/agent-keys.service', () => ({
   generateApiKey: () => mocks.generateApiKey(),
+}))
+
+vi.mock('@/lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: mocks.loggerError },
 }))
 
 // ---------------------------------------------------------------------------
@@ -330,18 +335,17 @@ describe('AC10 — Rollback compensatorio', () => {
   })
 
   it('createUser OK, insert falla, deleteUser también falla → log zombie user → 500', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.loggerError.mockClear()
     mocks.fromInsert.mockResolvedValue({ data: null, error: { message: 'DB error' } })
     mocks.deleteUser.mockResolvedValue({ error: { message: 'Delete failed' } })
 
     const res = await POST(makeRequest({ email: 'bot@example.com' }))
 
     expect(res.status).toBe(500)
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(mocks.loggerError).toHaveBeenCalledWith(
       expect.stringContaining('ZOMBIE USER'),
       expect.anything(),
     )
-    consoleSpy.mockRestore()
   })
 })
 

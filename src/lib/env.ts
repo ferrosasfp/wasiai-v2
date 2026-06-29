@@ -5,7 +5,12 @@
  * Fails fast at startup if required variables are missing.
  *
  * T-03: Replaces scattered process.env.VAR! non-null assertions.
+ *
+ * Audit hardening: this module validates server-only secrets (service-role key,
+ * operator private key, etc.). `import 'server-only'` makes any client-side
+ * import a build-time error so secrets can never leak into a browser bundle.
  */
+import 'server-only'
 import { z } from 'zod'
 
 // ── Schema ────────────────────────────────────────────────────────────────────
