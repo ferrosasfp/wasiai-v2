@@ -10,6 +10,12 @@ remappings = [
     "@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/"
 ]
 
+[invariant]
+runs = 256
+depth = 50
+fail_on_revert = false
+call_override = false
+
 [rpc_endpoints]
 # Avalanche (default)
 avalanche = "https://api.avax.network/ext/bc/C/rpc"
