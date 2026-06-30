@@ -12,8 +12,9 @@ import type { Address } from 'viem'
  *
  *   - `primary`: the M-1 contract used for ALL writes (deposits, settles) and
  *     reads. Published via `NEXT_PUBLIC_MARKETPLACE_ADDRESS_<network>` (and, on
- *     the server, kept coherent with `MARKETPLACE_CONTRACT_ADDRESS` — see
- *     configCoherence.test.ts).
+ *     the server, kept coherent with `MARKETPLACE_CONTRACT_ADDRESS` — this
+ *     coherence is enforced by the audit2 config-coherence test, added in the
+ *     marketplace-hardening PR; both vars must resolve to the same address).
  *   - `legacy` (optional): the OLD contract, READ-ONLY / withdraw-only. Only set
  *     when `NEXT_PUBLIC_MARKETPLACE_ADDRESS_LEGACY_<network>` is configured.
  *
