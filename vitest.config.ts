@@ -12,7 +12,16 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'text-summary', 'lcov', 'html'],
       reportsDirectory: './coverage',
-      include: ['src/features/**', 'src/shared/**', 'src/actions/**'],
+      include: [
+        'src/features/**',
+        'src/shared/**',
+        'src/actions/**',
+        // Money paths — previously excluded from coverage. Now measured so a
+        // drop in settlement / billing / agent-key test coverage is visible
+        // and the global thresholds below cannot be silently bypassed.
+        'src/app/api/**',
+        'src/lib/**',
+      ],
       exclude: [
         '**/*.types.ts',
         '**/index.ts',
@@ -20,11 +29,15 @@ export default defineConfig({
         '**/*.test.*',
         '**/__mocks__/**',
       ],
+      // Thresholds are set just below the currently measured coverage with the
+      // money paths included (stmts/lines ~21.7%, branches ~69.2%, funcs
+      // ~69.9%). They act as a regression floor — raise them as coverage on the
+      // api/lib money paths grows. (audit: coverage scope widened to money paths)
       thresholds: {
-        lines: 60,
-        functions: 60,
-        branches: 50,
-        statements: 60,
+        lines: 20,
+        functions: 65,
+        branches: 65,
+        statements: 20,
       },
     },
   },

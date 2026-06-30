@@ -209,7 +209,7 @@ async function bootstrapAnonymousCreator(
       .insert({ id: userId, username: `agent_${uuid.slice(0, 8)}`, display_name: 'Agent Publisher', email_domain: 'bootstrap.wasiai.internal', account_status: 'active' })
     if (profileError) {
       await serviceClient.auth.admin.deleteUser(userId).catch(err =>
-        console.error('[register] bootstrap rollback failed — creator_profile insert', { userId, err })
+        logger.error('[register] bootstrap rollback failed — creator_profile insert', { userId, err })
       )
       return null
     }
@@ -386,7 +386,7 @@ export async function POST(request: NextRequest) {
     try {
       bootstrapResult = await bootstrapAnonymousCreator(serviceClient)
     } catch (err) {
-      console.error('[register] bootstrapAnonymousCreator threw unexpectedly', err)
+      logger.error('[register] bootstrapAnonymousCreator threw unexpectedly', { err })
     }
     if (!bootstrapResult) {
       return NextResponse.json(
@@ -459,7 +459,7 @@ export async function POST(request: NextRequest) {
     if (insertError?.message?.includes('unique constraint') || insertError?.code === '23505') {
       if (isBootstrap && creatorId) {
         await serviceClient.auth.admin.deleteUser(creatorId).catch(err =>
-          console.error('[register] bootstrap rollback failed — agent insert', { userId: creatorId, err })
+          logger.error('[register] bootstrap rollback failed — agent insert', { userId: creatorId, err })
         )
       }
       return NextResponse.json(
@@ -469,7 +469,7 @@ export async function POST(request: NextRequest) {
     }
     if (isBootstrap && creatorId) {
       await serviceClient.auth.admin.deleteUser(creatorId).catch(err =>
-        console.error('[register] bootstrap rollback failed — agent insert', { userId: creatorId, err })
+        logger.error('[register] bootstrap rollback failed — agent insert', { userId: creatorId, err })
       )
     }
     return NextResponse.json(
@@ -505,11 +505,11 @@ export async function POST(request: NextRequest) {
         try {
           await serviceClient.from('agents').delete().eq('id', agent.id)
         } catch (err) {
-          console.error('[register] bootstrap rollback failed — agent delete', { agentId: agent.id, err })
+          logger.error('[register] bootstrap rollback failed — agent delete', { agentId: agent.id, err })
         }
         // Then deleteUser (CASCADE limpia creator_profile)
         await serviceClient.auth.admin.deleteUser(creatorId).catch(err =>
-          console.error('[register] bootstrap rollback failed — key insert', { userId: creatorId, err })
+          logger.error('[register] bootstrap rollback failed — key insert', { userId: creatorId, err })
         )
         return NextResponse.json(
           { error: 'Registration service temporarily unavailable', code: 'bootstrap_failed' },
@@ -568,7 +568,7 @@ export async function POST(request: NextRequest) {
       const probeAgentId     = agent.id
       after(() =>
         probeEndpoint(probeEndpointUrl, probeAgentId).catch(err =>
-          console.error('[register] probe failed silently', { agentId: probeAgentId, err: String(err) })
+          logger.error('[register] probe failed silently', { agentId: probeAgentId, err: String(err) })
         )
       )
     } else {

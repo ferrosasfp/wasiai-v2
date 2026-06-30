@@ -7,6 +7,7 @@ import { validateCsrf } from '@/lib/security/csrf'
 import { getKeyBalanceOnChain } from '@/lib/contracts/marketplaceClient'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { jsonError } from '@/lib/api/jsonError'
 
 const createSchema = z.object({
   name: z.string().min(1).max(64),
@@ -102,7 +103,15 @@ export async function POST(request: NextRequest) {
   if (rlHit) return rlHit
   try {
     const body = await request.json()
-    const { name, budget_usdc } = createSchema.parse(body)
+    // safeParse → uniform 400; raw Zod issues stay server-side (don't leak the
+    // schema shape / field names to the client).
+    const parsed = createSchema.safeParse(body)
+    if (!parsed.success) {
+      return jsonError('invalid_request', 'Invalid request body', 400, {
+        logDetail: parsed.error.issues,
+      })
+    }
+    const { name, budget_usdc } = parsed.data
     const key = await createAgentKey(name, budget_usdc)
     // Return raw key ONCE — never retrievable again
     return NextResponse.json({
@@ -111,7 +120,9 @@ export async function POST(request: NextRequest) {
       message: 'Save this key — it will not be shown again',
     }, { status: 201 })
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Error' }, { status: 400 })
+    return jsonError('agent_key_create_failed', 'Could not create agent key', 400, {
+      logDetail: err,
+    })
   }
 }
 

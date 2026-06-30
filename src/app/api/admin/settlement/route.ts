@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       .is('settled_at', null)
       .neq('status', 'error')
       .or('payment_type.neq.api_key,agent_slug.is.null')
-    console.debug(`[settlement] Excluding ${excluded ?? 0} calls (non api_key or no slug)`)
+    logger.debug('[settlement] excluding non-api_key / no-slug calls', { excluded: excluded ?? 0 })
 
     // Pre-verificar qué slugs están registrados on-chain
     const uniqueSlugs = [...new Set(pendingCalls.map(c => c.agent_slug as string))]
@@ -230,11 +230,12 @@ export async function POST(request: NextRequest) {
         // Actualizar pending_earnings_usdc en creator_profiles por cada creator
         // Calcular earnings por creator (net = total - platform fee). El fee bps
         // sale de PLATFORM_FEE_BPS (on-chain / env, default 1000 = 10%) calculado arriba.
-        // V-03 (audit 2026-06-25): el net se calcula en micro-USDC enteros vía
-        // feeSplit (fee floor, creator recibe el resto) y se acumula como bigint,
-        // idéntico al cron runSettlement.ts:256-263. El viejo `amount * (1 - bps/10000)`
-        // en float driftea respecto al split entero on-chain y desincroniza el
-        // ledger off-chain. feeSplit garantiza fee + creator === amount exacto.
+        // V-03 (audit 2026-06-25) / V4 (KEY_BALANCE_MISMATCH): el net del creator
+        // se calcula en micro-USDC enteros vía feeSplit (fee floor, creator recibe
+        // el resto exacto) y se acumula como bigint — byte-for-byte el mismo split
+        // que el contrato hizo on-chain (idéntico al cron runSettlement.ts). El viejo
+        // `amount * (1 - bps/10000)` en float driftea respecto al split entero y
+        // desincroniza el ledger off-chain. feeSplit garantiza fee + creator === amount.
         const earningsByCreator = new Map<string, bigint>()
         for (let i = 0; i < batchSlugs.length; i++) {
           let creatorWallet: string | null = null
@@ -250,13 +251,15 @@ export async function POST(request: NextRequest) {
           }
           if (creatorWallet) {
             const amountAtomic = toAtomic(batchAmounts[i] ?? 0)
-            const { creator }  = feeSplit(amountAtomic, PLATFORM_FEE_BPS)
+            const { creator } = feeSplit(amountAtomic, PLATFORM_FEE_BPS)
             earningsByCreator.set(creatorWallet, (earningsByCreator.get(creatorWallet) ?? 0n) + creator)
           }
         }
         for (const [wallet, atomic] of earningsByCreator.entries()) {
           if (atomic > 0n) {
-            const amount = Number(fromAtomic(atomic)) // canónico 6-dec, exacto a 6 decimales
+            // Convert back to a fixed-6-decimal USDC value for the numeric(20,6)
+            // column / RPC. fromAtomic is exact to 6 decimals (no float drift).
+            const amount = Number(fromAtomic(atomic)) // canónico 6-dec, exacto
             try {
               // Try RPC first; if it doesn't exist fall back to direct update
               const { error: rpcErr } = await supabase.rpc('increment_pending_earnings', { p_wallet: wallet, p_amount: amount })

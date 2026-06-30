@@ -8,7 +8,9 @@
  * - Private key cifrada con AES-256-GCM (AGENT_WALLET_ENCRYPTION_KEY)
  * - NUNCA serializada fuera de getAgentWalletClient()
  * - Solo acceso via service role (RLS USING false en agent_wallets)
+ * - import 'server-only': handles decrypted agent private keys → never client-side
  */
+import 'server-only'
 import crypto from 'crypto'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { createWalletClient, createPublicClient, http, formatEther } from 'viem'

@@ -22,6 +22,7 @@ import { getSearchLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 // WasiAI handles x402 settlement natively — no external facilitator
 import { SITE_URL } from '@/lib/constants'
 import { resolveExampleInput } from '@/features/agents/utils/resolveExampleInput'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (searchError) {
-      console.error('[agents/search] Supabase RPC error:', searchError.message)
+      logger.error('[agents/search] Supabase RPC error', { detail: searchError.message })
       return NextResponse.json(
         { error: 'internal_error', message: 'Service temporarily unavailable' },
         { status: 503, headers: { 'Access-Control-Allow-Origin': '*' } }
@@ -188,7 +189,7 @@ export async function GET(request: NextRequest) {
     const { data: slimData, error: slimError, count: slimCount } = await slimQuery
 
     if (slimError) {
-      console.error('[agents/slim] Supabase error:', slimError.message)
+      logger.error('[agents/slim] Supabase error', { detail: slimError.message })
       return NextResponse.json(
         { error: 'internal_error', message: 'Service temporarily unavailable' },
         { status: 503, headers: CORS }
@@ -258,7 +259,7 @@ export async function GET(request: NextRequest) {
   try {
     result = await query
   } catch (err) {
-    console.error('[agents] Unexpected error:', err)
+    logger.error('[agents] Unexpected error', { err })
     return NextResponse.json(
       { error: 'internal_error', message: 'Service temporarily unavailable' },
       { status: 503, headers: CORS }
@@ -268,7 +269,7 @@ export async function GET(request: NextRequest) {
   const { data, error, count } = result
 
   if (error) {
-    console.error('[agents] Supabase error:', error.message)
+    logger.error('[agents] Supabase error', { detail: error.message })
     return NextResponse.json(
       { error: 'internal_error', message: 'Service temporarily unavailable' },
       { status: 503, headers: CORS }

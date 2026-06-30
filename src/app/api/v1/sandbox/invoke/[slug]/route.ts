@@ -137,8 +137,8 @@ export async function POST(
   }
 
   // 2. Rate limit — sliding window 10 calls / 1 hora (authenticated only)
-  if (!isAnonymous) {
-    const { success, limit, reset } = await getSandboxLimit().limit(user!.id)
+  if (user) {
+    const { success, limit, reset } = await getSandboxLimit().limit(user.id)
     if (!success) {
       const body: SandboxRateLimitResponse = {
         error:    'Rate limit exceeded',
@@ -194,20 +194,20 @@ export async function POST(
   }
 
   // 4-6. Balance check & deduction (authenticated only)
-  if (!isAnonymous) {
+  if (user) {
     // 4. Obtener/crear fila sandbox_credits (ignorar duplicados)
     await supabase
       .from('sandbox_credits')
-      .upsert({ user_id: user!.id }, { onConflict: 'user_id', ignoreDuplicates: true })
+      .upsert({ user_id: user.id }, { onConflict: 'user_id', ignoreDuplicates: true })
 
     const { data: creditsRow, error: creditsError } = await supabase
       .from('sandbox_credits')
       .select('balance_usdc')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .single<SandboxCreditsRow>()
 
     if (creditsError || !creditsRow) {
-      logger.error('[sandbox/invoke] No se pudo obtener sandbox_credits', { userId: user!.id })
+      logger.error('[sandbox/invoke] No se pudo obtener sandbox_credits', { userId: user.id })
       return NextResponse.json({ error: 'Internal error' }, { status: 500 })
     }
 
@@ -225,7 +225,7 @@ export async function POST(
     // 6. Deducir balance atómicamente via DB function
     const { data: deducted, error: deductError } = await supabase
       .rpc('deduct_sandbox_balance', {
-        p_user_id: user!.id,
+        p_user_id: user.id,
         p_amount:  agent.price_per_call,
       })
 
@@ -233,7 +233,7 @@ export async function POST(
       const { data: freshRow } = await supabase
         .from('sandbox_credits')
         .select('balance_usdc')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .single<SandboxCreditsRow>()
 
       const body: SandboxInsufficientResponse = {
@@ -251,9 +251,9 @@ export async function POST(
     await validateEndpointUrlAsync(agent.endpoint_url)
   } catch {
     // Reembolso atómico antes de retornar (authenticated only)
-    if (!isAnonymous) {
+    if (user) {
       await supabase.rpc('refund_sandbox_balance', {
-        p_user_id: user!.id,
+        p_user_id: user.id,
         p_amount:  agent.price_per_call,
       })
     }
@@ -290,9 +290,9 @@ export async function POST(
 
   // 9b. Reembolso si el agente falló — incremento atómico (B-01)
   if (agentFailed) {
-    if (!isAnonymous) {
+    if (user) {
       await supabase.rpc('refund_sandbox_balance', {
-        p_user_id: user!.id,
+        p_user_id: user.id,
         p_amount:  agent.price_per_call,
       })
     }
@@ -304,9 +304,9 @@ export async function POST(
     const outputErr = validateInput(agent.output_schema, agentResult)
     if (outputErr) {
       // Reembolso
-      if (!isAnonymous) {
+      if (user) {
         await supabase.rpc('refund_sandbox_balance', {
-          p_user_id: user!.id,
+          p_user_id: user.id,
           p_amount:  agent.price_per_call,
         })
       }
@@ -351,13 +351,13 @@ export async function POST(
 
   // 11. Obtener balance restante actualizado
   let balanceRemaining: string
-  if (isAnonymous) {
+  if (!user) {
     balanceRemaining = '0'
   } else {
     const { data: updatedCredits } = await supabase
       .from('sandbox_credits')
       .select('balance_usdc')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .single<SandboxCreditsRow>()
     balanceRemaining = (updatedCredits?.balance_usdc ?? 0).toString()
   }

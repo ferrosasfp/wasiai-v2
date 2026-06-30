@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { depositForKeyOnChain, getKeyBalanceOnChain } from '@/lib/contracts/marketplaceClient'
 import { logger } from '@/lib/logger'
+import { jsonError } from '@/lib/api/jsonError'
 
 // Route B: EOA — EIP-3009 TransferWithAuthorization
 const depositSchemaEOA = z.object({
@@ -44,16 +45,15 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Validate request body
-    let body: z.infer<typeof depositSchema>
-    try {
-      body = depositSchema.parse(await request.json())
-    } catch (err) {
-      return NextResponse.json(
-        { error: 'Invalid request body', detail: err instanceof Error ? err.message : String(err) },
-        { status: 400 },
-      )
+    // 2. Validate request body — safeParse so the raw Zod issues (which expose
+    // the schema shape / field names) stay server-side, not in the 400 body.
+    const parsed = depositSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return jsonError('invalid_request', 'Invalid request body', 400, {
+        logDetail: parsed.error.issues,
+      })
     }
+    const body: z.infer<typeof depositSchema> = parsed.data
 
     // 3. Get key from DB — verify ownership
     const { data: keyRow, error: keyError } = await supabase
