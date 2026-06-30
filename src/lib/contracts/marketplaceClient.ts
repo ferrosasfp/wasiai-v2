@@ -14,11 +14,16 @@
  */
 
 import 'server-only'
-import { createWalletClient, createPublicClient, http, type Address } from 'viem'
+import { createWalletClient, createPublicClient, decodeEventLog, http, parseAbiItem, type Address } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { WASIAI_MARKETPLACE_ABI, toUSDCAtomics } from './WasiAIMarketplace'
 import { logger } from '@/lib/logger'
+
+// ── USDC ERC-20 Transfer event (for receipt-amount decoding) ────────────────
+const ERC20_TRANSFER_EVENT = parseAbiItem(
+  'event Transfer(address indexed from, address indexed to, uint256 value)',
+)
 
 function getChain() {
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
@@ -410,6 +415,67 @@ export async function depositForKeyOnChain(params: {
     logger.error('[marketplace] depositForKey failed', {
       message: msg.slice(0, 500),
       cause:   (err as { cause?: unknown })?.cause ? String((err as { cause?: unknown }).cause).slice(0, 300) : undefined,
+    })
+    return null
+  }
+}
+
+/**
+ * TB-06 (audit 2026-06-30): decode the USDC amount actually transferred to the
+ * marketplace contract from a confirmed deposit tx receipt, instead of trusting
+ * the amount supplied in the request body.
+ *
+ * Sums the value of every ERC-20 `Transfer` log emitted by the USDC token whose
+ * `to` is the marketplace contract (and, when `from` is provided, whose `from`
+ * matches the depositor). Returns the amount in USDC dollars, or `null` if no
+ * matching transfer is found / the receipt can't be read (caller decides the
+ * fallback — but must never credit MORE than this when non-null).
+ *
+ * @param txHash       confirmed deposit transaction hash.
+ * @param usdcAddress  the USDC token address for the active chain.
+ * @param fromAddress  optional depositor address to additionally match on.
+ */
+export async function getDepositedUsdcFromReceipt(
+  txHash:      `0x${string}`,
+  usdcAddress: Address,
+  fromAddress?: Address,
+): Promise<number | null> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) return null
+
+  try {
+    const { public: pub } = getOperatorClient()
+    const receipt = await pub.getTransactionReceipt({ hash: txHash })
+
+    const usdcLower     = usdcAddress.toLowerCase()
+    const contractLower = contractAddress.toLowerCase()
+    const fromLower     = fromAddress?.toLowerCase()
+
+    let total = 0n
+    for (const log of receipt.logs) {
+      if (log.address.toLowerCase() !== usdcLower) continue
+      let decoded
+      try {
+        decoded = decodeEventLog({
+          abi:    [ERC20_TRANSFER_EVENT],
+          data:   log.data,
+          topics: log.topics,
+        })
+      } catch {
+        continue // not a Transfer log
+      }
+      const { from, to, value } = decoded.args as { from: Address; to: Address; value: bigint }
+      if (to.toLowerCase() !== contractLower) continue
+      if (fromLower && from.toLowerCase() !== fromLower) continue
+      total += value
+    }
+
+    if (total === 0n) return null
+    return Number(total) / 1_000_000
+  } catch (err) {
+    logger.error('[marketplace] getDepositedUsdcFromReceipt failed', {
+      txHash,
+      err: String(err).slice(0, 200),
     })
     return null
   }

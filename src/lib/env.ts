@@ -59,6 +59,12 @@ const envSchema = z.object({
   AGENT_SIGNUP_KEY: z.string().optional(),
   WASIAI_SYSTEM_CREATOR_ID: z.string().optional(), // UUID-like but not strictly validated
 
+  // TB-09 (audit 2026-06-30): shared secret for internal/operator routes.
+  // Declared here so a misconfiguration is visible at the env layer. The
+  // verifiers (verifyInternalSecret / verifySignedRequest) still fail-closed at
+  // request time when it is unset. ≥16 chars when present.
+  INTERNAL_API_SECRET: z.string().min(16).optional(),
+
   // Runtime
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 

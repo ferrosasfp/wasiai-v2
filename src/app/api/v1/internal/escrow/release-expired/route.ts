@@ -2,7 +2,9 @@
  * POST /api/v1/internal/escrow/release-expired
  *
  * Internal endpoint to release expired escrows (> 24h pending).
- * Auth: Bearer ${INTERNAL_API_SECRET}
+ * Auth: TB-03 HMAC signed request over INTERNAL_API_SECRET (timestamp + nonce).
+ *       Headers: x-internal-signature, x-internal-timestamp, x-internal-nonce
+ *       (produced by signInternalRequest). A static bearer is NOT accepted.
  *
  * Triggered by:
  *  - Operator manually
@@ -14,19 +16,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { releaseExpiredOnChain } from '@/lib/contracts/escrow'
 import { logger } from '@/lib/logger'
-import { safeBearerEqual } from '@/lib/cron/verifyCronSecret'
+import { verifySignedRequest } from '@/lib/security/verifySignedRequest'
+
+const ROUTE_PATH = '/api/v1/internal/escrow/release-expired'
 
 export async function POST(request: NextRequest) {
   // ── Auth ───────────────────────────────────────────────────────────────────
-  const secret = process.env.INTERNAL_API_SECRET
-  if (!secret) {
-    return NextResponse.json({ error: 'server_misconfigured' }, { status: 500 })
-  }
-
-  // V-12/V-13: constant-time compare (timing side-channel hardening).
-  const auth = request.headers.get('Authorization') ?? ''
-  if (!safeBearerEqual(auth, `Bearer ${secret}`)) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // TB-03 (audit 2026-06-30): this route triggers an operator-signed on-chain
+  // action (releaseExpired). A static bearer is infinitely replayable, so we
+  // require an HMAC signed request with a fresh timestamp + single-use nonce
+  // (mirrors the admin-fee nonce+expiry pattern). Fail-closed on every error.
+  //
+  // Caller (operator / upkeep-listener) must produce the headers via
+  // signInternalRequest(method, path, INTERNAL_API_SECRET).
+  const auth = await verifySignedRequest('POST', ROUTE_PATH, request.headers)
+  if (!auth.ok) {
+    if (auth.status === 500) logger.error('[release-expired] auth misconfigured', { reason: auth.reason })
+    else logger.warn('[release-expired] rejected signed request', { reason: auth.reason })
+    return NextResponse.json({ error: auth.reason }, { status: auth.status })
   }
 
   const svc = createServiceClient()

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { depositForKeyOnChain, getKeyBalanceOnChain } from '@/lib/contracts/marketplaceClient'
+import { depositForKeyOnChain, getKeyBalanceOnChain, getDepositedUsdcFromReceipt } from '@/lib/contracts/marketplaceClient'
+import { creditKeyBudgetIdempotent } from '@/lib/contracts/creditKeyBudget'
+import { USDC_ADDRESS_BY_CHAIN, ACTIVE_CHAIN_ID } from '@/lib/contracts/usdc'
 import { logger } from '@/lib/logger'
 import { jsonError } from '@/lib/api/jsonError'
 
@@ -119,16 +121,40 @@ export async function POST(
       logger.info('[deposit] Route B on-chain tx submitted', { txHash })
     }
 
-    // 5. HAL-011: Update budget_usdc atomically via RPC (prevents race condition)
-    const { error: updateError } = await supabase.rpc('increment_key_budget', {
-      p_key_id:   id,
-      p_amount:   body.amount,
-      p_owner_id: user.id,
-    })
+    // 5. TB-06: credit the amount DECODED FROM THE RECEIPT Transfer log, not the
+    // trusted body.amount. The receipt amount is capped at body.amount so we can
+    // never over-credit if decoding ever returns more than was authorized.
+    const usdcAddress = USDC_ADDRESS_BY_CHAIN[ACTIVE_CHAIN_ID] ?? null
+    let creditAmount = body.amount
+    if (usdcAddress) {
+      const decoded = await getDepositedUsdcFromReceipt(
+        txHash as `0x${string}`,
+        usdcAddress,
+        body.ownerAddress as `0x${string}`,
+      )
+      if (decoded !== null) {
+        creditAmount = Math.min(decoded, body.amount)
+        if (decoded !== body.amount) {
+          logger.warn('[deposit] receipt amount differs from body.amount', { decoded, bodyAmount: body.amount, txHash })
+        }
+      }
+    }
 
-    if (updateError) {
+    // HAL-011 + TB-06: atomic, idempotent budget credit keyed by (chain_id, tx_hash)
+    // so the same confirmed deposit tx can never credit twice.
+    const credit = await creditKeyBudgetIdempotent(supabase, {
+      keyId:   id,
+      amount:  creditAmount,
+      ownerId: user.id,
+      chainId: ACTIVE_CHAIN_ID,
+      txHash,
+    })
+    if (!credit.ok && credit.alreadyCredited) {
+      // Replay of an already-credited deposit — return success without re-crediting.
+      logger.warn('[deposit] deposit already credited (idempotent no-op)', { txHash })
+    } else if (!credit.ok) {
       // On-chain tx succeeded, DB update failed — log but return partial success
-      logger.error('[deposit] DB budget_usdc atomic update failed (tx already submitted)', { updateError, txHash })
+      logger.error('[deposit] DB budget_usdc atomic update failed (tx already submitted)', { error: credit.error, txHash })
     }
 
     // 6. Persistir owner_wallet_address en primer depósito (HAL-025: solo después de tx OK)
@@ -142,7 +168,7 @@ export async function POST(
 
     // 7. Fetch on-chain balance for response
     const onChainBalance = await getKeyBalanceOnChain(keyRow.key_hash)
-    const newBudget = Number(keyRow.budget_usdc) + body.amount  // optimistic estimate
+    const newBudget = Number(keyRow.budget_usdc) + creditAmount  // optimistic estimate
 
     return NextResponse.json({
       ok:            true,

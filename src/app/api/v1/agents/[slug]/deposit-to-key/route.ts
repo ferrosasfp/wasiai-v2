@@ -15,7 +15,8 @@ import {
   getAgentWalletAddress,
   getAgentWalletUsdcBalance,
 } from '@/lib/agent-wallets/agentWallet'
-import { depositForKeyOnChain } from '@/lib/contracts/marketplaceClient'
+import { depositForKeyOnChain, getDepositedUsdcFromReceipt } from '@/lib/contracts/marketplaceClient'
+import { creditKeyBudgetIdempotent } from '@/lib/contracts/creditKeyBudget'
 import { calcPlatformOverhead } from '@/lib/pricing/overhead'
 import { getSharedRedis } from '@/lib/ratelimit'
 import { logger } from '@/lib/logger'
@@ -278,15 +279,36 @@ export async function POST(
     .update({ status: 'success', tx_hash: txHash })
     .eq('id', depositId)
 
-  // Atomic increment of budget_usdc
-  const { error: budgetError } = await supabase.rpc('increment_key_budget', {
-    p_key_id:   targetKeyId,
-    p_amount:   amount_usdc,
-    p_owner_id: keyRow.owner_id,
-  })
+  // TB-06: credit the amount DECODED FROM THE RECEIPT Transfer log (capped at
+  // the requested amount), not the trusted body amount.
+  const usdcAddress = USDC_ADDR[CHAIN_ID_NUM] ?? null
+  let creditAmount = amount_usdc
+  if (usdcAddress) {
+    const decoded = await getDepositedUsdcFromReceipt(
+      txHash as `0x${string}`,
+      usdcAddress,
+      walletAddress as `0x${string}`,
+    )
+    if (decoded !== null) {
+      creditAmount = Math.min(decoded, amount_usdc)
+      if (decoded !== amount_usdc) {
+        logger.warn('[agent-self-deposit] receipt amount differs from requested', { decoded, requested: amount_usdc, txHash })
+      }
+    }
+  }
 
-  if (budgetError) {
-    logger.error('[agent-self-deposit] budget_usdc atomic update failed (tx already submitted)', { budgetError, txHash })
+  // TB-06: atomic, idempotent budget credit keyed by (chain_id, tx_hash).
+  const credit = await creditKeyBudgetIdempotent(supabase, {
+    keyId:   targetKeyId,
+    amount:  creditAmount,
+    ownerId: keyRow.owner_id,
+    chainId: CHAIN_ID_NUM,
+    txHash,
+  })
+  if (!credit.ok && credit.alreadyCredited) {
+    logger.warn('[agent-self-deposit] deposit already credited (idempotent no-op)', { txHash })
+  } else if (!credit.ok) {
+    logger.error('[agent-self-deposit] budget_usdc atomic update failed (tx already submitted)', { error: credit.error, txHash })
   }
 
   // Fetch updated budget for response
@@ -311,7 +333,7 @@ export async function POST(
     {
       success:            true,
       tx_hash:            txHash,
-      deposited_usdc:     amount_usdc,
+      deposited_usdc:     creditAmount,
       gas_fee_usdc:       gasOverhead,
       total_debited_usdc: amount_usdc + gasOverhead,
       new_budget_usdc:    newBudget,

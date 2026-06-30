@@ -36,6 +36,20 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/contracts/marketplaceClient', () => ({
   depositForKeyOnChain: mocks.depositForKeyOnChain,
+  // TB-06: receipt-amount decoder. Return null so creditAmount falls back to the
+  // requested amount (preserves existing deposited_usdc / budget assertions).
+  getDepositedUsdcFromReceipt: vi.fn(async () => null),
+}))
+
+// TB-06: idempotent credit helper delegates to supabaseRpc so existing
+// budget-RPC-driven assertions continue to work.
+vi.mock('@/lib/contracts/creditKeyBudget', () => ({
+  creditKeyBudgetIdempotent: vi.fn(async (supabase: { rpc: (fn: string, args: unknown) => Promise<{ error: unknown }> }, args: { keyId: string; amount: number; ownerId: string }) => {
+    const { error } = await supabase.rpc('increment_key_budget', {
+      p_key_id: args.keyId, p_amount: args.amount, p_owner_id: args.ownerId,
+    })
+    return error ? { ok: false, alreadyCredited: false, error: String(error) } : { ok: true, idempotent: false }
+  }),
 }))
 
 vi.mock('@/lib/pricing/overhead', () => ({
