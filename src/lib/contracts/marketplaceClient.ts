@@ -447,6 +447,43 @@ export async function getKeyBalanceOnChain(keyId: string): Promise<number> {
 }
 
 /**
+ * Reconcile-only variant of getKeyBalanceOnChain.
+ *
+ * Returns `null` on RPC error (mirrors getPlatformFeeBps' null-on-error
+ * pattern) so the reconciler can distinguish "chain says 0" from "chain
+ * unknown (RPC blip)" and SKIP the comparison instead of false-alarming a
+ * RECONCILE_DIVERGENCE. Do NOT use this in settle/payment paths — those rely
+ * on the 0-fallback semantics of getKeyBalanceOnChain.
+ *
+ * @param keyId SHA-256 hex string from agent_keys.key_hash
+ * @returns Balance in USDC dollars, or null on RPC/contract error.
+ */
+export async function getKeyBalanceForReconcile(keyId: string): Promise<number | null> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) {
+    logger.warn('[marketplace] getKeyBalanceForReconcile: contract not configured')
+    return null
+  }
+
+  try {
+    const { public: pub } = getOperatorClient()
+    const bytes32KeyId = keyHashToBytes32(keyId)
+
+    const atomics = await pub.readContract({
+      address:      contractAddress,
+      abi:          WASIAI_MARKETPLACE_ABI,
+      functionName: 'getKeyBalance',
+      args:         [bytes32KeyId],
+    }) as bigint
+
+    return Number(atomics) / 1_000_000
+  } catch (err) {
+    logger.error('[marketplace] getKeyBalanceForReconcile failed', { err: String(err).slice(0, 200) })
+    return null
+  }
+}
+
+/**
  * Read the current platformFeeBps from the contract.
  * Returns null on failure so caller can apply a fallback — distinguishes
  * "fee is 0" (valid) from "RPC failed" (should use fallback).
@@ -497,6 +534,39 @@ export async function getPendingEarnings(creatorWallet: string): Promise<number>
   } catch (err) {
     logger.error('[marketplace] getPendingEarnings failed', { err: String(err).slice(0, 200) })
     return 0
+  }
+}
+
+/**
+ * Reconcile-only variant of getPendingEarnings.
+ *
+ * Returns `null` on RPC error (mirrors getPlatformFeeBps' null-on-error
+ * pattern) so the reconciler can distinguish "chain says 0" from "chain
+ * unknown (RPC blip)" and SKIP the comparison instead of false-alarming a
+ * RECONCILE_DIVERGENCE. Do NOT use this in settle/payment paths — those rely
+ * on the 0-fallback semantics of getPendingEarnings.
+ *
+ * @returns Pending earnings in USDC dollars, or null on RPC/contract error.
+ */
+export async function getPendingEarningsForReconcile(creatorWallet: string): Promise<number | null> {
+  const contractAddress = getContractAddress()
+  if (!contractAddress) {
+    logger.warn('[marketplace] getPendingEarningsForReconcile: contract not configured')
+    return null
+  }
+
+  try {
+    const { public: pub } = getOperatorClient()
+    const atomics = await pub.readContract({
+      address:      contractAddress,
+      abi:          WASIAI_MARKETPLACE_ABI,
+      functionName: 'getPendingEarnings',
+      args:         [creatorWallet as Address],
+    }) as bigint
+    return Number(atomics) / 1_000_000
+  } catch (err) {
+    logger.error('[marketplace] getPendingEarningsForReconcile failed', { err: String(err).slice(0, 200) })
+    return null
   }
 }
 
