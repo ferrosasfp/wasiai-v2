@@ -27,6 +27,12 @@ const envSchema = z.object({
   MARKETPLACE_CONTRACT_ADDRESS:              z.string().optional(),
   NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI:      z.string().optional(),
   NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET:   z.string().optional(),
+  // WKH-126: optional LEGACY (old, non-upgradeable) marketplace addresses for the
+  // dual-address parallel run. When unset, behavior is identical to single-address
+  // (AC-7 / CD-1). When set, the app reads balances from BOTH and offers assisted
+  // migration; all WRITES still target the PRIMARY address above.
+  NEXT_PUBLIC_MARKETPLACE_ADDRESS_LEGACY_FUJI:    z.string().optional(),
+  NEXT_PUBLIC_MARKETPLACE_ADDRESS_LEGACY_MAINNET: z.string().optional(),
   NEXT_PUBLIC_WASIAI_TREASURY:               z.string().optional(),
   WASIAI_TREASURY_ADDRESS:                   z.string().optional(),
   OPERATOR_PRIVATE_KEY:                      z.string().optional(),
