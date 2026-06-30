@@ -10,6 +10,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { triggerAgentEvent } from '@/lib/webhooks/triggerAgentEvent'
 import { logger } from '@/lib/logger'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { safeBearerEqual } from '@/lib/cron/verifyCronSecret'
 
 interface ProcessJobResponse {
   jobId: string
@@ -36,10 +37,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  // [1] Verificar secret
+  // [1] Verificar secret — V-12/V-13: constant-time compare + fail-closed when unset.
   const authHeader = request.headers.get('authorization') ?? ''
   const expectedSecret = process.env.JOB_PROCESSOR_SECRET
-  if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+  if (!expectedSecret || !safeBearerEqual(authHeader, `Bearer ${expectedSecret}`)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
