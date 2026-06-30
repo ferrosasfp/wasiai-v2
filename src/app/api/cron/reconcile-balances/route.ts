@@ -16,14 +16,23 @@
  *
  * Auth (AC via cron-secret): constant-time CRON_SECRET bearer verification,
  * fail-closed when unset (verifyCronAuth — same pattern as the other crons).
+ *
+ * MNR-1 (freeze is OBSERVABILITY-ONLY in v1): the optional `freeze=1` flag
+ * writes `agent_keys.is_frozen=true` for diverging keys, but that column is
+ * NOT yet read by the settle path (settle-key-batches does not gate on
+ * `is_frozen`). So today the flag is a durable observability marker only — it
+ * does NOT actually stop settlement. Real enforcement (gating
+ * settle-key-batches on `is_frozen=false`) ships together with the `is_frozen`
+ * column migration as a migration-coupled follow-up. Until then, `is_frozen`
+ * being written here has no effect on money movement.
  */
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { verifyCronAuth } from '@/lib/cron/verifyCronSecret'
 import { logger } from '@/lib/logger'
 import {
-  getKeyBalanceOnChain,
-  getPendingEarnings,
+  getKeyBalanceForReconcile,
+  getPendingEarningsForReconcile,
 } from '@/lib/contracts/marketplaceClient'
 import {
   reconcileKeyBalances,
@@ -61,11 +70,19 @@ function floatFromEnv(name: string, fallback: number): number {
 /**
  * Build off-chain ↔ on-chain key snapshots. Off-chain available is the DB
  * ledger `budget_usdc - spent_usdc`; on-chain is `getKeyBalance`.
+ *
+ * MNR-2: the on-chain read uses the reconcile-only variant that returns `null`
+ * on RPC error (vs the 0-fallback used in settle/payment paths). A `null`
+ * on-chain value means "chain unknown (RPC blip)", NOT "chain says 0", so the
+ * key is SKIPPED — it is never pushed into the snapshot list, hence never
+ * compared, alerted, or frozen. This prevents a transient RPC failure from
+ * being read as off-chain≫on-chain=0 and false-alarming RECONCILE_DIVERGENCE
+ * (and freezing) for every key. `skipped` is surfaced for observability.
  */
 async function buildKeySnapshots(
   service: ServiceClient,
   limit: number,
-): Promise<KeyLedgerSnapshot[]> {
+): Promise<{ snapshots: KeyLedgerSnapshot[]; skipped: number }> {
   const { data, error } = await service
     .from('agent_keys')
     .select('id, key_hash, budget_usdc, spent_usdc')
@@ -78,7 +95,7 @@ async function buildKeySnapshots(
     logger.error('[reconcile-balances] failed to read agent_keys', {
       err: String(error.message).slice(0, 200),
     })
-    return []
+    return { snapshots: [], skipped: 0 }
   }
 
   const rows = (data ?? []) as Array<{
@@ -89,10 +106,16 @@ async function buildKeySnapshots(
   }>
 
   const snapshots: KeyLedgerSnapshot[] = []
+  let skipped = 0
   for (const row of rows) {
     const offChainUsdc = Number(row.budget_usdc ?? 0) - Number(row.spent_usdc ?? 0)
-    // Read-only on-chain balance. On RPC error this returns 0 — guard below.
-    const onChainUsdc = await getKeyBalanceOnChain(row.key_hash)
+    // MNR-2: null = on-chain unknown (RPC error) → skip; only compare when the
+    // on-chain read definitively succeeded.
+    const onChainUsdc = await getKeyBalanceForReconcile(row.key_hash)
+    if (onChainUsdc === null) {
+      skipped++
+      continue
+    }
     snapshots.push({
       id: row.id,
       keyHash: row.key_hash,
@@ -100,17 +123,21 @@ async function buildKeySnapshots(
       onChainUsdc,
     })
   }
-  return snapshots
+  return { snapshots, skipped }
 }
 
 /**
  * Build off-chain ↔ on-chain creator snapshots. Off-chain is the DB
  * `pending_earnings_usdc`; on-chain is `getPendingEarnings(wallet)`.
+ *
+ * MNR-2: same null-vs-zero distinction as buildKeySnapshots — a `null`
+ * on-chain read means "chain unknown (RPC blip)" and the creator is SKIPPED
+ * (never compared / alerted / frozen). `skipped` is surfaced for observability.
  */
 async function buildCreatorSnapshots(
   service: ServiceClient,
   limit: number,
-): Promise<CreatorLedgerSnapshot[]> {
+): Promise<{ snapshots: CreatorLedgerSnapshot[]; skipped: number }> {
   const { data, error } = await service
     .from('creator_profiles')
     .select('wallet_address, pending_earnings_usdc')
@@ -123,7 +150,7 @@ async function buildCreatorSnapshots(
     logger.error('[reconcile-balances] failed to read creator_profiles', {
       err: String(error.message).slice(0, 200),
     })
-    return []
+    return { snapshots: [], skipped: 0 }
   }
 
   const rows = (data ?? []) as Array<{
@@ -132,13 +159,20 @@ async function buildCreatorSnapshots(
   }>
 
   const snapshots: CreatorLedgerSnapshot[] = []
+  let skipped = 0
   for (const row of rows) {
     const wallet = row.wallet_address.toLowerCase()
     const offChainUsdc = Number(row.pending_earnings_usdc ?? 0)
-    const onChainUsdc = await getPendingEarnings(wallet)
+    // MNR-2: null = on-chain unknown (RPC error) → skip; only compare when the
+    // on-chain read definitively succeeded.
+    const onChainUsdc = await getPendingEarningsForReconcile(wallet)
+    if (onChainUsdc === null) {
+      skipped++
+      continue
+    }
     snapshots.push({ wallet, offChainUsdc, onChainUsdc })
   }
-  return snapshots
+  return { snapshots, skipped }
 }
 
 /**
@@ -171,10 +205,17 @@ async function recordDivergences(
 }
 
 /**
- * Optionally mark diverging keys/creators non-settleable until resolved.
- * Gated by the `freeze=1` query flag (default off). Best-effort: a missing
- * `is_frozen` column (migration DEFER-TO-HU) is logged, not fatal. This does
- * NOT move funds — it only flips a settleability flag.
+ * Optionally mark diverging keys non-settleable until resolved by writing
+ * `agent_keys.is_frozen=true`. Gated by the `freeze=1` query flag (default
+ * off). Best-effort: a missing `is_frozen` column (migration DEFER-TO-HU) is
+ * logged, not fatal. This does NOT move funds.
+ *
+ * MNR-1: `is_frozen` is OBSERVABILITY-ONLY in v1. The settle path
+ * (settle-key-batches) does NOT yet read this flag, so writing it here does
+ * not actually block settlement — it is a durable marker for ops/dashboards.
+ * Enforcement (gating settle-key-batches on `is_frozen=false`) lands together
+ * with the `is_frozen` column migration as a follow-up. Do NOT assume freezing
+ * here stops money movement today.
  */
 async function freezeDiverging(
   service: ServiceClient,
@@ -220,8 +261,8 @@ export async function GET(req: Request) {
 
   const service = createServiceClient()
 
-  const keySnapshots = await buildKeySnapshots(service, maxKeys)
-  const creatorSnapshots = await buildCreatorSnapshots(service, maxCreators)
+  const { snapshots: keySnapshots, skipped: keysSkipped } = await buildKeySnapshots(service, maxKeys)
+  const { snapshots: creatorSnapshots, skipped: creatorsSkipped } = await buildCreatorSnapshots(service, maxCreators)
 
   const keyReport = reconcileKeyBalances(keySnapshots, tolerance)
   const creatorReport = reconcileEarnings(creatorSnapshots, tolerance)
@@ -248,11 +289,14 @@ export async function GET(req: Request) {
       checked: keyReport.checked,
       matched: keyReport.matched,
       divergences: keyReport.divergences.length,
+      // MNR-2: keys whose on-chain read failed (RPC unknown) — skipped, not compared.
+      skipped: keysSkipped,
     },
     creators: {
       checked: creatorReport.checked,
       matched: creatorReport.matched,
       divergences: creatorReport.divergences.length,
+      skipped: creatorsSkipped,
     },
     recorded,
     frozen,
