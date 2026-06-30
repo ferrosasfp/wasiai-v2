@@ -65,30 +65,69 @@ export default function AdminPage() {
 
   const isOwner = isConnected && !!address && ADMIN_ALLOWED.includes(address.toLowerCase())
 
-  async function loadStatus() {
+  // V-08 / V-02 (audit 2026-06-25): /api/admin/status and
+  // /api/admin/treasury/creators now require an EIP-712 admin signature. Build
+  // the signed headers here so the dashboard reads keep working. Returns null
+  // when the wallet isn't ready yet (effect re-fires once walletClient lands).
+  const buildSignedHeaders = useCallback(async (action: string): Promise<Record<string, string> | null> => {
+    if (!walletClient) return null
+    const nonce     = ('0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`
+    const timestamp = BigInt(Math.floor(Date.now() / 1000))
+    const signature = await walletClient.signTypedData({
+      domain: {
+        name:    'WasiAI Admin',
+        version: '1',
+        chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113),
+      },
+      types: { AdminAction: [
+        { name: 'action',    type: 'string'  },
+        { name: 'nonce',     type: 'bytes32' },
+        { name: 'timestamp', type: 'uint256' },
+      ] },
+      primaryType: 'AdminAction',
+      message: { action, nonce, timestamp },
+    }).catch(() => null)
+    if (!signature) return null
+    return {
+      'X-Admin-Signature': signature,
+      'X-Admin-Nonce':     nonce,
+      'X-Admin-Timestamp': timestamp.toString(),
+    }
+  }, [walletClient])
+
+  const loadStatus = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/status')
+      const headers = await buildSignedHeaders('adminStatus')
+      if (!headers) return
+      const res = await fetch('/api/admin/status', { headers })
       if (res.ok) setStatus(await res.json() as AdminStatus)
     } finally {
       setLoading(false)
     }
-  }
+  }, [buildSignedHeaders])
 
   const loadTreasury = useCallback(async () => {
     setTreasuryLoading(true)
     try {
+      const creatorsHeaders = await buildSignedHeaders('treasuryCreators')
       const [t, c] = await Promise.all([
         fetch('/api/admin/treasury').then(r => r.ok ? r.json() : null) as Promise<TreasuryData | null>,
-        fetch('/api/admin/treasury/creators').then(r => r.ok ? r.json() : []) as Promise<CreatorRow[]>,
+        creatorsHeaders
+          ? fetch('/api/admin/treasury/creators', { headers: creatorsHeaders }).then(r => r.ok ? r.json() : []) as Promise<CreatorRow[]>
+          : Promise.resolve([] as CreatorRow[]),
       ])
       setTreasury(t)
       setCreators(Array.isArray(c) ? c : [])
     } catch { /* best-effort */ }
     finally { setTreasuryLoading(false) }
-  }, [])
+  }, [buildSignedHeaders])
 
-  useEffect(() => { void loadStatus(); void loadTreasury() }, [loadTreasury])
+  useEffect(() => {
+    if (!walletClient || !isOwner) return
+    void loadStatus(); void loadTreasury()
+  }, [walletClient, isOwner, loadStatus, loadTreasury])
 
   async function signAdminAction(action: string): Promise<{
     signature: string

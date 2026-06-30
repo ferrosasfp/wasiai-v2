@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 import { createServiceClient } from '@/lib/supabase/server'
 import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
+import { toAtomic, feeSplit, fromAtomic } from '@/lib/money/usdc'
 import { logger } from '@/lib/logger'
 import { jsonError } from '@/lib/api/jsonError'
 
@@ -229,7 +230,12 @@ export async function POST(request: NextRequest) {
         // Actualizar pending_earnings_usdc en creator_profiles por cada creator
         // Calcular earnings por creator (net = total - platform fee). El fee bps
         // sale de PLATFORM_FEE_BPS (on-chain / env, default 1000 = 10%) calculado arriba.
-        const earningsByCreator = new Map<string, number>()
+        // V-03 (audit 2026-06-25): el net se calcula en micro-USDC enteros vía
+        // feeSplit (fee floor, creator recibe el resto) y se acumula como bigint,
+        // idéntico al cron runSettlement.ts:256-263. El viejo `amount * (1 - bps/10000)`
+        // en float driftea respecto al split entero on-chain y desincroniza el
+        // ledger off-chain. feeSplit garantiza fee + creator === amount exacto.
+        const earningsByCreator = new Map<string, bigint>()
         for (let i = 0; i < batchSlugs.length; i++) {
           let creatorWallet: string | null = null
           if (batchSlugs[i]) {
@@ -243,12 +249,14 @@ export async function POST(request: NextRequest) {
             } catch { /* skip */ }
           }
           if (creatorWallet) {
-            const net = (batchAmounts[i] ?? 0) * (1 - PLATFORM_FEE_BPS / 10000)
-            earningsByCreator.set(creatorWallet, (earningsByCreator.get(creatorWallet) ?? 0) + net)
+            const amountAtomic = toAtomic(batchAmounts[i] ?? 0)
+            const { creator }  = feeSplit(amountAtomic, PLATFORM_FEE_BPS)
+            earningsByCreator.set(creatorWallet, (earningsByCreator.get(creatorWallet) ?? 0n) + creator)
           }
         }
-        for (const [wallet, amount] of earningsByCreator.entries()) {
-          if (amount > 0) {
+        for (const [wallet, atomic] of earningsByCreator.entries()) {
+          if (atomic > 0n) {
+            const amount = Number(fromAtomic(atomic)) // canónico 6-dec, exacto a 6 decimales
             try {
               // Try RPC first; if it doesn't exist fall back to direct update
               const { error: rpcErr } = await supabase.rpc('increment_pending_earnings', { p_wallet: wallet, p_amount: amount })

@@ -15,9 +15,24 @@ const mocks = vi.hoisted(() => ({
   validateEndpointUrlAsync: vi.fn(),
   limitFn:                  vi.fn(),
   fetchFn:                  vi.fn(),
+  fetchPinnedFn:            vi.fn(),
   rpc:                      vi.fn(),
   checkIpLimit:             vi.fn(),
 }))
+
+// H-2: the route now calls fetchPinned (IP-pinned, no redirect-follow) instead
+// of the global fetch. Mock the module and provide a real EndpointValidationError
+// so the SSRF-rejection branch (400 invalid_endpoint) can be exercised. The
+// class is declared INSIDE the factory (vi.mock is hoisted; no top-level refs).
+vi.mock('@/lib/security/fetchPinned', () => {
+  class EndpointValidationError extends Error {
+    constructor(message: string) { super(message); this.name = 'EndpointValidationError' }
+  }
+  return {
+    fetchPinned: (...args: unknown[]) => mocks.fetchPinnedFn(...args),
+    EndpointValidationError,
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Mocks de módulos
@@ -67,6 +82,7 @@ const mockSvcFrom = vi.fn()
 // ---------------------------------------------------------------------------
 
 import { GET, POST } from '@/app/api/v1/agents/[slug]/trial/route'
+import { EndpointValidationError } from '@/lib/security/fetchPinned'
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -155,6 +171,12 @@ beforeEach(() => {
     ok: true,
     text: vi.fn().mockResolvedValue('{"result":"ok"}'),
   } as unknown as Response)
+
+  // H-2: fetchPinned delega en fetchFn por defecto, de modo que la batería
+  // existente (que configura mocks.fetchFn.mockResolvedValueOnce) siga siendo
+  // válida sin tocar cada caso. Los tests específicos de H-2 sobreescriben
+  // fetchPinnedFn directamente.
+  mocks.fetchPinnedFn.mockImplementation((...args: unknown[]) => mocks.fetchFn(...args))
 })
 
 // ===========================================================================
@@ -412,5 +434,70 @@ describe('POST /api/v1/agents/[slug]/trial', () => {
     expect(body).not.toHaveProperty('stack_trace')
     // Solo debe contener claves de error controladas
     expect(Object.keys(body)).not.toContain('output')
+  })
+
+  // =========================================================================
+  // H-2 — SSRF / DNS-rebinding: usa fetchPinned, no el fetch global
+  // =========================================================================
+  it('H-2: invoca el agente vía fetchPinned (IP-pinned) y NO vía fetch global', async () => {
+    mockSvcFrom
+      .mockReturnValueOnce(makeChain({ data: AGENT, error: null }))   // agents
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))    // agent_trials check
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))    // agent_trials upsert
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))    // agent_calls insert
+
+    mocks.fetchPinnedFn.mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      text: vi.fn().mockResolvedValue('pinned ok'),
+    } as unknown as Response)
+
+    const res = await POST(makePostRequest('test-agent', { input: 'test' }), makeParams('test-agent'))
+
+    expect(res.status).toBe(200)
+    // El upstream se llamó por el helper IP-pinned, nunca por el fetch global.
+    expect(mocks.fetchPinnedFn).toHaveBeenCalledTimes(1)
+    expect(mocks.fetchPinnedFn).toHaveBeenCalledWith(
+      AGENT.endpoint_url,
+      expect.objectContaining({ method: 'POST', timeoutMs: 15000 }),
+    )
+    expect(mocks.fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('H-2: una rebinding rejection de fetchPinned → 400 invalid_endpoint (bearer NO se filtra)', async () => {
+    mockSvcFrom
+      .mockReturnValueOnce(makeChain({ data: { ...AGENT, webhook_secret: 'super-secret' }, error: null })) // agents
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))    // agent_calls insert (logTrialCall)
+
+    // El pre-check pasa (IP pública al validar) pero el connect-time pinning
+    // detecta el rebinding y rechaza con EndpointValidationError.
+    mocks.fetchPinnedFn.mockRejectedValueOnce(
+      new EndpointValidationError('resolved to private IP 127.0.0.1'),
+    )
+
+    const res = await POST(makePostRequest('test-agent', { input: 'test' }), makeParams('test-agent'))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body).toMatchObject({ error: 'invalid_endpoint' })
+    expect(mocks.fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('H-2: timeout de fetchPinned (TimeoutError) → 504 timeout', async () => {
+    mockSvcFrom
+      .mockReturnValueOnce(makeChain({ data: AGENT, error: null }))   // agents
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))    // agent_trials check
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))    // agent_trials upsert
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))    // agent_calls insert
+
+    const timeoutErr = new Error('The operation timed out.')
+    timeoutErr.name = 'TimeoutError'
+    mocks.fetchPinnedFn.mockRejectedValueOnce(timeoutErr)
+
+    const res = await POST(makePostRequest('test-agent', { input: 'test' }), makeParams('test-agent'))
+
+    expect(res.status).toBe(504)
+    const body = await res.json()
+    expect(body).toMatchObject({ error: 'timeout' })
   })
 })

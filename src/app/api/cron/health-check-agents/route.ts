@@ -11,6 +11,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { probeEndpointSync } from '@/lib/agents/health-probe'
 import { logger } from '@/lib/logger'
 import { jsonError } from '@/lib/api/jsonError'
+import { verifyCronAuth } from '@/lib/cron/verifyCronSecret'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120  // Consistent with other crons in this repo (reconcile-onchain, etc.)
@@ -19,10 +20,10 @@ const BATCH_SIZE = 10
 const FAILURE_THRESHOLD = 3
 
 export async function GET(req: Request) {
-  // Auth — same pattern as all other crons
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // V-13: constant-time cron secret verification + fail-closed when unset.
+  const auth = verifyCronAuth(req.headers.get('authorization'))
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
   const svc = createServiceClient()

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 import { createPublicClient, http } from 'viem'
 import { avalancheFuji } from 'viem/chains'
 
@@ -8,8 +9,25 @@ const EARNINGS_ABI = [
   { name: 'earnings', type: 'function' as const, stateMutability: 'view' as const, inputs: [{ name: '', type: 'address' }], outputs: [{ type: 'uint256' }] },
 ]
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function GET(_req: NextRequest) {
+// V-02 (audit 2026-06-25, defense-in-depth): explicit EIP-712 admin gate so a
+// future refactor of the DB grant can't silently open this endpoint. Additive —
+// the session check below is kept.
+async function verifyAuth(request: NextRequest, action: string) {
+  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr    = request.headers.get('x-admin-timestamp')
+
+  if (!sig || !nonceHdr || !tsHdr) return { ok: false, status: 401, reason: 'Missing admin auth headers' }
+
+  const message: AdminActionMessage = { action, nonce: nonceHdr, timestamp: BigInt(tsHdr) }
+  const { ok, reason } = await verifyAdminSignature(sig, message)
+  return ok ? { ok: true } : { ok: false, status: 401, reason }
+}
+
+export async function GET(req: NextRequest) {
+  const auth = await verifyAuth(req, 'treasuryCreators')
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 401 })
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -566,6 +566,21 @@ contract WasiAIMarketplace is Ownable2Step, ReentrancyGuard, Pausable, Automatio
             "WasiAI: insufficient free balance"
         );
 
+        // M-1 (audit 2026-06-25): subject claimEarnings to the same dailySettlementCap
+        // as settleKeyBatch (:686-693). claimEarnings moves USDC out of the contract
+        // on an operator-signed voucher; without the cap a leaked operator key could
+        // drain the contract in a single day, bypassing the rate-limit the cap exists
+        // to enforce. grossAmount is the amount leaving escrow, so it counts against
+        // the same daily window.
+        _checkAndResetDailyWindow();
+        if (dailySettlementCap > 0) {
+            require(
+                dailySettledAmount + grossAmount <= dailySettlementCap,
+                "WasiAI: daily cap exceeded"
+            );
+        }
+        dailySettledAmount += grossAmount;
+
         // 5. Split: 90% to creator wallet, 10% to treasury
         uint256 platformShare = (grossAmount * platformFeeBps) / 10_000;
         uint256 creatorShare  = grossAmount - platformShare;

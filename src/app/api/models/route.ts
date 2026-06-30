@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
+import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { validateCsrf } from '@/lib/security/csrf'
 import { ensureCreatorProfile } from '@/lib/ensureCreatorProfile'
 // A-07: Use shared schema to keep client/server validation in sync
@@ -41,10 +41,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Validation failed', errors }, { status: 422 })
   }
 
-  // SEC-01: Block SSRF via endpoint_url — only if provided (drafts may not have it)
+  // SEC-01 / V-10 (audit 2026-06-25): Block SSRF via endpoint_url — only if
+  // provided (drafts may not have it). Use the DNS-aware async validator at this
+  // persistence sink so a hostname resolving to a private/internal IP is
+  // rejected before it's stored (the sync validator only blocks literal IPs/hosts).
   if (result.data.endpoint_url) {
     try {
-      validateEndpointUrl(result.data.endpoint_url)
+      await validateEndpointUrlAsync(result.data.endpoint_url)
     } catch (err) {
       return jsonError('invalid_endpoint_url', 'Endpoint URL is not allowed', 422, { logDetail: err })
     }
