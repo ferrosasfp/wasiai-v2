@@ -11,7 +11,10 @@ if (!_rawOperator || !/^0x[0-9a-fA-F]{40}$/.test(_rawOperator)) {
 }
 export const WASIAI_OPERATOR_ADDRESS = (_rawOperator ?? '0xf432baf1315ccDB23E683B95b03fD54Dd3e447Ba') as `0x${string}`
 
-export const WASIAI_MARKETPLACE_ADDRESS = '0x3583fb96bAB5DbBDd85CCeA1C4fCE3EfF3249F08' as `0x${string}`
+// C-2 (audit 2026-06-30): the hardcoded WASIAI_MARKETPLACE_ADDRESS export was a
+// stale, dead constant (no importers) that risked masking the env-resolved
+// address. Removed. Use getMarketplaceAddress(chainId) from
+// '@/lib/contracts/WasiAIMarketplace' (env-resolved) instead.
 
 export const USDC_EIP712_CONFIG = {
   name: 'USD Coin',
