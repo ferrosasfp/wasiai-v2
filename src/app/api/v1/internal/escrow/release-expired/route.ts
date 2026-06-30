@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { releaseExpiredOnChain } from '@/lib/contracts/escrow'
 import { logger } from '@/lib/logger'
+import { safeBearerEqual } from '@/lib/cron/verifyCronSecret'
 
 export async function POST(request: NextRequest) {
   // ── Auth ───────────────────────────────────────────────────────────────────
@@ -22,8 +23,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'server_misconfigured' }, { status: 500 })
   }
 
+  // V-12/V-13: constant-time compare (timing side-channel hardening).
   const auth = request.headers.get('Authorization') ?? ''
-  if (auth !== `Bearer ${secret}`) {
+  if (!safeBearerEqual(auth, `Bearer ${secret}`)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { runSettlement } from '@/lib/settlement/runSettlement'
 import { logger } from '@/lib/logger'
+import { verifyCronAuth } from '@/lib/cron/verifyCronSecret'
 
 /**
  * Vercel Cron — ejecutar diariamente a las 02:00 UTC
@@ -18,16 +19,13 @@ import { logger } from '@/lib/logger'
  * Si no está disponible, este endpoint puede llamarse manualmente con el CRON_SECRET.
  */
 export async function GET(request: NextRequest) {
-  // HAL-008: SIEMPRE verificar — si CRON_SECRET no está configurado, rechazar todo
-  const cronSecret = process.env.CRON_SECRET?.trim()
-  if (!cronSecret) {
-    logger.error('[settle-key-batches] CRON_SECRET not configured')
-    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    logger.warn('[settle-key-batches] Unauthorized cron attempt')
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // V-07 / HAL-008: SIEMPRE verificar (fail-closed si CRON_SECRET no está) +
+  // comparación constant-time del Bearer.
+  const auth = verifyCronAuth(request.headers.get('authorization'))
+  if (!auth.ok) {
+    if (auth.status === 500) logger.error('[settle-key-batches] CRON_SECRET not configured')
+    else logger.warn('[settle-key-batches] Unauthorized cron attempt')
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
   const supabase = createServiceClient()

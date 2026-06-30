@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 import { createServiceClient } from '@/lib/supabase/server'
 import { settleKeyBatchOnChain } from '@/lib/contracts/marketplaceClient'
+import { toAtomic, feeSplit, fromAtomic } from '@/lib/money/usdc'
 import { logger } from '@/lib/logger'
 import { jsonError } from '@/lib/api/jsonError'
-import { toAtomic, fromAtomic, feeSplit } from '@/lib/money/usdc'
 
 type SettlementAction = 'run' | 'toggle'
 type SettlementMode   = 'vercel' | 'chainlink'
@@ -230,11 +230,12 @@ export async function POST(request: NextRequest) {
         // Actualizar pending_earnings_usdc en creator_profiles por cada creator
         // Calcular earnings por creator (net = total - platform fee). El fee bps
         // sale de PLATFORM_FEE_BPS (on-chain / env, default 1000 = 10%) calculado arriba.
-        // V4 (KEY_BALANCE_MISMATCH): the creator's net share is computed in
-        // integer micro-USDC via feeSplit (fee floored, creator gets the exact
-        // remainder) and accumulated as bigint — byte-for-byte the same split
-        // the contract performed on-chain. The previous `amount * (1 - bps/1e4)`
-        // float drifts against that integer split. Mirrors runSettlement.ts.
+        // V-03 (audit 2026-06-25) / V4 (KEY_BALANCE_MISMATCH): el net del creator
+        // se calcula en micro-USDC enteros vía feeSplit (fee floor, creator recibe
+        // el resto exacto) y se acumula como bigint — byte-for-byte el mismo split
+        // que el contrato hizo on-chain (idéntico al cron runSettlement.ts). El viejo
+        // `amount * (1 - bps/10000)` en float driftea respecto al split entero y
+        // desincroniza el ledger off-chain. feeSplit garantiza fee + creator === amount.
         const earningsByCreator = new Map<string, bigint>()
         for (let i = 0; i < batchSlugs.length; i++) {
           let creatorWallet: string | null = null
@@ -258,7 +259,7 @@ export async function POST(request: NextRequest) {
           if (atomic > 0n) {
             // Convert back to a fixed-6-decimal USDC value for the numeric(20,6)
             // column / RPC. fromAtomic is exact to 6 decimals (no float drift).
-            const amount = Number(fromAtomic(atomic))
+            const amount = Number(fromAtomic(atomic)) // canónico 6-dec, exacto
             try {
               // Try RPC first; if it doesn't exist fall back to direct update
               const { error: rpcErr } = await supabase.rpc('increment_pending_earnings', { p_wallet: wallet, p_amount: amount })

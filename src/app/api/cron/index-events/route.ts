@@ -4,15 +4,16 @@ import { createPublicClient, http } from 'viem'
 import { avalanche, avalancheFuji } from 'viem/chains'
 import { logger } from '@/lib/logger'
 import { indexEvents } from '@/lib/indexer/eventIndexer'
+import { verifyCronAuth } from '@/lib/cron/verifyCronSecret'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
 
 export async function GET(req: Request) {
-  // Verify cron secret
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // V-12: constant-time cron secret verification + fail-closed when unset.
+  const auth = verifyCronAuth(req.headers.get('authorization'))
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
   const contractAddress = process.env.MARKETPLACE_CONTRACT_ADDRESS

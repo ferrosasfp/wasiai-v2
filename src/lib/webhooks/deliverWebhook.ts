@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { fetchPinned } from '@/lib/security/fetchPinned'
 
 export interface WebhookPayload {
   event: string
@@ -18,7 +19,13 @@ export async function deliverWebhook(
     .digest('hex')
 
   try {
-    const res = await fetch(url, {
+    // V-06 (audit 2026-06-25): the webhook URL is DB-stored and was POSTed with a
+    // plain `fetch` (no delivery-time SSRF validation, follows redirects to
+    // internal IPs). fetchPinned validates the URL via validateEndpointUrlAsync
+    // at delivery time and connects to the validated IP with the hostname pinned
+    // (no DNS re-resolution, no redirect-follow via node:https). A validation
+    // rejection throws EndpointValidationError → caught below → fail-closed.
+    const res = await fetchPinned(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -26,7 +33,7 @@ export async function deliverWebhook(
         'X-WasiAI-Event': payload.event,
       },
       body,
-      signal: AbortSignal.timeout(10_000), // 10s timeout
+      timeoutMs: 10_000, // 10s timeout
     })
     return { success: res.ok, statusCode: res.status }
   } catch (err: unknown) {

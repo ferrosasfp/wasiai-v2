@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 
 import { getPublicClient } from '@/shared/lib/web3/client'
 import { WASIAI_MARKETPLACE_ABI } from '@/lib/contracts/WasiAIMarketplace'
@@ -8,15 +9,29 @@ import { logger } from '@/lib/logger'
 const CONTRACT_ADDRESS = (process.env.MARKETPLACE_CONTRACT_ADDRESS ?? '') as `0x${string}`
 const OPERATOR_ADDRESS = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x${string}`
 
+// V-08 (audit 2026-06-25): same EIP-712 admin gate as fee/settlement routes.
+// The JSDoc claimed this endpoint required a signature but the handler had no
+// auth, exposing operator AVAX balance, settlement health and failure counts.
+async function verifyAuth(request: NextRequest, action: string) {
+  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr    = request.headers.get('x-admin-timestamp')
+
+  if (!sig || !nonceHdr || !tsHdr) return { ok: false, status: 401, reason: 'Missing admin auth headers' }
+
+  const message: AdminActionMessage = { action, nonce: nonceHdr, timestamp: BigInt(tsHdr) }
+  const { ok, reason } = await verifyAdminSignature(sig, message)
+  return ok ? { ok: true } : { ok: false, status: 401, reason }
+}
+
 /**
  * GET /api/admin/status
  * Requiere firma EIP-712 admin (NG-C02).
  * Retorna: { platformFeeBps, avaxBalance, settlementMode, lastSettlement }
  */
-export async function GET() {
-  // GET reads public on-chain/DB data — no auth required
-  // Mutative operations require EIP-712 admin signature
-
+export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request, 'adminStatus')
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 401 })
 
   try {
     const supabase = createServiceClient()

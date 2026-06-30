@@ -1,22 +1,42 @@
 /**
  * POST /api/admin/upload — upload image to Supabase Storage
- * Auth: requires authenticated user (Supabase session).
+ * Auth: requires EIP-712 admin signature (same gate as /api/admin/collections).
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { verifyAdminSignature, type AdminActionMessage } from '@/lib/admin/verifyAdminSignature'
 import { jsonError } from '@/lib/api/jsonError'
 
+// V-09 (audit 2026-06-25): only these buckets may be written. The bucket name
+// arrived from untrusted formData and was passed straight to Supabase Storage,
+// letting any caller write to an arbitrary bucket.
+const ALLOWED_BUCKETS = new Set(['collections', 'agents', 'avatars'])
+
+// V-09: EIP-712 admin gate (was: any authenticated user). Mirrors fee/settlement.
+async function verifyAuth(request: NextRequest, action: string) {
+  const sig      = request.headers.get('x-admin-signature') as `0x${string}` | null
+  const nonceHdr = request.headers.get('x-admin-nonce')     as `0x${string}` | null
+  const tsHdr    = request.headers.get('x-admin-timestamp')
+
+  if (!sig || !nonceHdr || !tsHdr) return { ok: false, status: 401, reason: 'Missing admin auth headers' }
+
+  const message: AdminActionMessage = { action, nonce: nonceHdr, timestamp: BigInt(tsHdr) }
+  const { ok, reason } = await verifyAdminSignature(sig, message)
+  return ok ? { ok: true } : { ok: false, status: 401, reason }
+}
+
 export async function POST(request: NextRequest) {
-  // Auth: require logged-in user
-  const supabaseAuth = await createClient()
-  const { data: { user } } = await supabaseAuth.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await verifyAuth(request, 'adminUpload')
+  if (!auth.ok) return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 401 })
 
   const formData = await request.formData()
   const file = formData.get('file') as File | null
   const bucket = (formData.get('bucket') as string) || 'collections'
+
+  // V-09: reject arbitrary buckets.
+  if (!ALLOWED_BUCKETS.has(bucket)) {
+    return NextResponse.json({ error: 'Invalid bucket' }, { status: 400 })
+  }
 
   if (!file) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 })

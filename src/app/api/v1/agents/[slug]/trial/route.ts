@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { fetchPinned, EndpointValidationError } from '@/lib/security/fetchPinned'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { z } from 'zod'
@@ -200,8 +201,10 @@ export async function POST(
     : JSON.stringify(parsedData)
 
   // 8. Llamar al agente con timeout de 15s (census agents are slow)
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 15000)
+  // H-2: pinned fetch — validateEndpointUrlAsync resolves+validates the IP and
+  // fetchPinned connects to THAT IP (no DNS re-resolution / no redirect-follow),
+  // closing the DNS-rebinding TOCTOU that could leak `webhook_secret` to an
+  // internal host. Mirrors the invoke path (handleInvoke.ts callUpstream).
   const t0 = Date.now()
   let statusCode = 0
   let output = ''
@@ -215,13 +218,12 @@ export async function POST(
       logger.warn('[trial] agent missing webhook_secret', { slug })
     }
 
-    const agentRes = await fetch(agent.endpoint_url as string, {
+    const agentRes = await fetchPinned(agent.endpoint_url as string, {
       method: 'POST',
       headers: reqHeaders,
       body: upstreamBody,
-      signal: controller.signal,
+      timeoutMs: 15000,
     })
-    clearTimeout(timeout)
     statusCode = agentRes.status
 
     if (statusCode >= 400) {
@@ -234,8 +236,15 @@ export async function POST(
     const raw = await agentRes.text()
     output = raw.length > 10240 ? raw.slice(0, 10240) + '\n[Output truncado]' : raw
   } catch (err) {
-    clearTimeout(timeout)
-    const isTimeout = (err as Error).name === 'AbortError'
+    // H-2: SSRF/DNS-rebinding rejection → invalid endpoint (bearer NOT sent).
+    if (err instanceof EndpointValidationError) {
+      logger.warn('[trial] endpoint validation failed', { err: String(err), slug })
+      await logTrialCall(svc, agent.id, 400, Date.now() - t0, slug)
+      return NextResponse.json({ error: 'invalid_endpoint' }, { status: 400 })
+    }
+    // fetchPinned timeout surfaces as DOMException name='TimeoutError' (Node);
+    // global fetch fallback (Edge) surfaces as AbortError.
+    const isTimeout = (err as Error).name === 'TimeoutError' || (err as Error).name === 'AbortError'
     statusCode = isTimeout ? 504 : 502
     await logTrialCall(svc, agent.id, statusCode, Date.now() - t0, slug)
     if (isTimeout) return NextResponse.json({ error: 'timeout' }, { status: 504 })
