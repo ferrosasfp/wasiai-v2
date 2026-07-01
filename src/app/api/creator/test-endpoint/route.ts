@@ -9,7 +9,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { jsonError } from '@/lib/api/jsonError'
-import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { fetchPinned, EndpointValidationError } from '@/lib/security/fetchPinned'
+import { validateCsrf } from '@/lib/security/csrf'
+import { logger } from '@/lib/logger'
 import { checkRateLimit, getIdentifier } from '@/lib/ratelimit'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
@@ -33,6 +35,10 @@ function getTestLimit(): Ratelimit {
 }
 
 export async function POST(req: NextRequest) {
+  // CSRF (H6): match the sibling creator routes — reject cross-origin form posts.
+  const csrfError = validateCsrf(req)
+  if (csrfError) return csrfError
+
   // Auth
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -52,27 +58,33 @@ export async function POST(req: NextRequest) {
 
   const { endpoint_url, auth_header } = result.data
 
-  // SSRF protection + NG-005 DNS probe
-  try {
-    await validateEndpointUrlAsync(endpoint_url)
-  } catch (err) {
-    return jsonError('invalid_endpoint_url', 'Endpoint URL is not allowed', 400, { logDetail: err })
+  // H6: relaying a caller-chosen Authorization header to an arbitrary URL is a
+  // credential-relay vector. It stays behind auth + the 5/min rate limit above;
+  // log every use (with only the target host, never the secret) for abuse review.
+  if (auth_header) {
+    let host = 'invalid'
+    try { host = new URL(endpoint_url).host } catch { /* keep 'invalid' */ }
+    logger.warn('[test-endpoint] relaying caller-supplied Authorization header', {
+      userId: user.id,
+      host,
+    })
   }
 
-  // Probe the endpoint
-  const controller = new AbortController()
-  const timeoutId  = setTimeout(() => controller.abort(), 5000)
+  // Probe the endpoint via a pinned request (H6: fetchPinned validates the URL
+  // and connects to THAT exact resolved IP with Host/TLS-SNI pinned, closing the
+  // DNS-rebinding TOCTOU window the previous validate()+fetch() left open — the
+  // outbound Authorization would otherwise land on an internal/rebound host).
   const t0 = Date.now()
 
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (auth_header) headers['Authorization'] = auth_header
 
-    const res = await fetch(endpoint_url, {
-      method:  'POST',
+    const res = await fetchPinned(endpoint_url, {
+      method:    'POST',
       headers,
-      body:    JSON.stringify({ input: 'test' }),
-      signal:  controller.signal,
+      body:      JSON.stringify({ input: 'test' }),
+      timeoutMs: 5000,
     })
 
     const latencyMs = Date.now() - t0
@@ -83,14 +95,16 @@ export async function POST(req: NextRequest) {
       latencyMs,
     })
   } catch (err: unknown) {
+    // SSRF/validation rejection → hard 400 (same as the old validateEndpointUrlAsync).
+    if (err instanceof EndpointValidationError) {
+      return jsonError('invalid_endpoint_url', 'Endpoint URL is not allowed', 400, { logDetail: err })
+    }
     const latencyMs = Date.now() - t0
-    const isTimeout = err instanceof Error && err.name === 'AbortError'
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
     return NextResponse.json({
       ok:        false,
       error:     isTimeout ? 'timeout' : 'unreachable',
       latencyMs,
     })
-  } finally {
-    clearTimeout(timeoutId)
   }
 }

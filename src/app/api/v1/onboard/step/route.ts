@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
+import { fetchPinned, EndpointValidationError } from '@/lib/security/fetchPinned'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
 import { randomBytes } from 'crypto'
 import { CHAIN_NAME } from '@/lib/chain'
@@ -73,31 +73,38 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
       if (typeof answer !== 'string') {
         return NextResponse.json({ error: 'endpoint_url must be a string' }, { status: 400 })
       }
-      try {
-        await validateEndpointUrlAsync(answer)
-      } catch (err) {
-        return jsonError('invalid_endpoint_url', 'Onboarding step failed', 400, { logDetail: err })
-      }
-      // Inline ping
+      // H5 (audit 2026-07-01): validate + ping in a SINGLE pinned request.
+      // fetchPinned resolves/validates the hostname and connects to THAT exact
+      // IP (Host header + TLS SNI pinned), closing the DNS-rebinding TOCTOU
+      // window that a separate validateEndpointUrlAsync() + fetch(answer) left
+      // open (validation could resolve to a public IP, then fetch re-resolves
+      // to an internal one).
       let pingOk = false
       let pingError: string | undefined
       try {
-        const res = await fetch(answer, { signal: AbortSignal.timeout(5000) })
+        const res = await fetchPinned(answer, { method: 'GET', timeoutMs: 5000 })
         pingOk = res.ok
         if (!res.ok) pingError = `Endpoint returned HTTP ${res.status}`
       } catch (err) {
+        // A validation/SSRF rejection is a hard 400 (same as the old
+        // validateEndpointUrlAsync rejection). Any other error is a soft ping
+        // failure that still lets the user advance.
+        if (err instanceof EndpointValidationError) {
+          return jsonError('invalid_endpoint_url', 'Onboarding step failed', 400, { logDetail: err })
+        }
         pingError = err instanceof Error ? err.message : 'Endpoint unreachable'
       }
       data.endpoint_url = answer
       if (!pingOk) {
-        // Advance step but warn
+        // Advance step but warn. Truncate pingError so raw connection/timeout
+        // detail toward internal hosts is not reflected back to the caller.
         await serviceClient
           .from('onboarding_sessions')
           .update({ current_step: step + 1, data })
           .eq('id', session_id)
         return NextResponse.json({
           step: step + 1,
-          warning: `Endpoint ping failed: ${pingError}. You can still continue.`,
+          warning: `Endpoint ping failed: ${(pingError ?? 'unreachable').slice(0, 100)}. You can still continue.`,
           ...QUESTIONS[step + 1],
         })
       }
