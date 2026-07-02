@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { depositForKeyOnChain, getKeyBalanceOnChain } from '@/lib/contracts/marketplaceClient'
 import { logger } from '@/lib/logger'
 import { jsonError } from '@/lib/api/jsonError'
@@ -120,7 +120,13 @@ export async function POST(
     }
 
     // 5. HAL-011: Update budget_usdc atomically via RPC (prevents race condition)
-    const { error: updateError } = await supabase.rpc('increment_key_budget', {
+    // SEC (audit 2026-07-01, C4): increment_key_budget is now REVOKEd from PUBLIC
+    // and GRANTed to service_role only. Ownership is still enforced by the
+    // p_owner_id = user.id argument (derived from the cookie-authenticated session
+    // above), so this stays a self-credit path — the service client only bypasses
+    // the PostgREST EXECUTE grant, not the ownership check.
+    const serviceSupabase = createServiceClient()
+    const { error: updateError } = await serviceSupabase.rpc('increment_key_budget', {
       p_key_id:   id,
       p_amount:   body.amount,
       p_owner_id: user.id,

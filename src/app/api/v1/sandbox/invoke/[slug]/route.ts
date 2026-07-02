@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID, createHash } from 'crypto'
 import { getClientIp } from '@/lib/get-client-ip'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { logger } from '@/lib/logger'
@@ -93,6 +93,12 @@ export async function POST(
   }
 
   const supabase = await createClient()
+  // SEC (audit 2026-07-01, M2): deduct/refund_sandbox_balance are now REVOKEd
+  // from PUBLIC and GRANTed to service_role only. These credit-moving RPCs must
+  // go through the service-role client; ownership is enforced by the
+  // p_user_id = user.id argument (from the cookie-authenticated session below).
+  // Reads/writes of sandbox_credits keep using the RLS-scoped `supabase` client.
+  const sandboxRpc = createServiceClient()
 
   // 1. Auth (optional — anonymous allowed)
   const { data: { user } } = await supabase.auth.getUser()
@@ -223,7 +229,7 @@ export async function POST(
     }
 
     // 6. Deducir balance atómicamente via DB function
-    const { data: deducted, error: deductError } = await supabase
+    const { data: deducted, error: deductError } = await sandboxRpc
       .rpc('deduct_sandbox_balance', {
         p_user_id: user.id,
         p_amount:  agent.price_per_call,
@@ -252,7 +258,7 @@ export async function POST(
   } catch {
     // Reembolso atómico antes de retornar (authenticated only)
     if (user) {
-      await supabase.rpc('refund_sandbox_balance', {
+      await sandboxRpc.rpc('refund_sandbox_balance', {
         p_user_id: user.id,
         p_amount:  agent.price_per_call,
       })
@@ -291,7 +297,7 @@ export async function POST(
   // 9b. Reembolso si el agente falló — incremento atómico (B-01)
   if (agentFailed) {
     if (user) {
-      await supabase.rpc('refund_sandbox_balance', {
+      await sandboxRpc.rpc('refund_sandbox_balance', {
         p_user_id: user.id,
         p_amount:  agent.price_per_call,
       })
@@ -305,7 +311,7 @@ export async function POST(
     if (outputErr) {
       // Reembolso
       if (user) {
-        await supabase.rpc('refund_sandbox_balance', {
+        await sandboxRpc.rpc('refund_sandbox_balance', {
           p_user_id: user.id,
           p_amount:  agent.price_per_call,
         })
