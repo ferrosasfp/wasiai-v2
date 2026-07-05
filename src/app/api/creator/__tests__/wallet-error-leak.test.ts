@@ -49,11 +49,17 @@ describe('POST /api/creator/wallet — V10 error leak guard', () => {
 
   it('returns a generic message + code and logs the raw Supabase error', async () => {
     // First .from() call → SELECT current profile (no existing wallet).
-    // Second .from() call → UPDATE returns a Supabase error.
+    // Second .from() call → SELECT creator_earnings pending (WKH-SEC-03).
+    // Third .from() call → UPDATE returns a Supabase error.
     const selectChain = {
       select: vi.fn().mockReturnThis(),
       eq:     vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: null }),
+    }
+    const earningsChain = {
+      select:      vi.fn().mockReturnThis(),
+      eq:          vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null }),
     }
     const updateChain = {
       update: vi.fn().mockReturnThis(),
@@ -61,6 +67,7 @@ describe('POST /api/creator/wallet — V10 error leak guard', () => {
     }
     mocks.from
       .mockReturnValueOnce(selectChain)
+      .mockReturnValueOnce(earningsChain)
       .mockReturnValueOnce(updateChain)
 
     const req = new NextRequest('http://localhost/api/creator/wallet', {

@@ -61,13 +61,17 @@ const TEST_USER = { id: 'user-creator-1' }
 
 const PROFILE = {
   id:                     TEST_USER.id,
-  pending_earnings_usdc:  '12.50',
   wallet_address:         '0xabc123',
 }
 
 const PROFILE_NO_WALLET = {
   ...PROFILE,
   wallet_address: null,
+}
+
+// WKH-SEC-03: pending_earnings_usdc now comes from creator_earnings (2nd query).
+const EARNINGS = {
+  pending_earnings_usdc: '12.50',
 }
 
 const AGENT_1 = { id: 'agent-1', name: 'Agente Uno' }
@@ -119,8 +123,9 @@ function makeChain(resolveWith: unknown) {
 function setupEmptyAgentsMock(profileOverride?: Record<string, unknown>) {
   const profile = profileOverride ?? PROFILE
   mockSvcFrom
-    .mockReturnValueOnce(makeChain({ data: profile, error: null }))  // creator_profiles
-    .mockReturnValueOnce(makeChain({ data: [],      error: null }))  // agents (vacío)
+    .mockReturnValueOnce(makeChain({ data: profile,  error: null }))  // creator_profiles
+    .mockReturnValueOnce(makeChain({ data: EARNINGS, error: null }))  // creator_earnings (WKH-SEC-03)
+    .mockReturnValueOnce(makeChain({ data: [],       error: null }))  // agents (vacío)
 }
 
 /**
@@ -157,6 +162,8 @@ function setupOneAgentMock(options: {
   mockSvcFrom
     // 1. creator_profiles
     .mockReturnValueOnce(makeChain({ data: profile, error: null }))
+    // 1b. creator_earnings (WKH-SEC-03 — pending_earnings_usdc self-read)
+    .mockReturnValueOnce(makeChain({ data: EARNINGS, error: null }))
     // 2. agents
     .mockReturnValueOnce(makeChain({ data: agents, error: null }))
     // ── Promise.all (6 queries) ──────────────────────────────────────────
@@ -290,6 +297,7 @@ describe('GET /api/creator/analytics', () => {
     // El creator tiene AGENT_1, pero se pide un agent distinto
     mockSvcFrom
       .mockReturnValueOnce(makeChain({ data: PROFILE, error: null }))    // creator_profiles
+      .mockReturnValueOnce(makeChain({ data: EARNINGS, error: null }))   // creator_earnings (WKH-SEC-03)
       .mockReturnValueOnce(makeChain({ data: [AGENT_1], error: null }))  // agents del creator
 
     const otherAgentId = '550e8400-e29b-41d4-a716-446655440099'

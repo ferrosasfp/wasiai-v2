@@ -111,11 +111,12 @@ async function resolveAccountStatus(
   if (!domain || BULK_EMAIL_PROVIDERS.has(domain)) return 'active'
 
   // WAS-282: excluir el propio userId para evitar falsos positivos (bug off-by-one)
+  // WKH-SEC-03: email_domain ahora vive en creator_earnings (service_role read).
   const { count: domainCount } = await svc
-    .from('creator_profiles')
-    .select('id', { count: 'exact', head: true })
+    .from('creator_earnings')
+    .select('creator_id', { count: 'exact', head: true })
     .eq('email_domain', domain)
-    .neq('id', userId)
+    .neq('creator_id', userId)
 
   return (domainCount ?? 0) >= 3 ? 'pending_review' : 'active'
 }
@@ -164,15 +165,31 @@ async function resolveCreatorFromEmail(
     id: userId,
     username: `${(email.split('@')[0] ?? email).replace(/[^a-z0-9_]/gi, '_').toLowerCase()}_${Date.now()}`,
     display_name: email.split('@')[0],
-    email_domain: email.split('@')[1]?.toLowerCase() ?? null,
   }
 
-  // Solo evaluar account_status en perfiles nuevos
+  // WKH-SEC-03: email_domain/account_status ahora viven en creator_earnings.
+  // Solo evaluar account_status en perfiles nuevos (WAS-282).
+  let resolvedStatus: 'active' | 'pending_review' | null = null
   if (!existingProfile) {
-    profilePayload.account_status = await resolveAccountStatus(email, userId, serviceClient)
+    resolvedStatus = await resolveAccountStatus(email, userId, serviceClient)
   }
 
   await serviceClient.from('creator_profiles').upsert(profilePayload, { onConflict: 'id' })
+
+  // El trigger AFTER INSERT ya creó la fila espejo en creator_earnings
+  // (ON CONFLICT DO NOTHING), así que la fila existe: escribimos email_domain
+  // (siempre) y account_status (solo en perfil nuevo) con un UPDATE.
+  const earningsUpdate: Record<string, unknown> = {
+    email_domain: email.split('@')[1]?.toLowerCase() ?? null,
+  }
+  if (resolvedStatus) earningsUpdate.account_status = resolvedStatus
+  const { error: earningsErr } = await serviceClient
+    .from('creator_earnings')
+    .update(earningsUpdate)
+    .eq('creator_id', userId)
+  if (earningsErr) {
+    logger.warn('[register] creator_earnings update failed', { userId, err: earningsErr.message })
+  }
 
   return userId
 }
@@ -204,14 +221,24 @@ async function bootstrapAnonymousCreator(
 
   if (!profile) {
     // Trigger no lo creó — insertar manualmente como fallback
+    // WKH-SEC-03: email_domain/account_status ahora viven en creator_earnings.
     const { error: profileError } = await serviceClient
       .from('creator_profiles')
-      .insert({ id: userId, username: `agent_${uuid.slice(0, 8)}`, display_name: 'Agent Publisher', email_domain: 'bootstrap.wasiai.internal', account_status: 'active' })
+      .insert({ id: userId, username: `agent_${uuid.slice(0, 8)}`, display_name: 'Agent Publisher' })
     if (profileError) {
       await serviceClient.auth.admin.deleteUser(userId).catch(err =>
         logger.error('[register] bootstrap rollback failed — creator_profile insert', { userId, err })
       )
       return null
+    }
+    // El trigger AFTER INSERT creó la fila espejo en creator_earnings; escribir
+    // el email_domain sintético (account_status queda en su default 'active').
+    const { error: earningsErr } = await serviceClient
+      .from('creator_earnings')
+      .update({ email_domain: 'bootstrap.wasiai.internal', account_status: 'active' })
+      .eq('creator_id', userId)
+    if (earningsErr) {
+      logger.warn('[register] bootstrap creator_earnings update failed', { userId, err: earningsErr.message })
     }
   }
 

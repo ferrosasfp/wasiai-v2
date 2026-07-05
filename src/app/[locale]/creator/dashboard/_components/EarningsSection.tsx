@@ -20,13 +20,21 @@ export async function EarningsSection({ userId }: EarningsSectionProps) {
   const supabase = await createClient()
 
   // HU-067: earnings now tracked off-chain in Supabase (pending_earnings_usdc)
+  // WKH-SEC-03: wallet_address stays in creator_profiles; pending_earnings_usdc
+  // moved to the RLS-protected creator_earnings table (self-read).
   const { data: profile } = await supabase
     .from('creator_profiles')
-    .select('wallet_address, pending_earnings_usdc')
+    .select('wallet_address')
     .eq('id', userId)
     .single()
 
-  const pendingOnChain = Number(profile?.pending_earnings_usdc ?? 0)
+  const { data: earnings } = await supabase
+    .from('creator_earnings')
+    .select('pending_earnings_usdc')
+    .eq('creator_id', userId)
+    .maybeSingle()
+
+  const pendingOnChain = Number(earnings?.pending_earnings_usdc ?? 0)
 
   // #14: Show "accumulating today" — successful calls in last 24h not yet withdrawn
   // These are already included in pending_earnings_usdc but we surface them separately

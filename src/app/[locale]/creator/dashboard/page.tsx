@@ -75,9 +75,11 @@ export default async function CreatorDashboardPage({
   await ensureCreatorProfile(supabase, user)
 
   // HU-1.1: Check onboarding status and pending earnings
+  // WKH-SEC-03: onboarding_* + wallet_address stay in creator_profiles;
+  // pending_earnings_usdc moved to the RLS-protected creator_earnings table.
   const { data: creatorProfile } = await supabase
     .from('creator_profiles')
-    .select('onboarding_completed, onboarding_step, pending_earnings_usdc, wallet_address')
+    .select('onboarding_completed, onboarding_step, wallet_address')
     .eq('id', user.id)
     .single()
 
@@ -86,7 +88,13 @@ export default async function CreatorDashboardPage({
     redirect(`/${locale ?? 'en'}/onboarding`)
   }
 
-  const pendingEarnings = Number(creatorProfile?.pending_earnings_usdc ?? 0)
+  const { data: earnings } = await supabase
+    .from('creator_earnings')
+    .select('pending_earnings_usdc')
+    .eq('creator_id', user.id)
+    .maybeSingle()
+
+  const pendingEarnings = Number(earnings?.pending_earnings_usdc ?? 0)
   const hasWallet       = !!creatorProfile?.wallet_address
 
   // P-01 + A-02: Fetch models only; earnings/wallet fetched inside EarningsSection (Suspense)
