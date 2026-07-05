@@ -6,7 +6,7 @@
  * Returns 200 if healthy, 503 if unreachable.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { validateEndpointUrl } from '@/lib/security/validateEndpointUrl'
 
 const CORS = {
@@ -19,7 +19,10 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params
-  const supabase = await createClient()
+  // Uses service client: this route reads the agent's `webhook_secret` (to send it
+  // as a Bearer to the agent's own endpoint). That secret is REVOKEd from the anon
+  // role, so an anon-scoped client cannot select it. Server-only, no user session.
+  const supabase = createServiceClient()
 
   const { data: model } = await supabase
     .from('agents')

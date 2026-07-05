@@ -8,6 +8,7 @@ export const revalidate = 300
 
 import { getModels } from '@/features/models/services/models.service'
 import { createClient } from '@/lib/supabase/server'
+import { AGENT_PUBLIC_COLUMNS } from '@/lib/agent-columns'
 import { ModelCard } from '@/features/models/components/ModelCard'
 import { CollectionCard } from '@/features/collections/components/CollectionCard'
 import { ReputationBadge } from '@/features/models/components/ReputationBadge'
@@ -69,17 +70,17 @@ export default async function HomePage({ params, searchParams }: Props) {
 
   const [freeTrialAgents, trendingAgents, topRatedAgents, newAgents] = isFirstPage && supabase
     ? await Promise.all([
-        supabase.from('agents').select('*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)')
+        supabase.from('agents').select(`${AGENT_PUBLIC_COLUMNS}, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)`)
           .eq('status', 'active').eq('free_trial_enabled', true)
           .order('total_calls', { ascending: false }).limit(6)
           .then(r => r.data ?? []),
         supabase.rpc('get_trending_agents', { days: 7, limit_count: 6 })
           .then(r => r.data ?? []),
-        supabase.from('agents').select('*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)')
+        supabase.from('agents').select(`${AGENT_PUBLIC_COLUMNS}, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)`)
           .eq('status', 'active').not('reputation_score', 'is', null)
           .order('reputation_score', { ascending: false }).limit(6)
           .then(r => r.data ?? []),
-        supabase.from('agents').select('*, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)')
+        supabase.from('agents').select(`${AGENT_PUBLIC_COLUMNS}, creator:creator_profiles!agents_creator_id_fkey(id, username, display_name, avatar_url, verified)`)
           .eq('status', 'active')
           .gte('created_at', fourteenDaysAgo)
           .order('created_at', { ascending: false }).limit(6)
