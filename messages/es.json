@@ -536,7 +536,7 @@
       "fieldNextCursor": "String opaco — pasa como cursor= para obtener la siguiente página. null = última página"
     },
     "x402Content": {
-      "intro": "x402 es un protocolo de micropagos HTTP nativo basado en el código de estado {code}402 Payment Required{/code}. WasiAI lo implementa sobre {strong}Avalanche C-Chain{/strong} con {strong}USDC{/strong} usando firmas ERC-3009 (transferWithAuthorization).",
+      "intro": "x402 es un protocolo de micropagos HTTP nativo basado en el código de estado {code}402 Payment Required{/code}. WasiAI lo implementa sobre {strong}Avalanche Fuji (testnet){/strong} con {strong}USDC{/strong} usando firmas ERC-3009 (transferWithAuthorization).",
       "whenTitle": "¿Cuándo se usa?",
       "when1": "Cuando invocas un agente {strong}sin Agent Key{/strong} — pago on-demand por llamada.",
       "when2": "Para agentes autónomos que descubren y pagan a otros agentes sin intervención humana.",
@@ -546,7 +546,7 @@
       "signDesc": "El header {code}X-402-Payment{/code} es un JSON Base64 con la firma ERC-3009. WasiAI verifica la firma y ejecuta {code}transferWithAuthorization{/code} on-chain.",
       "receiptTitle": "Verificar el recibo",
       "receiptDesc": "Cada respuesta exitosa incluye un {code}receipt_signature{/code}: firma ECDSA del operador WasiAI que confirma la ejecución. Puedes verificarla on-chain contra la dirección del contrato Marketplace.",
-      "contractsTitle": "Contratos Mainnet"
+      "contractsTitle": "Contratos Testnet"
     }
   },
   "codeExamples": {
@@ -740,7 +740,7 @@
     "gaslessNote": "Firma un mensaje EIP-712 — no necesitas AVAX para gas ⚡",
     "errorInsufficientBalance": "USDC insuficiente en Avalanche. Añade fondos e intenta de nuevo.",
     "errorCancelled": "Pago cancelado.",
-    "errorChain": "Cambia tu wallet a Avalanche C-Chain.",
+    "errorChain": "Cambia tu wallet a Avalanche Fuji (testnet).",
     "errorSwitching": "Cambiando a red Avalanche...",
     "errorSwitched": "Red cambiada. Haz clic en \"Pagar y Llamar\" de nuevo para continuar.",
     "errorSwitchFailed": "Cambia tu wallet a la red Avalanche e intenta de nuevo.",

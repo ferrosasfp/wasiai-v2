@@ -536,7 +536,7 @@
       "fieldNextCursor": "Opaque string — pass as cursor= to get the next page. null = last page"
     },
     "x402Content": {
-      "intro": "x402 is a native HTTP micropayment protocol based on the {code}402 Payment Required{/code} status code. WasiAI implements it on {strong}Avalanche C-Chain{/strong} with {strong}USDC{/strong} using ERC-3009 signatures (transferWithAuthorization).",
+      "intro": "x402 is a native HTTP micropayment protocol based on the {code}402 Payment Required{/code} status code. WasiAI implements it on {strong}Avalanche Fuji (testnet){/strong} with {strong}USDC{/strong} using ERC-3009 signatures (transferWithAuthorization).",
       "whenTitle": "When is it used?",
       "when1": "When you invoke an agent {strong}without an Agent Key{/strong} — on-demand pay-per-call.",
       "when2": "For autonomous agents that discover and pay other agents without human intervention.",
@@ -546,7 +546,7 @@
       "signDesc": "The {code}X-402-Payment{/code} header is a Base64 JSON with the ERC-3009 signature. WasiAI verifies the signature and executes {code}transferWithAuthorization{/code} on-chain.",
       "receiptTitle": "Verify the receipt",
       "receiptDesc": "Every successful response includes a {code}receipt_signature{/code}: an ECDSA signature from the WasiAI operator confirming execution. You can verify it on-chain against the Marketplace contract address.",
-      "contractsTitle": "Mainnet Contracts"
+      "contractsTitle": "Testnet Contracts"
     }
   },
   "codeExamples": {
@@ -740,7 +740,7 @@
     "gaslessNote": "Signs an EIP-712 message — no AVAX needed for gas ⚡",
     "errorInsufficientBalance": "Not enough USDC on Avalanche. Add funds and try again.",
     "errorCancelled": "Payment cancelled.",
-    "errorChain": "Switch your wallet to Avalanche C-Chain.",
+    "errorChain": "Switch your wallet to Avalanche Fuji (testnet).",
     "errorSwitching": "Switching to Avalanche network...",
     "errorSwitched": "Network switched! Click \"Pay & Call\" again to continue.",
     "errorSwitchFailed": "Please switch to Avalanche network in your wallet and try again.",
