@@ -49,16 +49,24 @@ export async function linkWallet(walletAddress: string) {
 
     // HU-069: Always sync connected wallet → creator_profiles.wallet_address
     // Block if creator has pending earnings on a different wallet.
+    // WKH-SEC-03: id + wallet_address stay in creator_profiles; pending_earnings_usdc
+    // moved to the RLS-protected creator_earnings table (self-read).
     const { data: creatorProfile } = await supabase
         .from('creator_profiles')
-        .select('id, wallet_address, pending_earnings_usdc')
+        .select('id, wallet_address')
         .eq('id', user.id)
         .maybeSingle()
 
     if (creatorProfile) {
+        const { data: earnings } = await supabase
+            .from('creator_earnings')
+            .select('pending_earnings_usdc')
+            .eq('creator_id', user.id)
+            .maybeSingle()
+
         const isNewWallet = creatorProfile.wallet_address &&
             creatorProfile.wallet_address.toLowerCase() !== validated.data.toLowerCase()
-        const hasPending = Number(creatorProfile.pending_earnings_usdc ?? 0) > 0
+        const hasPending = Number(earnings?.pending_earnings_usdc ?? 0) > 0
 
         if (isNewWallet && hasPending) {
             // Don't block the profile link — just skip creator_profiles sync

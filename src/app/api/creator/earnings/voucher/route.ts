@@ -32,9 +32,11 @@ export async function POST(req: NextRequest) {
   if (rlHit) return rlHit
 
   // 2. Get creator profile
+  // WKH-SEC-03: wallet_address stays in creator_profiles; pending_earnings_usdc
+  // moved to the RLS-protected creator_earnings table (self-read).
   const { data: profile } = await supabase
     .from('creator_profiles')
-    .select('wallet_address, pending_earnings_usdc')
+    .select('wallet_address')
     .eq('id', user.id)
     .single()
 
@@ -42,10 +44,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No wallet_address configured for this creator' }, { status: 400 })
   }
 
+  const { data: earnings } = await supabase
+    .from('creator_earnings')
+    .select('pending_earnings_usdc')
+    .eq('creator_id', user.id)
+    .maybeSingle()
+
   // V4 (KEY_BALANCE_MISMATCH): derivar el monto atómico directo del valor canónico de DB
   // (numeric(20,6), llega como string) vía toAtomic, sin round-trip por float. Math.round(
   // pendingUsdc * 1e6) podía diferir 1 unidad si pendingUsdc venía de sumas float.
-  const pendingRaw    = profile.pending_earnings_usdc ?? 0
+  const pendingRaw    = earnings?.pending_earnings_usdc ?? 0
   const grossAtomicBn = toAtomic(pendingRaw as string | number)
   if (grossAtomicBn <= 0n) {
     return NextResponse.json({ error: 'No pending earnings to claim' }, { status: 400 })

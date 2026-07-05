@@ -36,10 +36,11 @@ export async function triggerImmediateSettlement(userId: string): Promise<void> 
 
   if (!agents || agents.length === 0) {
     // No agents — just clear the pending counter
+    // WKH-SEC-03: pending_earnings_usdc lives in creator_earnings (service_role).
     await supabase
-      .from('creator_profiles')
+      .from('creator_earnings')
       .update({ pending_earnings_usdc: 0 })
-      .eq('id', userId)
+      .eq('creator_id', userId)
     return
   }
 
@@ -67,10 +68,11 @@ export async function triggerImmediateSettlement(userId: string): Promise<void> 
 
   if (!pendingCalls || pendingCalls.length === 0) {
     logger.info('[immediateSettlement] no pending calls', { userId })
+    // WKH-SEC-03: pending_earnings_usdc lives in creator_earnings (service_role).
     await supabase
-      .from('creator_profiles')
+      .from('creator_earnings')
       .update({ pending_earnings_usdc: 0 })
-      .eq('id', userId)
+      .eq('creator_id', userId)
     return
   }
 
@@ -165,10 +167,11 @@ export async function triggerImmediateSettlement(userId: string): Promise<void> 
 
   // 5. Zero out pending_earnings_usdc — wallet is now set,
   //    cron will handle any remaining unsettled calls correctly next run
+  // WKH-SEC-03: pending_earnings_usdc lives in creator_earnings (service_role).
   await supabase
-    .from('creator_profiles')
+    .from('creator_earnings')
     .update({ pending_earnings_usdc: 0 })
-    .eq('id', userId)
+    .eq('creator_id', userId)
 
   logger.info('[immediateSettlement] completed', { userId })
 }

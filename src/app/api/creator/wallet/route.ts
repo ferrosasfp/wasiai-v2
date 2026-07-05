@@ -25,15 +25,23 @@ export async function POST(req: NextRequest) {
   }
 
   // HU-069: Block wallet change if pending earnings > 0
+  // WKH-SEC-03: wallet_address stays in creator_profiles; pending_earnings_usdc
+  // moved to the RLS-protected creator_earnings table (self-read).
   const { data: current } = await supabase
     .from('creator_profiles')
-    .select('wallet_address, pending_earnings_usdc')
+    .select('wallet_address')
     .eq('id', user.id)
     .single()
 
+  const { data: earnings } = await supabase
+    .from('creator_earnings')
+    .select('pending_earnings_usdc')
+    .eq('creator_id', user.id)
+    .maybeSingle()
+
   if (current?.wallet_address &&
       current.wallet_address.toLowerCase() !== wallet_address.toLowerCase()) {
-    const pending = Number(current.pending_earnings_usdc ?? 0)
+    const pending = Number(earnings?.pending_earnings_usdc ?? 0)
     if (pending > 0) {
       return NextResponse.json(
         { error: 'Withdraw your pending earnings before changing your withdrawal wallet.' },

@@ -79,13 +79,14 @@ export async function PATCH(
 
   if (result.data.status === 'active') {
     // WAS-282: block activation if creator account is pending_review
-    const { data: profile } = await serviceClient
-      .from('creator_profiles')
+    // WKH-SEC-03: account_status moved to creator_earnings (service_role read).
+    const { data: earnings } = await serviceClient
+      .from('creator_earnings')
       .select('account_status')
-      .eq('id', user.id)
+      .eq('creator_id', user.id)
       .single()
 
-    if (profile?.account_status === 'pending_review') {
+    if (earnings?.account_status === 'pending_review') {
       return NextResponse.json(
         {
           error: 'Account pending review',

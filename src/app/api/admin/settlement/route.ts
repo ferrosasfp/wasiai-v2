@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
           logger.warn('[admin/settlement] post-settlement sync failed', { keyId, err: String(syncErr).slice(0, 200) })
         }
 
-        // Actualizar pending_earnings_usdc en creator_profiles por cada creator
+        // Actualizar pending_earnings_usdc en creator_earnings por cada creator
         // Calcular earnings por creator (net = total - platform fee). El fee bps
         // sale de PLATFORM_FEE_BPS (on-chain / env, default 1000 = 10%) calculado arriba.
         // V-03 (audit 2026-06-25) / V4 (KEY_BALANCE_MISMATCH): el net del creator
@@ -261,19 +261,28 @@ export async function POST(request: NextRequest) {
             // column / RPC. fromAtomic is exact to 6 decimals (no float drift).
             const amount = Number(fromAtomic(atomic)) // canónico 6-dec, exacto
             try {
-              // Try RPC first; if it doesn't exist fall back to direct update
-              const { error: rpcErr } = await supabase.rpc('increment_pending_earnings', { p_wallet: wallet, p_amount: amount })
-              if (rpcErr) {
-                const { data: profileRow } = await supabase
-                  .from('creator_profiles')
-                  .select('id, pending_earnings_usdc')
-                  .eq('wallet_address', wallet)
-                  .single()
-                if (profileRow) {
+              // §3.5 fix: resolver el id del creator por wallet_address en
+              // creator_profiles, luego RPC con la firma correcta (p_user_id).
+              // El bug previo pasaba p_wallet (no existe en la firma) → el RPC
+              // siempre fallaba y solo corría el fallback. WKH-SEC-03: el fallback
+              // ahora escribe pending_earnings_usdc en creator_earnings.
+              const { data: profileRow } = await supabase
+                .from('creator_profiles')
+                .select('id')
+                .eq('wallet_address', wallet)
+                .single()
+              if (profileRow) {
+                const { error: rpcErr } = await supabase.rpc('increment_pending_earnings', { p_user_id: profileRow.id, p_amount: amount })
+                if (rpcErr) {
+                  const { data: earningsRow } = await supabase
+                    .from('creator_earnings')
+                    .select('pending_earnings_usdc')
+                    .eq('creator_id', profileRow.id)
+                    .maybeSingle()
                   await supabase
-                    .from('creator_profiles')
-                    .update({ pending_earnings_usdc: Number(profileRow.pending_earnings_usdc) + amount })
-                    .eq('id', profileRow.id)
+                    .from('creator_earnings')
+                    .update({ pending_earnings_usdc: Number(earningsRow?.pending_earnings_usdc ?? 0) + amount })
+                    .eq('creator_id', profileRow.id)
                 }
               }
             } catch {

@@ -15,12 +15,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const mocks = vi.hoisted(() => ({
-  getUser:       vi.fn(),
-  validateCsrf:  vi.fn(),
-  checkRateLimit: vi.fn(),
-  profileSingle: vi.fn(),
-  rpc:           vi.fn(),
-  signTypedData: vi.fn(),
+  getUser:              vi.fn(),
+  validateCsrf:         vi.fn(),
+  checkRateLimit:       vi.fn(),
+  profileSingle:        vi.fn(),
+  earningsMaybeSingle:  vi.fn(),
+  rpc:                  vi.fn(),
+  signTypedData:        vi.fn(),
 }))
 
 const USER_ID       = 'creator-123'
@@ -31,7 +32,9 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(() =>
     Promise.resolve({
       auth: { getUser: mocks.getUser },
-      from: () => ({ select: () => ({ eq: () => ({ single: mocks.profileSingle }) }) }),
+      // WKH-SEC-03: creator_profiles.single() → wallet_address;
+      // creator_earnings.maybeSingle() → pending_earnings_usdc.
+      from: () => ({ select: () => ({ eq: () => ({ single: mocks.profileSingle, maybeSingle: mocks.earningsMaybeSingle }) }) }),
       rpc:  mocks.rpc,
     }),
   ),
@@ -76,7 +79,10 @@ beforeEach(() => {
   mocks.checkRateLimit.mockResolvedValue(null)
   mocks.getUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
   mocks.profileSingle.mockResolvedValue({
-    data: { wallet_address: WALLET, pending_earnings_usdc: '5.000000' },
+    data: { wallet_address: WALLET },
+  })
+  mocks.earningsMaybeSingle.mockResolvedValue({
+    data: { pending_earnings_usdc: '5.000000' },
   })
   mocks.signTypedData.mockResolvedValue('0x' + 'ee'.repeat(65))
   // Default: slot reserved (no pending voucher exists).

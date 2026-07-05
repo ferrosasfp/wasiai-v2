@@ -86,7 +86,6 @@ export interface CreatorProfile {
   bio: string | null
   avatar_url: string | null
   wallet_address: string | null
-  total_earnings: number
   total_models: number
   verified: boolean
   created_at: string

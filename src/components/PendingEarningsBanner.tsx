@@ -6,7 +6,7 @@ import { WalletSetup } from '@/components/WalletSetup'
 import { Wallet } from 'lucide-react'
 
 interface Props {
-  /** pending_earnings_usdc from creator_profiles (raw numeric, 6 decimals) */
+  /** pending_earnings_usdc from creator_earnings (raw numeric, 6 decimals) */
   pendingEarnings: number
 }
 

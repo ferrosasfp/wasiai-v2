@@ -53,13 +53,22 @@ export async function GET(req: NextRequest) {
   const svc = createServiceClient()
 
   // Obtener creator profile (creator_profiles.id = auth.users.id)
+  // WKH-SEC-03: id + wallet_address stay in creator_profiles; pending_earnings_usdc
+  // moved to creator_earnings (service_role read, bypasses RLS).
   const { data: profile } = await svc
     .from('creator_profiles')
-    .select('id, pending_earnings_usdc, wallet_address')
+    .select('id, wallet_address')
     .eq('id', user.id)
     .single()
 
   if (!profile) return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
+
+  const { data: earnings } = await svc
+    .from('creator_earnings')
+    .select('pending_earnings_usdc')
+    .eq('creator_id', profile.id)
+    .maybeSingle()
+  const pendingEarningsUsdc = String(earnings?.pending_earnings_usdc ?? '0')
 
   // WAS-56: Obtener TODOS los agentes del creator (sin filtrar por status activo)
   // para que analytics muestre datos aunque el agente esté en draft/pending/etc.
@@ -89,7 +98,7 @@ export async function GET(req: NextRequest) {
         avgLatencyMs: 0,
         errorRate: null,
         uptime24h: null,
-        pendingEarningsUsdc: String(profile.pending_earnings_usdc ?? '0'),
+        pendingEarningsUsdc: pendingEarningsUsdc,
         onchainEarningsUsdc: null,
       },
       dailySeries: buildEmptyDailySeries(),
@@ -225,7 +234,7 @@ export async function GET(req: NextRequest) {
       avgLatencyMs,
       errorRate,
       uptime24h,
-      pendingEarningsUsdc: String(profile.pending_earnings_usdc ?? '0'),
+      pendingEarningsUsdc: pendingEarningsUsdc,
       onchainEarningsUsdc,
     },
     dailySeries,
