@@ -66,6 +66,16 @@ suite('WKH-SEC-03 — creator_earnings RLS (real DB)', () => {
     if (bErr || !b.user) throw bErr ?? new Error('failed to create user B')
     bUserId = b.user.id
 
+    // NOTE: in this project `handle_new_user` does NOT create a creator_profiles
+    // row for `admin.createUser` (profiles are created via app code paths /
+    // ensureCreatorProfile, not the auth trigger). Insert the profiles explicitly
+    // — the `on_creator_profile_created` trigger then mirrors each into
+    // creator_earnings (this exercises WKH-SEC-03's trigger for real).
+    await admin.from('creator_profiles').insert([
+      { id: aUserId, username: `test_a_${aUserId.slice(0, 8)}`, display_name: 'Test A' },
+      { id: bUserId, username: `test_b_${bUserId.slice(0, 8)}`, display_name: 'Test B' },
+    ])
+
     // Seed distinct values (service_role bypasses RLS). B has a value A must never see.
     await admin.from('creator_earnings')
       .update({ pending_earnings_usdc: 99 }).eq('creator_id', bUserId)
@@ -88,6 +98,12 @@ suite('WKH-SEC-03 — creator_earnings RLS (real DB)', () => {
 
   afterAll(async () => {
     if (!admin) return
+    // Explicit cleanup (in case the auth.users FK does not cascade to these tables).
+    // supabase-js queries return { error } and never throw, so no .catch needed.
+    for (const uid of [aUserId, bUserId].filter(Boolean)) {
+      await admin.from('creator_earnings').delete().eq('creator_id', uid)
+      await admin.from('creator_profiles').delete().eq('id', uid)
+    }
     if (aUserId) await admin.auth.admin.deleteUser(aUserId).catch(() => {})
     if (bUserId) await admin.auth.admin.deleteUser(bUserId).catch(() => {})
   })

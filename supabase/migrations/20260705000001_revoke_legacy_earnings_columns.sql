@@ -131,8 +131,9 @@ GRANT SELECT (
 -- SECURITY DEFINER RPCs / service_role). Column-level REVOKE is correct here:
 -- these roles have no table-level INSERT/UPDATE path that matters (writes are
 -- RPC-only), so this simply removes any residual default-ACL column write grant.
-REVOKE INSERT, UPDATE
-  ON creator_profiles (total_earnings, pending_earnings_usdc, account_status, email_domain)
+REVOKE INSERT (total_earnings, pending_earnings_usdc, account_status, email_domain),
+       UPDATE (total_earnings, pending_earnings_usdc, account_status, email_domain)
+  ON public.creator_profiles
   FROM anon, authenticated;
 
 COMMIT;
