@@ -69,8 +69,8 @@ export function ApiReferenceSection() {
       "payment": {
         "method": "x402",
         "asset": "USDC",
-        "chain": "avalanche",
-        "contract": "0x9316E902760f2c37CDA57C8Be01358D890a26276"
+        "chain": "avalanche-testnet",
+        "contract": "0xC01DEF0ca66b86E9F8655dc202347F1cf104b7A7"
       }
     }
   ],

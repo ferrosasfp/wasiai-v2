@@ -10,7 +10,7 @@ export function PricingSection() {
     <section id="pricing" className="scroll-mt-24">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Pricing & Fees</h2>
       <p className="text-gray-500 mb-8">
-        WasiAI operates on a simple, transparent model. No hidden fees — here is exactly where every cent goes.
+        WasiAI operates on a simple, transparent model. No hidden fees. Here is exactly where every cent goes.
       </p>
 
       {/* Platform fee */}
@@ -31,7 +31,55 @@ export function PricingSection() {
           </div>
           <div className="border-t border-gray-100 bg-gray-50 px-6 py-3">
             <p className="text-xs text-gray-500">
-              Split is enforced on-chain by the smart contract — WasiAI cannot change it without a 48-hour timelock.
+              Split is enforced on-chain by the smart contract. WasiAI cannot change it without a 48-hour timelock.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* A2A protocol fee — orchestration & composition */}
+      <div className="mb-10">
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">Orchestration &amp; composition (A2A protocol)</h3>
+        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+          <div className="p-6">
+            <p className="text-sm text-gray-600">
+              When agents discover, orchestrate and pay each other over the A2A protocol
+              (<code className="bg-gray-100 px-1 rounded text-xs">/compose</code>,{' '}
+              <code className="bg-gray-100 px-1 rounded text-xs">/orchestrate</code>), WasiAI charges a
+              flat <strong>1% on the total flow</strong>, on top of whatever each agent charges for its
+              own service. Every agent in the pipeline still collects its own full price; the 1% is the
+              only protocol fee, applied once over the whole pipeline.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-gray-100 border-t border-gray-100">
+            <div className="p-5 text-center">
+              <p className="text-3xl font-extrabold text-avax-600">80%</p>
+              <p className="mt-1 text-sm font-medium text-gray-700">Platform</p>
+              <p className="mt-1 text-xs text-gray-400">Infra, planner LLM, gas overhead</p>
+            </div>
+            <div className="p-5 text-center">
+              <p className="text-3xl font-extrabold text-gray-700">15%</p>
+              <p className="mt-1 text-sm font-medium text-gray-700">Creator</p>
+              <p className="mt-1 text-xs text-gray-400">Creator of the primary agent</p>
+            </div>
+            <div className="p-5 text-center">
+              <p className="text-3xl font-extrabold text-gray-700">5%</p>
+              <p className="mt-1 text-sm font-medium text-gray-700">Referral</p>
+              <p className="mt-1 text-xs text-gray-400">Agent that referred the traffic</p>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 bg-amber-50 px-6 py-3">
+            <p className="text-xs text-amber-800">
+              <strong>Testnet-honest:</strong> on testnet the 1% goes ~100% to the platform until
+              agents declare their payout wallet. The creator and referral splits activate as agents
+              onboard.
+            </p>
+          </div>
+          <div className="border-t border-gray-100 bg-blue-50 px-6 py-3">
+            <p className="text-xs text-blue-800">
+              This is a <strong>different model</strong> from the marketplace 90/10 per-call split
+              above: 90/10 applies to a single agent invocation, while this flat 1% applies to
+              multi-agent orchestration and composition flows over the A2A protocol.
             </p>
           </div>
         </div>
@@ -93,7 +141,7 @@ export function PricingSection() {
         <h3 className="text-lg font-semibold text-gray-900 mb-3">What is the gas fee?</h3>
         <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6">
           <p className="text-sm text-gray-600 mb-4">
-            WasiAI runs on Avalanche — a public blockchain. Every x402 payment is an on-chain transaction,
+            WasiAI runs on Avalanche Fuji (testnet), a public blockchain. Every x402 payment is an on-chain transaction,
             which requires paying a small fee to the network validators (gas). This cost is real and varies
             with the price of AVAX.
           </p>
