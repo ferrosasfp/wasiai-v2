@@ -75,3 +75,4 @@
 | 073 | 2026-05-11 | WAS-V2-2 | wasiai-facilitator as primary x402 settler, Ultravioleta DAO as fallback | refactor | QUALITY | DONE | feat/was-v2-2-wasiai-facilitator-primary ([done-report.md](073-was-v2-2-wasiai-facilitator-primary/done-report.md)) |
 | 074 | 2026-05-29 | WKH-AUDIT-V2 | Remediación auditoría profesional — seguridad + calidad (B+ → A+) | security | QUALITY | DONE | feat/074-remediacion-auditoria-v2 ([done-report.md](074-remediacion-auditoria-v2/done-report.md)) |
 | 075 | 2026-07-05 | WKH-SEC-03 | Cerrar cross-read `authenticated` de earnings/PII de creators con RLS Postgres-level | security | QUALITY | DONE | fix/075-wkh-sec-03-creator-earnings-rls ([done-report.md](075-wkh-sec-03-creator-earnings-rls/done-report.md)) |
+| 076 | 2026-07-08 | WKH-162 | Config-drift de la address del marketplace — voucher EIP-712 vs server path (subset urgente WKH-130) | security | FAST+AR | in progress | fix/076-wkh-162-marketplace-address-config-drift |

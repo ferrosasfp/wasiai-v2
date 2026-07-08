@@ -16,6 +16,7 @@ import { avalancheFuji, avalanche }       from 'viem/chains'
 import { randomBytes }                    from 'crypto'
 import { getKeysLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
 import { toAtomic, fromAtomic }            from '@/lib/money/usdc'
+import { assertMarketplaceAddressCoherence } from '@/lib/contracts/marketplaceAddressCoherence'
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrf(req)
@@ -30,6 +31,19 @@ export async function POST(req: NextRequest) {
   const rlId  = getIdentifier(req, user.id)
   const rlHit = await checkRateLimit(getKeysLimit(), rlId)
   if (rlHit) return rlHit
+
+  // WKH-162: fail LOUD if the voucher's verifyingContract source
+  // (NEXT_PUBLIC_MARKETPLACE_ADDRESS_<net>) has drifted from the server on-chain
+  // path (MARKETPLACE_CONTRACT_ADDRESS). Signing a drifted voucher would revert
+  // claimEarnings() silently on-chain. Runs before any DB side-effect.
+  try {
+    assertMarketplaceAddressCoherence()
+  } catch (err) {
+    logger.error('[voucher] marketplace address drift — refusing to sign', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return NextResponse.json({ error: 'MARKETPLACE_ADDRESS_DRIFT' }, { status: 500 })
+  }
 
   // 2. Get creator profile
   // WKH-SEC-03: wallet_address stays in creator_profiles; pending_earnings_usdc
@@ -111,9 +125,9 @@ export async function POST(req: NextRequest) {
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
   const chain   = chainId === 43114 ? avalanche : avalancheFuji
 
-  const marketplaceAddr = (chainId === 43114
+  const marketplaceAddr = ((chainId === 43114
     ? process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET
-    : process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI) ?? ''
+    : process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI) ?? '').trim()
 
   let signature: `0x${string}`
   try {
