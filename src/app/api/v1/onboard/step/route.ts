@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { findAuthUserIdByEmail } from '@/lib/supabase/adminUsers'
 import { fetchPinned, EndpointValidationError } from '@/lib/security/fetchPinned'
 import { generateApiKey } from '@/features/agent-api/services/agent-keys.service'
 import { randomBytes } from 'crypto'
@@ -337,16 +338,22 @@ export async function processOnboardStep(session_id: string, answer: unknown): P
           createError.status === 422
 
         if (isEmailExists) {
-          // WAS-259: email ya existe → asociar al creator existente
-          const { data: listData } = await serviceClient.auth.admin.listUsers({ perPage: 1000 })
-          const existing = listData?.users?.find((u) => u.email === answer)
+          // WAS-259: email ya existe → asociar al creator existente.
+          // `listUsers` es paginado y no acepta filtro por email: una sola llamada
+          // con perPage:1000 truncaba en silencio (>1 página ⇒ el usuario que ya
+          // existe no aparece, sin error) ⇒ este paso terminal devolvía un 500
+          // 'Failed to resolve existing account' PERMANENTE: el retry vuelve a
+          // fallar igual (createUser siempre da email_exists y la página 1 nunca
+          // trae al usuario), dejando al creador recurrente sin poder terminar el
+          // wizard. findAuthUserIdByEmail recorre las páginas (match exacto).
+          const existingUserId = await findAuthUserIdByEmail(serviceClient, answer)
 
-          if (!existing) {
+          if (!existingUserId) {
             await serviceClient.rpc('release_onboard_step_claim', { p_session_id: session_id })
             return NextResponse.json({ error: 'Failed to resolve existing account' }, { status: 500 })
           }
 
-          userId = existing.id
+          userId = existingUserId
           isExistingUser = true
         } else {
           logger.error('[onboard/step8] createUser failed', { createError })
