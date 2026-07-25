@@ -28,6 +28,7 @@ import { probeEndpoint } from '@/lib/agents/health-probe'
 import { jsonError } from '@/lib/api/jsonError'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { findAuthUserIdByEmail } from '@/lib/supabase/adminUsers'
 import { registerAgentOnChain } from '@/lib/contracts/marketplaceClient'
 import { validateEndpointUrlAsync } from '@/lib/security/validateEndpointUrl'
 import { getRegisterLimit, getRegisterEmailLimit, getBootstrapLimit, getIdentifier, checkRateLimit } from '@/lib/ratelimit'
@@ -143,10 +144,12 @@ async function resolveCreatorFromEmail(
     createError?.code === 'user_already_exists' ||
     createError?.status === 422
   ) {
-    // TODO: paginar cuando haya >1000 usuarios
-    const { data: listData } = await serviceClient.auth.admin.listUsers({ perPage: 1000 })
-    const existing = listData?.users?.find((u) => u.email === email)
-    if (existing) userId = existing.id
+    // El email ya existe en auth.users → resolver su id.
+    // `listUsers` es paginado y no acepta filtro por email: una sola llamada
+    // trunca en silencio (>1 página ⇒ el usuario existente no aparece y
+    // quedaríamos con userId=null ⇒ el agente se registraría bajo la cuenta
+    // de sistema y sin management key). findAuthUserIdByEmail recorre páginas.
+    userId = await findAuthUserIdByEmail(serviceClient, email)
   }
 
   if (!userId) return null
