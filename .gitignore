@@ -38,12 +38,39 @@ next-env.d.ts
 
 # supabase
 .supabase/
+# estado local de la CLI de supabase: guarda el host, la region y el ref
+# del proyecto de produccion. Nunca debe versionarse.
+supabase/.temp/
 contracts/lib/
 contracts/.git/
 contracts/broadcast/
 contracts/cache/DeployMarketplace.s.sol/
 
+# artefactos de compilacion de foundry (regenerables con `forge build`)
+contracts/out/
+
 # Playwright
 test-results/
 playwright-report/
 .env*
+
+# herramientas de desarrollo locales (andamiaje de agentes, notas de proceso).
+# No forman parte del producto y se mantienen fuera del repo publico.
+.nexus/
+.claude/
+.agent/
+GEMINI.md
+
+# documentacion interna que expone infraestructura, hallazgos de seguridad
+# propios o numeros de negocio. Los archivos siguen en el disco del equipo,
+# solo quedan fuera del repo publico.
+doc/audit/
+doc/business/modelo-economico.md
+doc/adversarial/025-review.md
+doc/adversarial/027-review.md
+doc/sdd/WAS-V2-1-done-report.md
+doc/sdd/WAS-V2-1-auto-blindaje.md
+doc/sdd/WAS-V2-1-external-facilitator-optin.md
+doc/sdd/073-was-v2-2-wasiai-facilitator-primary/production-activation-log.md
+doc/sdd/073-was-v2-2-wasiai-facilitator-primary/production-smoke-evidence.md
+doc/sdd/075-wkh-sec-03-creator-earnings-rls/
