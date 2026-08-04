@@ -55,9 +55,23 @@
  * Se pagina sobre lo que UNA llamada upstream devuelve. Si aguas arriba recorta
  * (su fetch por registry se clampea al `maxLimit` declarado — el registry
  * `WasiAI` declara 100), el conjunto paginado es el recortado, no el catálogo.
- * No se esconde: `total` es el denominador PRE-límite de a2a, así que un cliente
- * que llega a `has_more: false` con `offset + agents.length < total` sabe que no
- * se le entregó todo. Cerrarlo de verdad exige paginación en a2a (otro repo).
+ * Cerrarlo de verdad exige paginación en a2a (otro repo).
+ *
+ * ⚠️ ACÁ DECÍA que el cliente se entera comparando `offset + agents.length` con
+ * `total`, "el denominador PRE-límite de a2a". Esa receta ES EL BUG QUE ESTA
+ * NOTA TENÍA: `wasiai-a2a` 9faff4f (HU-323) hizo que `total` sea
+ * `number | 'unknown'`, y vale `'unknown'` EXACTAMENTE en el caso que la receta
+ * quería detectar (catálogo incompleto). O sea que la comparación se rompía
+ * justo cuando había que hacerla, y encima en silencio: `offset + n < 'unknown'`
+ * no tira, devuelve `false`, que se lee como "te entregué todo".
+ *
+ * Las dos señales que SÍ sirven, y las dos viajan en el body sin que este módulo
+ * las toque (ver `a2a-discover-contract.ts`):
+ *   catalogStatus !== 'complete'            -> el catálogo llegó incompleto.
+ *   offset + agents.length < totalAtLeast   -> `totalAtLeast` es SIEMPRE un
+ *                                              número, y es una COTA INFERIOR:
+ *                                              "hay al menos esto", no "hay
+ *                                              esto".
  */
 
 /**

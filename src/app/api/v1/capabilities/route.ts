@@ -190,9 +190,31 @@ function paginationUnsupported(): NextResponse {
  * `offset`).
  *
  * Campos NUEVOS de la respuesta, y sólo en este camino: `offset`, `limit`,
- * `has_more`, `next_offset`. El resto del body de a2a (`total`, `registries`,
- * `sources`, `catalogStatus`, `excluded`) se reenvía tal cual — este cambio no
- * toca ninguno.
+ * `has_more`, `next_offset`. El resto del body de a2a (`total`, `totalAtLeast`,
+ * `registries`, `sources`, `catalogStatus`, `excluded`) se reenvía tal cual —
+ * este cambio no toca ninguno.
+ *
+ * ─── QUÉ HACE ESTE REPO CON `total` (y por qué eso es todo) ─────────────────
+ * NADA, y es deliberado. `total` entra en el `...body` de abajo y sale igual,
+ * sin leerse, compararse ni convertirse. `has_more` / `next_offset` se calculan
+ * contra el arreglo que REALMENTE llegó (`paginateCatalog`), nunca contra
+ * `total` — ver el porqué en `catalog-pagination.ts`.
+ *
+ * Eso deja de ser un detalle desde `wasiai-a2a` 9faff4f (HU-323): `total` pasó a
+ * ser `number | 'unknown'` (contrato espejado en `lib/api/a2a-discover-contract.ts`).
+ * Un proxy que no interpreta el valor no necesita defenderse de él, así que acá
+ * NO hay ningún manejo especial del caso `'unknown'` y no debería aparecer uno.
+ *
+ * ⚠️ LO QUE NO HAY QUE ESCRIBIR ACÁ. La tentación es "normalizar" el campo al
+ * reenviarlo. Las tres formas de hacerlo mal, en orden de peligro:
+ *   total ?? 0         -> no hace nada (`'unknown'` no es nullish) y da la
+ *                         sensación de haberlo cubierto.
+ *   Number(total)      -> `NaN` viajando al cliente.
+ *   Number(total) || 0 -> `0`, o sea "no hay agentes", al lado de una página
+ *                         llena de agentes. Un número plausible y falso.
+ * Este repo no sabe el total si a2a no lo sabe. Si alguna vez hace falta un
+ * número, el honesto es `totalAtLeast`, y hay que nombrarlo como cota inferior.
+ * `__tests__/total-unknown.test.ts` pinea las tres.
  */
 async function paginatedCapabilities(
   req: NextRequest,
