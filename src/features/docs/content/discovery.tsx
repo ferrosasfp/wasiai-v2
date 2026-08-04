@@ -14,7 +14,14 @@ curl "https://app.wasiai.io/api/v1/capabilities?tag=oracle"
 curl "https://app.wasiai.io/api/v1/capabilities?max_price=0.01"
 
 # Cap the number of results
-curl "https://app.wasiai.io/api/v1/capabilities?limit=5"`,
+curl "https://app.wasiai.io/api/v1/capabilities?limit=5"
+
+# Walk the WHOLE catalog, page by page.
+# Sending offset switches to a deterministic order and adds has_more/next_offset.
+curl "https://app.wasiai.io/api/v1/capabilities?offset=0&limit=20"
+# -> { "agents": [...20], "total": 25, "has_more": true, "next_offset": 20 }
+curl "https://app.wasiai.io/api/v1/capabilities?offset=20&limit=20"
+# -> { "agents": [...5],  "total": 25, "has_more": false, "next_offset": null }`,
   },
   {
     label: 'JavaScript',
@@ -54,12 +61,21 @@ const result = await fetch(
 // Desde WKH-322 el gateway responde 400 UNKNOWN_DISCOVER_PARAM a las claves que
 // no conoce, asi que seguir publicandolos era instruir una llamada que falla.
 // El campo de respuesta `next_cursor` salio por lo mismo: tampoco existe.
-// La paginacion real del catalogo esta pendiente de diseno.
+//
+// `offset` se agrega ACA DESPUES de existir, no antes — es el orden que el
+// commit ceddfca83 documenta haber invertido. Lo implementa
+// `src/lib/api/catalog-pagination.ts` + `src/app/api/v1/capabilities/route.ts`
+// y lo cubre `__tests__/pagination.test.ts` (recorrido completo del catalogo
+// sin repetidos ni faltantes, con el doble de upstream barajando cada llamada).
+// NO se agrega nada a RESPONSE_FIELDS: esa tabla es de campos POR AGENTE y
+// `offset`/`limit`/`has_more`/`next_offset` son de primer nivel — se describen
+// en `queryOffsetDesc` y en el ejemplo curl de arriba.
 const QUERY_PARAMS = [
   { p: 'tag', t: 'string', dk: 'queryTagDesc' },
   { p: 'max_price', t: 'number', dk: 'queryMaxPriceDesc' },
   { p: 'min_reputation', t: 'number', dk: 'queryMinReputationDesc' },
   { p: 'limit', t: 'number', dk: 'queryLimitDesc' },
+  { p: 'offset', t: 'number', dk: 'queryOffsetDesc' },
 ] as const
 
 const RESPONSE_FIELDS = [

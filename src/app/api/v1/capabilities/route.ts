@@ -27,6 +27,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/lib/env'
 import { isDelegated, forwardRequest } from '@/lib/proxy/forward-handler'
+import { jsonError } from '@/lib/api/jsonError'
+import {
+  CATALOG_FETCH_LIMIT,
+  PAGINATION_LIMIT_PARAM,
+  PAGINATION_OFFSET_PARAM,
+  paginateCatalog,
+  parsePageRequest,
+} from '@/lib/api/catalog-pagination'
 import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceAddress } from '@/lib/contracts/WasiAIMarketplace'
 import { CHAIN_ID, CHAIN_NAME } from '@/lib/chain'
@@ -119,10 +127,21 @@ function stripUrlDecoration(searchParams: URLSearchParams): void {
   }
 }
 
+/**
+ * El modo paginado es OPT-IN por la presencia de `offset`, y eso es lo que
+ * mantiene intactos a los clientes de hoy: sin `offset` no se toca una sola
+ * línea del camino que ya existía — misma query string reescrita, mismo
+ * `forwardRequest`, mismo body de a2a devuelto tal cual, mismo orden (el
+ * ranking barajado de a2a). Con `offset`, en cambio, el orden pasa a ser el
+ * determinístico de `catalog-pagination.ts`, porque el de a2a no se puede
+ * recorrer (ver el módulo: cuatro llamadas idénticas, cuatro órdenes).
+ */
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const wantsPaging = req.nextUrl.searchParams.has(PAGINATION_OFFSET_PARAM)
+
   // TD-002: break a2a → v2 → a2a recursion.
   if (isA2ARegistryCallback(req)) {
-    return legacyCapabilities(req)
+    return wantsPaging ? paginationUnsupported() : legacyCapabilities(req)
   }
   if (isDelegated('capabilities')) {
     // TD-002: rewrite v2-style query params into a2a's canonical names BEFORE
@@ -130,10 +149,101 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const url = new URL(req.url)
     translateParamsForA2A(url.searchParams)
     stripUrlDecoration(url.searchParams)
+    if (wantsPaging) return paginatedCapabilities(req, url)
     const rewritten = new NextRequest(url.toString(), req)
     return forwardRequest(rewritten, `${env.WASIAI_A2A_BASE_URL}/discover`)
   }
-  return legacyCapabilities(req)
+  return wantsPaging ? paginationUnsupported() : legacyCapabilities(req)
+}
+
+/**
+ * `offset` sobre un camino que no lo puede honrar.
+ *
+ * Los dos caminos que caen acá terminan en `legacyCapabilities`, que lee
+ * `tag`/`category`/`max_price`/`min_reputation`/`limit`/`cursor` y NADA más: un
+ * `offset` ahí se descartaría en silencio y el caller recibiría la página 1
+ * creyendo que recibió la 3. Es exactamente el bug que WKH-322 cerró aguas
+ * arriba y el que documenta el commit ceddfca83 (`?cursor=BASURA` devolvía la
+ * misma primera página), así que se contesta en vez de ignorar.
+ *
+ * Alcanzable por cualquiera que mande un header `x-agent-key` (rama TD-002) o
+ * con la delegación apagada (dev local). El a2a real nunca manda `offset`: lo
+ * arma desde su propia allowlist, que no lo incluye.
+ */
+function paginationUnsupported(): NextResponse {
+  return jsonError(
+    'PAGINATION_NOT_SUPPORTED',
+    `${PAGINATION_OFFSET_PARAM} is not supported on this path`,
+    400,
+  )
+}
+
+/**
+ * Camino paginado: UNA llamada a a2a por el conjunto completo, orden propio,
+ * y la ventana pedida.
+ *
+ * El `limit` que viaja upstream NO es el del caller — es `CATALOG_FETCH_LIMIT`.
+ * Mandar el del caller pediría un top-N de una barajada distinta a la que
+ * ordena esta respuesta, y la ventana `[offset, offset+limit)` no estaría
+ * contenida en ese top-N: páginas con repetidos y agentes que no aparecen en
+ * ninguna. Los tests lo pinean (el forwarded URL lleva `limit=500` y no lleva
+ * `offset`).
+ *
+ * Campos NUEVOS de la respuesta, y sólo en este camino: `offset`, `limit`,
+ * `has_more`, `next_offset`. El resto del body de a2a (`total`, `registries`,
+ * `sources`, `catalogStatus`, `excluded`) se reenvía tal cual — este cambio no
+ * toca ninguno.
+ */
+async function paginatedCapabilities(
+  req: NextRequest,
+  url: URL,
+): Promise<NextResponse> {
+  const parsed = parsePageRequest(url.searchParams)
+  if (!parsed.ok) return jsonError(parsed.code, parsed.message, 400)
+  const { offset, limit } = parsed.value
+
+  const upstreamUrl = new URL(url.toString())
+  upstreamUrl.searchParams.delete(PAGINATION_OFFSET_PARAM)
+  upstreamUrl.searchParams.set(PAGINATION_LIMIT_PARAM, String(CATALOG_FETCH_LIMIT))
+
+  const upstream = await forwardRequest(
+    new NextRequest(upstreamUrl.toString(), req),
+    `${env.WASIAI_A2A_BASE_URL}/discover`,
+  )
+  // Un 4xx/5xx de a2a (filtro inválido, clave desconocida, timeout) se devuelve
+  // sin tocar: paginar no debe cambiar cómo se ve un error del gateway.
+  if (upstream.status !== 200) return upstream
+
+  let body: unknown
+  try {
+    body = await upstream.json()
+  } catch {
+    return jsonError('UPSTREAM_MALFORMED', 'Discovery upstream returned a malformed response', 502)
+  }
+  if (!isCatalogBody(body)) {
+    return jsonError('UPSTREAM_MALFORMED', 'Discovery upstream returned a malformed response', 502)
+  }
+
+  const { page, hasMore, nextOffset } = paginateCatalog(body.agents, { offset, limit })
+  return NextResponse.json({
+    ...body,
+    agents: page,
+    offset,
+    limit,
+    has_more: hasMore,
+    next_offset: nextOffset,
+  })
+}
+
+/** El body de a2a sirve para paginar si trae un `agents` que sea arreglo. */
+function isCatalogBody(
+  body: unknown,
+): body is Record<string, unknown> & { agents: Array<{ slug?: unknown; id?: unknown }> } {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    Array.isArray((body as { agents?: unknown }).agents)
+  )
 }
 
 // ── Legacy handler ───────────────────────────────────────────────────────────
