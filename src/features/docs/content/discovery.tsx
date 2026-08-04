@@ -21,7 +21,16 @@ curl "https://app.wasiai.io/api/v1/capabilities?limit=5"
 curl "https://app.wasiai.io/api/v1/capabilities?offset=0&limit=20"
 # -> { "agents": [...20], "total": 25, "has_more": true, "next_offset": 20 }
 curl "https://app.wasiai.io/api/v1/capabilities?offset=20&limit=20"
-# -> { "agents": [...5],  "total": 25, "has_more": false, "next_offset": null }`,
+# -> { "agents": [...5],  "total": 25, "has_more": false, "next_offset": null }
+
+# "total" is a number OR the string "unknown", when the catalog came back
+# incomplete and nobody can know the real total. It is never a truncated count
+# presented as a total. Do not do arithmetic on it without checking:
+# Number("unknown") is NaN, and Number("unknown") || 0 is 0, which reads as
+# "no agents" next to a full page of agents.
+# "totalAtLeast" is always a number: a LOWER BOUND, not a total.
+# -> { "agents": [...20], "total": "unknown", "totalAtLeast": 100,
+#      "catalogStatus": "truncated", "has_more": true, "next_offset": 20 }`,
   },
   {
     label: 'JavaScript',
