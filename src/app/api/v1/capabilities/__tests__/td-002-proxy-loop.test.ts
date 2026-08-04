@@ -121,6 +121,39 @@ describe('GET /api/v1/capabilities — TD-002 fixes', () => {
       expect(url.searchParams.get('min_reputation')).toBeNull()
     })
 
+    it('strips URL decoration so a shared link does not 400 upstream', async () => {
+      // Regresión medida en producción el 2026-08-04: desde WKH-322 el gateway
+      // a2a responde 400 UNKNOWN_DISCOVER_PARAM a las claves que no conoce, y
+      // forward-handler reenvía la query string COMPLETA. Un link del
+      // marketplace compartido en Twitter llega con ?utm_source=twitter y el
+      // 400 lo convierte en un link roto.
+      const req = makeGet(
+        'http://v2.local/api/v1/capabilities?tag=oracle&utm_source=twitter&utm_medium=social&fbclid=IwAR1&gclid=xyz&ref=newsletter',
+      )
+      await GET(req)
+      const forwardedReq = mockForwardRequest.mock.calls[0][0] as NextRequest
+      const url = new URL(forwardedReq.url)
+      // La decoración no llega al gateway...
+      for (const decoration of ['utm_source', 'utm_medium', 'fbclid', 'gclid', 'ref']) {
+        expect(url.searchParams.get(decoration)).toBeNull()
+      }
+      // ...y el filtro real sí, traducido.
+      expect(url.searchParams.get('capabilities')).toBe('oracle')
+    })
+
+    it('does NOT strip an unknown key that is not URL decoration (a typo must still 400)', async () => {
+      // El complemento del test anterior, y es el que impide que este arreglo
+      // se convierta en "descartar todo lo desconocido": un `tagg=oracle` es un
+      // typo del integrador y TIENE que seguir viajando para que el gateway lo
+      // rechace con 400. Descartarlo reintroduciría el silencio que WKH-322 cerró.
+      const req = makeGet('http://v2.local/api/v1/capabilities?tagg=oracle&bogus=1')
+      await GET(req)
+      const forwardedReq = mockForwardRequest.mock.calls[0][0] as NextRequest
+      const url = new URL(forwardedReq.url)
+      expect(url.searchParams.get('tagg')).toBe('oracle')
+      expect(url.searchParams.get('bogus')).toBe('1')
+    })
+
     it('keeps existing canonical names untouched when both present (a2a names win)', async () => {
       const req = makeGet(
         'http://v2.local/api/v1/capabilities?tag=defi&capabilities=oracle',

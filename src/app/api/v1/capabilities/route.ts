@@ -73,6 +73,52 @@ function translateParamsForA2A(searchParams: URLSearchParams): void {
   }
 }
 
+/**
+ * Decoración de URL que NO es parte de ninguna API: parámetros de campañas y de
+ * click-ids que agregan las redes sociales y las herramientas de analítica.
+ *
+ * POR QUÉ EXISTE ESTO. Desde WKH-322 el gateway a2a responde 400
+ * `UNKNOWN_DISCOVER_PARAM` a cualquier clave que no reconoce, y eso es
+ * deliberado: un parámetro ignorado en silencio hace creer al integrador que
+ * filtró cuando no filtró. Pero `forward-handler.ts` reenvía la query string
+ * COMPLETA, así que un link del marketplace compartido en Twitter llega acá con
+ * `?utm_source=twitter` y el 400 lo convierte en un link roto.
+ *
+ * Medido en produccion el 2026-08-04, antes de este cambio:
+ *   ?tag=oracle                    -> 200
+ *   ?tag=oracle&utm_source=twitter -> 400 unknown parameter 'utm_source'
+ *   ?fbclid=... / ?gclid=...       -> 400
+ *
+ * Se descartan SOLO estas claves, y no cualquier clave desconocida, a propósito:
+ * un `?tagg=oracle` (typo del integrador) TIENE que seguir dando 400. Descartar
+ * todo lo no reconocido reintroduciría exactamente el silencio que WKH-322 cerró.
+ */
+const URL_DECORATION_PARAMS = new Set([
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'utm_id',
+  'gclid',
+  'fbclid',
+  'msclkid',
+  'ttclid',
+  'twclid',
+  'igshid',
+  'mc_cid',
+  'mc_eid',
+  'ref',
+  'ref_src',
+])
+
+/** Saca la decoración de campañas antes de reenviar. Mutates in place. */
+function stripUrlDecoration(searchParams: URLSearchParams): void {
+  for (const key of [...searchParams.keys()]) {
+    if (URL_DECORATION_PARAMS.has(key)) searchParams.delete(key)
+  }
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   // TD-002: break a2a → v2 → a2a recursion.
   if (isA2ARegistryCallback(req)) {
@@ -83,6 +129,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // forwarding, so server-side filters actually apply on the upstream side.
     const url = new URL(req.url)
     translateParamsForA2A(url.searchParams)
+    stripUrlDecoration(url.searchParams)
     const rewritten = new NextRequest(url.toString(), req)
     return forwardRequest(rewritten, `${env.WASIAI_A2A_BASE_URL}/discover`)
   }
