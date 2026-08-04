@@ -63,7 +63,7 @@ export default async function ProfilePage({
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="flex items-center gap-3">
           {/* Avatar con iniciales */}
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#E84142] text-white text-xl font-bold select-none">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-avax-500 text-white text-xl font-bold select-none">
             {initials}
           </div>
           <div className="min-w-0">
@@ -169,7 +169,7 @@ export default async function ProfilePage({
             <div className="flex flex-col gap-2">
               <Link
                 href={`/${locale}/login`}
-                className="flex items-center justify-center rounded-xl bg-[#E84142] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#c73535] transition"
+                className="flex items-center justify-center rounded-xl bg-avax-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-avax-600 transition"
               >
                 {t('signIn')}
               </Link>
@@ -209,7 +209,7 @@ function NavLink({
       <span className="text-gray-400 shrink-0">{icon}</span>
       <span className="flex-1 text-sm font-medium text-gray-800">{label}</span>
       {badge && (
-        <span className="rounded-full bg-[#E84142]/10 px-2 py-0.5 text-[10px] font-semibold text-[#E84142]">
+        <span className="rounded-full bg-avax-500/10 px-2 py-0.5 text-[10px] font-semibold text-avax-500">
           {badge}
         </span>
       )}

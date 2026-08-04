@@ -107,7 +107,7 @@ export function CreatorAnalytics({ agents }: Props) {
           <select
             value={selectedAgentId}
             onChange={e => setSelectedAgentId(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#E84142]/30"
+            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-avax-500/30"
           >
             <option value="">{t('all_agents')}</option>
             {agents.map(a => (

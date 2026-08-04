@@ -49,7 +49,7 @@ export function CreatorProfileView({ creator, locale }: Props) {
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 space-y-4">
           <div className="flex items-center gap-4">
             {/* Avatar */}
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#E84142] text-2xl font-bold text-white">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-avax-500 text-2xl font-bold text-white">
               {initial}
             </div>
 
@@ -112,7 +112,7 @@ function AgentCardPublic({
       className="group block rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
     >
       <div className="flex items-start gap-3">
-        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E84142] to-[#c73535] text-lg overflow-hidden">
+        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-avax-500 to-avax-600 text-lg overflow-hidden">
           {agent.cover_image ? (
             <Image
               src={agent.cover_image}
@@ -127,7 +127,7 @@ function AgentCardPublic({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-gray-900 group-hover:text-[#E84142] transition-colors truncate">
+          <h3 className="font-semibold text-gray-900 group-hover:text-avax-500 transition-colors truncate">
             {agent.name}
           </h3>
           <div className="mt-1 flex items-center gap-1.5 flex-wrap">

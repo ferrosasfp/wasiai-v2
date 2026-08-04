@@ -216,7 +216,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
           {/* Barra de balance */}
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#E84142] rounded-full transition-all duration-500"
+              className="h-full bg-avax-500 rounded-full transition-all duration-500"
               style={{ width: `${balancePct}%` }}
             />
           </div>
@@ -237,7 +237,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
               <p className="text-sm text-gray-400">{t('noActiveAgents')}</p>
             ) : (
               <select
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142]"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-avax-500/30 focus:border-avax-500"
                 value={selectedSlug}
                 onChange={e => handleSlugChange(e.target.value)}
               >
@@ -256,7 +256,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
               {t('inputLabel')} <span className="text-gray-400 font-normal">({t('inputHint')})</span>
             </label>
             <textarea
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 focus:border-[#E84142] font-mono resize-none"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-avax-500/30 focus:border-avax-500 font-mono resize-none"
               rows={6}
               placeholder='{"input": ""}'
               value={inputText}
@@ -273,7 +273,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
 
           {/* Botón */}
           <button
-            className="w-full bg-[#E84142] hover:bg-[#d03536] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+            className="w-full bg-avax-500 hover:bg-avax-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
             onClick={handleInvoke}
             disabled={loading || !selectedSlug || agents.length === 0 || anonLimitHit}
           >
@@ -287,7 +287,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
             <p className="text-sm text-blue-800 font-medium">{t('anonLimitTitle')}</p>
             <Link
               href="/auth/login"
-              className="inline-block bg-[#E84142] text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-[#d03536] transition-colors"
+              className="inline-block bg-avax-500 text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-avax-600 transition-colors"
             >
               {t('anonLimitCta')}
             </Link>
@@ -318,7 +318,7 @@ export function SandboxClient({ userId }: { userId: string | null }) {
               <div className="flex gap-3 text-xs text-gray-400">
                 <span>{t('resultCost')} <span className="text-gray-700 font-medium">{formatUsdc(result.cost_usdc)}</span></span>
                 <span>·</span>
-                <span>{t('resultRemaining')} <span className="text-[#E84142] font-medium">{formatUsdc(result.balance_remaining)}</span></span>
+                <span>{t('resultRemaining')} <span className="text-avax-500 font-medium">{formatUsdc(result.balance_remaining)}</span></span>
               </div>
             </div>
             <CopyableOutput content={JSON.stringify(result.result, null, 2)} />

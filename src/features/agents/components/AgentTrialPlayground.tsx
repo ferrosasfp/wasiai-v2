@@ -87,7 +87,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
   if (!isAuthenticated) {
     return (
       <section className="border border-gray-200 rounded-xl p-5 space-y-3 text-center">
-        <span className="text-xs font-semibold bg-[#E84142]/10 text-[#E84142] px-2 py-1 rounded-full">
+        <span className="text-xs font-semibold bg-avax-500/10 text-avax-500 px-2 py-1 rounded-full">
           {t('badge')}
         </span>
         <p className="text-sm text-gray-600">
@@ -95,7 +95,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
         </p>
         <Link
           href="/login"
-          className="inline-block bg-[#E84142] text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-[#c73535] transition-colors"
+          className="inline-block bg-avax-500 text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-avax-600 transition-colors"
         >
           {t('signUpCta') ?? 'Create free account →'}
         </Link>
@@ -106,7 +106,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
   return (
     <section className="border border-gray-200 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold bg-[#E84142]/10 text-[#E84142] px-2 py-1 rounded-full">
+        <span className="text-xs font-semibold bg-avax-500/10 text-avax-500 px-2 py-1 rounded-full">
           {t('badge')}
         </span>
         {trialsRemaining !== null && state !== 'used' && (
@@ -121,7 +121,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
           <p className="text-sm text-gray-500">✅ {t('used')}</p>
           <Link
             href="/keys"
-            className="inline-block bg-[#E84142] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#c73535] transition-colors"
+            className="inline-block bg-avax-500 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-avax-600 transition-colors"
           >
             {t('cta')}
           </Link>
@@ -136,13 +136,13 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
                 maxLength={2000}
                 rows={6}
                 disabled={state === 'loading'}
-                className="w-full border border-gray-200 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#E84142]/30 disabled:opacity-50"
+                className="w-full border border-gray-200 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-avax-500/30 disabled:opacity-50"
               />
 
               <button
                 onClick={handleTrial}
                 disabled={!input.trim() || state === 'loading'}
-                className="bg-[#E84142] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#c73535] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="bg-avax-500 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-avax-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {state === 'loading' ? t('loading') : t('button')}
               </button>
@@ -152,7 +152,7 @@ export function AgentTrialPlayground({ slug, isAuthenticated, inputSchema, input
                   <CopyableOutput content={output} className="bg-gray-900 text-gray-100" maxHeightClass="max-h-72" />
                   <p className="text-sm text-gray-500">
                     {t('success_cta')}{' '}
-                    <Link href="/keys" className="text-[#E84142] underline">{t('cta')}</Link>
+                    <Link href="/keys" className="text-avax-500 underline">{t('cta')}</Link>
                   </p>
                 </div>
               )}

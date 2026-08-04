@@ -72,9 +72,9 @@ export function SummaryCards({ summary }: Props) {
       </div>
 
       {/* Earnings */}
-      <div className="rounded-xl border border-[#E84142]/20 bg-[#E84142]/5 p-4 shadow-sm">
+      <div className="rounded-xl border border-avax-500/20 bg-avax-500/5 p-4 shadow-sm">
         <p className="text-xs text-gray-500 font-medium">{t('earnings')} USDC</p>
-        <p className="mt-1 text-2xl font-bold text-[#E84142]">
+        <p className="mt-1 text-2xl font-bold text-avax-500">
           ${totalEarnings(pendingEarningsUsdc, onchainEarningsUsdc)}
         </p>
         {onchainEarningsUsdc === null && parseFloat(pendingEarningsUsdc) > 0 && (

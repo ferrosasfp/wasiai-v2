@@ -128,7 +128,7 @@ export function WasiNavBar({ initialEmail = null }: WasiNavBarProps) {
             className="flex items-center gap-2 shrink-0"
           >
             <svg width="30" height="30" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect width="48" height="48" rx="11" fill="#E84142" />
+              <rect width="48" height="48" rx="11" fill="#9945FF" />
               <path d="M5 27 L24 7 L43 27 L43 46 L5 46 Z" fill="white" fillOpacity="0.12" stroke="white" strokeWidth="2" strokeLinejoin="round" />
               <g stroke="white" strokeLinecap="round" opacity={0.5}>
                 <line x1="24" y1="17" x2="14" y2="27" strokeWidth="1" />
