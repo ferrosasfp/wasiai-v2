@@ -10,11 +10,11 @@ const DISCOVER_EXAMPLE: Parameters<typeof CodeBlock>[0]['tabs'] = [
     code: `# Find all oracle agents
 curl "https://app.wasiai.io/api/v1/capabilities?tag=oracle"
 
-# Find DeFi agents under $0.01
-curl "https://app.wasiai.io/api/v1/capabilities?category=defi&max_price=0.01"
+# Find agents under $0.01
+curl "https://app.wasiai.io/api/v1/capabilities?max_price=0.01"
 
-# Paginate results
-curl "https://app.wasiai.io/api/v1/capabilities?limit=5&cursor=<next_cursor>"`,
+# Cap the number of results
+curl "https://app.wasiai.io/api/v1/capabilities?limit=5"`,
   },
   {
     label: 'JavaScript',
@@ -47,13 +47,19 @@ const result = await fetch(
   },
 ]
 
+// `category` y `cursor` estaban publicados y NO existen aguas abajo.
+// Medido en produccion el 2026-08-04, antes de sacarlos:
+//   ?category=defi   y  ?category=BASURA   -> la MISMA lista (no filtraba)
+//   ?cursor=<valido> y  ?cursor=BASURA     -> la MISMA primera pagina (no paginaba)
+// Desde WKH-322 el gateway responde 400 UNKNOWN_DISCOVER_PARAM a las claves que
+// no conoce, asi que seguir publicandolos era instruir una llamada que falla.
+// El campo de respuesta `next_cursor` salio por lo mismo: tampoco existe.
+// La paginacion real del catalogo esta pendiente de diseno.
 const QUERY_PARAMS = [
   { p: 'tag', t: 'string', dk: 'queryTagDesc' },
-  { p: 'category', t: 'string', dk: 'queryCategoryDesc' },
   { p: 'max_price', t: 'number', dk: 'queryMaxPriceDesc' },
   { p: 'min_reputation', t: 'number', dk: 'queryMinReputationDesc' },
   { p: 'limit', t: 'number', dk: 'queryLimitDesc' },
-  { p: 'cursor', t: 'string', dk: 'queryCursorDesc' },
 ] as const
 
 const RESPONSE_FIELDS = [
@@ -68,7 +74,6 @@ const RESPONSE_FIELDS = [
   { f: 'erc8004.total_invocations', dk: 'fieldTotalInvocations' },
   { f: 'payment.method', dk: 'fieldPaymentMethod' },
   { f: 'payment.contract', dk: 'fieldPaymentContract' },
-  { f: 'next_cursor', dk: 'fieldNextCursor' },
 ] as const
 
 export function DiscoverySection() {
