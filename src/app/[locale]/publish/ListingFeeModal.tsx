@@ -9,6 +9,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+// El dominio EIP-712 del USDC es idéntico en ambas redes (name 'USD Coin', version '2'):
+// solo cambian chainId y verifyingContract, así que basta seguir a CHAIN_ID.
+import { CHAIN_ID, USDC_ADDRESS } from '@/lib/chain'
 
 interface Props {
   slug:            string
@@ -60,8 +63,8 @@ export default function ListingFeeModal({
         domain: {
           name:              'USD Coin',
           version:           '2',
-          chainId:           43114,
-          verifyingContract: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
+          chainId:           CHAIN_ID,
+          verifyingContract: USDC_ADDRESS,
         },
         types: {
           TransferWithAuthorization: [

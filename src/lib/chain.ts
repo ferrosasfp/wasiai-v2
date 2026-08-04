@@ -25,6 +25,11 @@ export const USDC_ADDRESS = IS_MAINNET
   ? '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'
   : '0x5425890298aed601595a70AB815c96711a31Bc65'
 
+/** JSON-RPC endpoint — must follow CHAIN_ID, or on-chain reads hit the wrong network */
+export const RPC_URL = IS_MAINNET
+  ? (process.env.NEXT_PUBLIC_RPC_MAINNET ?? 'https://api.avax.network/ext/bc/C/rpc')
+  : (process.env.NEXT_PUBLIC_RPC_TESTNET ?? 'https://api.avax-test.network/ext/bc/C/rpc')
+
 /** Block explorer base URL */
 export const EXPLORER_URL = IS_MAINNET
   ? 'https://snowtrace.io'
@@ -64,6 +69,6 @@ export const CHAIN_PARAMS = {
   chainId:           IS_MAINNET ? '0xA86A' : '0xA869',
   chainName:         IS_MAINNET ? 'Avalanche C-Chain' : 'Avalanche Fuji Testnet',
   nativeCurrency:    { name: 'AVAX', symbol: 'AVAX', decimals: 18 as number },
-  rpcUrls:           [IS_MAINNET ? 'https://api.avax.network/ext/bc/C/rpc' : 'https://api.avax-test.network/ext/bc/C/rpc'] as string[],
+  rpcUrls:           [RPC_URL] as string[],
   blockExplorerUrls: [IS_MAINNET ? 'https://snowtrace.io/' : 'https://testnet.snowtrace.io/'] as string[],
 }

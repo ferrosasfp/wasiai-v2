@@ -9,6 +9,7 @@ import { WITHDRAW_KEY_ABI }       from '@/lib/contracts/abis'
 import { keyHashToBytes32 }       from '@/lib/contracts/utils'
 import { createPublicClient, http } from 'viem'
 import { avalancheFuji, avalanche }  from 'viem/chains'
+import { CHAIN_ID, IS_MAINNET, USDC_ADDRESS, RPC_URL } from '@/lib/chain'
 
 interface AgentKey {
   id: string
@@ -27,16 +28,8 @@ interface AgentKey {
   stale?: boolean                        // WAS-218: true if balance may be outdated
 }
 
-// USDC contract addresses by chain
-const USDC_BY_CHAIN: Record<number, string> = {
-  43114: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', // Avalanche mainnet
-  43113: '0x5425890298aed601595a70AB815c96711a31Bc65', // Fuji testnet
-}
-
 // Marketplace contract address (recipient for ERC-3009 transfer)
-const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 43113)
-const USDC_ADDRESS = USDC_BY_CHAIN[CHAIN_ID] ?? USDC_BY_CHAIN[43113]
-const MARKETPLACE_ADDRESS = CHAIN_ID === 43114
+const MARKETPLACE_ADDRESS = IS_MAINNET
   ? (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_MAINNET ?? '')
   : (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS_FUJI    ?? '')
 
@@ -76,7 +69,7 @@ function DepositModal({ keyId, keyName, ownerWalletAddress, spentUsdc, onClose, 
     if (!address) return
     const ERC20_BALANCE_OF = '0x70a08231'
     const paddedAddr = address.replace('0x','').toLowerCase().padStart(64,'0')
-    fetch('https://api.avax.network/ext/bc/C/rpc', {
+    fetch(RPC_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc:'2.0', method:'eth_call', id:1,
