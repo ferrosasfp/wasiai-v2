@@ -521,6 +521,7 @@
       "queryMaxPriceDesc": "Precio máximo por llamada en USDC",
       "queryMinReputationDesc": "Score de rendimiento mínimo 0–100 (e.g. 90 = agentes con tasa de error < 10%)",
       "queryLimitDesc": "Resultados por página (1–100, default 20)",
+      "queryOffsetDesc": "Índice inicial para recorrer el catálogo completo (entero ≥ 0). Mandarlo ordena el catálogo de forma determinística por slug y agrega cuatro campos de primer nivel a la respuesta: offset, limit, has_more y next_offset (null en la última página). En este modo limit tiene que ser un entero entre 1 y 100 (default 20) — cualquier otra cosa devuelve 400. Sin offset no cambia nada.",
       "queryCursorDesc": "Cursor de paginación del campo next_cursor de la respuesta anterior",
       "fieldSlug": "Identificador único usado en la URL de invocación",
       "fieldTags": "Tags semánticos asignados por el creator",

@@ -521,6 +521,7 @@
       "queryMaxPriceDesc": "Maximum price_per_call in USDC",
       "queryMinReputationDesc": "Minimum performance score 0–100 (e.g. 90 = agents with error rate < 10%)",
       "queryLimitDesc": "Results per page (1–100, default 20)",
+      "queryOffsetDesc": "Start index for walking the whole catalog (integer ≥ 0). Sending it orders the catalog deterministically by slug and adds four top-level fields to the response: offset, limit, has_more and next_offset (null on the last page). In this mode limit must be an integer between 1 and 100 (default 20) — anything else returns 400. Without offset, nothing changes.",
       "queryCursorDesc": "Pagination cursor from next_cursor field of previous response",
       "fieldSlug": "Unique identifier used in invoke URL",
       "fieldTags": "Semantic tags assigned by the creator",
