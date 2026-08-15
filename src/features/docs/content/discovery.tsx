@@ -43,23 +43,20 @@ const { agents } = await res.json();
 
 if (agents.length === 0) throw new Error("No oracle agents found");
 
-const oracle = agents[0]; // already sorted by created_at DESC
-console.log(oracle.slug, oracle.price_per_call_usdc);
-console.log(oracle.input_schema);  // know exactly what to send
-console.log(oracle.output_schema); // know exactly what you'll receive
+// Ranked verified first, then reputation desc, then price asc.
+const oracle = agents[0];
+console.log(oracle.slug, oracle.priceUsdc);
+console.log(oracle.capabilities); // the semantic tags it answers to
 
-// Invoke it
-const result = await fetch(
-  \`https://app.wasiai.io\${oracle.invoke_url}\`,
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-agent-key": "wasi_xxx"
-    },
-    body: JSON.stringify({ input: { token_symbol: "AVAX" } })
-  }
-);`,
+// Invoke it. invokeUrl is an absolute URL, so do not prefix it.
+const result = await fetch(oracle.invokeUrl, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-agent-key": "wasi_xxx"
+  },
+  body: JSON.stringify({ input: { token_symbol: "AVAX" } })
+});`,
   },
 ]
 
@@ -70,6 +67,13 @@ const result = await fetch(
 // Desde WKH-322 el gateway responde 400 UNKNOWN_DISCOVER_PARAM a las claves que
 // no conoce, asi que seguir publicandolos era instruir una llamada que falla.
 // El campo de respuesta `next_cursor` salio por lo mismo: tampoco existe.
+//
+// ⚠️ ESE ARREGLO CUBRIO UNA SOLA DE LAS DOS SUPERFICIES. `category` y `cursor`
+// siguieron publicados 10 dias mas en `content/api-reference.tsx:47` y `:51`,
+// que documenta EL MISMO endpoint en la misma seccion de docs. Recien salieron
+// de ahi el 2026-08-14. Antes de tocar una tabla de esta pagina, grepear el
+// nombre del parametro o del campo en `src/features/docs/content/` COMPLETO: la
+// duplicacion es real y no la avisa nada.
 //
 // `offset` se agrega ACA DESPUES de existir, no antes — es el orden que el
 // commit ceddfca83 documenta haber invertido. Lo implementa
@@ -87,16 +91,33 @@ const QUERY_PARAMS = [
   { p: 'offset', t: 'number', dk: 'queryOffsetDesc' },
 ] as const
 
+// ─── 2026-08-14: la tabla nombraba la forma LEGACY, que este endpoint ya no
+// devuelve ───────────────────────────────────────────────────────────────────
+// Desde que `capabilities` delega en a2a `GET /discover`, el agente que sale por
+// el cable NO es el que armaba `legacyCapabilities`. Medido en produccion sobre
+// los 25 agentes de `GET /api/v1/capabilities`, contando presencia campo por
+// campo con jq:
+//   tags               -> 0/25   (el arreglo de tags se llama `capabilities`, 25/25)
+//   price_per_call_usdc-> 0/25   (se llama `priceUsdc`, 25/25)
+//   invoke_url         -> 0/25   (se llama `invokeUrl`, 25/25, y es ABSOLUTA)
+//   input_schema       -> 0/25   en el agente
+//   output_schema      -> 0/25   en el agente
+//   erc8004.*          -> 0/25   en el agente
+// Los tres primeros son RENOMBRES y por eso se corrigen en vez de borrarse.
+//
+// Los otros tres SE BORRAN y no se reescriben como `metadata.input_schema`,
+// aunque ahi aparezcan: la forma de `metadata` la decide el registry de origen y
+// NO es una sola. Medido en la misma corrida: `metadata.input_schema` 21/25 y
+// `metadata.inputSchema` 3/25 (los self-published), `metadata.erc8004` 22/25.
+// Publicar cualquiera de las dos grafias seria una promesa que se rompe para los
+// otros. Cuando el gateway unifique esa forma, vuelven a la tabla.
+//
+// `slug`, `payment.method` y `payment.contract` se quedan: 25/25 los tres.
 const RESPONSE_FIELDS = [
   { f: 'slug', dk: 'fieldSlug' },
-  { f: 'tags[]', dk: 'fieldTags' },
-  { f: 'price_per_call_usdc', dk: 'fieldPrice' },
-  { f: 'input_schema', dk: 'fieldInputSchema' },
-  { f: 'output_schema', dk: 'fieldOutputSchema' },
-  { f: 'invoke_url', dk: 'fieldInvokeUrl' },
-  { f: 'erc8004.identity_id', dk: 'fieldIdentityId' },
-  { f: 'erc8004.reputation_score', dk: 'fieldReputationScore' },
-  { f: 'erc8004.total_invocations', dk: 'fieldTotalInvocations' },
+  { f: 'capabilities[]', dk: 'fieldTags' },
+  { f: 'priceUsdc', dk: 'fieldPrice' },
+  { f: 'invokeUrl', dk: 'fieldInvokeUrl' },
   { f: 'payment.method', dk: 'fieldPaymentMethod' },
   { f: 'payment.contract', dk: 'fieldPaymentContract' },
 ] as const
