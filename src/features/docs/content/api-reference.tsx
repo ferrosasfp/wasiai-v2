@@ -17,7 +17,7 @@ export function ApiReferenceSection() {
       <EndpointCard
         method="POST"
         path="/agents/:slug/invoke"
-        description="Invoke an agent with a JSON payload. Returns the agent's output synchronously. The input is validated against the agent's input_schema before payment — returns 422 input_invalid if validation fails."
+        description="Invoke an agent with a JSON payload. Returns the agent's output synchronously. The input is validated against the agent's input_schema before payment — returns 422 input_invalid if validation fails. This endpoint reads the key from the X-API-Key header, not x-agent-key."
         auth={true}
         params={[
           { name: ':slug', type: 'string', required: true, description: 'Agent slug identifier (e.g. wasi-defi-sentiment)' },
@@ -31,9 +31,16 @@ export function ApiReferenceSection() {
     "flags": ["FOMO naming"],
     "analysis": "High-risk token with speculative characteristics."
   },
-  "latency_ms": 1240,
-  "agent_slug": "wasi-defi-sentiment",
-  "receipt_signature": "0xdef..."
+  "meta": {
+    "model": "wasi-defi-sentiment",
+    "latency_ms": 1240,
+    "charged": 0.01,
+    "currency": "USDC",
+    "chain": "avalanche",
+    "tx_hash": "0xabc...",
+    "status": "success"
+  },
+  "receipt": { "signature": "0xdef..." }
 }`}
       />
 
@@ -44,58 +51,57 @@ export function ApiReferenceSection() {
         auth={false}
         bodyParams={[
           { name: 'tag', type: 'string', description: 'Filter by semantic tag (e.g. oracle, defi, sentiment)' },
-          { name: 'category', type: 'string', description: 'Filter by category (defi, nlp, vision, code…)' },
           { name: 'max_price', type: 'number', description: 'Maximum price per call in USDC' },
-          { name: 'min_reputation', type: 'number', description: 'Minimum reputation score (0.0–1.0)' },
+          { name: 'min_reputation', type: 'number', description: 'Minimum reputation score (0–100)' },
           { name: 'limit', type: 'number', description: 'Results per page (1–100, default 20)' },
-          { name: 'cursor', type: 'string', description: 'Pagination cursor from previous response' },
         ]}
         responseExample={`{
   "agents": [
     {
       "slug": "wasi-chainlink-price",
-      "name": "Chainlink Price Feed",
-      "category": "defi",
-      "tags": ["oracle", "price-feed", "defi", "real-time"],
-      "price_per_call_usdc": 0.001,
-      "input_schema": { "type": "object", "properties": { "token_symbol": { "type": "string" } } },
-      "output_schema": { "type": "object", "properties": { "price_usd": { "type": "number" } } },
-      "invoke_url": "/api/v1/agents/wasi-chainlink-price/invoke",
-      "erc8004": {
-        "identity_id": "0xBF95...",
-        "reputation_score": null,
-        "total_invocations": 10
-      },
+      "name": "Chainlink Price Oracle",
+      "description": "Reads live Chainlink price feeds directly on-chain.",
+      "capabilities": ["price-feed", "oracle", "defi", "real-time"],
+      "priceUsdc": 0.001,
+      "invokeUrl": "https://wasiai-v2.vercel.app/api/v1/models/wasi-chainlink-price/invoke",
+      "registry": "WasiAI",
+      "verified": false,
+      "status": "active",
       "payment": {
         "method": "x402",
         "asset": "USDC",
-        "chain": "avalanche-testnet",
-        "contract": "0xC01DEF0ca66b86E9F8655dc202347F1cf104b7A7"
+        "chain": "avalanche",
+        "contract": "0x54a75aa76cC544106C3707356937C05013CfB391"
       }
     }
   ],
-  "total": 5,
-  "next_cursor": null
+  "total": 25,
+  "totalAtLeast": 25,
+  "catalogStatus": "complete"
 }`}
       />
 
       <EndpointCard
         method="POST"
         path="/compose"
-        description="Execute a pipeline of up to 5 agents in a single request. Supports serial and parallel execution with output passing between steps."
+        description="Execute a pipeline of up to 5 agents in a single request. Steps run in order and each one can take the output of the step before it."
         auth={true}
         bodyParams={[
-          { name: 'steps', type: 'ComposeStep[]', required: true, description: 'Array of pipeline steps (max 5). Each step: { agent_slug, input?, pass_output?, parallel? }' },
+          { name: 'steps', type: 'ComposeStep[]', required: true, description: 'Array of pipeline steps (max 5). Each step: { agent | capability, input, passOutput?, inputFromPrevious?, registry? }. Give either agent or capability, never both.' },
         ]}
         responseExample={`{
-  "pipeline_id": "uuid",
-  "steps_executed": 3,
-  "groups_executed": 2,
-  "total_cost_usdc": "0.15",
-  "result": { "risk_score": 72 },
-  "receipts": [
-    { "step": 0, "agent_slug": "wasi-chainlink-price", "cost_usdc": "0.05", "receipt_signature": "0x..." }
-  ]
+  "success": true,
+  "output": { "risk_score": 72 },
+  "steps": [
+    {
+      "agent": { "slug": "wasi-chainlink-price", "name": "Chainlink Price Oracle" },
+      "output": { "price_usd": 42.1 },
+      "costUsdc": 0.05,
+      "latencyMs": 1200
+    }
+  ],
+  "totalCostUsdc": 0.15,
+  "totalLatencyMs": 3200
 }`}
       />
 
@@ -111,17 +117,13 @@ export function ApiReferenceSection() {
   "slug": "wasi-defi-sentiment",
   "name": "DeFi Sentiment",
   "category": "defi",
-  "tags": ["sentiment", "defi"],
-  "price_per_call_usdc": 0.01,
+  "price_per_call": 0.01,
   "input_schema": { "type": "object", "properties": { "token_symbol": { "type": "string" } } },
   "output_schema": { "type": "object", "properties": { "sentiment_score": { "type": "number" } } },
   "sandbox_enabled": true,
   "performance_score": 94,
-  "erc8004": {
-    "identity_id": "0xBF95...",
-    "reputation_score": 0.87,
-    "total_invocations": 1420
-  }
+  "reputation": { "score": 87, "count": 12 },
+  "stats": { "total_calls": 1420, "total_revenue": 14.2 }
 }`}
       />
 
@@ -131,12 +133,14 @@ export function ApiReferenceSection() {
         description="Get balance and metadata for the current Agent Key."
         auth={true}
         responseExample={`{
-  "key_id": "uuid",
   "name": "my-agent-bot",
-  "budget_usdc": "10.00",
-  "spent_usdc": "2.35",
-  "remaining_usdc": "7.65",
-  "created_at": "2026-01-15T10:00:00Z"
+  "is_active": true,
+  "budget_usdc": 10,
+  "spent_usdc": 2.35,
+  "remaining_usdc": 7.65,
+  "usage_pct": 24,
+  "created_at": "2026-01-15T10:00:00Z",
+  "status": "ok"
 }`}
       />
 
@@ -217,9 +221,18 @@ export function ApiReferenceSection() {
           { name: 'output_schema', type: 'object', description: 'JSON Schema describing the output format' },
         ]}
         responseExample={`{
-  "id": "uuid",
-  "slug": "my-defi-agent",
-  "status": "active",
+  "message": "Agent registered successfully",
+  "verified": false,
+  "agent": {
+    "id": "uuid",
+    "slug": "my-defi-agent",
+    "name": "My DeFi Agent",
+    "category": "defi",
+    "price_per_call": 0.02,
+    "invoke_url": "https://app.wasiai.io/api/v1/models/my-defi-agent/invoke",
+    "status": "active"
+  },
+  "creator_id": "uuid",
   "management_key": "wasi_mgmt_..."
 }`}
       />
