@@ -486,6 +486,15 @@ export function evaluateDelegationMatch(host, match, vercelEnv) {
  * `declaresDelegation` = el endpoint de estado declaró `compose` u `orchestrate`
  * en `delegation.runtime`. Un ambiente que DECLARA delegar y no deja medir los
  * headers del camino del dinero **no es un OK**; uno que declara no delegar, sí.
+ *
+ * ⚠️ La línea dice CUÁNTOS pasos quedaron sin medir, no "no se midió nada"
+ * (fix-pack F4 · `F4-1`). Esta función recibe un CONTADOR, no la lista: no sabe
+ * si el inconcluso fue el paso 3, el 4 o la pata de control del 5 contra el
+ * gateway. La versión anterior afirmaba *"los headers del camino del dinero NO
+ * se midieron ninguna vez"*, y eso es falso en cuanto UN solo paso queda
+ * inconcluso y los otros miden — por ejemplo el paso 5, que ni siquiera pega
+ * contra el mismo host. El exit code no cambia: lo que cambia es que la línea
+ * no afirma de más. Cuál paso fue lo dice la línea INCONCLUSO de cada paso.
  */
 export function decideVerdict(host, failureCount, inconclusiveCount, declaresDelegation) {
   const suffix = inconclusiveCount > 0 ? ` + ${inconclusiveCount} paso(s) INCONCLUSO(s)` : ''
@@ -503,8 +512,9 @@ export function decideVerdict(host, failureCount, inconclusiveCount, declaresDel
       line: formatLine(
         host,
         `SMOKE FALLA — 0 problema(s)${suffix}: este ambiente DECLARA delegar ` +
-          '(delegation.runtime) y los headers del camino del dinero NO se midieron ' +
-          'ninguna vez. Resolver la causa de cada INCONCLUSO y volver a correrlo',
+          `(delegation.runtime) y ${inconclusiveCount} paso(s) del camino del dinero ` +
+          'NO se midieron. Un OK acá afirmaría sobre lo que no se midió: resolver la ' +
+          'causa de cada INCONCLUSO —la línea de cada paso la nombra— y volver a correrlo',
       ),
     }
   }

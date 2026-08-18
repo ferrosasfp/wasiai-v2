@@ -493,7 +493,11 @@ describe('fix-pack AR it.2 `BLQ-BAJO-3`: un ambiente que DECLARA delegar y no de
     expect(declara.exitCode).toBe(1)
     expect(declara.isError).toBe(true)
     expect(declara.line).toContain('DECLARA delegar')
-    expect(declara.line).toContain('NO se midieron')
+    // fix-pack F4 `F4-1`: la línea dice CUÁNTOS pasos quedaron sin medir. Decía
+    // "los headers ... NO se midieron ninguna vez", que es falso en cuanto un
+    // solo paso queda inconcluso y los otros miden.
+    expect(declara.line).toContain('3 paso(s) del camino del dinero NO se midieron')
+    expect(declara.line).not.toContain('ninguna vez')
 
     // (c) 0 fallas + inconclusos + el ambiente NO declara delegar ⇒ 0. El AR
     // pidió explícitamente no tocar este caso: el manifiesto dice que no delega.
