@@ -5,7 +5,7 @@
 > Tipo: bugfix (money-path) + improvement (observabilidad de ambiente)
 > SDD_MODE: full
 > Modo del pipeline: QUALITY
-> Branch: `fix/077-wkh-361-contracting-headers-passthrough`
+> Branch: `feat/077-headers-proxy`
 > Repo: `wasiai-v2` (marketplace, consumidor). `wasiai-a2a` es canónico y esa relación NO se invierte.
 > `main` = `b558713`
 > Artefactos: `doc/sdd/077-wkh-361-cutover-a2a-no-cableado/`

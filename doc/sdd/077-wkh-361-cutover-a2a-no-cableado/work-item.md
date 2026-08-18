@@ -33,7 +33,7 @@ a mano** — que es exactamente lo que produjo el diagnóstico equivocado que ab
   (`app.wasiai.io` cobra x402 vía a2a en `/compose` y `/orchestrate`) y **no se puede probar en
   staging tal como está hoy** (ver DT-2). QUALITY se mantiene.
 - **Estimación:** M
-- **Branch sugerido:** `fix/077-wkh-361-contracting-headers-passthrough`
+- **Branch sugerido:** `feat/077-headers-proxy`
 - **Skills de dominio (máx. 2):** `security/proxy-headers` · `infra/env-y-deploy`
 
 ---

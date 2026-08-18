@@ -3,8 +3,46 @@
 > SDD: `doc/sdd/077-wkh-361-cutover-a2a-no-cableado/sdd.md` — **SPEC_APPROVED 2026-08-18**
 > Work item: `doc/sdd/077-wkh-361-cutover-a2a-no-cableado/work-item.md` rev. 2 — HU_APPROVED 2026-08-18
 > Fecha: 2026-08-18
-> Branch: `fix/077-wkh-361-contracting-headers-passthrough`
+> Branch: `feat/077-headers-proxy`
 > Repo: `wasiai-v2` (marketplace, consumidor). `wasiai-a2a` es canónico y esa relación NO se invierte.
+
+---
+
+## ⚠️ Editado DESPUÉS de F4 — leé esto antes de seguir una cita por línea
+
+Este documento se editó en el cierre pre-merge, sobre los hallazgos de `f4-report.md`. Los cambios:
+
+| Dónde | Qué cambió | Origen |
+|---|---|---|
+| §11 `[TBD-1]` | **reescrito entero**: su instrumento no podía dar ninguna de sus dos ramas (los Previews de `wasiai-prod` están detrás de Deployment Protection). Ahora tiene las **tres salidas reales**, la recomendación por escrito y el bloque ⛔ *"Lo que NO mide esto"* | `F4-2` + `F4-3` |
+| §11 `[TBD-2]` | agregado el bloque ⛔ *"Lo que NO mide esto"* que le faltaba | `F4-3` |
+| §11 `[TBD-4]` | su 3.er renglón **cerrado con medición** (`CRON_SECRET` está en `wasiai-v2`; `SENTRY_DSN` no) y la rama que dependía de él, descartada | `f4-report.md` §3.6 |
+| §10 (DT-8) | puntero al `why` de `x-api-key` en `passthrough-headers.ts`, donde ahora vive la consecuencia viva, con `T-04c` de candado | `P-8` |
+| §13 pasos 2-3 | el paso 2 ya no es un `curl`: es **decidir `[TBD-1]` por escrito** | `F4-2` |
+| §14 (contador) | `802 → 812` estaba viejo; la cadena real, medida eslabón por eslabón | `DRIFT-3` |
+| encabezado | la rama declarada no existía (`fix/077-…-passthrough`); la real es `feat/077-headers-proxy` — corregida también en `work-item.md:36`, `sdd.md:8` y `_INDEX.md` | `DRIFT-1` |
+
+⚠️ **Consecuencia de estas ediciones, que no la caza ningún barrido del diff**: son **+175 / −13
+líneas** (`git diff --numstat`), y **este mismo bloque que estás leyendo corre todo lo que sigue
++38**. O sea: **toda cita `story-file.md:NNN` con `NNN ≥ 9` escrita en `ar-report.md`,
+`ar-report-it2.md`, `cr-report.md` o `f4-report.md` apunta ahora a otra línea.** Las 8 primeras
+—título, SDD, work item, fecha, **branch (`:6`)**, repo— no se movieron.
+
+Desplazamiento medido, encabezado por encabezado:
+
+| Sección | Antes (`349e9c8eb`) | Ahora | Δ |
+|---|---|---|---|
+| `## 0` | 11 | **49** | +38 |
+| `## 10` | 795 | **833** | +38 |
+| `## 11` | 847 | **901** | +54 |
+| `## 12` | 1051 | **1135** | +84 |
+| `## 13` | 1076 | **1160** | +84 |
+| `## 14` | 1210 | **1294** | +84 |
+| `## 15` | 1248 | **1350** | +102 |
+
+Esas citas eran ciertas contra `349e9c8eb` y **no se retocaron a mano**: reescribir un reporte
+histórico para que sus números cierren es falsificar el expediente.
+**El ancla estable es el título de la sección, no el número de línea.**
 
 ---
 
@@ -802,7 +840,10 @@ proyectos Vercel ⇒ **una sola etiqueta en el log del gateway**. Además, aline
 `wasiai-v2` consuma el mismo gateway que sirve a `wasiai-prod`, escribiendo recibos y telemetría en
 la misma base. *Falsable*: si `x-wasiai-source` llevara el ambiente, el primer motivo cae.
 ⇒ **El primer testigo es el Preview de `wasiai-prod`. Si el Preview no delega, el primer testigo es
-`app.wasiai.io`, y queda escrito** (`[TBD-1]`, §11). Agregarle el ambiente a `x-wasiai-source` es
+`app.wasiai.io`, y queda escrito** (`[TBD-1]`, §11). ⚠️ **Actualizado tras F4**: el Preview de
+`wasiai-prod` no contesta —está detrás de Deployment Protection— así que la pregunta no se resuelve
+midiendo sino **eligiendo** entre tres salidas; la recomendada es que el primer testigo sea
+`app.wasiai.io`. Ver `[TBD-1]` reescrito en §11. Agregarle el ambiente a `x-wasiai-source` es
 **A-3b**, fuera de scope: cambia lo que ve el gateway y no tiene AC en esta HU.
 
 **DT-8: las dos pantallas NO migran a `x-a2a-key` en esta HU.** Razón principal, **medida**: con
@@ -813,6 +854,19 @@ Kite**, salvo que además elijan red — **lo cual depende de esta misma HU** (e
 selector de red devolviera 200. Sale como **A-5**, ya desbloqueada por ésta.
 `x-api-key` **se conserva** en la lista blanca marcado como alias muerto (CD-12), con T-04b
 exigiendo que sea la **única** entrada sin lector citado.
+
+⚠️ **La consecuencia viva de DT-8 ya no vive sólo acá** (pedido de F4: DT-7 estaba en el docblock
+del cron y DT-8 sólo en un `.md`). Está escrita en el `why` de la entrada `x-api-key` de
+`src/lib/proxy/passthrough-headers.ts` —el campo que lee cualquiera que toque la lista blanca— y
+**lockeada por `T-04c`** (`src/lib/proxy/__tests__/forward-handler.test.ts`): si alguien poda esa
+frase y la deja en "alias muerto", el test se pone rojo. Lo que dice, y que hay que llevar al
+done-report tal cual: las dos pantallas mandan `x-api-key` a un endpoint **delegado**
+(`PipelinePageClient.tsx:84` → `/api/v1/compose`, `DemoPageClient.tsx:93` → `/api/v1/orchestrate`),
+el gateway **no** lo lee, y por eso **hoy** reciben `402` en `wasiai-prod` / `app.wasiai.io`.
+Sacar el header de la lista no las arregla ni las rompe: ya están rotas, y lo que las arregla es
+**A-5**. El tercer emisor de `x-api-key` (`ChatPageClient.tsx:69`) pega a `/api/v1/chat`, que **no**
+es un `DelegatedEndpoint` (`forward-handler.ts:66`) y por eso no cruza el proxy: **son dos
+pantallas, no tres.**
 
 **DT-7 y su residual — decilo sin adornar.** El card-diff del cron **habría cazado los dos headers
 de contracting el día que WKH-360 se desplegó**. Medido hoy contra
@@ -850,16 +904,76 @@ Ninguno bloquea W0/W1/W2. **No los resuelvas inventando**: seguí la rama que d�
 
 ### `[TBD-1]` ¿Delega el Preview de `wasiai-prod`?
 
-Instrumento (se corre en W3, después del push de la branch):
+⚠️ **REESCRITO tras F4 (`f4-report.md` §4 `F4-2`). El instrumento anterior no puede dar ninguna de
+sus dos ramas** — y eso se descubrió midiendo, no razonando. Lo que decía esta sección era:
 
 ```
-POST https://<preview-url-de-wasiai-prod>/api/v1/compose  -H 'content-type: application/json'  -d '{"steps":[]}'
+POST https://<preview-url-de-wasiai-prod>/api/v1/compose  -d '{"steps":[]}'
+   VALIDATION_ERROR  ⇒ delega        503 COMPOSE_DISABLED ⇒ no delega
 ```
 
-| Resultado | Rama |
-|---|---|
-| `{"code":"VALIDATION_ERROR","requestId":…}` | **El Preview DELEGA.** Es el primer testigo de AC-1/AC-1b, **fuera** del camino de dinero. Corré las dos ternas contra el Preview. |
-| `503 {"error":"COMPOSE_DISABLED"}` | **El Preview NO delega** (las 3 vars están scopeadas a Production). ⇒ **el primer ambiente donde se verifica AC-1/AC-1b es `wasiai-prod` / `app.wasiai.io`**, o sea el camino de dinero. Se acepta y **se escribe en el done-report**, porque (a) la promoción es manual y deliberada (`CLAUDE.md:22-23`), (b) la reversa es Instant Rollback sobre un cambio de **código**, y (c) las pruebas de la terna cortan antes de cobrar. |
+**Medido el 2026-08-18 contra los Previews existentes de `wasiai-prod`:**
+
+```
+POST https://wasiai-prod-qxcym047k-….vercel.app/api/v1/compose
+  -> 401 {"error":{"message":"Protected deployment","code":"401"},
+          "protection":{"vercel_auth_callback":"https://vercel.com/sso-api?…"}}
+GET  https://wasiai-prod-la66nyjzr-….vercel.app/api/v1/capabilities -> 200, y el cuerpo es la página SSO
+GET  https://wasiai-prod-jr73e1w07-….vercel.app/api/v1/capabilities -> 200, ídem
+```
+
+**Los Previews de `wasiai-prod` están detrás de Deployment Protection.** El resultado no es
+`VALIDATION_ERROR` ni `503`: es la pantalla de login de Vercel. Cae la Escalation Rule de §15
+(*"cualquier `[TBD]` de §11 que dé un resultado que no es ninguna de sus dos ramas"*), y por eso esto
+se decide **acá y ahora**, no el día del cutover con el dedo sobre el botón.
+
+⛔ **Lo que NO mide esto — tres formas de creer que se contestó:**
+
+1. **Un Preview del proyecto `wasiai-v2` no contesta esta pregunta.** Son dos proyectos Vercel
+   distintos con env vars distintas: `wasiai-v2` no tiene ninguna de las 3 vars de delegación
+   (`f4-report.md` §3.6: **0 coincidencias** en `Production` y en `Preview`), así que ahí el `503
+   COMPOSE_DISABLED` es el estado **declarado** (DT-2 B+), no una respuesta sobre `wasiai-prod`.
+   **Medir el proyecto Vercel equivocado y creer que se midió el otro es exactamente el error que
+   abrió esta HU** (CD-6).
+2. **Un `200` no es "delega".** Los dos `GET` de arriba devolvieron `200` con la página SSO en el
+   cuerpo. Leer el status y no el cuerpo da un falso "el Preview responde bien".
+3. **Que las 3 vars aparezcan en `vercel env ls` no dice a qué ambiente están scopeadas.** La
+   pregunta de `[TBD-1]` es de *scope* (`Production` vs `Production+Preview`), y el listado de
+   nombres no lo distingue. El instrumento que sí: `vercel link --project wasiai-prod` +
+   `vercel env ls preview` — que F4 **no pudo correr** (bloqueado por el sistema de permisos de su
+   entorno) y que queda como `P-3`/`P-7`.
+
+**Las tres salidas reales. Hay que elegir UNA por escrito antes del paso 2 del runbook (§13):**
+
+| # | Salida | Qué cuesta | Qué deja |
+|---|---|---|---|
+| **A** | **Aceptar `app.wasiai.io` como primer testigo de AC-1/AC-1b** — la rama 2 del `[TBD-1]` viejo, ya escrita y ya justificada | ningún cambio de configuración en el proyecto del dinero | el primer testigo de los headers es el camino del dinero |
+| **B** | **Protection Bypass for Automation**: generar el secreto en `wasiai-prod` → Settings → Deployment Protection y mandar `x-vercel-protection-bypass: <secreto>` en las tres sondas | crea un **secreto permanente que saltea la protección** del proyecto del dinero, y hay que custodiarlo/rotarlo | un testigo fuera del camino del dinero, sin ventana pública |
+| **C** | **Desactivar la protección** de ese Preview mientras dure la verificación | deja el Preview del proyecto del dinero **público** durante la ventana, y depende de que alguien se acuerde de volver a prenderla | ídem B, con una ventana abierta y un paso manual que envejece |
+
+**RECOMENDACIÓN: A.** No por comodidad — por estas cuatro, en este orden:
+
+1. **B y C cambian la configuración del proyecto del dinero para poder probar**, y esta HU declara
+   en §12 que **no toca ninguna env var ni configuración de ningún proyecto Vercel**. Elegir B o C
+   es ampliar el scope del cutover justo en el ambiente donde menos conviene.
+2. **C deja un agujero que sólo cierra la memoria de alguien.** Un paso manual de reversa que nadie
+   verifica no es una mitigación: es un pendiente. B es preferible a C si hay que elegir entre las
+   dos.
+3. **No hay un tercer ambiente que sirva de testigo intermedio.** `wasiai-v2` /
+   `wasiai-v2.vercel.app` no delega y alinearlo está **Out of Scope** (§12). O sea que la elección
+   real es "A" contra "cambiar config de `wasiai-prod`", no "A" contra "un staging seguro".
+4. **El riesgo de A está acotado y medido, no supuesto**: (a) la promoción de `wasiai-prod` es un
+   acto manual y deliberado — `vercel ls wasiai-prod` muestra los 3 despliegues recientes como
+   **Preview** y el último `Production` de hace 4 días (`f4-report.md` §3.2), o sea que mergear no
+   publica nada; (b) la reversa es Instant Rollback sobre un cambio de **código**; (c) **las tres
+   sondas cortan antes de cobrar**: `400` (validación / contracting) y `402` (challenge x402, que es
+   "esto costaría", no un cobro) — `smoke-delegation.mjs` lo tiene escrito en su docblock y ninguno
+   de sus 7 pasos mueve fondos.
+
+⚠️ **Elegir A tiene una consecuencia que hay que escribir, no tragarse**: AC-1 y AC-1b se cierran
+**por primera vez** contra `app.wasiai.io`. Por eso el runbook exige el paso 0 (`P-4`, la sonda de
+`forward-key`) inmediatamente antes, y la ventana de 60 min de §13 después. **Si el founder prefiere
+un testigo previo al camino del dinero, la salida es B y hay que decirlo con la misma letra.**
 
 ### `[TBD-2]` ¿Acepta Vercel el 5.º cron en `wasiai-prod`?
 
@@ -872,6 +986,22 @@ schedule `0 6 * * *`**.
 |---|---|
 | Aparece listado | AC-7 y AC-11 tienen disparador real. Nada más que hacer. |
 | No aparece (límite de plan) | El backstop declarado es **el smoke (AC-8)**, que hay que correr a mano post-deploy — **y hay que decirlo en el done-report**. El código del cron se mergea igual: sigue siendo invocable a mano con el `CRON_SECRET`. |
+
+⛔ **Lo que NO mide esto** *(agregado tras F4 `F4-3`: `[TBD-3]` lo dice para su propia pregunta y acá
+quedaba implícito)* — tres cosas que parecen contestarlo y no lo hacen:
+
+1. **`curl` al endpoint del cron y ver `200` NO prueba que Vercel lo haya registrado.** Prueba que la
+   ruta existe y que la auth pasa; el cron es un **schedule del lado de Vercel**, y una ruta
+   invocable a mano corre exactamente igual si el schedule nunca se creó. Es la misma clase de
+   instrumento que `[TBD-3]` prohíbe: uno que no puede desmentirte.
+2. **Que `vercel.json:19-22` esté versionado tampoco lo prueba.** El archivo declara la intención;
+   quien decide si el 5.º cron entra es el **plan** del proyecto. Leer el repo contesta "qué pedimos",
+   no "qué quedó registrado".
+3. **Verlo listado en un proyecto no contesta por el otro.** El mismo `vercel.json` lo despliegan
+   `wasiai-prod` **y** `wasiai-v2` — eso es justamente `[TBD-4]`, y hay que mirar los dos dashboards.
+
+No hay instrumento de CLI para esto (`f4-report.md` §8, punto 2): **es dashboard, y por eso el dueño
+es el operador.**
 
 ### `[TBD-3]` ¿Está declarado el `Host` con que Vercel invoca el cron?
 
@@ -936,7 +1066,7 @@ nombran **sólo `wasiai-prod`**.
 |---|---|---|
 | 1 | Dashboard de Vercel → proyecto **`wasiai-v2`** → **Cron Jobs** → ¿aparece `/api/cron/delegation-drift`? | si el cron existe en staging (`[TBD-2]` para el otro proyecto) |
 | 2 | Si aparece: **Run** desde el dashboard (NO con `curl`, por la misma razón de `[TBD-3]`: un `Host` que mandás vos no puede desmentirte) y leer `environment.host` + `environment.declaredAs` de esa corrida | si el `Host` con que **Vercel** invoca está en `hosts` de `wasiai-v2` (`delegation-manifest.ts:73`) |
-| 3 | Dashboard → proyecto `wasiai-v2` → **Environment Variables** → ¿existe `CRON_SECRET`? | si el handler corta antes en `verifyCronAuth` (`route.ts:119-122`) |
+| 3 | ~~Dashboard → proyecto `wasiai-v2` → **Environment Variables** → ¿existe `CRON_SECRET`?~~ | ✅ **MEDIDO Y CERRADO por F4** — ver abajo |
 
 **Las ramas** (ninguna se decide sin la medición de arriba):
 
@@ -945,7 +1075,21 @@ nombran **sólo `wasiai-prod`**.
 | El cron NO aparece en `wasiai-v2` | no hay ruido; nada que arreglar | se anota y se cierra |
 | Aparece + `declaredAs: "wasiai-v2"` + `CRON_SECRET` presente | el cron corre bien en staging | nada |
 | Aparece + `verdict: "UNDECLARED_HOST"` (500) | **500 diario** con `logger.error` + `Sentry.captureMessage` en el proyecto que nadie mira | agregar ese `environment.host` **crudo** a `hosts` de `wasiai-v2`, con la salida pegada como evidencia. ⛔ `delegated` no se toca (CD-9) |
-| Aparece + sin `CRON_SECRET` | **500 diario** por otra causa (`verifyCronAuth` es fail-closed) | decidir explícitamente: setear `CRON_SECRET` en `wasiai-v2` o declarar por escrito que en staging el cron falla a propósito |
+| ~~Aparece + sin `CRON_SECRET`~~ | ~~**500 diario** por otra causa (`verifyCronAuth` es fail-closed)~~ | **rama descartada por medición**: `CRON_SECRET` **está** en `wasiai-v2` |
+
+✅ **El renglón 3 lo cerró F4 con medición** (`f4-report.md` §3.6, `vercel env ls` sobre el proyecto
+`wasiai-v2` — sólo nombres, nunca valores):
+
+| Var | `Production` | `Preview` | Consecuencia |
+|---|---|---|---|
+| `CRON_SECRET` | **presente** | **presente** | el cron de staging **no** va a fallar por auth: va a correr y a comparar. La rama "sin `CRON_SECRET`" queda descartada, y con ella la decisión que pedía |
+| `SENTRY_DSN` | **0 coincidencias** | **0** | **DT-6 confirmado con medición**: en `wasiai-v2` el canal 3 (Sentry) es un **no-op silencioso**, y el 500 del cron es el único canal que existe ahí |
+
+⚠️ **Lo que esa medición NO cierra**: los renglones 1 y 2 siguen abiertos (son dashboard, no CLI), y
+**no se midió lo mismo en `wasiai-prod`** — F4 quedó bloqueada por el sistema de permisos de su
+entorno al intentar enlazar ese proyecto (`f4-report.md` §8, punto 1). O sea: que `CRON_SECRET` esté
+en `wasiai-v2` **no dice nada** sobre `wasiai-prod`, que es otro proyecto Vercel. Instrumento para el
+operador: `vercel link --project wasiai-prod` + `vercel env ls`.
 
 ⚠️ **Por qué importa y no es cosmético**: una alarma diaria en un proyecto que nadie mira es
 exactamente el ruido que CD-10 evita con tanto cuidado en `wasiai-prod`. Una alarma que suena todos
@@ -1024,8 +1168,8 @@ declarado, no cronometrar una corrida sana.
 |---|---|---|---|
 | **0** | **ANTES de promover**: probar que el gateway monta `forward-key` | si no lo monta, **ninguna** de las 6 familias se puede atribuir al proxy y el disparador de reversa se queda sin su método #1 | `POST <gateway>/compose` con `x-wasiai-forward-key` **inválida** ⇒ `401 INVALID_FORWARD_KEY`. **Medido el 2026-08-18: `401`**, control sin el header ⇒ `400 VALIDATION_ERROR` (la ausencia es passthrough por AC-4, así que **la sonda tiene que mandar una clave MALA**, no ninguna) |
 | 1 | push de la branch | crea **Preview** en `wasiai-prod`; `wasiai-v2` / `wasiai-v2.vercel.app` se actualiza | — |
-| 2 | sondear el Preview (`[TBD-1]`) | decide quién es el primer testigo | `POST <preview>/api/v1/compose {"steps":[]}` |
-| 3 | si el Preview delega: las dos ternas contra el Preview | AC-1 / AC-1b verificados **fuera** del camino de dinero | §2.1 + §2.2 |
+| 2 | **decidir `[TBD-1]` por escrito (A / B / C)** — ⚠️ **NO es un `curl` pelado**: los Previews de `wasiai-prod` están detrás de Deployment Protection y contestan `401 Protected deployment` / la página SSO (medido, `[TBD-1]` §11) | decide quién es el primer testigo | la salida elegida, escrita en el PR. **Recomendada: A** (primer testigo = `app.wasiai.io`) |
+| 3 | **sólo si se eligió B o C**: sondear el Preview y, si delega, las dos ternas contra el Preview | AC-1 / AC-1b verificados **fuera** del camino de dinero | `POST <preview>/api/v1/compose {"steps":[]}` **con `x-vercel-protection-bypass`** (B) · §2.1 + §2.2. Con **A** este paso **se salta** y se anota que se saltó |
 | 4 | merge a `main` | `wasiai-v2.vercel.app` sigue en 503 — **esperado, no es incidente** | AC-10 |
 | 5 | **Redeploy manual de `wasiai-prod`** (`CLAUDE.md:22`) | los 3 headers empiezan a atravesar | **las dos ternas** contra `app.wasiai.io` + `npm run smoke:delegation app.wasiai.io` |
 | 6 | ventana de 60 min | detectar R-1 / R-2 | logs de Railway del gateway (**A-4**, fuera de este repo) |
@@ -1163,7 +1307,25 @@ el ambiente entero con 500.
       de §4.b). `Tests`: **763 → 797** (+34), 5 skipped en las dos puntas. **Fix-pack it.2 (§4.c):
       `Test Files` se queda en 89 —cero archivos nuevos, y ése es su control— y `Tests` va
       **797 → 807 passed** (+10: `T-FP2-1…5`, `T-FP3-1…3`, `T-FP-7`, `T-FP-8`), con los mismos
-      5 skipped ⇒ **802 → 812 en el total**, que es el número que imprime vitest.
+      5 skipped ⇒ **802 → 812 en el total**.
+
+      ⚠️ **Ese `812` quedó viejo el mismo día que se escribió, y lo cazó F4** (`DRIFT-3`). La cadena
+      real, cada eslabón medido con `vitest --reporter=json --outputFile` (el stdout bajo el hook de
+      `rtk` se trunca):
+
+      | Momento | `Test Files` | `Tests` (total = passed + 5 skipped) | Cómo se sabe |
+      |---|---|---|---|
+      | base (`main` = `b55871347`) | 82 | 698 | §0 |
+      | cierre de W2 | 87 | — | tabla de §0 |
+      | fix-pack AR + it.2 | **89** | **812** *(declarado acá)* | este renglón |
+      | fix-pack CR `MNR-CR-1` (`048236dcb`) | 89 | **819** (814 + 5) | **medido por F4** — los +7 son `T-CR1-1…6`, y nadie actualizó el renglón |
+      | fix-pack F4 (guarda del paso 5 + candado de DT-8) | **89** | **826** (821 + 5) | **medido**: +7 (`T-F41-1…6` y `T-04c`) |
+
+      **`Test Files` se queda en 89 en los tres fix-packs, y ÉSE es el control de CD-14**: cero
+      archivos nuevos ⇒ el número no puede subir, y si un test viviera fuera de
+      `src/**/*.test.{ts,tsx}` este contador no lo levantaría y `npm test` quedaría verde igual.
+      El que envejece solo es el de `Tests`: es un número escrito a mano y **ningún test lo
+      verifica**. Si no coincide, el que tiene razón es `vitest`, no este renglón.
 - [ ] `scripts/smoke-delegation.mjs` **no ejecuta nada al importarse** (main-guard, CD-15) y **no
       importa ninguna dependencia** (sólo builtins de Node + `fetch`).
 - [ ] No agregué **ninguna** dependencia a `package.json`.

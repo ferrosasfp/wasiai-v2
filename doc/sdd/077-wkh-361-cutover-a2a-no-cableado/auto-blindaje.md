@@ -497,3 +497,59 @@ no existe.
   palabras, que ningún `grep` de la frase vieja podía cazar porque no comparte
   ni una. Corregido a `400 CON el error_code de la red ⇒ sin problema`. O sea:
   enumerar no es una precaución teórica, pagó en la primera corrida.
+
+---
+
+### [2026-08-18 22:10] Cierre pre-merge F4 — La tabla de desplazamiento que yo mismo invalidé, dos veces seguidas
+
+- **Error**: F4 pidió trazar el drift de las citas. Al reescribir `[TBD-1]` y los
+  otros bloques de `story-file.md` corrí +137 líneas y escribí, honestamente, un
+  bloque nuevo al principio del documento avisando *"toda cita `story-file.md:NNN`
+  con `NNN ≥ 847` apunta ahora a otra línea"*, con una tabla de desplazamiento
+  medida: `## 11` 847 → 863, `## 12` 1051 → 1097, etc. **Los números eran falsos
+  en el instante en que los guardé**: el propio bloque que los contenía corría
+  todo lo que seguía +25 más. Los volví a corregir y la corrección volvió a ser
+  falsa, porque agregó 13 líneas más.
+- **Causa raíz**: medí el desplazamiento **antes** de aplicar la edición que lo
+  documenta. Es un caso de auto-referencia: el instrumento (el bloque de aviso)
+  es parte del sistema medido (el archivo). La lección de la memoria dice *"los
+  barridos miran lo que ESCRIBISTE, no lo que DESPLAZASTE"*; ésta es la vuelta
+  siguiente: **cuando lo que escribís mide el desplazamiento, te desplazás a vos
+  mismo**, y el error no lo caza ningún `grep` porque el texto que escribiste es
+  exactamente el que querías escribir.
+- **Fix**: tercera pasada **línea-neutra**. Sustitución sólo de las celdas
+  numéricas, con `assert` de que el número de `\n` del archivo **no cambia**
+  antes de guardar. Eso hace que la medición tomada después de la edición siga
+  siendo válida cuando la edición se aplica ⇒ punto fijo. Verificado
+  re-derivando `grep -n '^## '` y `git diff --numstat` **después** de escribir:
+  los 7 valores de la tabla coinciden con los encabezados reales y el `+175/−13`
+  con el numstat.
+- **Aplicar en**: cualquier documento que declare posiciones **de sí mismo**
+  (tablas de líneas, índices, "esto está en la línea N"). Regla operable: la
+  edición que escribe los números tiene que ser **línea-neutra**, o los números
+  se derivan **después** y se aplican en una segunda pasada línea-neutra. Si no
+  se puede, no se escriben números: se escribe el ancla estable (el título de la
+  sección), que es lo que además quedó dicho en el propio bloque.
+- **Cómo lo detecté**: por el reflejo de re-derivar `grep -n '^## '` **después**
+  de cada edición en vez de confiar en la medición previa. Sin esa re-derivación
+  el documento se mergeaba con una tabla de desplazamiento que mentía sobre el
+  desplazamiento — el peor lugar posible para un número falso, porque el bloque
+  existe justamente para que nadie confíe en los números viejos.
+
+### [2026-08-18 22:25] Cierre pre-merge F4 — F4 nombró TRES artefactos con la rama inexistente; eran CUATRO
+
+- **Error**: el encargo decía *"`work-item.md:36`, `story-file.md:6` y
+  `_INDEX.md:77`… corregí los tres"*. Iba a corregir exactamente esos tres.
+- **Causa raíz**: tomé la enumeración de un reporte como si fuera el conjunto. El
+  reporte enumeraba lo que **su** barrido había encontrado, no lo que existe.
+- **Fix**: antes de editar, `grep -rn 'fix/077-wkh-361-contracting-headers-passthrough' doc/`.
+  Apareció **`sdd.md:8`**, que ningún artefacto previo había nombrado. Los cuatro
+  corregidos. Las 3 ocurrencias restantes (`ar-report-it2.md:180`,
+  `cr-report.md:417`, `f4-report.md:285`) **no se tocan a propósito**: son el
+  registro histórico del hallazgo y tienen que seguir diciendo lo que decían.
+- **Aplicar en**: toda instrucción de la forma "corregí los N de la lista".
+  **Derivá el conjunto con un barrido antes de editarlo**; la lista del reporte
+  es una foto de otro barrido, no el universo. Es el mismo criterio que el
+  `CLAUDE.md` de `wasiai-a2a` aplica a las tablas de ownership: *"no te apoyes en
+  el número: derivalo"*.
+
