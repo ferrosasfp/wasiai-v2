@@ -29,6 +29,7 @@ import {
   PASSTHROUGH_HEADER_ENTRIES,
   REJECTION_FAMILIES,
   REVERSAL_WATCHLIST,
+  UNATTRIBUTABLE_FAMILIES,
   WKH_361_NEW_HEADERS,
 } from '../passthrough-headers'
 
@@ -457,13 +458,22 @@ describe('REJECTION_FAMILIES: las 6 familias que habilita esta HU', () => {
     }
   })
 
-  it('T-FP-4: o tiene línea de log propia, o tiene el punto ciego ESCRITO — nunca ninguna de las dos', () => {
+  it('T-FP-4: el punto ciego está escrito ⇔ falta la línea de log O falta la atribución', () => {
     // Es la regla que el AR pidió: si una familia no se puede vigilar desde el
     // punto de observación declarado, se dice; no se deja afuera en silencio.
+    // ⚠️ Fix-pack AR it.2: antes era un XOR contra `railwayLogLine` sola, y por
+    // eso las 4 CONTRACTING_* podían llevar `blindSpot: null` —o sea, AFIRMAR
+    // que no tienen punto ciego— mientras su rechazo era inatribuible al proxy.
+    // El XOR viejo CERTIFICABA esa afirmación falsa. Son dos preguntas
+    // distintas: "¿se ve el error_code?" y "¿se puede atribuir al proxy?".
     for (const f of REJECTION_FAMILIES) {
       const hasLog = typeof f.railwayLogLine === 'string' && f.railwayLogLine.length > 0
       const hasBlind = typeof f.blindSpot === 'string' && f.blindSpot.length > 0
-      expect(hasLog !== hasBlind, `${f.code}: log=${hasLog} blindSpot=${hasBlind}`).toBe(true)
+      const attributable = f.proxyAttribution === 'reqId'
+      expect(
+        hasBlind,
+        `${f.code}: log=${hasLog} attr=${f.proxyAttribution} blindSpot=${hasBlind}`,
+      ).toBe(!hasLog || !attributable)
     }
   })
 
@@ -472,6 +482,40 @@ describe('REJECTION_FAMILIES: las 6 familias que habilita esta HU', () => {
     expect(blind.map((f) => f.code)).toEqual(['CHAIN_NOT_SUPPORTED'])
     expect(blind[0]?.blindSpot).toContain('reqId')
     expect(blind[0]?.blindSpot).toContain('forward-key source')
+  })
+
+  it('T-FP-7: las 4 familias de contracting NO se pueden atribuir al proxy, y lo dicen', () => {
+    // Medido con `app.inject` sobre la versión real del gateway:
+    // `preHandlers ejecutados = ["contractingGuard"]` ⇒ `forwardKey` nunca corre
+    // ⇒ no hay línea `forward-key source` que cruzar por reqId. El disparador de
+    // reversa (`story-file.md` §13) exige justamente esa línea.
+    expect([...UNATTRIBUTABLE_FAMILIES].sort()).toEqual([
+      'CONTRACTING_CHAIN_MALFORMED',
+      'CONTRACTING_DEPTH_EXCEEDED',
+      'CONTRACTING_DEPTH_MALFORMED',
+      'CONTRACTING_LOOP_DETECTED',
+    ])
+    for (const code of UNATTRIBUTABLE_FAMILIES) {
+      const f = REJECTION_FAMILIES.find((x) => x.code === code)
+      // No alcanza con marcarlas: el punto ciego tiene que decir POR QUÉ y CON
+      // QUÉ se suple, o vuelve a ser un dato que nadie sabe usar.
+      expect(f?.blindSpot, `${code} sin punto ciego escrito`).toBeTruthy()
+      expect(f?.blindSpot).toContain('compose.ts:909')
+      expect(f?.blindSpot).toContain('forward-key source')
+      expect(f?.blindSpot).toContain('CERO')
+      expect(f?.blindSpot).toContain('DELTA')
+    }
+  })
+
+  it('T-FP-8: las 2 familias de a2a-key SÍ se atribuyen, y el reparto es exhaustivo', () => {
+    // La calibración en la otra dirección: si TODO fuera inatribuible, la tabla
+    // del runbook no tendría método y nadie lo notaría. `a2a-key` corre DESPUÉS
+    // de `requireForwardKey()` en la cadena, así que estas dos sí tienen origen.
+    const atribuibles = REJECTION_FAMILIES.filter((f) => f.proxyAttribution === 'reqId').map(
+      (f) => f.code,
+    )
+    expect([...atribuibles].sort()).toEqual(['CHAIN_NOT_SUPPORTED', 'INSUFFICIENT_BUDGET'])
+    expect(atribuibles.length + UNATTRIBUTABLE_FAMILIES.length).toBe(REJECTION_FAMILIES.length)
   })
 
   it('T-FP-6: cada familia cita su emisor en wasiai-a2a y trae el status medido', () => {

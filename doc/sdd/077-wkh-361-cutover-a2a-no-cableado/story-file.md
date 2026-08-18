@@ -938,6 +938,7 @@ trabajo. Confundirlo con un incidente del cutover haría revertir un cambio que 
 
 | # | Acción | Efecto | Verificación |
 |---|---|---|---|
+| **0** | **ANTES de promover**: probar que el gateway monta `forward-key` | si no lo monta, **ninguna** de las 6 familias se puede atribuir al proxy y el disparador de reversa se queda sin su método #1 | `POST <gateway>/compose` con `x-wasiai-forward-key` **inválida** ⇒ `401 INVALID_FORWARD_KEY`. **Medido el 2026-08-18: `401`**, control sin el header ⇒ `400 VALIDATION_ERROR` (la ausencia es passthrough por AC-4, así que **la sonda tiene que mandar una clave MALA**, no ninguna) |
 | 1 | push de la branch | crea **Preview** en `wasiai-prod`; `wasiai-v2` / `wasiai-v2.vercel.app` se actualiza | — |
 | 2 | sondear el Preview (`[TBD-1]`) | decide quién es el primer testigo | `POST <preview>/api/v1/compose {"steps":[]}` |
 | 3 | si el Preview delega: las dos ternas contra el Preview | AC-1 / AC-1b verificados **fuera** del camino de dinero | §2.1 + §2.2 |
@@ -994,11 +995,32 @@ no loguea headers).
 
 **Cómo se buscan (A-4, logs de Railway del gateway):**
 
-| Qué buscar | Cubre |
-|---|---|
-| `contracting-guard.rejected` — trae el campo `code` | las 4 familias de contracting (filas 3-6) |
-| `a2a-key.insufficient-budget` | fila 2 |
-| `forward-key source` con `{"forwardSource":"v2-proxy"}` | marca **qué `reqId` viene del proxy**, para no contar tráfico directo al gateway |
+| Qué buscar | Cubre | ¿Se puede atribuir al proxy? |
+|---|---|---|
+| `contracting-guard.rejected` — trae el campo `code` | las 4 familias de contracting (filas 3-6) | ⛔ **NO** — ver abajo. Lo que hay es un **delta contra línea base** |
+| `a2a-key.insufficient-budget` | fila 2 | ✅ sí, cruzando por `reqId` |
+| `forward-key source` con `{"forwardSource":"v2-proxy"}` | marca **qué `reqId` viene del proxy**, para no contar tráfico directo al gateway | — (es el instrumento de atribución, no una familia) |
+
+⛔ **Las 4 familias `CONTRACTING_*` NO se pueden ATRIBUIR al proxy, aunque su `error_code` sí se
+vea.** Son dos preguntas distintas y confundirlas es lo que dejaba este disparador sin ejecutar:
+`contractingGuardHandler` es el **primer** preHandler de `/compose`
+(`wasiai-a2a/src/routes/compose.ts:909`) y aborta con `return reply.status(400).send(...)`
+(`wasiai-a2a/src/middleware/contracting-guard.ts:116`), lo que en Fastify **corta el resto de la
+cadena** ⇒ `requireForwardKey()` (`compose.ts:912`) **nunca corre** y no se emite la línea
+`forward-key source`. Y el log que sí sale lleva `{code, layer, chainHeaderChars, depthMax,
+selfHostCount}`: **ningún campo de origen**. Cruzar por `reqId` devuelve **cero coincidencias**, y
+leer ese cero como *"ninguno vino por el proxy"* es la conclusión equivocada — pueden haber venido
+todos. Lo que se usa en su lugar: **delta** entre las líneas `contracting-guard.rejected` de los 60
+min **previos** a la promoción y las de los 60 **posteriores**. La lista canónica de estas familias
+es `UNATTRIBUTABLE_FAMILIES` (`src/lib/proxy/passthrough-headers.ts`), derivada del campo
+`proxyAttribution` y verificada por `T-FP-7`/`T-FP-8`; este párrafo no es la fuente.
+
+⚠️ **Y toda la atribución —también la de las 2 familias que sí la tienen— depende de una var que
+vive en Railway**: `requireForwardKey()` devuelve `[]` (middleware **no montado**) si
+`WASIAI_V2_FORWARD_KEY` falta o mide <16 chars (`wasiai-a2a/src/middleware/forward-key.ts:72-81`).
+Sin ella no hay línea `forward-key source` para **ninguna** familia, y la suplencia #1 de
+`CHAIN_NOT_SUPPORTED` tampoco existe. Por eso es el **paso 0** de la tabla de despliegue, con sonda
+propia; no se asume.
 
 ⛔ **`CHAIN_NOT_SUPPORTED` (fila 1) NO se puede vigilar directo, y esto se declara en vez de dejarlo
 afuera en silencio.** Su emisor (`wasiai-a2a/src/middleware/a2a-key.ts:366-370`) hace
@@ -1015,7 +1037,8 @@ En Railway se ve como un `400` sin código.
 Cómo se suple, en orden de costo:
 1. **Por diferencia**: los `reqId` con `forwardSource: v2-proxy` que terminan en `400` y **no**
    tienen una línea `contracting-guard.rejected` son candidatos a `CHAIN_NOT_SUPPORTED` (junto con
-   los errores de validación de body, que ya existían antes del cambio).
+   los errores de validación de body, que ya existían antes del cambio). ⚠️ **Este método depende
+   del paso 0**: si el gateway no monta `forward-key`, no hay `forwardSource` con el que empezar.
 2. **Activamente**: `npm run smoke:delegation app.wasiai.io` incluye el **paso 4b**, que manda
    `x-payment-chain: nonexistent-chain-xyz` y exige `400`. Contesta "¿el efecto está activo?", no
    "¿cuántos callers reales lo están sufriendo?".

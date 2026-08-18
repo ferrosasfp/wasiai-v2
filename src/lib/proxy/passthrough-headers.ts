@@ -190,7 +190,39 @@ export interface RejectionFamily {
    * se ve como un `400` anónimo: ese caso OBLIGA a llenar `blindSpot`.
    */
   railwayLogLine: string | null
-  /** Por qué no se puede vigilar directo, y con qué se suple. */
+  /**
+   * ¿Se puede ATRIBUIR AL PROXY un rechazo de esta familia? — fix-pack AR it.2
+   * (`BLQ-BAJO-1`). Es una pregunta DISTINTA de `railwayLogLine`, y confundirlas
+   * fue el defecto: el disparador de reversa (`story-file.md` §13) no exige ver
+   * el `error_code`, exige verlo **con `x-wasiai-source: v2-proxy`**, para no
+   * contar tráfico que llegó directo al gateway.
+   *
+   *   - `'reqId'` → sí: la petición pasa por `requireForwardKey()`, que emite
+   *     `forward-key source` con `{forwardSource:"v2-proxy"}`
+   *     (`wasiai-a2a/src/middleware/forward-key.ts:96-98`), y se cruza por `reqId`.
+   *   - `'unavailable'` → NO: `contractingGuardHandler` es el PRIMER preHandler
+   *     de `/compose` (`wasiai-a2a/src/routes/compose.ts:909`) y aborta con
+   *     `return reply.status(400).send(...)`
+   *     (`wasiai-a2a/src/middleware/contracting-guard.ts:116`), lo que en Fastify
+   *     corta el resto de la cadena ⇒ `requireForwardKey()` (`compose.ts:912`)
+   *     NUNCA corre y no hay línea de origen que cruzar. Lo que queda no es
+   *     atribución sino un DELTA contra línea base.
+   *
+   * ⚠️ Precondición de TODA atribución, incluida la de `'reqId'`:
+   * `requireForwardKey()` devuelve `[]` —el middleware NO se monta— si
+   * `WASIAI_V2_FORWARD_KEY` falta o mide <16 chars en Railway
+   * (`wasiai-a2a/src/middleware/forward-key.ts:72-81`). Por eso el runbook lo
+   * verifica ANTES de promover: sin esa var no hay ninguna línea de origen para
+   * ninguna de las 6 familias.
+   */
+  proxyAttribution: 'reqId' | 'unavailable'
+  /**
+   * Qué NO se puede ver desde el punto de observación declarado, y con qué se
+   * suple. Se llena cuando falta la línea de log (`railwayLogLine: null`) O
+   * cuando falta la atribución (`proxyAttribution: 'unavailable'`). `null`
+   * AFIRMA que no hay punto ciego, así que dejarlo en `null` con una de las dos
+   * faltando es afirmar algo falso — T-FP-4 lo pone rojo en las dos direcciones.
+   */
   blindSpot: string | null
   /** `archivo:línea` del emisor en `wasiai-a2a` @ `10a6eb1`. */
   citation: string
@@ -203,6 +235,7 @@ export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
     header: 'x-payment-chain',
     trigger: "un slug de red que el gateway no conoce (p. ej. 'nonexistent-chain-xyz'), o vacío",
     railwayLogLine: null,
+    proxyAttribution: 'reqId',
     blindSpot:
       'el emisor NO loguea: `reply.status(400).send(...)` sin `request.log`. Y ninguno de los dos ' +
       'ganchos globales lo suple: el `setErrorHandler` (`error-boundary.ts:72`) sólo atrapa ' +
@@ -220,6 +253,9 @@ export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
     header: 'x-payment-chain',
     trigger: 'una red en la que la agent key del caller no tiene saldo',
     railwayLogLine: "log.warn 'a2a-key.insufficient-budget' con {keyId, chainKey, defaultApplied}",
+    // El emisor vive en `a2a-key`, que corre DESPUÉS de `requireForwardKey()` en
+    // la cadena de preHandlers ⇒ la línea de origen sí se emite.
+    proxyAttribution: 'reqId',
     blindSpot: null,
     citation: 'wasiai-a2a/src/middleware/a2a-key.ts:1264-1275',
   },
@@ -231,7 +267,19 @@ export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
       "depth >= depthMax. El card vivo declara depthMax: 2, así que '2' —un valor normal para " +
       "un intermediario de segundo nivel— pasa de funcionar a 400. Medido: '1' ⇒ 402, '2' ⇒ 400",
     railwayLogLine: "log.warn 'contracting-guard.rejected' con {code, layer:'depth', depthMax}",
-    blindSpot: null,
+    proxyAttribution: 'unavailable',
+    blindSpot:
+      'el `error_code` SÍ se ve (`contracting-guard.rejected`), pero NO se puede atribuir al ' +
+      'proxy: `contractingGuardHandler` es el primer preHandler de /compose (`compose.ts:909`) ' +
+      'y aborta con `reply.status(400).send` (`contracting-guard.ts:116`), lo que en Fastify ' +
+      'corta la cadena ⇒ `requireForwardKey()` (`compose.ts:912`) nunca corre y no se emite la ' +
+      'línea `forward-key source`. Su propio log lleva {code, layer, chainHeaderChars, ' +
+      'depthMax, selfHostCount}: NINGÚN campo de origen. Cruzar por `reqId` da CERO ' +
+      'coincidencias, y leer ese cero como "ninguno vino por el proxy" es la conclusión ' +
+      'equivocada. Se suple por DELTA contra línea base: contar estas líneas en los 60 min ' +
+      'previos a la promoción y compararlas con los 60 posteriores. Cerrarlo de verdad = ' +
+      'agregar el origen al log de `contracting-guard` en `wasiai-a2a` ⇒ CD-5 lo prohíbe en ' +
+      'esta HU ⇒ acción declarada, no ejecutada.',
     citation: 'wasiai-a2a/src/lib/contracting-chain.ts:837-838',
   },
   {
@@ -240,7 +288,19 @@ export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
     header: 'x-a2a-contracting-depth',
     trigger: "cualquier valor que no sea un entero decimal de 1 a 3 dígitos (p. ej. 'abc')",
     railwayLogLine: "log.warn 'contracting-guard.rejected' con {code, layer:'depth'}",
-    blindSpot: null,
+    proxyAttribution: 'unavailable',
+    blindSpot:
+      'el `error_code` SÍ se ve (`contracting-guard.rejected`), pero NO se puede atribuir al ' +
+      'proxy: `contractingGuardHandler` es el primer preHandler de /compose (`compose.ts:909`) ' +
+      'y aborta con `reply.status(400).send` (`contracting-guard.ts:116`), lo que en Fastify ' +
+      'corta la cadena ⇒ `requireForwardKey()` (`compose.ts:912`) nunca corre y no se emite la ' +
+      'línea `forward-key source`. Su propio log lleva {code, layer, chainHeaderChars, ' +
+      'depthMax, selfHostCount}: NINGÚN campo de origen. Cruzar por `reqId` da CERO ' +
+      'coincidencias, y leer ese cero como "ninguno vino por el proxy" es la conclusión ' +
+      'equivocada. Se suple por DELTA contra línea base: contar estas líneas en los 60 min ' +
+      'previos a la promoción y compararlas con los 60 posteriores. Cerrarlo de verdad = ' +
+      'agregar el origen al log de `contracting-guard` en `wasiai-a2a` ⇒ CD-5 lo prohíbe en ' +
+      'esta HU ⇒ acción declarada, no ejecutada.',
     citation: 'wasiai-a2a/src/lib/contracting-chain.ts:823-824',
   },
   {
@@ -250,7 +310,19 @@ export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
     trigger: "un valor que no es CSV de hostnames pelados (p. ej. 'no es un host!!')",
     railwayLogLine:
       "log.warn 'contracting-guard.rejected' con {code, layer:'chain', chainHeaderChars}",
-    blindSpot: null,
+    proxyAttribution: 'unavailable',
+    blindSpot:
+      'el `error_code` SÍ se ve (`contracting-guard.rejected`), pero NO se puede atribuir al ' +
+      'proxy: `contractingGuardHandler` es el primer preHandler de /compose (`compose.ts:909`) ' +
+      'y aborta con `reply.status(400).send` (`contracting-guard.ts:116`), lo que en Fastify ' +
+      'corta la cadena ⇒ `requireForwardKey()` (`compose.ts:912`) nunca corre y no se emite la ' +
+      'línea `forward-key source`. Su propio log lleva {code, layer, chainHeaderChars, ' +
+      'depthMax, selfHostCount}: NINGÚN campo de origen. Cruzar por `reqId` da CERO ' +
+      'coincidencias, y leer ese cero como "ninguno vino por el proxy" es la conclusión ' +
+      'equivocada. Se suple por DELTA contra línea base: contar estas líneas en los 60 min ' +
+      'previos a la promoción y compararlas con los 60 posteriores. Cerrarlo de verdad = ' +
+      'agregar el origen al log de `contracting-guard` en `wasiai-a2a` ⇒ CD-5 lo prohíbe en ' +
+      'esta HU ⇒ acción declarada, no ejecutada.',
     citation: 'wasiai-a2a/src/lib/contracting-chain.ts:810-816',
   },
   {
@@ -259,7 +331,19 @@ export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
     header: 'x-a2a-contracting-chain',
     trigger: 'que el propio host del gateway figure en la cadena',
     railwayLogLine: "log.warn 'contracting-guard.rejected' con {code, layer:'chain'}",
-    blindSpot: null,
+    proxyAttribution: 'unavailable',
+    blindSpot:
+      'el `error_code` SÍ se ve (`contracting-guard.rejected`), pero NO se puede atribuir al ' +
+      'proxy: `contractingGuardHandler` es el primer preHandler de /compose (`compose.ts:909`) ' +
+      'y aborta con `reply.status(400).send` (`contracting-guard.ts:116`), lo que en Fastify ' +
+      'corta la cadena ⇒ `requireForwardKey()` (`compose.ts:912`) nunca corre y no se emite la ' +
+      'línea `forward-key source`. Su propio log lleva {code, layer, chainHeaderChars, ' +
+      'depthMax, selfHostCount}: NINGÚN campo de origen. Cruzar por `reqId` da CERO ' +
+      'coincidencias, y leer ese cero como "ninguno vino por el proxy" es la conclusión ' +
+      'equivocada. Se suple por DELTA contra línea base: contar estas líneas en los 60 min ' +
+      'previos a la promoción y compararlas con los 60 posteriores. Cerrarlo de verdad = ' +
+      'agregar el origen al log de `contracting-guard` en `wasiai-a2a` ⇒ CD-5 lo prohíbe en ' +
+      'esta HU ⇒ acción declarada, no ejecutada.',
     citation: 'wasiai-a2a/src/lib/contracting-chain.ts:830-832',
   },
 ]
@@ -271,6 +355,22 @@ export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
  * es lo que quedó corta la primera vez.
  */
 export const REVERSAL_WATCHLIST: readonly string[] = REJECTION_FAMILIES.map((f) => f.code)
+
+/**
+ * Las familias cuyo rechazo NO se puede ATRIBUIR al proxy desde el punto de
+ * observación declarado — fix-pack AR it.2 (`BLQ-BAJO-1`). Se DERIVA de
+ * `REJECTION_FAMILIES`, igual que `REVERSAL_WATCHLIST`, para que el runbook
+ * apunte a un dato versionado y no a un párrafo: una lista a mano es lo que se
+ * quedó corta las dos veces anteriores.
+ *
+ * Para estas, el disparador de reversa NO puede exigir `x-wasiai-source:
+ * v2-proxy`: lo que hay es un DELTA contra línea base. Leer el cero de
+ * coincidencias como "ninguno vino por el proxy" es la conclusión equivocada, y
+ * es la que deja la reversa sin ejecutar.
+ */
+export const UNATTRIBUTABLE_FAMILIES: readonly string[] = REJECTION_FAMILIES.filter(
+  (f) => f.proxyAttribution === 'unavailable',
+).map((f) => f.code)
 
 /**
  * Los tres headers que WKH-361 agrega a la lista blanca — o sea, los únicos cuyo
