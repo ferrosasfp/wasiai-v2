@@ -225,6 +225,24 @@ El AR (`ar-report.md`) devolvió **RECHAZADO** con 1 `BLQ-MED` + 1 `BLQ-BAJO` + 
 | 28 | `src/app/api/v1/compose/__tests__/proxy-headers.test.ts` | **Crear** | `MNR-5` — el eslabón `route → new NextRequest → forwardRequest → fetch`, sin mockear `forwardRequest` |
 | 29 | `doc/sdd/077-…/story-file.md` | Modificar | `BLQ-MED-1` (§13), `MNR-4` (§5.2), el cómo-se-mide de `[TBD-3]` (§11) |
 
+### 4.c Fix-pack it.2 (2026-08-18) — el re-AR: 3 `BLQ-BAJO` + 4 `MNR`
+
+El re-AR (`ar-report-it2.md`) confirmó cerrados los 7 hallazgos de it.1 y devolvió **RECHAZADO** con
+3 `BLQ-BAJO` nuevos. **Los tres estaban en el instrumento, no en el arreglo.** Cero archivos nuevos.
+
+| # | Archivo | Acción | Hallazgo que cierra |
+|---|---|---|---|
+| 21 | `scripts/smoke-delegation.mjs` | Modificar | `BLQ-BAJO-2` (precondición POSITIVA: `GATEWAY_EXECUTED_STATUSES`) · `BLQ-BAJO-3` (paso 2 medible + `decideVerdict`) · `MNR-it2-1` (paso 4b exige `CHAIN_NOT_SUPPORTED`) |
+| 22 | `src/lib/proxy/__tests__/smoke-delegation.test.ts` | Modificar | `T-FP2-1`…`T-FP2-5`, `T-FP3-1`…`T-FP3-3` |
+| 19 | `src/lib/proxy/passthrough-headers.ts` | Modificar | `BLQ-BAJO-1` (`proxyAttribution` + los 4 `blindSpot` + `UNATTRIBUTABLE_FAMILIES`) · `MNR-it2-2` (criterio 3) |
+| 20 | `src/lib/proxy/__tests__/forward-handler.test.ts` | Modificar | `BLQ-BAJO-1` — `T-FP-4` pasa de XOR a bicondicional, + `T-FP-7` / `T-FP-8` |
+| 29 | `doc/sdd/077-…/story-file.md` | Modificar | `BLQ-BAJO-1` (§13: columna de atribución + paso 0 del runbook) · `MNR-it2-1` (§13) |
+| 30 | `doc/sdd/077-…/auto-blindaje.md` | Modificar | los errores de esta iteración + el remapeo de hashes del `reword` (`MNR-it2-3`) |
+
+⚠️ **`MNR-it2-4` NO se toca**: `doc/sdd/_INDEX.md` apunta a una rama que no existe, pero el re-AR lo
+confirmó **preexistente** (mtime ~2 h anterior al primer commit del fix-pack) y su dueño es la fase
+DONE.
+
 ---
 
 ## 5. Contrato de Integración ⚠️ BLOQUEANTE
@@ -1076,7 +1094,10 @@ el ambiente entero con 500.
 - [ ] `delegation-off.test.ts` está en su **propio archivo** con su propio mock (DT-9).
 - [ ] Ningún test vive fuera de `src/**/*.test.{ts,tsx}` (CD-14), y el contador `Test Files` subió
       de **82 → 84 → 87** en W1 y W2, y de **87 → 89** en el fix-pack del AR (los 2 archivos nuevos
-      de §4.b). `Tests`: **763 → 797** (+34), 5 skipped en las dos puntas.
+      de §4.b). `Tests`: **763 → 797** (+34), 5 skipped en las dos puntas. **Fix-pack it.2 (§4.c):
+      `Test Files` se queda en 89 —cero archivos nuevos, y ése es su control— y `Tests` va
+      **797 → 807 passed** (+10: `T-FP2-1…5`, `T-FP3-1…3`, `T-FP-7`, `T-FP-8`), con los mismos
+      5 skipped ⇒ **802 → 812 en el total**, que es el número que imprime vitest.
 - [ ] `scripts/smoke-delegation.mjs` **no ejecuta nada al importarse** (main-guard, CD-15) y **no
       importa ninguna dependencia** (sólo builtins de Node + `fetch`).
 - [ ] No agregué **ninguna** dependencia a `package.json`.

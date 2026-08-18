@@ -235,7 +235,8 @@ no existe.
 ### [2026-08-18 15:50] Fix-pack AR — afirmé una AUSENCIA después de mirar dos archivos
 
 - **Error**: escribí —en el código, en `story-file.md` y en el mensaje del commit
-  `575ebd307`— que `CHAIN_NOT_SUPPORTED` es invisible en los logs porque "el
+  `a071b6131` (era `575ebd307` antes del `reword` del fix-pack it.2, ver el último
+  bloque)— que `CHAIN_NOT_SUPPORTED` es invisible en los logs porque "el
   gateway no tiene `onSend` ni `setErrorHandler` global que loguee el body". Lo
   había "medido" con un `grep` sobre **dos archivos**: `src/index.ts` y
   `src/lib/logger.ts`. Salió vacío y lo tomé por un "no existe".
@@ -257,3 +258,150 @@ no existe.
   sistema.
 - **Cómo lo detecté**: releyendo mis propias afirmaciones antes de cerrar, con la
   pregunta "¿qué grep hice exactamente para poder decir esto?".
+
+---
+
+### [2026-08-18 16:05] Fix-pack it.2 — declaré EXHAUSTIVA una lista de los dos casos que había visto
+
+- **Error**: la guarda de INCONCLUSO del smoke enumeraba `503 *_DISABLED` y `429`,
+  y el docblock lo escribía como un hecho: *"hay **dos** estados del ambiente en
+  los que…"*. Hay al menos cuatro: el propio proxy genera `504 GATEWAY_TIMEOUT`
+  (`forward-handler.ts:186-190`) y `502 UPSTREAM_ERROR` (`:168-179` / `:198-201`)
+  **sin que el gateway ejecute nada**, y con cualquiera de las dos el smoke
+  volvía a escupir, palabra por palabra, la acusación falsa que ese mismo
+  fix-pack había cerrado.
+- **Causa raíz**: enumeré los estados que **había producido en mis pruebas** y
+  cerré la lista. Peor: los dos que faltaban los generaba **el código de este
+  repo, a 40 líneas del que estaba tocando** — no hacía falta ningún ambiente
+  raro, sólo leer la función que el smoke atraviesa. Y el más probable de todos
+  durante el cutover, porque el runbook corre el smoke con la lambda fría.
+- **Fix**: invertir el criterio. La guarda ya no pregunta "¿es uno de los estados
+  malos?" sino "¿esta respuesta PRUEBA que se ejecutó en el gateway?"
+  (`GATEWAY_EXECUTED_STATUSES` = 400/402/403). El default pasó de **acusar** a
+  **no se pudo medir**, así que un estado que nadie enumeró ya no puede fabricar
+  una acusación falsa. `T-FP2-3` barre 418/500/404/503/302 para fijarlo.
+- **Aplicar en**: toda guarda escrita como lista de casos malos. Preguntarse
+  **qué produce el sistema propio** (no el ajeno) que no esté en la lista, y si
+  se puede reemplazar por una precondición positiva. Una lista de estados malos
+  envejece con cada rama nueva de error; una precondición positiva, no.
+- **Cómo lo detecté**: me lo reportó el AR. Lo que yo no hice fue leer
+  `forwardRequest` entera antes de escribir "hay dos estados": la respuesta
+  estaba en el archivo que el propio docblock citaba.
+
+---
+
+### [2026-08-18 16:20] Fix-pack it.2 — reciclé una justificación para una rama que no cubría
+
+- **Error**: el docblock justificaba el exit 0 ante inconclusos con "el caso
+  'debería delegar y no delega' lo cazan antes el paso 2 o el paso 6". Era cierto
+  para la rama `503 *_DISABLED`, y **lo dejé escrito igual después de agregar la
+  rama `429`**, donde es falso: con un 429 la aserción del paso 2 ("no es
+  `*_DISABLED`") se satisface **vacuamente** y el paso 6 sólo lee datos del env.
+  Resultado: `paso 2 OK` sobre un 429, los tres headers del camino del dinero
+  medidos **cero veces**, y el proceso saliendo **0**.
+- **Causa raíz**: al agregar un caso nuevo a una función, heredé la justificación
+  del caso viejo sin re-derivarla para el nuevo. La justificación era una frase
+  en prosa, así que nada se puso rojo cuando dejó de ser cierta.
+- **Fix**: (a) el paso 2 pasa por la misma guarda positiva, así que ya no puede
+  decir OK sobre lo que no midió; (b) `decideVerdict()` —pura y exportada— decide
+  el exit code, y sale **1** cuando el ambiente DECLARA delegar y quedó algo sin
+  medir. Las cuatro combinaciones tienen test (`T-FP3-1`).
+- **Aplicar en**: cada vez que se agrega una rama a una función que tiene una
+  justificación escrita. Releer la justificación **con la rama nueva puesta**, y
+  si sigue valiendo, escribir por qué. Vale también para los `switch` y para todo
+  `default:` que hereda el comentario del caso anterior.
+- **Cómo lo detecté**: me lo reportó el AR, con la corrida exacta que lo produce.
+
+---
+
+### [2026-08-18 16:40] Fix-pack it.2 — un `null` que AFIRMA, y un test que certificaba la afirmación
+
+- **Error**: las 4 familias `CONTRACTING_*` tenían `blindSpot: null`, campo cuya
+  semántica documentada es "no hay punto ciego". Sí lo hay: su rechazo **no se
+  puede atribuir al proxy**, porque `contractingGuardHandler` corta la cadena de
+  preHandlers antes de que `requireForwardKey()` emita la línea de origen. Y
+  `T-FP-4` —el test que yo mismo escribí para que ninguna familia quedara sin
+  declarar— **certificaba** ese `null`, porque hacía el XOR contra
+  `railwayLogLine` **sola**.
+- **Causa raíz**: modelé UNA pregunta ("¿se ve el `error_code` en los logs?") y
+  la usé para responder DOS ("¿y se puede atribuir al proxy?"). Un campo que
+  puede valer `null` afirma algo cuando vale `null`; si el invariante que lo
+  vigila sólo mira una de las dos dimensiones, el test **le da respaldo a la
+  afirmación falsa** en vez de cazarla.
+- **Fix**: campo `proxyAttribution: 'reqId' | 'unavailable'` separado del de los
+  logs, los 4 `blindSpot` escritos, `UNATTRIBUTABLE_FAMILIES` derivada (no a
+  mano), y `T-FP-4` convertido en **bicondicional**: hay punto ciego escrito si y
+  sólo si falta la línea de log **o** falta la atribución. Medido: con los 4
+  `blindSpot` de vuelta en `null`, `T-FP-4` da rojo; en `10f63ac80` ese mismo
+  estado estaba verde.
+- **Aplicar en**: todo campo `X | null` donde `null` signifique "no hay
+  problema". Preguntar **cuántas preguntas distintas** puede responder ese `null`
+  y si el invariante las cubre a todas. Un guard que mira una dimensión de dos
+  no es medio guard: es un guard que **firma** la dimensión que no mira.
+- **Cómo lo detecté**: me lo reportó el AR. Yo verifiqué sus dos premisas por mi
+  cuenta antes de moverme (`compose.ts:909` vs `:912`, y el `reply.status(400)`
+  de `contracting-guard.ts:116`), y las dos eran exactas.
+
+---
+
+### [2026-08-18 16:55] Fix-pack it.2 — declaré una deuda impagable sobre una premisa que nunca medí
+
+- **Error**: en it.1 escribí que corregir el mensaje del commit `575ebd307` era
+  impagable porque "altera historia publicada". Medido ahora:
+  `git ls-remote --heads origin feat/077-headers-proxy` ⇒ **vacío**, y
+  `git branch -vv` no muestra upstream. **La rama nunca estuvo publicada.** Un
+  `rebase --reword` local no alteraba historia de nadie y costaba cero.
+- **Causa raíz**: es textualmente el patrón que yo mismo había escrito dos
+  bloques más arriba —*"toda frase de la forma 'esto ya es público' es el tipo de
+  premisa que decide un finding y que nadie vuelve a medir"*— aplicado a una
+  decisión propia, veinte minutos después. Documentar una lección no la aplica.
+- **Fix**: `reword` hecho (con `GIT_SEQUENCE_EDITOR` + `GIT_EDITOR`, sin `-i`
+  interactivo). El árbol quedó **idéntico**: `git rev-parse <viejo>^{tree}` y
+  `<nuevo>^{tree}` dan el mismo SHA, y `git diff` entre los dos commits sale
+  vacío. **Remapeo de hashes** (lo viejo sigue vivo en el reflog):
+
+  | antes | después |
+  |---|---|
+  | `575ebd307` | `a071b6131` |
+  | `f1934db5a` | `0a14b8260` |
+  | `a51118378` | `dcf5a49f0` |
+  | `2a72a2ff1` | `066175bbc` |
+  | `6c506178f` | `3b0977ddb` |
+  | `4e306d5ce` | `03a5d28b4` |
+  | `6ff54be3d` | `aa0a5183d` |
+
+  ⚠️ **Un `reword` rompe toda cita al hash de los commits que le siguen.** La
+  única cita en el expediente era la de este archivo (`575ebd307`) y quedó
+  actualizada; `ar-report-it2.md` cita `6ff54be3d` y `a3d333928` y **no se toca**,
+  porque es el artefacto congelado del revisor: `a3d333928` sigue siendo válido
+  (es anterior al `reword`) y el otro está en esta tabla.
+- **Aplicar en**: antes de declarar una deuda impagable, **medir la precondición
+  que la vuelve impagable**, no la consecuencia. Y si la premisa es "ya es
+  público", el comando que lo decide es `git ls-remote`, no la intuición. La
+  ventana se cierra en el primer `git push`.
+- **Cómo lo detecté**: me lo reportó el AR, que corrió el `ls-remote` que yo no
+  corrí. Lo re-medí antes de tocar nada.
+
+---
+
+### [2026-08-18 17:10] Fix-pack it.2 — mi verificación contó el tipo como si fuera un dato
+
+- **Error**: al aplicar el campo nuevo, mi script de edición abortó con
+  `AssertionError` porque contó **3** apariciones de `proxyAttribution: 'reqId'`
+  cuando había 2 entradas. La tercera era la **declaración del tipo**
+  (`proxyAttribution: 'reqId' | 'unavailable'`), que contiene la cadena buscada
+  como prefijo.
+- **Causa raíz**: conté por subcadena sobre un archivo donde el tipo y los datos
+  comparten el literal. La herramienta de medición fabricó una discrepancia que
+  no existía; si el assert hubiera sido `>= 2` en vez de `== 2`, habría pasado
+  desapercibido y yo habría "confirmado" un conteo falso.
+- **Fix**: contar con la indentación del dato (`"    proxyAttribution: 'reqId',"`,
+  con la coma final), que la declaración del tipo no tiene. Los tres asserts del
+  script (`4` inatribuibles, `2` atribuibles, `1` `blindSpot: null` restante)
+  quedaron exactos.
+- **Aplicar en**: todo conteo por subcadena sobre un archivo TypeScript donde
+  conviven el tipo y sus instancias. Anclar por indentación o por el separador
+  final antes de convertir un conteo en una verificación.
+- **Cómo lo detecté**: el propio assert. Es el argumento para que los scripts de
+  edición afirmen conteos EXACTOS: si hubiera usado `replace` a secas, el error
+  habría entrado en silencio.
