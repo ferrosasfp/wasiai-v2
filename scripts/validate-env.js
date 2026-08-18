@@ -127,6 +127,80 @@ function printReport({ ok, missing, warnings }, totalKeys) {
   }
 }
 
+// ─── WKH-361: regla CONDICIONAL para el trío de la delegación ────────────────
+/**
+ * ⚠️ ESTE SCRIPT NO SABE EN QUÉ AMBIENTE CORRE. Sólo mira `process.env` del
+ * shell que lo invoca. Decir lo contrario sería exactamente el over-claim que
+ * abrió WKH-361 (dar por verificado un ambiente que no es el que se midió).
+ * Qué ambiente delega qué lo contesta `GET /api/v1/status/delegation`, que sí
+ * corre dentro del despliegue.
+ *
+ * Las 3 vars NO se agregan a REQUIRED_VARS a propósito: haría fallar a todo
+ * ambiente que legítimamente no delega (hoy caen en `warnings` y el script sale
+ * 0). Lo que sí es un error duro es la combinación incoherente.
+ *
+ * ⚠️ `env` y `log` son PARÁMETROS con default (fix-pack AR `MNR-2`). Esta función
+ * decide un `exit 1` y `scripts/**` está fuera del typecheck (`tsconfig.json`) y
+ * del lint (`eslint.config.mjs`), así que su único control mecánico es
+ * `src/lib/proxy/__tests__/validate-env-delegation.test.ts` — y ese test necesita
+ * poder inyectar un entorno sin ensuciar el `process.env` del runner. El
+ * comportamiento por CLI es idéntico: los defaults son `process.env` y
+ * `console.log`.
+ *
+ * @param {Record<string, string|undefined>} [env] - entorno a evaluar
+ * @param {(line: string) => void} [log] - sumidero de salida
+ * @returns {boolean} true si hay error bloqueante
+ */
+function checkDelegationTrio(env = process.env, log = console.log) {
+  const flag = (env.V2_DELEGATE_TO_A2A || '').trim();
+
+  if (flag === '') {
+    log(
+      `\n${c.gray}ℹ️  V2_DELEGATE_TO_A2A vacío o ausente: este ambiente NO delega a wasiai-a2a.${c.reset}`,
+    );
+    log(
+      `${c.gray}   /compose y /orchestrate responderán 503 *_DISABLED. Es un estado válido, no un error.${c.reset}\n`,
+    );
+    return false;
+  }
+
+  const faltantes = [];
+  for (const key of ['WASIAI_A2A_BASE_URL', 'WASIAI_V2_FORWARD_KEY']) {
+    const v = env[key];
+    if (v === undefined || v === '') faltantes.push(key);
+  }
+  if (faltantes.length === 0) {
+    log(
+      `\n${c.green}✅ Delegación coherente: V2_DELEGATE_TO_A2A="${flag}" con sus 2 vars presentes.${c.reset}\n`,
+    );
+    return false;
+  }
+
+  log(`\n${c.red}${c.bold}❌ CD-1 VIOLADA — delegación incoherente${c.reset}`);
+  log(
+    `   ${c.red}V2_DELEGATE_TO_A2A="${flag}" pero falta(n): ${faltantes.join(', ')}${c.reset}`,
+  );
+  log(
+    `   ${c.bold}El efecto NO es un 503 acotado en /compose: es un 500 en TODA ruta que${c.reset}`,
+  );
+  log(
+    `   ${c.bold}importe \`@/lib/env\`, porque el schema tira en CARGA DE MÓDULO${c.reset}`,
+  );
+  // Citas re-medidas el 2026-08-18 (fix-pack AR `MNR-1`): el constraint es el
+  // `.refine` y el throw es el de `createEnv`. La cita anterior (`:75-86 + :94`)
+  // apuntaba al docblock de FACILITATOR_API_KEY y a una llave de apertura.
+  log(
+    `   ${c.gray}(el .refine de src/lib/env.ts:88-99 + el throw de :106-110 — se cae el ambiente entero).${c.reset}`,
+  );
+  log(
+    `   ${c.gray}Orden de encendido: primero las 2 vars + deploy, después el flag + deploy.${c.reset}`,
+  );
+  log(
+    `   ${c.gray}Orden de apagado: el inverso exacto — primero el flag, después las vars.${c.reset}\n`,
+  );
+  return true;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 function main() {
   const envExamplePath = path.resolve(process.cwd(), '.env.example');
@@ -138,11 +212,21 @@ function main() {
   const result = checkEnv(keys);
   printReport(result, keys.length);
 
-  if (result.missing.length > 0) {
+  // WKH-361: aditivo, después de checkEnv y sin tocar REQUIRED_VARS.
+  const delegationError = checkDelegationTrio();
+
+  if (result.missing.length > 0 || delegationError) {
     process.exit(1);
   }
 
   process.exit(0);
 }
 
-main();
+// fix-pack AR `MNR-2` — main-guard. Sin esto, `require()` desde el test correría
+// `main()` y su `process.exit()` mataría al runner de vitest. Es el mismo patrón
+// que `scripts/smoke-delegation.mjs` (CD-15), acá en su forma CommonJS.
+if (require.main === module) {
+  main();
+}
+
+module.exports = { checkDelegationTrio, checkEnv, parseEnvExample };

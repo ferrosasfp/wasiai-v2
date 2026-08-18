@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/lib/env'
+import { PASSTHROUGH_HEADERS } from './passthrough-headers'
 
 const DEFAULT_TIMEOUT_MS = 180_000
 
@@ -25,9 +26,35 @@ const DEFAULT_TIMEOUT_MS = 180_000
  * El runtime guard de abajo asegura que el primer request post-deploy falle
  * de forma explícita si la env var nunca se inyectó.
  */
+/**
+ * WKH-361 (CD-4): UN SOLO PREDICADO, DOS CONSUMIDORES.
+ * Es la misma expresión que usaba `assertForwardKeyConfigured` inline. Vive
+ * suelta para que `GET /api/v1/status/delegation` no pueda contestar `true`
+ * donde el proxy tiraría: si el endpoint de estado recalculara la condición
+ * por su cuenta, sería un guard que se compara consigo mismo.
+ * Devuelve PRESENCIA. Jamás el valor ni su longitud (CD-11).
+ */
+export function isForwardKeyConfigured(): boolean {
+  const key = env.WASIAI_V2_FORWARD_KEY
+  return !(!key || key.length === 0)
+}
+
+/**
+ * WKH-361 (CD-4): mismo criterio de presencia sobre `WASIAI_A2A_BASE_URL`.
+ * Existe para que la ruta de estado no lea `env` por su cuenta para uno de los
+ * dos booleanos y termine reportando algo distinto de lo que usa el proxy.
+ */
+export function isA2aBaseUrlConfigured(): boolean {
+  const url = env.WASIAI_A2A_BASE_URL
+  return !(!url || url.length === 0)
+}
+
 function assertForwardKeyConfigured(): string {
   const key = env.WASIAI_V2_FORWARD_KEY
-  if (!key || key.length === 0) {
+  // `key === undefined` es SÓLO estrechamiento de tipo para el `return` de
+  // abajo (la var es `.optional()` en el schema). La condición que decide es
+  // `isForwardKeyConfigured()`, la misma que consume el endpoint de estado.
+  if (!isForwardKeyConfigured() || key === undefined) {
     throw new Error(
       'WASIAI_V2_FORWARD_KEY is not configured but V2_DELEGATE_TO_A2A includes a delegated endpoint. ' +
         'Set WASIAI_V2_FORWARD_KEY (>=16 chars, must match a2a side) before enabling delegation.',
@@ -36,18 +63,26 @@ function assertForwardKeyConfigured(): string {
   return key
 }
 
-const PASSTHROUGH_HEADERS = [
-  'x-payment',
-  'payment-signature',
-  'x-a2a-key',
-  'x-api-key',
-  'authorization',
-  'content-type',
-  'user-agent',
-  'x-forwarded-for',
-] as const
-
 export type DelegatedEndpoint = 'compose' | 'orchestrate' | 'capabilities' | 'mcp'
+
+/**
+ * WKH-361: unión exhaustiva. El `Record<DelegatedEndpoint, true>` obliga a que
+ * agregar un miembro a la unión no compile hasta clasificarlo acá — que es
+ * exactamente el punto. Sin esto, `DELEGATED_ENDPOINT_VALUES` se quedaría
+ * atrás en silencio y `listDelegatedEndpoints()` reportaría un conjunto
+ * incompleto al endpoint de estado y al cron.
+ * Patrón tomado de `wasiai-a2a/src/adapters/chain-resolver.ts:118-127`.
+ */
+const DELEGATED_ENDPOINT_ORDER: Record<DelegatedEndpoint, true> = {
+  compose: true,
+  orchestrate: true,
+  capabilities: true,
+  mcp: true,
+}
+
+export const DELEGATED_ENDPOINT_VALUES = Object.keys(
+  DELEGATED_ENDPOINT_ORDER,
+) as DelegatedEndpoint[]
 
 export function parseDelegatedEndpoints(raw: string | undefined): Set<string> {
   if (!raw || !raw.trim()) return new Set()
@@ -60,6 +95,23 @@ const DELEGATED: Set<string> = parseDelegatedEndpoints(env.V2_DELEGATE_TO_A2A)
 
 export function isDelegated(endpoint: DelegatedEndpoint): boolean {
   return DELEGATED.has(endpoint)
+}
+
+/**
+ * WKH-361 (CD-4): el conjunto de endpoints que este despliegue está delegando
+ * REALMENTE, derivado del mismo `isDelegated` que consultan las rutas.
+ *
+ * El endpoint de estado y el cron de drift consumen ESTA función y no
+ * `process.env`, por dos razones:
+ *   (a) recalcular la fórmula que vigilás es un guard que se aplaude solo;
+ *   (b) `DELEGATED` se congela en carga de módulo (ver la línea de arriba), así
+ *       que leer la env en vivo puede reportar un valor que las rutas no están
+ *       usando — sobre lambdas tibias eso es un reporte falso.
+ *
+ * `DELEGATED` NO se exporta: un `Set` exportado es mutable desde afuera.
+ */
+export function listDelegatedEndpoints(): DelegatedEndpoint[] {
+  return DELEGATED_ENDPOINT_VALUES.filter(isDelegated)
 }
 
 export interface ForwardOptions {

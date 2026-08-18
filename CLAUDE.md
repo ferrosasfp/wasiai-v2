@@ -7,7 +7,7 @@ Marketplace on-chain de agentes IA en Avalanche.
 | Ambiente | Vercel | URL | Supabase | Contrato | Chain |
 |----------|--------|-----|----------|----------|-------|
 | **Staging** | `wasiai-v2` | wasiai-v2.vercel.app | `bdwvrwzvsldeprfibmuu` | `0x3583fb...` | Fuji (43113) |
-| **Producción** | `wasiai-prod` | wasiai-prod.vercel.app | `caldzjhjgctpgodldqav` | `0x24be31...` | Mainnet (43114) |
+| **Producción** | `wasiai-prod` | **app.wasiai.io** (el tráfico real entra por acá; `wasiai-prod.vercel.app` es alias) | `caldzjhjgctpgodldqav` | `0x24be31...` | Mainnet (43114) |
 
 ### 🚨 Checklist Pre-Deploy
 
@@ -92,6 +92,32 @@ Los endpoints `/api/v1/compose`, `/orchestrate`, `/capabilities` y `/mcp`
 delegan a `wasiai-a2a` (Railway, repo separado) cuando `V2_DELEGATE_TO_A2A`
 incluye el endpoint correspondiente. La lógica canónica vive en a2a — NO
 escribir lógica nueva de compose/orchestrate en v2.
+
+### ⚠️ Qué delega cada ambiente: PREGUNTALO, no lo recuerdes (WKH-361)
+
+Este archivo **no** lleva la lista de endpoints delegados por ambiente, a
+propósito. Una frase cierta el día que se escribe envejece igual que una falsa
+—sólo que nadie la discute— y eso es exactamente lo que dejó a `x-payment-chain`
+roto por meses en el camino del dinero. El estado vive en un endpoint:
+
+| Proyecto Vercel | Dominio | Instrumento |
+|---|---|---|
+| `wasiai-prod` | `app.wasiai.io` | `GET https://app.wasiai.io/api/v1/status/delegation` |
+| `wasiai-v2` | `wasiai-v2.vercel.app` | `GET https://wasiai-v2.vercel.app/api/v1/status/delegation` |
+
+Devuelve el ambiente que contesta, los endpoints que está delegando **leídos del
+mismo módulo que deciden las rutas**, los nombres de header reenviados y dos
+booleanos de presencia de config (nunca sus valores).
+
+La **intención** por ambiente —contra la que ese endpoint se compara— está
+versionada en `src/lib/proxy/delegation-manifest.ts`, y el cron
+`/api/cron/delegation-drift` (06:00 UTC) avisa solo cuando runtime y manifiesto
+divergen. ⛔ El campo `delegated` del manifiesto **jamás** se ajusta a lo
+observado para callar al cron.
+
+Última verificación manual de la terna de headers contra `app.wasiai.io`:
+**pendiente de la promoción de `wasiai-prod`** (WKH-361 F3, 2026-08-18 — el
+defecto sigue reproducible en ese dominio hasta que se promueva).
 
 ⚠️ Qué NO hacer en v2:
 - NO agregar lógica de pricing/x402/settlement en `/compose` o `/orchestrate`. Va en a2a.
