@@ -48,6 +48,7 @@ interface SmokeModule {
     body: string,
   ) => string | null
   evaluateInvalidChainSlug: (host: string, status: number, body: string) => string | null
+  GATEWAY_EXECUTED_STATUSES: readonly number[]
   INVALID_CHAIN_SLUG: string
   evaluateContractingTerna: (host: string, a: string, b: string) => string | null
   evaluatePaymentChainTerna: (
@@ -306,16 +307,22 @@ describe('fix-pack AR `BLQ-BAJO-1`: un ambiente que no delega da INCONCLUSO, no 
     expect(msg).toContain('rate limit')
   })
 
-  it('una respuesta medible NO se salta: 402 y 400 devuelven null', () => {
+  it('una respuesta medible NO se salta: 400, 402 y 403 devuelven null', () => {
     expect(
       s.evaluateStepPrecondition('app.wasiai.io', 3, 'compose', 402, '{"accepts":[]}'),
     ).toBeNull()
     expect(
       s.evaluateStepPrecondition('app.wasiai.io', 3, 'compose', 400, '{"error_code":"X"}'),
     ).toBeNull()
-    // Un 503 que NO es *_DISABLED es un problema real del upstream: se mide.
+    // 403 INSUFFICIENT_BUDGET también prueba que el gateway ejecutó.
     expect(
-      s.evaluateStepPrecondition('app.wasiai.io', 3, 'compose', 503, '{"error":"UPSTREAM_BUSY"}'),
+      s.evaluateStepPrecondition(
+        'app.wasiai.io',
+        3,
+        'compose',
+        403,
+        '{"error_code":"INSUFFICIENT_BUDGET"}',
+      ),
     ).toBeNull()
   })
 
@@ -390,6 +397,77 @@ describe('fix-pack AR `BLQ-BAJO-1`: un ambiente que no delega da INCONCLUSO, no 
     )
     const errors = logError.mock.calls.map((c) => String(c[0])).join('\n')
     expect(errors).toContain('NO tiene desplegada la HU')
+  })
+})
+
+describe('fix-pack AR it.2 `BLQ-BAJO-2`: el criterio es POSITIVO, no una lista de estados malos', () => {
+  // La versión anterior de la guarda enumeraba `503 *_DISABLED` y `429` y el
+  // docblock declaraba esa lista exhaustiva. El AR la rompió con las DOS
+  // respuestas que el propio proxy genera sin tocar el gateway.
+  const TIMEOUT_BODY = JSON.stringify({ error: 'GATEWAY_TIMEOUT' })
+  const UPSTREAM_BODY = JSON.stringify({ error: 'UPSTREAM_ERROR', detail: 'upstream error' })
+  /** La frase EXACTA que el AR reprodujo. Ninguna rama de INCONCLUSO puede emitirla. */
+  const ACUSACION = 'el header no atraviesa el proxy'
+
+  it('T-FP2-1: el 504 que genera el proxy por timeout ⇒ INCONCLUSO, no acusación', () => {
+    const msg = s.evaluateStepPrecondition('app.wasiai.io', 3, 'compose', 504, TIMEOUT_BODY)
+    expect(msg).toContain('INCONCLUSO')
+    expect(msg).toContain('504')
+    expect(msg).toContain('EL PROXY')
+    expect(msg).toContain('no contesta a tiempo')
+    expect(msg).not.toContain(ACUSACION)
+    expect(msg).not.toContain('FALLA')
+  })
+
+  it('T-FP2-2: el 502 que genera el proxy (5xx upstream o conexión caída) ⇒ INCONCLUSO', () => {
+    const msg = s.evaluateStepPrecondition('app.wasiai.io', 4, 'compose', 502, UPSTREAM_BODY)
+    expect(msg).toContain('INCONCLUSO')
+    expect(msg).toContain('502')
+    expect(msg).toContain('La causa NO es la lista blanca')
+    expect(msg).not.toContain(ACUSACION)
+  })
+
+  it('T-FP2-3: un status que NADIE enumeró ⇒ INCONCLUSO y sin causa inventada', () => {
+    // El punto del criterio positivo: lo que no se conoce no se acusa. Si esto
+    // volviera a `null`, el paso se correría y compararía dos bodies que no
+    // significan nada.
+    for (const status of [418, 500, 404, 503, 302]) {
+      const msg = s.evaluateStepPrecondition('app.wasiai.io', '4b', 'compose', status, 'lo que sea')
+      expect(msg, `status ${status} no salió INCONCLUSO`).toContain('INCONCLUSO')
+      expect(msg).toContain(String(status))
+      expect(msg).not.toContain(ACUSACION)
+    }
+  })
+
+  it('T-FP2-4: `GATEWAY_EXECUTED_STATUSES` es el contrato, y son exactamente estos tres', () => {
+    // El literal es el contrato: agregar un status acá es decir "esta respuesta
+    // prueba que el gateway ejecutó", y eso hay que medirlo, no suponerlo.
+    expect([...s.GATEWAY_EXECUTED_STATUSES].sort((a, b) => a - b)).toEqual([400, 402, 403])
+  })
+
+  it('T-FP2-5: con el gateway caído, el smoke NO acusa a la lista blanca (la reproducción del AR)', async () => {
+    const log = vi.fn()
+    const logError = vi.fn()
+    // Ambiente que SÍ delega, lista blanca PERFECTA, gateway con timeout: el
+    // proxy contesta 504 con body estático en las dos patas de cada terna.
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).includes('/api/v1/status/delegation')) {
+        return new Response(JSON.stringify(STATUS_OK), { status: 200 })
+      }
+      return new Response(TIMEOUT_BODY, { status: 504 })
+    })
+
+    await s.runSmoke({ host: 'app.wasiai.io', gateway: null }, { fetchImpl, log, logError })
+
+    const out = [...log.mock.calls, ...logError.mock.calls].map((c) => String(c[0])).join('\n')
+    expect(out).not.toContain(ACUSACION)
+    expect(out).not.toContain('IDÉNTICA')
+    expect(out).not.toContain('AC-1 FALLA')
+    expect(out).not.toContain('AC-1b FALLA')
+    expect(out).toContain('paso 3 INCONCLUSO')
+    expect(out).toContain('paso 4 INCONCLUSO')
+    expect(out).toContain('paso 4b INCONCLUSO')
+    expect(out).toContain('no contesta a tiempo')
   })
 })
 

@@ -19,8 +19,31 @@
  *
  * ⚠️ TRES VALORES, NO DOS (fix-pack AR · `BLQ-BAJO-1`). Cada paso puede salir
  * OK / FALLA / **INCONCLUSO**. El tercero existe porque las ternas comparan
- * BODIES, y hay dos estados del ambiente en los que las dos patas son iguales
- * por un motivo que NO es "el header no atraviesa el proxy":
+ * BODIES, y una comparación de bodies sólo significa algo si la petición LLEGÓ
+ * A EJECUTARSE EN EL GATEWAY. Reportar lo que no se pudo medir como "AC-1
+ * FALLA: el header no atraviesa el proxy" es NOMBRAR LA CAUSA EQUIVOCADA, que
+ * es exactamente el error que abrió esta HU un piso más arriba.
+ *
+ * ⚠️ EL CRITERIO ES POSITIVO, NO UNA LISTA DE ESTADOS MALOS (fix-pack AR it.2 ·
+ * `BLQ-BAJO-2`). La primera versión de esta guarda enumeraba los dos estados que
+ * había visto —`503 *_DISABLED` y `429`— y este docblock los declaraba
+ * exhaustivos ("hay dos estados"). No lo eran: el propio proxy GENERA otras dos
+ * respuestas sin que el gateway ejecute nada —`504 {"error":"GATEWAY_TIMEOUT"}`
+ * (`src/lib/proxy/forward-handler.ts:186-190`, body estático) y `502
+ * {"error":"UPSTREAM_ERROR",…}` (`:168-179` cuando el gateway devuelve 5xx,
+ * `:198-201` cuando falla la conexión)— y con cualquiera de las dos las patas
+ * salen iguales y el smoke acusaba a la lista blanca **con la misma frase,
+ * palabra por palabra**. Es el escenario MÁS probable del cutover, no el menos:
+ * el paso 5 del runbook corre este smoke inmediatamente después del redeploy,
+ * con la lambda fría y el gateway arrancando en frío.
+ *
+ * Por eso la guarda ya no pregunta "¿es uno de los estados malos?" sino "¿esta
+ * respuesta PRUEBA que se ejecutó en el gateway?" (`GATEWAY_EXECUTED_STATUSES`).
+ * Todo lo demás sale INCONCLUSO —con la causa nombrada cuando se la conoce, y
+ * sin inventar ninguna cuando no—, incluidos los estados que todavía no vimos.
+ * El default dejó de ser "acusar" y pasó a ser "no se pudo medir": un estado
+ * nuevo del borde, de Vercel o del gateway ya no puede fabricar una acusación
+ * falsa. Los dos estados conocidos siguen documentados:
  *   - `503 *_DISABLED` — el ambiente no delega ese endpoint (es el estado
  *     declarado de `wasiai-v2` / `wasiai-v2.vercel.app`, DT-2 B+);
  *   - `429` — rate limit del borde; medido el 2026-08-18 contra `app.wasiai.io`:
@@ -29,9 +52,7 @@
  *     `/compose` —1 del paso 2, 2 del 3, 2 del 4, 1 del 4b— y 1 a
  *     `/orchestrate`), así que UNA corrida entra debajo del límite y **dos
  *     encadenadas no**.
- * Reportar esos dos como "AC-1 FALLA: el header no atraviesa el proxy" es
- * NOMBRAR LA CAUSA EQUIVOCADA, que es exactamente el error que abrió esta HU un
- * piso más arriba. Un paso inconcluso NO suma a `failures`.
+ * Un paso inconcluso NO suma a `failures`.
  *
  * POR QUÉ UN INCONCLUSO NO CAMBIA EL EXIT CODE, Y POR QUÉ ESO NO AFLOJA NADA:
  * el caso "este ambiente debería delegar y no delega" NO llega nunca a los
@@ -161,39 +182,88 @@ export function evaluateDisabled(host, endpoint, status, bodyText) {
 }
 
 /**
- * GUARDA DE ENTRADA de los pasos 3, 4 y 4b — fix-pack AR `BLQ-BAJO-1`.
+ * Los ÚNICOS status en los que comparar bodies significa algo, porque son los
+ * únicos que PRUEBAN que la petición se ejecutó EN EL GATEWAY. Medidos el
+ * 2026-08-18 contra `wasiai-a2a` @ `10a6eb1` con los dos bodies de este smoke:
  *
- * Los tres pasos comparan BODIES para decidir si el header atravesó el proxy.
- * Esa comparación sólo significa algo si la petición llegó a ejecutarse. Devuelve
- * el mensaje de INCONCLUSO (y el paso NO se corre) en los dos estados medidos en
- * que las patas salen iguales por un motivo ajeno a la lista blanca:
+ *   - `400` — rechazo del gateway: validación de body, contracting
+ *     (`contracting-guard.ts:116`) o `CHAIN_NOT_SUPPORTED` (`a2a-key.ts:366-370`);
+ *   - `402` — challenge x402, el caso normal de `PAYMENT_CHAIN_BODY`;
+ *   - `403` — `INSUFFICIENT_BUDGET` (`a2a-key.ts:1264-1275`).
  *
- *   - `503 *_DISABLED` ⇒ el ambiente no delega ese endpoint. Se reutiliza
- *     `evaluateDisabled` a propósito: es el único lugar que sabe reconocer
- *     `*_DISABLED`, y tenerlo dos veces sería dos criterios que divergen.
- *   - `429` ⇒ rate limit del borde. Sin esta rama, el smoke acusa a la lista
- *     blanca por una respuesta que ni siquiera llegó al gateway.
+ * El proxy reenvía el status del gateway tal cual **salvo** `5xx → 502` y
+ * `Abort → 504` (`src/lib/proxy/forward-handler.ts:168-201`), y devuelve
+ * `503 *_DISABLED` sin salir a la red cuando la delegación está apagada. O sea:
+ * ninguno de estos tres se puede fabricar sin haber hablado con el gateway, y
+ * ésa es exactamente la propiedad que la guarda necesita.
+ *
+ * `200` NO está en la lista a propósito: con `{"steps":[]}` el gateway corta en
+ * 400 y con el agente pago corta en 402, así que un 200 sería un cambio de
+ * contrato upstream. Ante eso lo correcto es INCONCLUSO y re-medir esta lista,
+ * no comparar bodies de algo que ya no entendemos.
+ */
+export const GATEWAY_EXECUTED_STATUSES = Object.freeze([400, 402, 403])
+
+/**
+ * GUARDA DE ENTRADA de los pasos 2, 3, 4 y 4b — fix-pack AR `BLQ-BAJO-1`,
+ * invertida a precondición positiva en el fix-pack AR it.2 (`BLQ-BAJO-2`).
+ *
+ * Los pasos comparan BODIES (o afirman AC-8) para decidir si el header atravesó
+ * el proxy. Esa comparación sólo significa algo si la petición llegó a
+ * ejecutarse en el gateway. La guarda NO enumera estados malos —esa lista se
+ * quedó corta y produjo la acusación falsa que el AR reprodujo textual—: exige
+ * que el status esté en `GATEWAY_EXECUTED_STATUSES` y manda todo lo demás a
+ * INCONCLUSO.
+ *
+ * Cuando la causa se conoce, se nombra (y en los dos casos históricos se
+ * DESMIENTE explícitamente la lista blanca). Cuando no se conoce, se dice que no
+ * se pudo medir y **no se inventa una causa**: es la diferencia entre los tres
+ * valores y los dos.
+ *
+ * `503 *_DISABLED` se reconoce reutilizando `evaluateDisabled` a propósito: es
+ * el único lugar que sabe reconocer `*_DISABLED`, y tenerlo dos veces serían dos
+ * criterios que divergen.
  *
  * Devuelve `null` si la respuesta es medible (el paso se corre normalmente).
  */
 export function evaluateStepPrecondition(host, step, endpoint, status, bodyText) {
+  if (GATEWAY_EXECUTED_STATUSES.includes(status)) return null
+
+  const inconclusive = (cause) => formatLine(host, `paso ${step} INCONCLUSO: ${cause}`)
+
   const disabled = evaluateDisabled(host, endpoint, status, bodyText)
   if (disabled) {
-    return formatLine(
-      host,
-      `paso ${step} INCONCLUSO: /${endpoint} responde ${status} ${disabled.error} en este ` +
-        'ambiente (no delega) ⇒ NO se puede medir si el header atraviesa el proxy. ' +
-        'La causa NO es la lista blanca',
+    return inconclusive(
+      `/${endpoint} responde ${status} ${disabled.error} en este ambiente (no delega) ⇒ ` +
+        'NO se puede medir si el header atraviesa el proxy. La causa NO es la lista blanca',
     )
   }
   if (status === 429) {
-    return formatLine(
-      host,
-      `paso ${step} INCONCLUSO: /${endpoint} responde 429 (rate limit) ⇒ las dos patas ` +
-        'serían iguales por el límite, no por la lista blanca. Reintentar más tarde',
+    return inconclusive(
+      `/${endpoint} responde 429 (rate limit) ⇒ las dos patas serían iguales por el ` +
+        'límite, no por la lista blanca. Reintentar más tarde',
     )
   }
-  return null
+  if (status === 504) {
+    return inconclusive(
+      `/${endpoint} responde 504 ⇒ el body lo genera EL PROXY cuando el gateway no ` +
+        'contesta a tiempo (forward-handler.ts:186-190) y es el mismo con y sin el ' +
+        'header: las dos patas serían iguales por el timeout, no por la lista blanca. ' +
+        'Reintentar cuando el gateway esté caliente',
+    )
+  }
+  if (status === 502) {
+    return inconclusive(
+      `/${endpoint} responde 502 ⇒ el body lo genera EL PROXY cuando el gateway ` +
+        'devuelve 5xx o no se pudo conectar (forward-handler.ts:168-179 / :198-201): ' +
+        'la petición NO se ejecutó en el gateway. La causa NO es la lista blanca',
+    )
+  }
+  return inconclusive(
+    `/${endpoint} responde ${status}, que NO prueba que la petición se haya ejecutado ` +
+      `en el gateway (los medibles son ${GATEWAY_EXECUTED_STATUSES.join('/')}) ⇒ no se ` +
+      `puede concluir nada sobre la lista blanca. Recibido: ${String(bodyText).slice(0, 160)}`,
+  )
 }
 
 /**
