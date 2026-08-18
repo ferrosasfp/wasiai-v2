@@ -206,6 +206,25 @@ headers llegan sin pegar las dos ternas completas contra un host nombrado y con 
 
 **Nada fuera de esta tabla se toca.** Ver §12 (Out of Scope).
 
+### 4.b Fix-pack del AR (2026-08-18) — qué archivos suma, y por qué cada uno
+
+El AR (`ar-report.md`) devolvió **RECHAZADO** con 1 `BLQ-MED` + 1 `BLQ-BAJO` + 5 `MNR`. El fix-pack
+**no agrega ninguna capacidad**: cierra hallazgos. Los 2 archivos nuevos son de **test**.
+
+| # | Archivo | Acción | Hallazgo que cierra |
+|---|---|---|---|
+| 19 | `src/lib/proxy/passthrough-headers.ts` | Modificar | `BLQ-MED-1` — `REJECTION_FAMILIES` / `REVERSAL_WATCHLIST` / `WKH_361_NEW_HEADERS`: el radio de impacto pasa de prosa a datos versionados |
+| 20 | `src/lib/proxy/__tests__/forward-handler.test.ts` | Modificar | `BLQ-MED-1` — `T-FP-1`…`T-FP-6` |
+| 21 | `scripts/smoke-delegation.mjs` | Modificar | `BLQ-BAJO-1` (INCONCLUSO en los pasos 3/4/4b + OMITIDO del paso 2) y `MNR-3` (paso 4b) |
+| 22 | `src/lib/proxy/__tests__/smoke-delegation.test.ts` | Modificar | `BLQ-BAJO-1` + `MNR-3` |
+| 23 | `scripts/validate-env.js` | Modificar | `MNR-1` (cita re-medida) + `MNR-2` (main-guard + exports) |
+| 24 | `.env.example` | Modificar | `MNR-1` (la misma cita, duplicada) |
+| 25 | `src/lib/proxy/__tests__/validate-env-delegation.test.ts` | **Crear** | `MNR-2` — el único control automático de `checkDelegationTrio` |
+| 26 | `src/app/api/v1/status/delegation/route.ts` | Modificar | `MNR-4` — sale `commitSha`, queda `deploymentId` con el motivo escrito |
+| 27 | `src/app/api/v1/status/delegation/__tests__/route.test.ts` | Modificar | `MNR-4` |
+| 28 | `src/app/api/v1/compose/__tests__/proxy-headers.test.ts` | **Crear** | `MNR-5` — el eslabón `route → new NextRequest → forwardRequest → fetch`, sin mockear `forwardRequest` |
+| 29 | `doc/sdd/077-…/story-file.md` | Modificar | `BLQ-MED-1` (§13), `MNR-4` (§5.2), el cómo-se-mide de `[TBD-3]` (§11) |
+
 ---
 
 ## 5. Contrato de Integración ⚠️ BLOQUEANTE
@@ -276,7 +295,6 @@ header `Cache-Control: no-store`.
     "host":         "app.wasiai.io",
     "vercelEnv":    "production",
     "deploymentId": "dpl_xxx",
-    "commitSha":    "b558713…",
     "declaredAs":   "wasiai-prod"
   },
   "delegation": {
@@ -295,7 +313,7 @@ header `Cache-Control: no-store`.
 | `environment.host` | `string \| null` | `req.headers.get('host')`, normalizado (minúsculas, sin puerto) |
 | `environment.vercelEnv` | `'production' \| 'preview' \| 'development' \| null` | `process.env.VERCEL_ENV ?? null` |
 | `environment.deploymentId` | `string \| null` | `process.env.VERCEL_DEPLOYMENT_ID ?? null` |
-| `environment.commitSha` | `string \| null` | `process.env.VERCEL_GIT_COMMIT_SHA ?? null` |
+| ~~`environment.commitSha`~~ | **ELIMINADO** | fix-pack AR `MNR-4` — ver abajo |
 | `environment.declaredAs` | `'wasiai-prod' \| 'wasiai-v2' \| null` | `resolveDeclaration(host)?.key ?? null` |
 | `delegation.runtime` | `string[]` **ordenado alfabéticamente** | `listDelegatedEndpoints()` — **nunca** `process.env` |
 | `delegation.declared` | `string[] \| null` **ordenado alfabéticamente** | `resolveDeclaration(host)?.delegated ?? null` |
@@ -307,8 +325,27 @@ header `Cache-Control: no-store`.
 
 **Qué se expone y por qué no es un secreto** (va también en el docblock): dos booleanos de
 **presencia** (nunca los valores — AC-5), los **nombres** de header reenviados, el conjunto de
-endpoints delegados, y datos de despliegue que Vercel ya publica. **No** aparecen
-`WASIAI_A2A_BASE_URL`, `WASIAI_V2_FORWARD_KEY`, ni su longitud.
+endpoints delegados, y `deploymentId`. **No** aparecen `WASIAI_A2A_BASE_URL`,
+`WASIAI_V2_FORWARD_KEY`, ni su longitud.
+
+⚠️ **`commitSha` SE SACÓ en el fix-pack del AR (`MNR-4`).** `wasiai-v2` es un repo **PÚBLICO** con
+`doc/sdd/**` versionado (riesgos residuales y TD abiertos incluidos): publicar sin auth el commit
+exacto que corre `app.wasiai.io` permite cruzar *qué está desplegado* con *qué se sabe que todavía
+no está arreglado*. Ningún AC lo pedía — AC-5 pide **un** identificador y AC-6 pide que dos
+ambientes den identificadores **distintos**, y eso lo cubren `host` + `declaredAs` + `vercelEnv` +
+`deploymentId`. `deploymentId` **se queda** porque es lo único que distingue **dos despliegues del
+mismo commit** (la pregunta exacta del cutover: *¿ya corrió el redeploy manual de `wasiai-prod`?*),
+es la evidencia declarada de AC-6 (`sdd.md:730`) y es opaco: no se resuelve a código sin credencial
+de Vercel. Lo fija `route.test.ts` con la env **presente** (con la env ausente el campo daría `null`
+igual y el test pasaría sin medir nada).
+
+⚠️ **Y una afirmación que había que corregir**: el docblock decía que éstos eran *"datos de
+despliegue que Vercel ya publica por su cuenta"*. **Medido el 2026-08-18: falso para `dpl_…`.** Lo
+que Vercel manda sin auth en cada respuesta es `x-vercel-id: iad1::iad1::<traza>`, que es un id de
+**petición**, no el de despliegue. Este endpoint es el que lo estrena, y se decide con eso a la
+vista. Quien quiera saber si el fix de esta HU está desplegado tiene una respuesta mejor que un sha
+en `passthroughHeaders`: ahí se lee si `x-payment-chain` está en la lista blanca **de ese
+despliegue**. Es el hecho, no un puntero a él.
 
 **`host` lo escribe el caller.** Es identidad **informativa**, no un borde de autenticación. Por eso
 la respuesta devuelve **el host crudo junto a `declaredAs`**: si alguien falsea el `Host`, se ve en
@@ -825,6 +862,46 @@ schedule `0 6 * * *`**.
 | El host está en `hosts` de `wasiai-prod` | El cron compara contra la declaración correcta. |
 | El host **no** está | El cron responde **500 `UNDECLARED_HOST` con el host crudo** (fail-loud, por diseño). Entonces se **agrega ese host a `hosts` con la evidencia en el PR** — `hosts` es descriptivo. ⛔ **Jamás** se toca `delegated` para callarlo (CD-9). |
 
+#### Cómo se mide, exactamente, en la primera corrida post-deploy
+
+*(El AR declaró este punto como límite suyo —no tuvo consola de Vercel— y pidió dejar escrito el
+procedimiento. Si el `Host` no es uno de `delegation-manifest.ts:62` / `:73`, el resultado no es un
+detalle: es un **500 diario** con `logger.error` + Sentry, o sea una alarma falsa recurrente, que es
+una alarma que se aprende a ignorar.)*
+
+⛔ **Lo que NO mide esto — el error que hay que evitar:**
+
+```bash
+curl -H "authorization: Bearer $CRON_SECRET" https://app.wasiai.io/api/cron/delegation-drift
+```
+
+Esto devuelve `environment.host = "app.wasiai.io"` **porque ese `Host` lo mandaste vos**. Es el
+mismo footgun que abrió esta HU: confirmar con un instrumento que no puede desmentirte. **Sirve
+para probar la auth y el card-diff; NO contesta TBD-3.**
+
+✅ **Lo que sí lo mide** — hay que hacer que **Vercel** dispare la invocación:
+
+1. Dashboard de Vercel → proyecto **`wasiai-prod`** → **Cron Jobs** → `/api/cron/delegation-drift`
+   → **Run** (o esperar la corrida de las `0 6 * * *`).
+2. Leer **la respuesta de esa corrida** (o el log de la función). El handler devuelve el host
+   normalizado en `environment.host` (`route.ts:163-168`) y, si hay drift, el mismo objeto sale por
+   `logger.error('[delegation-drift] divergencia detectada', body)` (`route.ts:190`) — o sea que el
+   dato está en los logs de Vercel **aunque nadie mire el body de la respuesta**.
+3. Leer `environment.declaredAs` en esa misma respuesta:
+
+| Lo que se lee | Qué significa | Qué se hace |
+|---|---|---|
+| `declaredAs: "wasiai-prod"` y `delegation.verdict` ≠ `UNDECLARED_HOST` | el `Host` de Vercel **está** declarado | nada |
+| `declaredAs: null` + `verdict: "UNDECLARED_HOST"` + `500` | el `Host` de Vercel **no** está declarado | copiar el `environment.host` **crudo de esa corrida** y agregarlo a `hosts` de `wasiai-prod` en `delegation-manifest.ts:62`, con esa salida pegada en el PR como evidencia. ⛔ **`delegated` no se toca** (CD-9) |
+
+⚠️ **`environment.host` viene normalizado** (minúsculas, sin puerto — `delegation-manifest.ts:89-103`),
+que es la misma forma que compara `resolveDeclaration`. O sea: lo que se lee es directamente lo que
+hay que pegar en `hosts`, sin retocarlo a ojo.
+
+⚠️ **Un `500 UNDECLARED_HOST` en la primera corrida NO es motivo de reversa** y no está en la lista
+de la ventana de 60 minutos (§13): no toca el camino del dinero, es el fail-loud haciendo su
+trabajo. Confundirlo con un incidente del cutover haría revertir un cambio que funciona.
+
 ---
 
 ## 12. Out of Scope — no tocar bajo ninguna circunstancia
@@ -870,23 +947,75 @@ schedule `0 6 * * *`**.
 
 ### Lo que cambia de status en el camino de dinero vivo (declarado, no descubierto después)
 
-| Caso | Antes del fix | Después del fix |
-|---|---|---|
-| pide Base, le cobran Kite | silencio incorrecto | **le cotizan y le cobran Base** — *es el arreglo* |
-| **(b)** manda un slug inválido | le aplican el default y **funciona** | **400 `CHAIN_NOT_SUPPORTED`** |
-| **(c)** pide una red sin saldo | le cobran del default | **403 `INSUFFICIENT_BUDGET`** en la red pedida |
+⚠️ **Corregido en el fix-pack del AR (`BLQ-MED-1`): eran SEIS familias, no dos.** La tabla original
+declaraba 3 filas —las 3 de `x-payment-chain`— y dejaba afuera las 4 que abren los dos headers de
+contracting. Admitir un header no es sólo "ahora pasa": es **habilitar todos los rechazos que ese
+header puede provocar en el gateway**.
 
-**(b) y (c) son dos peticiones que hoy funcionan y pasarán a 400/403.** Es el comportamiento
-correcto (convierte un silencio-incorrecto en un error-correcto), pero **es un cambio de status en
-el camino de dinero** y no puede aparecer como sorpresa en el done-report. La población afectada
-—callers que hoy mandan `x-payment-chain` a `app.wasiai.io`— **no se puede contar desde este repo**
-(v2 sólo proxea y no loguea headers).
+Medido el **2026-08-18** contra `https://wasiai-a2a-production.up.railway.app/compose`, body
+`{"steps":[{"agent":"wasi-chainlink-price"}]}`. **`app.wasiai.io` devolvió `402` (el default) en las
+seis.** Ninguna petición movió fondos: todas cortan en `400`/`403`/challenge `402`.
+
+| # | Caso | Header | `app.wasiai.io` HOY | Después del fix | ¿Se ve en Railway? |
+|---|---|---|---|---|---|
+| 0 | pide Base, le cobran Kite | `x-payment-chain` | `402` con `eip155:2368` | **`402` con `eip155:84532`** — *es el arreglo* | n/a |
+| 1 | slug de red inválido (o vacío) | `x-payment-chain` | `402`, le aplican el default y **funciona** | **`400 CHAIN_NOT_SUPPORTED`** | ⚠️ **NO** — ver abajo |
+| 2 | red sin saldo en la key | `x-payment-chain` | le cobran del default | **`403 INSUFFICIENT_BUDGET`** en la red pedida | sí — `a2a-key.insufficient-budget` |
+| 3 | `depth: 2` (¡valor normal!) | `x-a2a-contracting-depth` | `402` | **`400 CONTRACTING_DEPTH_EXCEEDED`** | sí — `contracting-guard.rejected` |
+| 4 | `depth: abc` | `x-a2a-contracting-depth` | `402` | **`400 CONTRACTING_DEPTH_MALFORMED`** | sí — `contracting-guard.rejected` |
+| 5 | `chain: no es un host!!` | `x-a2a-contracting-chain` | `402` | **`400 CONTRACTING_CHAIN_MALFORMED`** | sí — `contracting-guard.rejected` |
+| 6 | `chain:` = el host del gateway | `x-a2a-contracting-chain` | `402` | **`400 CONTRACTING_LOOP_DETECTED`** | sí — `contracting-guard.rejected` |
+
+**La fila 3 es la que hace a esto BLQ y no MNR.** El card vivo declara `depthMax: 2` y el techo es
+`depth >= depthMax` (`wasiai-a2a/src/lib/contracting-chain.ts:837`), así que `depth: 2` —un valor
+perfectamente normal para un intermediario de segundo nivel— **pasa de funcionar a `400`**. Medido:
+`depth: 1` ⇒ `402`, `depth: 2` ⇒ `400`.
+
+**Las 6 filas son peticiones que hoy funcionan y pasarán a 400/403.** Es el comportamiento correcto
+(convierte un silencio-incorrecto en un error-correcto), pero **es un cambio de status en el camino
+de dinero** y no puede aparecer como sorpresa en el done-report. La población afectada —callers que
+hoy mandan estos headers a `app.wasiai.io`— **no se puede contar desde este repo** (v2 sólo proxea y
+no loguea headers).
+
+> 🔒 **La tabla ya no vive sólo acá.** El fix-pack la bajó a datos versionados:
+> `src/lib/proxy/passthrough-headers.ts` → `REJECTION_FAMILIES` / `REVERSAL_WATCHLIST`, con
+> `forward-handler.test.ts` (`T-FP-1`…`T-FP-6`) exigiendo que **cada header nuevo declare qué
+> rechazos habilita** y que cada familia declare **cómo se la vigila o por qué no se puede**. Una
+> prosa se puede quedar corta sin que nada se ponga rojo; eso fue lo que pasó la primera vez.
 
 ### Disparador de reversa
 
 > En la ventana de **60 minutos** posteriores a la promoción de `wasiai-prod`: si aparecen en los
-> logs de Railway del gateway respuestas `CHAIN_NOT_SUPPORTED` o `INSUFFICIENT_BUDGET` con
-> `x-wasiai-source: v2-proxy` que **no existían antes**, se ejecuta la reversa.
+> logs de Railway del gateway, con `x-wasiai-source: v2-proxy`, respuestas con **cualquiera de estos
+> SEIS `error_code`** que **no existían antes**, se ejecuta la reversa:
+> `CHAIN_NOT_SUPPORTED` · `INSUFFICIENT_BUDGET` · `CONTRACTING_DEPTH_EXCEEDED` ·
+> `CONTRACTING_DEPTH_MALFORMED` · `CONTRACTING_CHAIN_MALFORMED` · `CONTRACTING_LOOP_DETECTED`.
+> La lista canónica es `REVERSAL_WATCHLIST` (`src/lib/proxy/passthrough-headers.ts`), no este párrafo.
+
+**Cómo se buscan (A-4, logs de Railway del gateway):**
+
+| Qué buscar | Cubre |
+|---|---|
+| `contracting-guard.rejected` — trae el campo `code` | las 4 familias de contracting (filas 3-6) |
+| `a2a-key.insufficient-budget` | fila 2 |
+| `forward-key source` con `{"forwardSource":"v2-proxy"}` | marca **qué `reqId` viene del proxy**, para no contar tráfico directo al gateway |
+
+⛔ **`CHAIN_NOT_SUPPORTED` (fila 1) NO se puede vigilar directo, y esto se declara en vez de dejarlo
+afuera en silencio.** Su emisor (`wasiai-a2a/src/middleware/a2a-key.ts:366-370`) hace
+`reply.status(400).send(...)` **sin ninguna llamada a `request.log`**, y el gateway no tiene
+`onSend`/`setErrorHandler` global que loguee el body. En Railway se ve como un `400` sin código.
+
+Cómo se suple, en orden de costo:
+1. **Por diferencia**: los `reqId` con `forwardSource: v2-proxy` que terminan en `400` y **no**
+   tienen una línea `contracting-guard.rejected` son candidatos a `CHAIN_NOT_SUPPORTED` (junto con
+   los errores de validación de body, que ya existían antes del cambio).
+2. **Activamente**: `npm run smoke:delegation app.wasiai.io` incluye el **paso 4b**, que manda
+   `x-payment-chain: nonexistent-chain-xyz` y exige `400`. Contesta "¿el efecto está activo?", no
+   "¿cuántos callers reales lo están sufriendo?".
+3. **Cerrarlo de verdad** = agregar un `request.log.warn` en `wasiai-a2a` al lado del
+   `reply.status(400)`. **CD-5 prohíbe tocar ese repo en esta HU** ⇒ queda como **acción declarada
+   nueva** —candidata a `A-6`; la lista del SDD (`sdd.md:972-993`) hoy llega hasta `A-5`—, **no
+   ejecutada acá**. Sin ella, la vigilancia de la fila 1 es por diferencia, no directa.
 
 **Reversa**: revertir el commit + redeploy, o **Instant Rollback** de Vercel sobre `wasiai-prod`.
 Vuelve exactamente al comportamiento de hoy: los 3 headers se descartan.

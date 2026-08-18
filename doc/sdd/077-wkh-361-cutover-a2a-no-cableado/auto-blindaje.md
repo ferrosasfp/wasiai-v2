@@ -104,3 +104,104 @@ no existe.
   leyendo POR CUÁL de las dos ramas cayó. Cayó por la segunda. Si hubiera
   escrito sólo la primera, el smoke habría dicho "paso 3 OK" sobre un defecto
   vivo — el mismo falso verde que esta HU cura.
+
+---
+
+### [2026-08-18 15:12] Fix-pack AR — escribí un byte de control CRUDO en un archivo fuente
+
+- **Error**: en `src/lib/proxy/__tests__/validate-env-delegation.test.ts` puse
+  `.replace(/\x1b\[[0-9;]*m/g, '')` para sacar los colores ANSI. Lo que quedó en
+  disco **no fue la secuencia `\x1b` de 4 caracteres: fue el byte 0x1B literal**.
+  `npm run lint` falló con `Unused eslint-disable directive
+  (no problems were reported from 'no-control-regex')`, o sea que el disable que
+  había puesto por las dudas era mentira y la regla ni siquiera está activa.
+- **Causa raíz**: doble. (a) Asumí que `no-control-regex` estaba activo y puse un
+  `eslint-disable` *preventivo* — un disable que no desactiva nada es ruido que
+  el lint marca como warning, y con `--max-warnings 0` eso es rojo. (b) No
+  verifiqué qué BYTES quedaron en disco: el `Edit` posterior falló con "String to
+  replace not found" mostrando en pantalla exactamente el texto que yo pasaba, y
+  recién `python3 -c print(repr(...))` mostró el `\x1b` real.
+- **Fix**: `const ANSI = new RegExp(\`${String.fromCharCode(27)}\\[[0-9;]*m\`, 'g')`.
+  Sin byte de control en el fuente, sin `eslint-disable`. Y una aserción que
+  vuelve falsable lo que el helper afirma:
+  `expect(out.text()).not.toContain(String.fromCharCode(27))` — sin ella, el
+  helper podía dejar de limpiar y ningún test se enteraba.
+- **Aplicar en**: cualquier escape en un literal (`\x`, `\u`, `\0`) escrito con
+  una herramienta de edición. Si un `Edit` falla contra un texto que se ve
+  idéntico en pantalla, **mirar los bytes** (`repr()`), no volver a intentar. Y
+  nunca poner un `eslint-disable` "por las dudas": o lo pide una regla que falló,
+  o no va.
+- **Cómo lo detecté**: `npm run lint`, que es parte de `npm run qa`. Un `npm test`
+  verde no lo habría mostrado nunca.
+
+---
+
+### [2026-08-18 15:05] Fix-pack AR — casi publico un número medido con un off-by-one
+
+- **Error**: escribí en el docblock del smoke "medido: 12 POST seguidos a
+  `/compose` alcanzan para disparar el 429". Mi propia medición decía otra cosa:
+  los 10 primeros pasaron y **el 11.º** fue el primer `429`.
+- **Causa raíz**: conté los CASOS de mi script de medición (12 filas) en vez de
+  las PETICIONES POR HOST hasta el primer rechazo. Cada fila pega a dos hosts, y
+  el rate limit es por host: dos unidades distintas sumadas como si fueran la
+  misma.
+- **Fix**: el docblock dice ahora "los 10 primeros POST seguidos pasaron y el
+  11.º ya devolvió 429", y agrega el dato que hace accionable al número: el smoke
+  hace 5 POST a `/compose`, o sea que está por debajo, **pero dos corridas
+  encadenadas no**.
+- **Aplicar en**: todo número que se copie de una salida propia. Antes de
+  escribirlo: ¿qué unidad estoy contando, y es la misma que la del sistema que
+  impone el límite? Un número con la unidad equivocada envejece peor que ninguno,
+  porque parece medido.
+- **Cómo lo detecté**: releyendo la salida cruda de la medición antes de commitear
+  la prosa, no la prosa contra sí misma.
+
+---
+
+### [2026-08-18 15:20] Fix-pack AR — heredé una afirmación de infraestructura sin medirla
+
+- **Error**: el docblock de `status/delegation/route.ts` justificaba exponer
+  `deploymentId` + `commitSha` diciendo que eran "datos de despliegue que Vercel
+  ya publica por su cuenta". Al decidir el `MNR-4` del AR me apoyé en esa frase
+  por un rato: si Vercel ya los publica, exponerlos no agrega nada.
+- **Causa raíz**: la frase venía del Story File y la traté como medida. **Es
+  falsa para el `dpl_…`**: medido el 2026-08-18 con
+  `curl -sSD - https://app.wasiai.io/api/v1/capabilities`, lo que Vercel manda sin
+  auth es `x-vercel-id: iad1::iad1::glws9-…`, un id de **petición**, no de
+  despliegue. Ni `dpl_` ni el commit aparecen en ninguna cabecera.
+- **Fix**: la justificación de `deploymentId` pasó a apoyarse en tres razones que
+  sí se sostienen (distingue dos despliegues del mismo commit, es la evidencia
+  declarada de AC-6, y es opaco sin credencial de Vercel), y la frase falsa está
+  corregida **en los dos lugares** donde vivía: el docblock y `story-file.md` §5.2.
+  `commitSha` se sacó.
+- **Aplicar en**: toda frase de la forma "esto ya es público / esto ya lo hace la
+  plataforma" que aparezca en una justificación de seguridad. Es exactamente el
+  tipo de premisa que decide un finding y que nadie vuelve a medir. Se mide con
+  un `curl -sSD -` antes de apoyarse en ella.
+- **Cómo lo detecté**: porque la decisión de `MNR-4` dependía de esa premisa y la
+  regla es medir la PRECONDICIÓN, no la consecuencia. Si la daba por buena,
+  dejaba los dos campos y escribía una justificación falsa en el docblock.
+
+---
+
+### [2026-08-18 14:58] Fix-pack AR — el `grep -n` filtrado me devolvió los matches SIN su archivo:línea
+
+- **Error**: usé `grep -n 'env.ts:75-86\|env.ts:' .env.example scripts/validate-env.js …`
+  para ubicar la cita rota del `MNR-1`. La salida filtrada mostró **1 match en 1
+  archivo**, con el número de línea pegado a un fragmento y sin el nombre del
+  archivo — cuando en realidad la cita estaba **duplicada en dos archivos**
+  (`.env.example:115` y `scripts/validate-env.js:179`), que es justamente lo que
+  el AR advertía: "arreglar uno solo deja el otro podrido".
+- **Causa raíz**: el hook de `rtk` reformatea la salida de `grep` en un resumen
+  agrupado y **deduplica**. Es el mismo mecanismo que le borró 6 líneas a `cat`
+  en el AR, en otra herramienta.
+- **Fix**: todas las búsquedas de este fix-pack se hicieron con
+  `rtk proxy "grep -n …"` (salida cruda) o con la herramienta `Read`. Ninguna cita
+  `archivo:línea` de este fix-pack sale de un `grep` filtrado.
+- **Aplicar en**: cualquier búsqueda cuyo resultado se vaya a convertir en una
+  cita, en un conteo, o en un "no hay ninguno". El filtro está pensado para
+  ahorrar tokens de lectura, no para ser un instrumento de medición. ⚠️ Y ojo:
+  `rtk proxy "cmd | pipe"` **rompe el pipe** (el AR ya lo había reportado): dentro
+  de `rtk proxy` va un comando solo, sin tuberías.
+- **Cómo lo detecté**: el resultado no cerraba con lo que el AR decía (él citaba
+  dos archivos, yo veía uno). Re-medí con `rtk proxy` y aparecieron los dos.
