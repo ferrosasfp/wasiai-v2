@@ -783,8 +783,158 @@ describe('fix-pack CR `MNR-CR-1`: la guarda cubre las DOS patas, no sólo la pri
     // rename de `STEP_CONTROL_LEG` deja el `USAGE` viejo y pone esto rojo.
     expect(s.USAGE).toContain('pata de control, sin el header')
     expect(s.STEP_CONTROL_LEG(4)).toContain('pata de control, sin el header')
-    // Y que el `USAGE` diga que los pasos 3 y 4 hacen DOS peticiones, que es la
-    // premisa sin la cual la etiqueta no se entiende.
+    // Y que el `USAGE` diga que los pasos de dos patas hacen DOS peticiones, que
+    // es la premisa sin la cual la etiqueta no se entiende.
     expect(s.USAGE).toContain('DOS peticiones')
+  })
+})
+describe('fix-pack F4 `F4-1`: el paso 5 (control contra el gateway) guarda sus DOS patas', () => {
+  /**
+   * El defecto que cierra este fix-pack. `MNR-CR-1` puso la guarda en los pasos
+   * 3 y 4 y dejó afuera el 5, que era el ÚNICO paso sin `evaluateStepPrecondition`
+   * en NINGUNA de sus dos patas. F4 lo midió con stubs y sin red contra
+   * `349e9c8eb`:
+   *
+   *   1ª pata medible (402 con `eip155:84532`) + 2ª pata (el control, sin el
+   *   header) en `429`  ⇒  `paso 5 OK: el gateway directo (…) discrimina la red`
+   *                        + `SMOKE OK` + **exit 0**
+   *
+   * El mecanismo es idéntico al de `MNR-CR-1`: `extractFirstAccept` de un 429 da
+   * `null`, así que "las dos patas difieren" se cumple VACUAMENTE — la diferencia
+   * la fabrica el fallo, no la discriminación del gateway.
+   *
+   * Los tres primeros tests mueren si se le saca la guarda a cualquiera de las
+   * dos patas del paso 5. Los dos siguientes son la calibración EN LA OTRA
+   * DIRECCIÓN: que el arreglo no sea "mandar todo a INCONCLUSO", que dejaría el
+   * control sin capacidad de medir ni de acusar.
+   */
+
+  const GW = 'https://gw.example'
+  const ACCEPT_84532 = '{"accepts":[{"network":"eip155:84532","maxAmountRequired":"1010"}]}'
+  const ACCEPT_2368 = '{"accepts":[{"network":"eip155:2368","maxAmountRequired":"1010000000000000"}]}'
+
+  /**
+   * Host COMPLETAMENTE medible (pasos 1/2/3/4/4b en OK) para que lo único que
+   * cambie entre escenarios sea el gateway. Si el host también fallara, los
+   * INCONCLUSOS del paso 5 quedarían tapados por los de los otros pasos y el test
+   * no probaría nada del paso 5.
+   */
+  function fetchConGateway(
+    gwWith: { status: number; body: string },
+    gwWithout: { status: number; body: string },
+  ) {
+    const fn = vi.fn(async (url: string, init: RequestInit) => {
+      const u = String(url)
+      const headers = new Headers(init?.headers as HeadersInit)
+      if (u.includes('/api/v1/status/delegation')) {
+        return new Response(JSON.stringify(STATUS_OK), { status: 200 })
+      }
+      if (u.startsWith(GW)) {
+        return headers.get('x-payment-chain') === 'base-sepolia'
+          ? new Response(gwWith.body, { status: gwWith.status })
+          : new Response(gwWithout.body, { status: gwWithout.status })
+      }
+      if (headers.get('x-a2a-contracting-depth') === '99') {
+        return new Response('{"error":"CONTRACTING_DEPTH_EXCEEDED"}', { status: 400 })
+      }
+      if (headers.get('x-payment-chain') === 'base-sepolia') {
+        return new Response(ACCEPT_84532, { status: 402 })
+      }
+      if (headers.get('x-payment-chain') === s.INVALID_CHAIN_SLUG) {
+        return new Response('{"error_code":"CHAIN_NOT_SUPPORTED"}', { status: 400 })
+      }
+      return new Response('{"code":"VALIDATION_ERROR","requestId":"bbb"}', { status: 400 })
+    })
+    return fn
+  }
+
+  async function correr(
+    gwWith: { status: number; body: string },
+    gwWithout: { status: number; body: string },
+  ) {
+    const log = vi.fn()
+    const logError = vi.fn()
+    const fetchImpl = fetchConGateway(gwWith, gwWithout)
+    const code = await s.runSmoke(
+      { host: 'app.wasiai.io', gateway: GW },
+      { fetchImpl, log, logError },
+    )
+    const out = [...log.mock.calls, ...logError.mock.calls].map((c) => String(c[0])).join('\n')
+    const gwCalls = fetchImpl.mock.calls.filter((c) => String(c[0]).startsWith(GW)).length
+    return { code, out, gwCalls }
+  }
+
+  const MEDIBLE = { status: 402, body: ACCEPT_84532 }
+  const RATE_LIMIT = { status: 429, body: '{"error":"rate limited"}' }
+
+  it('T-F41-1: 1ª pata medible + control del gateway en 429 ⇒ NO dice `paso 5 OK`', async () => {
+    // La línea EXACTA que F4 reprodujo. Es la regresión.
+    const { out } = await correr(MEDIBLE, RATE_LIMIT)
+    expect(out).not.toContain('paso 5 OK')
+    expect(out).toContain(
+      `paso 5 (control, gateway ${GW}) (pata de control, sin el header) INCONCLUSO`,
+    )
+    // Con la causa nombrada, no inventada.
+    expect(out).toContain('429 (rate limit)')
+    // Y los otros pasos siguen midiendo: el escenario aísla el paso 5.
+    expect(out).toContain('paso 3 OK')
+    expect(out).toContain('paso 4 OK')
+  })
+
+  it('T-F41-2: y el veredicto ya no puede decir `SMOKE OK` a secas con exit 0', async () => {
+    const { code, out } = await correr(MEDIBLE, RATE_LIMIT)
+    // Antes del fix estas dos salían textuales: `SMOKE OK` con EXIT=0.
+    expect(out).not.toContain('[app.wasiai.io] SMOKE OK\n')
+    expect(out).not.toMatch(/SMOKE OK$/)
+    expect(out).toContain('1 paso(s) INCONCLUSO(s)')
+    // `app.wasiai.io` DECLARA delegar (STATUS_OK) ⇒ un paso sin medir sale 1.
+    expect(code).toBe(1)
+  })
+
+  it('T-F41-3: la 1ª pata del gateway tampoco se compara sin guarda, y ahorra la 2ª petición', async () => {
+    const { out, gwCalls } = await correr(RATE_LIMIT, RATE_LIMIT)
+    expect(out).toContain(`paso 5 (control, gateway ${GW}) INCONCLUSO`)
+    expect(out).not.toContain('paso 5 OK')
+    // Si la 1ª no es medible, la 2ª tampoco lo sería: no se pide. Una sola
+    // petición al gateway, no dos. (Antes de la guarda eran siempre dos.)
+    expect(gwCalls).toBe(1)
+  })
+
+  it('T-F41-4 (calibración inversa A): con las dos patas medibles el paso sigue dando OK y exit 0', async () => {
+    // Sin este control, "arreglar" el hallazgo mandando todo a INCONCLUSO pasaría
+    // los tres tests de arriba y dejaría el paso 5 sin capacidad de medir.
+    const { code, out, gwCalls } = await correr(MEDIBLE, {
+      status: 402,
+      body: ACCEPT_2368,
+    })
+    expect(out).toContain(`paso 5 OK: el gateway directo (${GW}) discrimina la red`)
+    expect(out).not.toContain('INCONCLUSO')
+    expect(gwCalls).toBe(2)
+    expect(code).toBe(0)
+  })
+
+  it('T-F41-5 (calibración inversa B): un gateway que NO discrimina sigue siendo INSTRUMENTO ROTO y sale 1', async () => {
+    // La otra mitad de la calibración: el paso 5 tiene que poder ACUSAR. Si las
+    // dos patas del gateway dan el mismo accepts[0], el control no discrimina y
+    // eso es una FALLA (instrumento), no un INCONCLUSO.
+    const { code, out } = await correr(MEDIBLE, { status: 402, body: ACCEPT_84532 })
+    expect(out).toContain(`paso 5 (control, gateway ${GW}) ⇒ INSTRUMENTO ROTO`)
+    expect(out).toContain('IDÉNTICO')
+    expect(code).toBe(1)
+  })
+
+  it('T-F41-6: la etiqueta del paso 5 dice CUÁL petición y contra QUÉ host no se midió', () => {
+    // El paso 5 pega contra el `--gateway`, no contra el host del smoke: sin el
+    // gateway en la etiqueta, el operador reintenta el lado equivocado.
+    const etiqueta = `5 (control, gateway ${GW})`
+    expect(s.STEP_CONTROL_LEG(etiqueta)).toBe(
+      `5 (control, gateway ${GW}) (pata de control, sin el header)`,
+    )
+    // Y es la MISMA función que usan los pasos 3 y 4: una sola etiqueta, tres
+    // llamadas que no pueden divergir.
+    expect(s.STEP_CONTROL_LEG(3)).toBe('3 (pata de control, sin el header)')
+    // El `USAGE` que lee el operador nombra los tres pasos de dos patas.
+    expect(s.USAGE).toContain('Los pasos 3, 4 y 5 hacen DOS peticiones')
+    expect(s.USAGE).toContain('5 (control, gateway <url>)')
   })
 })

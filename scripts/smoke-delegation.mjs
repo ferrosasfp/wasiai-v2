@@ -72,6 +72,20 @@
  * de OK. El número de peticiones no cambia: la guarda corre sobre una respuesta
  * que ya se pidió.
  *
+ * ⚠️ Y SE APLICA A LOS TRES PASOS DE DOS PATAS, NO A DOS (fix-pack F4 · `F4-1`).
+ * El fix-pack `MNR-CR-1` cubrió los pasos 3 y 4 y dejó afuera el 5 —la pata de
+ * control contra el gateway directo—, que era el único paso sin guarda en
+ * NINGUNA de sus dos patas. F4 midió el caso que faltaba, con stubs y sin red:
+ * 1ª pata medible + control en `429` ⇒ `paso 5 OK: el gateway directo (…)
+ * discrimina la red` + `SMOKE OK` a secas + **exit 0**. El mecanismo es el
+ * mismo: `extractFirstAccept` de un 429 da `null`, así que "las patas difieren"
+ * se cumple porque una de las dos no existe. Hoy el radio está acotado porque el
+ * default del gateway es `eip155:2368` y el `includes` de la 1ª pata todavía
+ * discrimina solo; el día que el default sea `base-sepolia` —el escenario que el
+ * propio paso 4 nombra— sería una conclusión falsa sobre el camino del dinero.
+ * Que el paso 5 sea el CONTROL no lo exime: un control que no se ejecutó y se
+ * reporta OK es peor que uno que falla ruidosamente.
+ *
  * CUÁNDO UN INCONCLUSO CAMBIA EL EXIT CODE (fix-pack AR it.2 · `BLQ-BAJO-3`).
  * La versión anterior decía que ningún inconcluso lo cambia, y lo justificaba
  * así: el caso "este ambiente debería delegar y no delega" lo cazan antes —con
@@ -141,10 +155,12 @@ export const USAGE = [
   'uno que sí delega NO se reporta OK sin haber medido nada. La última línea dice',
   'siempre cuántos inconclusos hubo.',
   '',
-  'Los pasos 3 y 4 hacen DOS peticiones cada uno y las comparan. Un INCONCLUSO dice',
-  'CUÁL de las dos no se pudo medir: sin aclaración es la que lleva el header, y',
-  '"(pata de control, sin el header)" es la otra. Se arreglan distinto: un 503 en la',
-  'primera = este ambiente no delega; un 429 en la segunda = reintentar más tarde.',
+  'Los pasos 3, 4 y 5 hacen DOS peticiones cada uno y las comparan. Un INCONCLUSO',
+  'dice CUÁL de las dos no se pudo medir: sin aclaración es la que lleva el header,',
+  'y "(pata de control, sin el header)" es la otra. Se arreglan distinto: un 503 en',
+  'la primera = este ambiente no delega; un 429 en la segunda = reintentar más tarde.',
+  'El paso 5 pega contra el --gateway, no contra el host: su INCONCLUSO lo dice en',
+  'la etiqueta ("5 (control, gateway <url>)") para no reintentar el lado equivocado.',
 ].join('\n')
 
 export const EXIT_OK = 0
@@ -254,13 +270,16 @@ export const GATEWAY_EXECUTED_STATUSES = Object.freeze([400, 402, 403])
  * Existe para que el operador no lea `paso 4 INCONCLUSO` sin saber CUÁL de las
  * dos peticiones no se pudo medir: son dos causas distintas y se arreglan
  * distinto (la 1ª pata en 503 = el ambiente no delega; la 2ª en 429 = reintentar
- * más tarde). Es una función y no un literal para que las dos llamadas no puedan
- * divergir.
+ * más tarde). Es una función y no un literal para que las TRES llamadas —pasos
+ * 3, 4 y 5— no puedan divergir. El paso 5 la usa sobre una etiqueta que ya trae
+ * el gateway (`5 (control, gateway <url>)`), porque ahí la pata no medible está
+ * en OTRO host que el del resto del smoke y confundirlos manda a reintentar el
+ * lado equivocado.
  */
 export const STEP_CONTROL_LEG = (step) => `${step} (pata de control, sin el header)`
 
 /**
- * GUARDA DE ENTRADA de los pasos 2, 3, 4 y 4b — fix-pack AR `BLQ-BAJO-1`,
+ * GUARDA DE ENTRADA de los pasos 2, 3, 4, 4b y 5 — fix-pack AR `BLQ-BAJO-1`,
  * invertida a precondición positiva en el fix-pack AR it.2 (`BLQ-BAJO-2`).
  *
  * Los pasos comparan BODIES (o afirman AC-8) para decidir si el header atravesó
@@ -725,31 +744,67 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
   }
 
   // ── Paso 5: pata de control contra el gateway directo ─────────────────────
+  // fix-pack F4 `F4-1`: este paso era el ÚNICO que no pasaba por
+  // `evaluateStepPrecondition` en NINGUNA de sus dos patas, y por eso admitía un
+  // falso OK que `MNR-CR-1` ya había cerrado en los pasos 3 y 4. Medido con
+  // stubs y sin red contra `349e9c8eb`: 1ª pata medible (402 con
+  // `eip155:84532`) + 2ª pata (el control, sin header) en `429` ⇒
+  // `paso 5 OK: el gateway directo (…) discrimina la red` + `SMOKE OK` a secas
+  // + **exit 0**. La diferencia entre patas la fabricaba el fallo:
+  // `evaluatePaymentChainTerna` devuelve `null` porque `extractFirstAccept` del
+  // 429 da `null` ⇒ `withAccept !== withoutAccept` se cumple VACUAMENTE.
+  // Ahora las dos patas pasan por la misma guarda que 3 y 4, con la etiqueta
+  // `STEP_CONTROL_LEG` en la segunda.
   if (gateway) {
     try {
+      const stepGw = `5 (control, gateway ${gateway})`
       const withHeader = await readResponse(fetchImpl, `${gateway}/compose`, {
         method: 'POST',
         headers: { ...jsonHeaders, 'x-payment-chain': 'base-sepolia' },
         body: PAYMENT_CHAIN_BODY,
       })
-      const without = await readResponse(fetchImpl, `${gateway}/compose`, {
-        method: 'POST',
-        headers: jsonHeaders,
-        body: PAYMENT_CHAIN_BODY,
-      })
-      const problem = evaluatePaymentChainTerna(
+      const skip = evaluateStepPrecondition(
         host,
+        stepGw,
+        'compose',
+        withHeader.status,
         withHeader.text,
-        without.text,
-        'eip155:84532',
       )
-      if (problem) {
-        // Si la pata de control falla, el roto es el INSTRUMENTO, no el sistema.
-        failures.push(
-          formatLine(host, `paso 5 (control, gateway ${gateway}) ⇒ INSTRUMENTO ROTO: ${problem}`),
-        )
+      if (skip) {
+        inconclusive.push(skip)
+        log(skip)
       } else {
-        log(formatLine(host, `paso 5 OK: el gateway directo (${gateway}) discrimina la red`))
+        const without = await readResponse(fetchImpl, `${gateway}/compose`, {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: PAYMENT_CHAIN_BODY,
+        })
+        const skipControl = evaluateStepPrecondition(
+          host,
+          STEP_CONTROL_LEG(stepGw),
+          'compose',
+          without.status,
+          without.text,
+        )
+        if (skipControl) {
+          inconclusive.push(skipControl)
+          log(skipControl)
+        } else {
+          const problem = evaluatePaymentChainTerna(
+            host,
+            withHeader.text,
+            without.text,
+            'eip155:84532',
+          )
+          if (problem) {
+            // Si la pata de control falla, el roto es el INSTRUMENTO, no el sistema.
+            failures.push(
+              formatLine(host, `paso ${stepGw} ⇒ INSTRUMENTO ROTO: ${problem}`),
+            )
+          } else {
+            log(formatLine(host, `paso 5 OK: el gateway directo (${gateway}) discrimina la red`))
+          }
+        }
       }
     } catch (err) {
       failures.push(formatLine(host, `paso 5 FALLA (control): ${String(err)}`))
