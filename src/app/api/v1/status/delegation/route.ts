@@ -11,7 +11,31 @@
  *     `WASIAI_V2_FORWARD_KEY`. Nunca su valor, nunca su longitud (AC-5 / CD-11);
  *   - los NOMBRES de los headers que el proxy reenvía. Nombres, jamás valores;
  *   - el conjunto de endpoints delegados;
- *   - datos de despliegue que Vercel ya publica por su cuenta.
+ *   - `deploymentId`, un identificador OPACO del despliegue que atiende.
+ *
+ * QUÉ **NO** EXPONE, Y POR QUÉ (fix-pack AR · `MNR-4`): el `commitSha`
+ * (`VERCEL_GIT_COMMIT_SHA`) estaba acá y se SACÓ. `wasiai-v2` es un repo PÚBLICO
+ * con `doc/sdd/**` versionado —riesgos residuales y TD abiertos incluidos—, así
+ * que publicar sin auth el commit exacto que corre `app.wasiai.io` permite cruzar
+ * "qué está desplegado" con "qué se sabe que todavía no está arreglado". Ningún
+ * AC lo pide: AC-5 pide *un* identificador del ambiente y AC-6 pide que dos
+ * ambientes den identificadores distintos — los cubren `host` + `declaredAs` +
+ * `vercelEnv` + `deploymentId`.
+ *
+ * `deploymentId` SÍ se queda, por tres razones medidas:
+ *   (a) es lo único que distingue DOS DESPLIEGUES DEL MISMO COMMIT, que es
+ *       exactamente la pregunta del cutover de esta HU ("¿ya corrió el redeploy
+ *       manual de `wasiai-prod`?");
+ *   (b) es la evidencia declarada de AC-6 (`sdd.md:730`);
+ *   (c) es opaco: no se resuelve a código fuente sin credencial de Vercel.
+ * ⚠️ Lo que NO es cierto es que "Vercel ya lo publica por su cuenta": medido el
+ * 2026-08-18, lo que Vercel manda sin auth en cada respuesta es `x-vercel-id`
+ * (`iad1::iad1::<traza>`), que es un id de PETICIÓN, no el `dpl_…`. Este endpoint
+ * es el que lo estrena, y se decide con eso a la vista.
+ *
+ * Quién quiera saber si el fix de esta HU está desplegado tiene una respuesta
+ * mejor que un sha en `passthroughHeaders`: ahí se lee si `x-payment-chain` está
+ * en la lista blanca de ESTE despliegue. Es el hecho, no un puntero a él.
  *
  * EL `Host` LO ESCRIBE EL CALLER. Es identidad INFORMATIVA, no un borde de
  * autenticación: por eso la respuesta devuelve el host recibido AL LADO de
@@ -70,7 +94,7 @@ export async function GET(req: Request): Promise<NextResponse> {
       host,
       vercelEnv: process.env.VERCEL_ENV ?? null,
       deploymentId: process.env.VERCEL_DEPLOYMENT_ID ?? null,
-      commitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+      // `commitSha` NO va acá a propósito (fix-pack AR `MNR-4`, ver docblock).
       declaredAs: declaration?.key ?? null,
     },
     delegation: {

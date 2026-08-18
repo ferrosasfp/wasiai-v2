@@ -41,7 +41,6 @@ interface DelegationStatusBody {
     host: string | null
     vercelEnv: string | null
     deploymentId: string | null
-    commitSha: string | null
     declaredAs: string | null
   }
   delegation: {
@@ -87,7 +86,6 @@ describe('T-05 (AC-5): GET /api/v1/status/delegation', () => {
     expect(body.environment.host).toBe('app.wasiai.io')
     expect(body.environment.vercelEnv).toBe('production')
     expect(body.environment.deploymentId).toBe('dpl_test123')
-    expect(body.environment.commitSha).toBe('b558713deadbeef')
     expect(body.environment.declaredAs).toBe('wasiai-prod')
 
     // CD-4: sale de listDelegatedEndpoints(), el mismo símbolo que usan las
@@ -142,7 +140,29 @@ describe('T-05 (AC-5): GET /api/v1/status/delegation', () => {
     const body = (await res.json()) as DelegationStatusBody
     expect(body.environment.vercelEnv).toBeNull()
     expect(body.environment.deploymentId).toBeNull()
-    expect(body.environment.commitSha).toBeNull()
+  })
+
+  it('fix-pack AR MNR-4: NO publica el commit desplegado, ni con la env seteada', async () => {
+    // El repo es PÚBLICO y `doc/sdd/**` está versionado: el sha desplegado se
+    // cruza con los TD abiertos del expediente. Se mide con la var PRESENTE,
+    // porque con la var ausente el campo daría null igual y el test pasaría sin
+    // haber ejercitado nada.
+    process.env.VERCEL_GIT_COMMIT_SHA = 'b558713deadbeefcafe'
+    process.env.VERCEL_DEPLOYMENT_ID = 'dpl_test123'
+    const res = await GET(makeReq('app.wasiai.io'))
+    const body = (await res.json()) as DelegationStatusBody
+    const serialized = JSON.stringify(body)
+
+    expect(serialized).not.toContain('b558713deadbeefcafe')
+    expect(serialized).not.toContain('commitSha')
+    expect(Object.keys(body.environment).sort()).toEqual([
+      'declaredAs',
+      'deploymentId',
+      'host',
+      'vercelEnv',
+    ])
+    // AC-6 sigue teniendo con qué distinguir dos despliegues del mismo commit.
+    expect(body.environment.deploymentId).toBe('dpl_test123')
   })
 })
 
