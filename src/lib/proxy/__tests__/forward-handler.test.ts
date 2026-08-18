@@ -15,7 +15,19 @@ vi.mock('@/lib/env', () => ({
   },
 }))
 
-import { forwardRequest, isDelegated, parseDelegatedEndpoints } from '../forward-handler'
+import {
+  forwardRequest,
+  isDelegated,
+  parseDelegatedEndpoints,
+  listDelegatedEndpoints,
+  DELEGATED_ENDPOINT_VALUES,
+  isForwardKeyConfigured,
+  isA2aBaseUrlConfigured,
+} from '../forward-handler'
+import {
+  PASSTHROUGH_HEADERS,
+  PASSTHROUGH_HEADER_ENTRIES,
+} from '../passthrough-headers'
 
 describe('parseDelegatedEndpoints', () => {
   it('returns empty Set when raw is undefined or blank', () => {
@@ -134,7 +146,10 @@ describe('forwardRequest', () => {
     expect(headers['x-payment']).toBe('sig-from-client')
   })
 
-  it('AC-7: does NOT forward host/origin/cookie', async () => {
+  // T-03 (WKH-361 / AC-3): extiende el AC-7 original de WKH-66 con las
+  // exclusiones POR DEFINICIÓN del criterio de admisión (§5.1 cond. 2):
+  // credenciales de wasiai-v2 e identidad del navegador nunca salen upstream.
+  it('AC-7 / T-03: does NOT forward host/origin/cookie/set-cookie/referer/x-vercel-*/x-middleware-*', async () => {
     const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response('', { status: 200 }) as unknown as Response,
     )
@@ -142,12 +157,103 @@ describe('forwardRequest', () => {
       host: 'attacker.com',
       origin: 'https://evil.test',
       cookie: 'sess=abc',
+      'set-cookie': 'sess=abc; HttpOnly',
+      referer: 'https://evil.test/page',
+      'x-vercel-id': 'gru1::abcde-1234567890-deadbeef',
+      'x-middleware-rewrite': '/somewhere-else',
     })
     await forwardRequest(req, 'http://a2a.local/compose')
     const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
     expect(headers['host']).toBeUndefined()
     expect(headers['origin']).toBeUndefined()
     expect(headers['cookie']).toBeUndefined()
+    expect(headers['set-cookie']).toBeUndefined()
+    expect(headers['referer']).toBeUndefined()
+    expect(headers['x-vercel-id']).toBeUndefined()
+    expect(headers['x-middleware-rewrite']).toBeUndefined()
+  })
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // WKH-361 — los tres headers que el gateway SÍ lee y el proxy descartaba.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('T-01 (AC-1): forwards x-a2a-contracting-chain and -depth with the exact received value', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('', { status: 200 }) as unknown as Response,
+    )
+    const req = makeReq('POST', {
+      'x-a2a-contracting-chain': 'wasi-coordinator,wasi-translate',
+      'x-a2a-contracting-depth': '99',
+    })
+    await forwardRequest(req, 'http://a2a.local/compose')
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+    expect(headers['x-a2a-contracting-chain']).toBe('wasi-coordinator,wasi-translate')
+    expect(headers['x-a2a-contracting-depth']).toBe('99')
+  })
+
+  it('T-01b (AC-1b): forwards x-payment-chain with the exact received value', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('', { status: 200 }) as unknown as Response,
+    )
+    const req = makeReq('POST', { 'x-payment-chain': 'base-sepolia' })
+    await forwardRequest(req, 'http://a2a.local/compose')
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+    // El valor viaja SIN MODIFICAR: v2 no traduce slugs. Si `base-sepolia` se
+    // normalizara acá, el 400 CHAIN_NOT_SUPPORTED del gateway dejaría de ser
+    // alcanzable desde el marketplace y volvería el silencio.
+    expect(headers['x-payment-chain']).toBe('base-sepolia')
+  })
+
+  it('T-02 (AC-2): headers absent upstream are undefined, NOT empty string', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('', { status: 200 }) as unknown as Response,
+    )
+    const req = makeReq('POST', { 'content-type': 'application/json' })
+    await forwardRequest(req, 'http://a2a.local/compose')
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+    for (const h of ['x-a2a-contracting-chain', 'x-a2a-contracting-depth', 'x-payment-chain']) {
+      expect(headers[h]).toBeUndefined()
+      expect(headers[h]).not.toBe('')
+    }
+    expect(Object.keys(headers)).not.toContain('x-payment-chain')
+  })
+
+  // CD-3: ausente ≠ vacío, y NO es el mismo caso para los tres. Medido contra
+  // wasiai-a2a @ 10a6eb1:
+  //   x-a2a-contracting-depth: ''  -> 400 CONTRACTING_DEPTH_MALFORMED
+  //                                   (contracting-chain.ts:822-825)
+  //   x-payment-chain: ''          -> 400 CHAIN_NOT_SUPPORTED
+  //                                   (chain-resolver.ts:422 + a2a-key.ts:365-370)
+  //   x-a2a-contracting-chain: ''  -> se absorbe como AUSENTE, NO da malformed
+  //                                   (contracting-chain.ts:792-795)
+  // Los dos primeros convierten peticiones que hoy funcionan en 400. Por eso la
+  // regla de no emitir vacío es la misma para los tres aunque la razón no lo sea.
+  it('T-02b (AC-2 / CD-3): the 3 headers received as empty string are NOT emitted upstream', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('', { status: 200 }) as unknown as Response,
+    )
+    const req = makeReq('POST', {
+      'x-a2a-contracting-chain': '',
+      'x-a2a-contracting-depth': '',
+      'x-payment-chain': '',
+    })
+    await forwardRequest(req, 'http://a2a.local/compose')
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+    expect(headers['x-a2a-contracting-chain']).toBeUndefined()
+    expect(headers['x-a2a-contracting-depth']).toBeUndefined()
+    expect(headers['x-payment-chain']).toBeUndefined()
+  })
+
+  it("T-02c (AC-2): x-a2a-contracting-depth '0' IS forwarded ('0' is truthy as a string)", async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('', { status: 200 }) as unknown as Response,
+    )
+    const req = makeReq('POST', { 'x-a2a-contracting-depth': '0' })
+    await forwardRequest(req, 'http://a2a.local/compose')
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+    // Atrapa a quien "arregle" la guarda con Number(v) o v !== '': '0' es un
+    // valor legítimo del techo de profundidad y tiene que llegar.
+    expect(headers['x-a2a-contracting-depth']).toBe('0')
   })
 
   it('AC-8: 402 passthrough body intact', async () => {
@@ -252,5 +358,99 @@ describe('forwardRequest', () => {
       ;(envMod.env as { NODE_ENV: string | undefined }).NODE_ENV = original
       consoleSpy.mockRestore()
     }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WKH-361 — la lista blanca como contrato verificado (AC-4 / AC-4b).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('PASSTHROUGH_HEADERS (WKH-361)', () => {
+  it('T-04 (AC-4): is exactly the 11-name literal, in order', () => {
+    // Este literal es el contrato. Cualquier alta o baja en
+    // passthrough-headers.ts rompe la suite: es el punto, no un accidente.
+    expect([...PASSTHROUGH_HEADERS]).toEqual([
+      'x-payment',
+      'payment-signature',
+      'x-a2a-key',
+      'x-api-key',
+      'authorization',
+      'content-type',
+      'user-agent',
+      'x-forwarded-for',
+      'x-a2a-contracting-chain',
+      'x-a2a-contracting-depth',
+      'x-payment-chain',
+    ])
+  })
+
+  it('T-04 (AC-4): PASSTHROUGH_HEADERS derives from PASSTHROUGH_HEADER_ENTRIES, same order', () => {
+    expect([...PASSTHROUGH_HEADERS]).toEqual(PASSTHROUGH_HEADER_ENTRIES.map((e) => e.header))
+  })
+
+  it('T-04 (AC-4): every header name is lowercase and appears once', () => {
+    for (const h of PASSTHROUGH_HEADERS) {
+      expect(h).toBe(h.toLowerCase())
+    }
+    expect(new Set(PASSTHROUGH_HEADERS).size).toBe(PASSTHROUGH_HEADERS.length)
+  })
+
+  it('T-04b (AC-4b): every entry with consumer !== none cites its reader in wasiai-a2a', () => {
+    for (const entry of PASSTHROUGH_HEADER_ENTRIES) {
+      if (entry.consumer === 'none') continue
+      expect(entry.citation, `${entry.header} sin cita de lector`).toBeTruthy()
+      // La cita tiene que apuntar a wasiai-a2a con archivo:línea. Una cita a un
+      // archivo de este repo no prueba que el gateway lea el header.
+      expect(entry.citation).toMatch(/^wasiai-a2a\/src\/.+:\d+$/)
+      expect(entry.why.trim().length).toBeGreaterThan(0)
+    }
+  })
+
+  it('T-04b (AC-4b): x-api-key is the ONLY entry without a cited reader', () => {
+    const orphans = PASSTHROUGH_HEADER_ENTRIES.filter(
+      (e) => e.consumer === 'none' || e.citation === null,
+    )
+    expect(orphans.map((e) => e.header)).toEqual(['x-api-key'])
+    // Alias muerto (CD-12): se conserva por regresión cero y se resuelve en A-5.
+    expect(orphans[0]?.consumer).toBe('none')
+    expect(orphans[0]?.citation).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WKH-361 — CD-4: el endpoint de estado y el cron leen el MISMO símbolo que
+// usan las rutas. Nada recalcula la fórmula que vigila.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('listDelegatedEndpoints / DELEGATED_ENDPOINT_VALUES (WKH-361)', () => {
+  it('T-11 (CD-4): DELEGATED_ENDPOINT_VALUES has the 4 members of the union', () => {
+    expect([...DELEGATED_ENDPOINT_VALUES].sort()).toEqual([
+      'capabilities',
+      'compose',
+      'mcp',
+      'orchestrate',
+    ])
+  })
+
+  it('T-11 (CD-4): listDelegatedEndpoints returns the subset actually delegated', () => {
+    // El mock de @/lib/env de este archivo declara compose,orchestrate,capabilities.
+    expect([...listDelegatedEndpoints()].sort()).toEqual([
+      'capabilities',
+      'compose',
+      'orchestrate',
+    ])
+    expect(listDelegatedEndpoints()).not.toContain('mcp')
+  })
+
+  it('T-11 (CD-4): listDelegatedEndpoints agrees with isDelegated for every member', () => {
+    const listed = new Set(listDelegatedEndpoints())
+    for (const e of DELEGATED_ENDPOINT_VALUES) {
+      expect(listed.has(e)).toBe(isDelegated(e))
+    }
+  })
+
+  it('T-11 (CD-4): both config predicates are true under this file mock', () => {
+    expect(isForwardKeyConfigured()).toBe(true)
+    expect(isA2aBaseUrlConfigured()).toBe(true)
   })
 })
