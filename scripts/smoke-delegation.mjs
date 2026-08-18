@@ -3,19 +3,44 @@
 /**
  * smoke-delegation.mjs — WKH-361 W2 · AC-8 + las dos ternas de regresión.
  *
- * Smoke post-deploy del proxy hacia `wasiai-a2a`. Contesta tres cosas que un
+ * Smoke post-deploy del proxy hacia `wasiai-a2a`. Contesta cuatro cosas que un
  * `200 OK` NO contesta:
  *   - si un endpoint declarado como delegado está en realidad devolviendo
  *     `503 *_DISABLED` (AC-8);
  *   - si los headers de contracting atraviesan el proxy (terna §2.2);
- *   - si `x-payment-chain` atraviesa el proxy (terna §2.1) — el que cuesta plata.
+ *   - si `x-payment-chain` atraviesa el proxy (terna §2.1) — el que cuesta plata;
+ *   - si un slug de red inválido corta en `400` en vez de cobrar la red por
+ *     defecto (paso 4b, la pata de AC-1b que no depende de ningún body).
  *
  * POR QUÉ UNA TERNA Y NO UN STATUS CODE: un `200 OK` se ve igual con el header
  * llegando y sin llegar; un `402` bien formado, también. Por eso cada prueba
  * compara TRES patas: gateway directo (control) / host con el header / host sin
  * el header. Si las dos últimas son iguales, el header no llegó.
  *
- * NINGUNO DE LOS 6 PASOS MUEVE FONDOS. Los pasos 3-5 cortan en 400/402: el 402
+ * ⚠️ TRES VALORES, NO DOS (fix-pack AR · `BLQ-BAJO-1`). Cada paso puede salir
+ * OK / FALLA / **INCONCLUSO**. El tercero existe porque las ternas comparan
+ * BODIES, y hay dos estados del ambiente en los que las dos patas son iguales
+ * por un motivo que NO es "el header no atraviesa el proxy":
+ *   - `503 *_DISABLED` — el ambiente no delega ese endpoint (es el estado
+ *     declarado de `wasiai-v2` / `wasiai-v2.vercel.app`, DT-2 B+);
+ *   - `429` — rate limit del borde; medido el 2026-08-18 contra `app.wasiai.io`:
+ *     los 10 primeros POST seguidos a `/compose` pasaron y el 11.º ya devolvió
+ *     `429`. El smoke hace 5 POST a `/compose`, así que está por debajo — pero
+ *     dos corridas encadenadas no.
+ * Reportar esos dos como "AC-1 FALLA: el header no atraviesa el proxy" es
+ * NOMBRAR LA CAUSA EQUIVOCADA, que es exactamente el error que abrió esta HU un
+ * piso más arriba. Un paso inconcluso NO suma a `failures`.
+ *
+ * POR QUÉ UN INCONCLUSO NO CAMBIA EL EXIT CODE, Y POR QUÉ ESO NO AFLOJA NADA:
+ * el caso "este ambiente debería delegar y no delega" NO llega nunca a los
+ * pasos 3/4/4b como inconcluso — lo cazan antes, y con exit 1, el paso 2 (AC-8:
+ * figura en `delegation.runtime` y contesta `503 *_DISABLED`) o el paso 6 (AC-7:
+ * `runtime` vacío contra un manifiesto que declara endpoints ⇒ `DRIFT`). Los
+ * inconclusos que quedan son los del ambiente que el manifiesto declara como no
+ * delegante. Por eso la última línea NUNCA dice `SMOKE OK` a secas cuando hubo
+ * inconclusos: dice cuántos, y que los headers NO se verificaron acá.
+ *
+ * NINGUNO DE LOS 7 PASOS MUEVE FONDOS. Los pasos 3-5 cortan en 400/402: el 402
  * es el challenge x402 ("esto es lo que tendrías que pagar") y el 400 es un
  * rechazo. El propio gateway lo dice en el body del 400 de contracting: "La
  * peticion se rechaza sin cobrar."
@@ -50,6 +75,10 @@ export const USAGE = [
   '                    ej: https://wasiai-a2a-production.up.railway.app',
   '',
   'Salidas: 0 = todo bien | 1 = fallo de smoke | 2 = uso incorrecto',
+  '',
+  'Un paso puede salir OK, FALLA o INCONCLUSO. INCONCLUSO no cambia el exit code,',
+  'y la última línea dice cuántos hubo: un ambiente que no delega NO se reporta',
+  'como si la lista blanca estuviera rota.',
 ].join('\n')
 
 export const EXIT_OK = 0
@@ -62,6 +91,11 @@ export const CONTRACTING_BODY = JSON.stringify({ steps: [] })
 export const PAYMENT_CHAIN_BODY = JSON.stringify({
   steps: [{ agent: 'wasi-chainlink-price' }],
 })
+/**
+ * Slug de red que el gateway NO reconoce (paso 4b, AC-1b · fix-pack AR `MNR-3`).
+ * Es el mismo literal que la *Evidencia exigida* del SDD (`sdd.md:491-492`).
+ */
+export const INVALID_CHAIN_SLUG = 'nonexistent-chain-xyz'
 
 /**
  * Parsea argv. Devuelve `{ ok: false, exitCode: 2 }` si falta el host.
@@ -122,6 +156,65 @@ export function evaluateDisabled(host, endpoint, status, bodyText) {
       `AC-8 FALLA: /${endpoint} figura como delegado pero responde ${status} ${errorCode}`,
     ),
   }
+}
+
+/**
+ * GUARDA DE ENTRADA de los pasos 3, 4 y 4b — fix-pack AR `BLQ-BAJO-1`.
+ *
+ * Los tres pasos comparan BODIES para decidir si el header atravesó el proxy.
+ * Esa comparación sólo significa algo si la petición llegó a ejecutarse. Devuelve
+ * el mensaje de INCONCLUSO (y el paso NO se corre) en los dos estados medidos en
+ * que las patas salen iguales por un motivo ajeno a la lista blanca:
+ *
+ *   - `503 *_DISABLED` ⇒ el ambiente no delega ese endpoint. Se reutiliza
+ *     `evaluateDisabled` a propósito: es el único lugar que sabe reconocer
+ *     `*_DISABLED`, y tenerlo dos veces sería dos criterios que divergen.
+ *   - `429` ⇒ rate limit del borde. Sin esta rama, el smoke acusa a la lista
+ *     blanca por una respuesta que ni siquiera llegó al gateway.
+ *
+ * Devuelve `null` si la respuesta es medible (el paso se corre normalmente).
+ */
+export function evaluateStepPrecondition(host, step, endpoint, status, bodyText) {
+  const disabled = evaluateDisabled(host, endpoint, status, bodyText)
+  if (disabled) {
+    return formatLine(
+      host,
+      `paso ${step} INCONCLUSO: /${endpoint} responde ${status} ${disabled.error} en este ` +
+        'ambiente (no delega) ⇒ NO se puede medir si el header atraviesa el proxy. ' +
+        'La causa NO es la lista blanca',
+    )
+  }
+  if (status === 429) {
+    return formatLine(
+      host,
+      `paso ${step} INCONCLUSO: /${endpoint} responde 429 (rate limit) ⇒ las dos patas ` +
+        'serían iguales por el límite, no por la lista blanca. Reintentar más tarde',
+    )
+  }
+  return null
+}
+
+/**
+ * Paso 4b (AC-1b · fix-pack AR `MNR-3`) — la pata SIN campos volátiles.
+ *
+ * Discrimina por STATUS CODE y nada más: hoy `app.wasiai.io` devuelve `402`
+ * (aplica la red por defecto porque descarta el header) y el gateway devuelve
+ * `400 CHAIN_NOT_SUPPORTED`. No compara bodies ni `accepts[0]`, así que —a
+ * diferencia del paso 4— no depende de que el upstream mantenga `accepts[0]`
+ * determinista entre dos llamadas. Si el gateway algún día le agrega un `nonce`
+ * o un `validBefore`, este paso sigue discriminando y el 4 no.
+ *
+ * El body recibido se imprime SÓLO en el mensaje de falla, para diagnosticar; la
+ * decisión no lo mira.
+ */
+export function evaluateInvalidChainSlug(host, status, bodyText) {
+  if (status === 400) return null
+  return formatLine(
+    host,
+    `AC-1b FALLA: con x-payment-chain: ${INVALID_CHAIN_SLUG} se esperaba 400 ` +
+      `(CHAIN_NOT_SUPPORTED) y llegó ${status} ⇒ el header no atraviesa el proxy y se ` +
+      `aplicó la red por defecto. Recibido: ${String(bodyText).slice(0, 200)}`,
+  )
 }
 
 /**
@@ -225,7 +318,8 @@ async function readResponse(fetchImpl, url, init) {
 }
 
 /**
- * Corre los 6 pasos y devuelve el código de salida. No llama a `process.exit`:
+ * Corre los 7 pasos (1, 2, 3, 4, 4b, 5, 6) y devuelve el código de salida. No
+ * llama a `process.exit`:
  * eso lo hace el main-guard, así el test puede correrlo sin matar al runner.
  *
  * @param {{host: string, gateway: string|null}} args
@@ -236,6 +330,8 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
   const { fetchImpl, log, logError } = { ...DEFAULT_DEPS, ...deps }
   const base = `https://${host}`
   const failures = []
+  /** Pasos que NO se pudieron medir. No suman a `failures` (ver docblock). */
+  const inconclusive = []
 
   const jsonHeaders = { 'content-type': 'application/json' }
 
@@ -246,8 +342,18 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
       method: 'GET',
     })
     if (res.status !== 200) {
+      // Un `404` acá tiene UNA causa concreta y vale nombrarla: el endpoint lo
+      // estrena esta HU, así que un ambiente sin la HU desplegada (o después de
+      // la reversa) contesta 404. Sigue siendo FALLA — post-deploy el endpoint
+      // tiene que existir — pero con la causa correcta y no "el smoke rompió".
       failures.push(
-        formatLine(host, `paso 1 FALLA: GET /api/v1/status/delegation ⇒ ${res.status}`),
+        formatLine(
+          host,
+          `paso 1 FALLA: GET /api/v1/status/delegation ⇒ ${res.status}` +
+            (res.status === 404
+              ? ' ⇒ este ambiente NO tiene desplegada la HU (o se ejecutó la reversa)'
+              : ''),
+        ),
       )
       status = null
     } else {
@@ -264,7 +370,21 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
   const delegatedRuntime = Array.isArray(status?.delegation?.runtime)
     ? status.delegation.runtime
     : []
-  for (const endpoint of delegatedRuntime.filter((e) => e === 'compose' || e === 'orchestrate')) {
+  const ac8Targets = delegatedRuntime.filter((e) => e === 'compose' || e === 'orchestrate')
+  // fix-pack AR `BLQ-BAJO-1`: el paso 2 imprime su OMITIDO como el 5. Antes, sin
+  // endpoints que mirar, no imprimía NADA y su silencio se leía como un OK.
+  if (ac8Targets.length === 0) {
+    log(
+      formatLine(
+        host,
+        status === null
+          ? 'paso 2 OMITIDO: sin /api/v1/status/delegation no se sabe qué delega este ambiente'
+          : 'paso 2 OMITIDO: delegation.runtime no incluye compose ni orchestrate ⇒ AC-8 no ' +
+              'aplica en este ambiente',
+      ),
+    )
+  }
+  for (const endpoint of ac8Targets) {
     try {
       const res = await readResponse(fetchImpl, `${base}/api/v1/${endpoint}`, {
         method: 'POST',
@@ -286,14 +406,22 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
       headers: { ...jsonHeaders, 'x-a2a-contracting-depth': '99' },
       body: CONTRACTING_BODY,
     })
-    const without = await readResponse(fetchImpl, `${base}/api/v1/compose`, {
-      method: 'POST',
-      headers: jsonHeaders,
-      body: CONTRACTING_BODY,
-    })
-    const problem = evaluateContractingTerna(host, withHeader.text, without.text)
-    if (problem) failures.push(problem)
-    else log(formatLine(host, 'paso 3 OK: x-a2a-contracting-depth atraviesa el proxy'))
+    // La guarda corre ANTES de pedir la 2ª pata: si la 1ª no es medible, la 2ª
+    // tampoco lo es y sería una petición al pedo.
+    const skip = evaluateStepPrecondition(host, 3, 'compose', withHeader.status, withHeader.text)
+    if (skip) {
+      inconclusive.push(skip)
+      log(skip)
+    } else {
+      const without = await readResponse(fetchImpl, `${base}/api/v1/compose`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: CONTRACTING_BODY,
+      })
+      const problem = evaluateContractingTerna(host, withHeader.text, without.text)
+      if (problem) failures.push(problem)
+      else log(formatLine(host, 'paso 3 OK: x-a2a-contracting-depth atraviesa el proxy'))
+    }
   } catch (err) {
     failures.push(formatLine(host, `paso 3 FALLA: ${String(err)}`))
   }
@@ -305,21 +433,47 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
       headers: { ...jsonHeaders, 'x-payment-chain': 'base-sepolia' },
       body: PAYMENT_CHAIN_BODY,
     })
-    const without = await readResponse(fetchImpl, `${base}/api/v1/compose`, {
-      method: 'POST',
-      headers: jsonHeaders,
-      body: PAYMENT_CHAIN_BODY,
-    })
-    const problem = evaluatePaymentChainTerna(
-      host,
-      withHeader.text,
-      without.text,
-      'eip155:84532',
-    )
-    if (problem) failures.push(problem)
-    else log(formatLine(host, 'paso 4 OK: x-payment-chain atraviesa el proxy'))
+    const skip = evaluateStepPrecondition(host, 4, 'compose', withHeader.status, withHeader.text)
+    if (skip) {
+      inconclusive.push(skip)
+      log(skip)
+    } else {
+      const without = await readResponse(fetchImpl, `${base}/api/v1/compose`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: PAYMENT_CHAIN_BODY,
+      })
+      const problem = evaluatePaymentChainTerna(
+        host,
+        withHeader.text,
+        without.text,
+        'eip155:84532',
+      )
+      if (problem) failures.push(problem)
+      else log(formatLine(host, 'paso 4 OK: x-payment-chain atraviesa el proxy'))
+    }
   } catch (err) {
     failures.push(formatLine(host, `paso 4 FALLA: ${String(err)}`))
+  }
+
+  // ── Paso 4b: slug de red inválido ⇒ 400 (AC-1b, sin campos volátiles) ─────
+  try {
+    const res = await readResponse(fetchImpl, `${base}/api/v1/compose`, {
+      method: 'POST',
+      headers: { ...jsonHeaders, 'x-payment-chain': INVALID_CHAIN_SLUG },
+      body: PAYMENT_CHAIN_BODY,
+    })
+    const skip = evaluateStepPrecondition(host, '4b', 'compose', res.status, res.text)
+    if (skip) {
+      inconclusive.push(skip)
+      log(skip)
+    } else {
+      const problem = evaluateInvalidChainSlug(host, res.status, res.text)
+      if (problem) failures.push(problem)
+      else log(formatLine(host, 'paso 4b OK: un slug de red inválido corta en 400'))
+    }
+  } catch (err) {
+    failures.push(formatLine(host, `paso 4b FALLA: ${String(err)}`))
   }
 
   // ── Paso 5: pata de control contra el gateway directo ─────────────────────
@@ -369,9 +523,24 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
   }
 
   for (const f of failures) logError(f)
+  const inconclusiveSuffix =
+    inconclusive.length > 0 ? ` + ${inconclusive.length} paso(s) INCONCLUSO(s)` : ''
   if (failures.length > 0) {
-    logError(formatLine(host, `SMOKE FALLA — ${failures.length} problema(s)`))
+    logError(formatLine(host, `SMOKE FALLA — ${failures.length} problema(s)${inconclusiveSuffix}`))
     return EXIT_FAIL
+  }
+  // Sin fallas pero con pasos que no se pudieron medir, el veredicto NO puede
+  // ser `SMOKE OK` a secas: sería afirmar que los headers atraviesan el proxy en
+  // un ambiente donde no se midió.
+  if (inconclusive.length > 0) {
+    log(
+      formatLine(
+        host,
+        `SMOKE OK — ${inconclusive.length} paso(s) INCONCLUSO(s): en este ambiente NO se ` +
+          'verificó que los headers atraviesen el proxy',
+      ),
+    )
+    return EXIT_OK
   }
   log(formatLine(host, 'SMOKE OK'))
   return EXIT_OK

@@ -40,6 +40,15 @@ interface SmokeModule {
     status: number,
     body: string,
   ) => { host: string; endpoint: string; status: number; error: string; message: string } | null
+  evaluateStepPrecondition: (
+    host: string,
+    step: number | string,
+    endpoint: string,
+    status: number,
+    body: string,
+  ) => string | null
+  evaluateInvalidChainSlug: (host: string, status: number, body: string) => string | null
+  INVALID_CHAIN_SLUG: string
   evaluateContractingTerna: (host: string, a: string, b: string) => string | null
   evaluatePaymentChainTerna: (
     host: string,
@@ -271,6 +280,167 @@ describe('las dos ternas — el discriminador que un 200 OK no da', () => {
     expect(
       s.evaluatePaymentChainTerna('app.wasiai.io', wrongNetwork, kite, 'eip155:84532'),
     ).toContain('se esperaba network eip155:84532')
+  })
+})
+
+describe('fix-pack AR `BLQ-BAJO-1`: un ambiente que no delega da INCONCLUSO, no FALLA', () => {
+  const DISABLED_BODY = JSON.stringify({
+    error: 'COMPOSE_DISABLED',
+    detail: 'Legacy compose handler removed in WKH-66.',
+  })
+
+  it('evaluateStepPrecondition reconoce el 503 *_DISABLED y nombra la causa real', () => {
+    const msg = s.evaluateStepPrecondition('wasiai-v2.vercel.app', 3, 'compose', 503, DISABLED_BODY)
+    expect(msg).toContain('INCONCLUSO')
+    expect(msg).toContain('COMPOSE_DISABLED')
+    expect(msg).toContain('no delega')
+    // El mensaje tiene que DESMENTIR explícitamente la causa que acusaba antes.
+    expect(msg).toContain('La causa NO es la lista blanca')
+    expect(msg).not.toContain('FALLA')
+  })
+
+  it('evaluateStepPrecondition reconoce el 429 del borde', () => {
+    const msg = s.evaluateStepPrecondition('app.wasiai.io', 4, 'compose', 429, 'Too Many Requests')
+    expect(msg).toContain('INCONCLUSO')
+    expect(msg).toContain('429')
+    expect(msg).toContain('rate limit')
+  })
+
+  it('una respuesta medible NO se salta: 402 y 400 devuelven null', () => {
+    expect(
+      s.evaluateStepPrecondition('app.wasiai.io', 3, 'compose', 402, '{"accepts":[]}'),
+    ).toBeNull()
+    expect(
+      s.evaluateStepPrecondition('app.wasiai.io', 3, 'compose', 400, '{"error_code":"X"}'),
+    ).toBeNull()
+    // Un 503 que NO es *_DISABLED es un problema real del upstream: se mide.
+    expect(
+      s.evaluateStepPrecondition('app.wasiai.io', 3, 'compose', 503, '{"error":"UPSTREAM_BUSY"}'),
+    ).toBeNull()
+  })
+
+  it('runSmoke contra un host con la delegación apagada: 0 acusaciones a la lista blanca', async () => {
+    const log = vi.fn()
+    const logError = vi.fn()
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).includes('/api/v1/status/delegation')) {
+        // El manifiesto declara `delegated: []` para este ambiente (DT-2 B+),
+        // así que runtime vacío es MATCH: no hay drift que reportar.
+        return new Response(
+          JSON.stringify({
+            environment: { host: 'wasiai-v2.vercel.app', vercelEnv: 'production' },
+            delegation: { runtime: [], declared: [], match: 'MATCH' },
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response(DISABLED_BODY, { status: 503 })
+    })
+
+    const code = await s.runSmoke(
+      { host: 'wasiai-v2.vercel.app', gateway: null },
+      { fetchImpl, log, logError },
+    )
+
+    const out = [...log.mock.calls, ...logError.mock.calls].map((c) => String(c[0])).join('\n')
+    // La acusación falsa que reportó el AR — textual — no puede volver a salir.
+    expect(out).not.toContain('el header no atraviesa el proxy')
+    expect(out).not.toContain('IDÉNTICA')
+    expect(out).not.toContain('AC-1 FALLA')
+    expect(out).not.toContain('AC-1b FALLA')
+    // Los tres pasos que pegan a /compose salen inconclusos, con su causa.
+    expect(out).toContain('paso 3 INCONCLUSO')
+    expect(out).toContain('paso 4 INCONCLUSO')
+    expect(out).toContain('paso 4b INCONCLUSO')
+    expect(out).toContain('paso 2 OMITIDO')
+    // Exit 0, pero el veredicto NO afirma que los headers atraviesen.
+    expect(code).toBe(0)
+    expect(out).toContain('3 paso(s) INCONCLUSO(s)')
+    expect(out).toContain('NO se verificó que los headers atraviesen el proxy')
+    expect(logError).not.toHaveBeenCalled()
+  })
+
+  it('el ambiente que SÍ debería delegar y no delega sigue saliendo exit 1 (AC-8 lo caza antes)', async () => {
+    const log = vi.fn()
+    const logError = vi.fn()
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).includes('/api/v1/status/delegation')) {
+        return new Response(JSON.stringify(STATUS_OK), { status: 200 })
+      }
+      return new Response(DISABLED_BODY, { status: 503 })
+    })
+    const code = await s.runSmoke(
+      { host: 'app.wasiai.io', gateway: null },
+      { fetchImpl, log, logError },
+    )
+    // Esta es la calibración en la otra dirección: la guarda de INCONCLUSO no
+    // puede tapar el caso que el smoke existe para cazar.
+    expect(code).toBe(1)
+    const errors = logError.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(errors).toContain('AC-8 FALLA')
+    expect(errors).toContain('COMPOSE_DISABLED')
+  })
+
+  it('un 404 en el paso 1 nombra que la HU no está desplegada', async () => {
+    const logError = vi.fn()
+    const fetchImpl = vi.fn(async () => new Response('not found', { status: 404 }))
+    await s.runSmoke(
+      { host: 'wasiai-v2.vercel.app', gateway: null },
+      { fetchImpl, log: vi.fn(), logError },
+    )
+    const errors = logError.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(errors).toContain('NO tiene desplegada la HU')
+  })
+})
+
+describe('fix-pack AR `MNR-3`: paso 4b — slug inválido ⇒ 400, sin mirar el body', () => {
+  it('400 ⇒ sin problema', () => {
+    expect(
+      s.evaluateInvalidChainSlug('app.wasiai.io', 400, '{"error_code":"CHAIN_NOT_SUPPORTED"}'),
+    ).toBeNull()
+  })
+
+  it('el defecto real medido el 2026-08-18 (402 con la red por defecto) se detecta', () => {
+    const problem = s.evaluateInvalidChainSlug(
+      'app.wasiai.io',
+      402,
+      '{"accepts":[{"network":"eip155:2368","maxAmountRequired":"1010000000000000"}]}',
+    )
+    expect(problem).toContain('AC-1b FALLA')
+    expect(problem).toContain('402')
+    expect(problem).toContain('red por defecto')
+  })
+
+  it('decide SOLO por el status: un 400 con cualquier body pasa, un 200 con el código adentro falla', () => {
+    // La propiedad que hace a este paso independiente de `accepts[0]`: si un día
+    // el upstream le agrega un nonce al challenge, este paso sigue midiendo.
+    expect(s.evaluateInvalidChainSlug('app.wasiai.io', 400, 'texto que no es JSON')).toBeNull()
+    expect(
+      s.evaluateInvalidChainSlug('app.wasiai.io', 200, '{"error_code":"CHAIN_NOT_SUPPORTED"}'),
+    ).not.toBeNull()
+  })
+
+  it('el slug es el literal de la Evidencia exigida del SDD', () => {
+    expect(s.INVALID_CHAIN_SLUG).toBe('nonexistent-chain-xyz')
+  })
+
+  it('runSmoke manda el slug inválido como x-payment-chain en un POST propio', async () => {
+    const seen: Array<{ url: string; chain: string | null }> = []
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+      const headers = new Headers(init?.headers as HeadersInit)
+      seen.push({ url: String(url), chain: headers.get('x-payment-chain') })
+      if (String(url).includes('/api/v1/status/delegation')) {
+        return new Response(JSON.stringify(STATUS_OK), { status: 200 })
+      }
+      if (headers.get('x-payment-chain') === 'nonexistent-chain-xyz') {
+        return new Response('{"error_code":"CHAIN_NOT_SUPPORTED"}', { status: 400 })
+      }
+      return new Response('{"accepts":[{"network":"eip155:84532"}]}', { status: 402 })
+    })
+    const log = vi.fn()
+    await s.runSmoke({ host: 'app.wasiai.io', gateway: null }, { fetchImpl, log, logError: vi.fn() })
+    expect(seen.filter((r) => r.chain === 'nonexistent-chain-xyz')).toHaveLength(1)
+    expect(log.mock.calls.map((c) => String(c[0])).join('\n')).toContain('paso 4b OK')
   })
 })
 
