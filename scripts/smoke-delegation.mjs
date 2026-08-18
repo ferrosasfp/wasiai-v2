@@ -55,6 +55,23 @@
  *     encadenadas no**.
  * Un paso inconcluso NO suma a `failures`.
  *
+ * ⚠️ LA GUARDA SE APLICA A LAS DOS PATAS, NO A LA PRIMERA (fix-pack CR ·
+ * `MNR-CR-1`). Durante el fix-pack AR it.2 la guarda cubría sólo la petición CON
+ * el header, con esta justificación escrita al lado: "si la 1ª no es medible, la
+ * 2ª tampoco lo es". Eso es cierto en esa dirección y **falso al revés**: una
+ * corrida puede medir bien la 1ª pata y comerse un `429` en la 2ª, que es
+ * justamente el DISCRIMINADOR (*"Si las dos últimas son iguales, el header no
+ * llegó"*). Medido antes del fix, con stub y sin red: primeras patas medibles +
+ * patas de control en `429` ⇒ `paso 3 OK` + `paso 4 OK` + `SMOKE OK`, **exit 0**,
+ * sin una sola línea diciendo que 2 de las 4 respuestas comparadas nunca llegaron
+ * al gateway. Y con el defecto presente —el día que el default del gateway sea
+ * `base-sepolia`, único escenario donde la diferencia entre patas es el único
+ * testigo— la misma terna imprimía `paso 4 OK` sobre el camino del dinero.
+ * Ahora la 2ª pata pasa por `evaluateStepPrecondition` con la etiqueta
+ * `STEP_CONTROL_LEG`, y un control no medible hace el paso **INCONCLUSO** en vez
+ * de OK. El número de peticiones no cambia: la guarda corre sobre una respuesta
+ * que ya se pidió.
+ *
  * CUÁNDO UN INCONCLUSO CAMBIA EL EXIT CODE (fix-pack AR it.2 · `BLQ-BAJO-3`).
  * La versión anterior decía que ningún inconcluso lo cambia, y lo justificaba
  * así: el caso "este ambiente debería delegar y no delega" lo cazan antes —con
@@ -123,6 +140,11 @@ export const USAGE = [
   'ambiente que no delega NO se reporta como si la lista blanca estuviera rota, y',
   'uno que sí delega NO se reporta OK sin haber medido nada. La última línea dice',
   'siempre cuántos inconclusos hubo.',
+  '',
+  'Los pasos 3 y 4 hacen DOS peticiones cada uno y las comparan. Un INCONCLUSO dice',
+  'CUÁL de las dos no se pudo medir: sin aclaración es la que lleva el header, y',
+  '"(pata de control, sin el header)" es la otra. Se arreglan distinto: un 503 en la',
+  'primera = este ambiente no delega; un 429 en la segunda = reintentar más tarde.',
 ].join('\n')
 
 export const EXIT_OK = 0
@@ -224,6 +246,18 @@ export function evaluateDisabled(host, endpoint, status, bodyText) {
  * no comparar bodies de algo que ya no entendemos.
  */
 export const GATEWAY_EXECUTED_STATUSES = Object.freeze([400, 402, 403])
+
+/**
+ * Etiqueta del paso cuando la guarda se aplica a la **2ª pata** de una terna —
+ * la que va SIN el header, o sea el discriminador (fix-pack CR · `MNR-CR-1`).
+ *
+ * Existe para que el operador no lea `paso 4 INCONCLUSO` sin saber CUÁL de las
+ * dos peticiones no se pudo medir: son dos causas distintas y se arreglan
+ * distinto (la 1ª pata en 503 = el ambiente no delega; la 2ª en 429 = reintentar
+ * más tarde). Es una función y no un literal para que las dos llamadas no puedan
+ * divergir.
+ */
+export const STEP_CONTROL_LEG = (step) => `${step} (pata de control, sin el header)`
 
 /**
  * GUARDA DE ENTRADA de los pasos 2, 3, 4 y 4b — fix-pack AR `BLQ-BAJO-1`,
@@ -590,7 +624,10 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
       body: CONTRACTING_BODY,
     })
     // La guarda corre ANTES de pedir la 2ª pata: si la 1ª no es medible, la 2ª
-    // tampoco lo es y sería una petición al pedo.
+    // tampoco lo es y sería una petición al pedo. Pero la implicación NO vale al
+    // revés (fix-pack CR · `MNR-CR-1`): la 1ª pata puede ser medible y la 2ª no,
+    // y la 2ª es justamente el DISCRIMINADOR de la terna. Por eso pasa por la
+    // MISMA guarda antes de compararla.
     const skip = evaluateStepPrecondition(host, 3, 'compose', withHeader.status, withHeader.text)
     if (skip) {
       inconclusive.push(skip)
@@ -601,9 +638,21 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
         headers: jsonHeaders,
         body: CONTRACTING_BODY,
       })
-      const problem = evaluateContractingTerna(host, withHeader.text, without.text)
-      if (problem) failures.push(problem)
-      else log(formatLine(host, 'paso 3 OK: x-a2a-contracting-depth atraviesa el proxy'))
+      const skipControl = evaluateStepPrecondition(
+        host,
+        STEP_CONTROL_LEG(3),
+        'compose',
+        without.status,
+        without.text,
+      )
+      if (skipControl) {
+        inconclusive.push(skipControl)
+        log(skipControl)
+      } else {
+        const problem = evaluateContractingTerna(host, withHeader.text, without.text)
+        if (problem) failures.push(problem)
+        else log(formatLine(host, 'paso 3 OK: x-a2a-contracting-depth atraviesa el proxy'))
+      }
     }
   } catch (err) {
     failures.push(formatLine(host, `paso 3 FALLA: ${String(err)}`))
@@ -626,14 +675,29 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
         headers: jsonHeaders,
         body: PAYMENT_CHAIN_BODY,
       })
-      const problem = evaluatePaymentChainTerna(
+      // fix-pack CR `MNR-CR-1` — ver el comentario del paso 3. Acá pesa más: el
+      // día que el default del gateway sea `base-sepolia`, la ÚNICA cosa que
+      // distingue "el header atravesó" de "no atravesó" es esta 2ª pata.
+      const skipControl = evaluateStepPrecondition(
         host,
-        withHeader.text,
+        STEP_CONTROL_LEG(4),
+        'compose',
+        without.status,
         without.text,
-        'eip155:84532',
       )
-      if (problem) failures.push(problem)
-      else log(formatLine(host, 'paso 4 OK: x-payment-chain atraviesa el proxy'))
+      if (skipControl) {
+        inconclusive.push(skipControl)
+        log(skipControl)
+      } else {
+        const problem = evaluatePaymentChainTerna(
+          host,
+          withHeader.text,
+          without.text,
+          'eip155:84532',
+        )
+        if (problem) failures.push(problem)
+        else log(formatLine(host, 'paso 4 OK: x-payment-chain atraviesa el proxy'))
+      }
     }
   } catch (err) {
     failures.push(formatLine(host, `paso 4 FALLA: ${String(err)}`))

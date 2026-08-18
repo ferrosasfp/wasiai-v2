@@ -49,6 +49,7 @@ interface SmokeModule {
   ) => string | null
   evaluateInvalidChainSlug: (host: string, status: number, body: string) => string | null
   GATEWAY_EXECUTED_STATUSES: readonly number[]
+  STEP_CONTROL_LEG: (step: number | string) => string
   decideVerdict: (
     host: string,
     failureCount: number,
@@ -637,5 +638,129 @@ describe('paso 6: delegation.match', () => {
     const out = s.evaluateDelegationMatch('algo.vercel.app', 'UNDECLARED_HOST', 'preview')
     expect(out?.fail).toBe(false)
     expect(out?.message).toContain('PREVIEW_NOT_DECLARED')
+  })
+})
+
+describe('fix-pack CR `MNR-CR-1`: la guarda cubre las DOS patas, no sólo la primera', () => {
+  /**
+   * El defecto que cerró este fix-pack: `evaluateStepPrecondition` se aplicaba
+   * sólo a la petición CON el header. La pata SIN el header —el discriminador de
+   * la terna, la que decide si "las dos son iguales"— se comparaba sin mirar su
+   * status. Con las primeras patas medibles y las de control en `429`, el smoke
+   * imprimía `paso 3 OK` + `paso 4 OK` + `SMOKE OK` y salía **0**.
+   *
+   * Estos tests son el candado. Los tres primeros mueren si se le saca la guarda
+   * a la 2ª pata; el cuarto es la calibración en la otra dirección (que la guarda
+   * nueva no convierta en INCONCLUSO una terna que sí se puede medir).
+   */
+
+  /** Terna: 1ª pata medible; 2ª pata (sin header) con el status que se le pase. */
+  function fetchConPataDeControl(statusControl: number, bodyControl: string) {
+    let contractingSinHeader = 0
+    return vi.fn(async (url: string, init: RequestInit) => {
+      const headers = new Headers(init?.headers as HeadersInit)
+      if (String(url).includes('/api/v1/status/delegation')) {
+        return new Response(JSON.stringify(STATUS_OK), { status: 200 })
+      }
+      const esPago = String(init?.body ?? '').includes('wasi-chainlink-price')
+      if (headers.get('x-a2a-contracting-depth') === '99') {
+        return new Response('{"error":"CONTRACTING_DEPTH_EXCEEDED"}', { status: 400 })
+      }
+      if (headers.get('x-payment-chain') === 'base-sepolia') {
+        return new Response('{"accepts":[{"network":"eip155:84532","maxAmountRequired":"1"}]}', {
+          status: 402,
+        })
+      }
+      if (headers.get('x-payment-chain') === s.INVALID_CHAIN_SLUG) {
+        return new Response('{"error_code":"CHAIN_NOT_SUPPORTED"}', { status: 400 })
+      }
+      // Pata SIN header del paso 4.
+      if (esPago) return new Response(bodyControl, { status: statusControl })
+      // Los 2 POST del paso 2 son medibles; el 3.º es la pata sin header del paso 3.
+      contractingSinHeader += 1
+      if (contractingSinHeader <= 2) {
+        return new Response('{"code":"VALIDATION_ERROR","requestId":"aaa"}', { status: 400 })
+      }
+      return new Response(bodyControl, { status: statusControl })
+    })
+  }
+
+  async function correr(statusControl: number, bodyControl: string) {
+    const log = vi.fn()
+    const logError = vi.fn()
+    const code = await s.runSmoke(
+      { host: 'app.wasiai.io', gateway: null },
+      { fetchImpl: fetchConPataDeControl(statusControl, bodyControl), log, logError },
+    )
+    const out = [...log.mock.calls, ...logError.mock.calls].map((c) => String(c[0])).join('\n')
+    return { code, out }
+  }
+
+  it('T-CR1-1: primeras patas medibles + patas de control en 429 ⇒ NI `paso 3 OK` NI `paso 4 OK`', async () => {
+    const { out } = await correr(429, '{"error":"rate limited"}')
+    // Las dos líneas EXACTAS que el CR reprodujo. Son la regresión.
+    expect(out).not.toContain('paso 3 OK')
+    expect(out).not.toContain('paso 4 OK')
+    expect(out).toContain('paso 3 (pata de control, sin el header) INCONCLUSO')
+    expect(out).toContain('paso 4 (pata de control, sin el header) INCONCLUSO')
+    // Y con la causa nombrada, no inventada.
+    expect(out).toContain('429 (rate limit)')
+  })
+
+  it('T-CR1-2: y el veredicto ya no puede decir `SMOKE OK` con exit 0', async () => {
+    const { code, out } = await correr(429, '{"error":"rate limited"}')
+    expect(code).toBe(1)
+    // Antes del fix esta línea salía textual, con EXIT=0.
+    expect(out).not.toContain('[app.wasiai.io] SMOKE OK')
+    expect(out).toContain('2 paso(s) INCONCLUSO(s)')
+  })
+
+  it('T-CR1-3: el 502/504 que genera EL PROXY en la 2ª pata tampoco da OK', async () => {
+    // La otra mitad de `BLQ-BAJO-2`: el proxy fabrica estos dos bodies sin que el
+    // gateway ejecute nada, y son IGUALES con y sin el header ⇒ comparar patas
+    // acusaría a la lista blanca por un timeout.
+    const { out } = await correr(504, '{"error":"GATEWAY_TIMEOUT"}')
+    expect(out).not.toContain('paso 4 OK')
+    expect(out).toContain('paso 4 (pata de control, sin el header) INCONCLUSO')
+    expect(out).not.toContain('el header no atraviesa el proxy')
+  })
+
+  it('T-CR1-4 (calibración inversa): con las dos patas medibles el paso sigue dando OK y exit 0', async () => {
+    // Sin este control, "arreglar" el hallazgo mandando todo a INCONCLUSO
+    // pasaría los tres tests de arriba y dejaría el smoke sin capacidad de medir.
+    const { code, out } = await correr(400, '{"code":"VALIDATION_ERROR","requestId":"bbb"}')
+    expect(out).toContain('paso 3 OK: x-a2a-contracting-depth atraviesa el proxy')
+    expect(out).toContain('paso 4 OK: x-payment-chain atraviesa el proxy')
+    expect(out).not.toContain('INCONCLUSO')
+    expect(code).toBe(0)
+  })
+
+  it('T-CR1-5: la etiqueta de la pata de control es UNA sola y dice cuál petición no se midió', () => {
+    // Es una función y no dos literales para que las llamadas de los pasos 3 y 4
+    // no puedan divergir; el test fija el texto que lee el operador.
+    expect(s.STEP_CONTROL_LEG(3)).toBe('3 (pata de control, sin el header)')
+    expect(s.STEP_CONTROL_LEG(4)).toBe('4 (pata de control, sin el header)')
+    // Y el mensaje resultante distingue las dos causas, que se arreglan distinto.
+    const msg = s.evaluateStepPrecondition(
+      'app.wasiai.io',
+      s.STEP_CONTROL_LEG(4),
+      'compose',
+      429,
+      'Too Many Requests',
+    )
+    expect(msg).toContain('paso 4 (pata de control, sin el header) INCONCLUSO')
+  })
+
+  it('T-CR1-6: el `USAGE` que lee el operador y la etiqueta real no pueden divergir', () => {
+    // El bloque de las 17:35 del auto-blindaje: la conducta escrita en dos
+    // lugares (docblock + `USAGE`) y sólo uno actualizado. `USAGE` es una
+    // constante de strings y hasta acá NINGÚN test la comparaba con la conducta.
+    // Este candado ata la frase del `USAGE` al valor que produce el código: un
+    // rename de `STEP_CONTROL_LEG` deja el `USAGE` viejo y pone esto rojo.
+    expect(s.USAGE).toContain('pata de control, sin el header')
+    expect(s.STEP_CONTROL_LEG(4)).toContain('pata de control, sin el header')
+    // Y que el `USAGE` diga que los pasos 3 y 4 hacen DOS peticiones, que es la
+    // premisa sin la cual la etiqueta no se entiende.
+    expect(s.USAGE).toContain('DOS peticiones')
   })
 })
