@@ -117,3 +117,33 @@ export function resolveDeclaration(
   if (normalized === null) return null
   return DELEGATION_MANIFEST.find((d) => d.hosts.includes(normalized)) ?? null
 }
+
+export interface DelegationDiff {
+  /** declarados en el manifiesto que el runtime NO está delegando */
+  missing: string[]
+  /** delegados en runtime que el manifiesto NO declara */
+  unexpected: string[]
+}
+
+/**
+ * Compara los dos conjuntos COMO CONJUNTOS (CD-16), nunca por igualdad de
+ * array: un `DRIFT` disparado por orden de inserción sería una alarma falsa
+ * diaria, y una alarma falsa diaria es la forma más rápida de volver a no
+ * mirar nada. Las dos salidas van ordenadas alfabéticamente para que el
+ * mensaje del cron sea estable entre corridas.
+ *
+ * Lo consumen tanto `GET /api/v1/status/delegation` (para el veredicto
+ * MATCH/DRIFT) como `GET /api/cron/delegation-drift` (para nombrar cada
+ * endpoint que difiere): una sola fórmula, dos consumidores.
+ */
+export function diffDelegation(
+  runtime: readonly string[],
+  declared: readonly string[],
+): DelegationDiff {
+  const runtimeSet = new Set(runtime)
+  const declaredSet = new Set(declared)
+  return {
+    missing: [...declaredSet].filter((e) => !runtimeSet.has(e)).sort(),
+    unexpected: [...runtimeSet].filter((e) => !declaredSet.has(e)).sort(),
+  }
+}

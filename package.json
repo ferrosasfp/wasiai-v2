@@ -30,7 +30,8 @@
     "test:e2e:fuji": "npx tsx scripts/test-e2e-fuji.ts",
     "test:api": "bash scripts/test-api.sh",
     "verify:receipt": "npx tsx scripts/verify-receipt.ts",
-    "validate:env": "node scripts/validate-env.js"
+    "validate:env": "node scripts/validate-env.js",
+    "smoke:delegation": "node scripts/smoke-delegation.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.40.0",
