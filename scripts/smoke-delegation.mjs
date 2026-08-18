@@ -54,13 +54,31 @@
  *     encadenadas no**.
  * Un paso inconcluso NO suma a `failures`.
  *
- * POR QUÉ UN INCONCLUSO NO CAMBIA EL EXIT CODE, Y POR QUÉ ESO NO AFLOJA NADA:
- * el caso "este ambiente debería delegar y no delega" NO llega nunca a los
- * pasos 3/4/4b como inconcluso — lo cazan antes, y con exit 1, el paso 2 (AC-8:
- * figura en `delegation.runtime` y contesta `503 *_DISABLED`) o el paso 6 (AC-7:
- * `runtime` vacío contra un manifiesto que declara endpoints ⇒ `DRIFT`). Los
- * inconclusos que quedan son los del ambiente que el manifiesto declara como no
- * delegante. Por eso la última línea NUNCA dice `SMOKE OK` a secas cuando hubo
+ * CUÁNDO UN INCONCLUSO CAMBIA EL EXIT CODE (fix-pack AR it.2 · `BLQ-BAJO-3`).
+ * La versión anterior decía que ningún inconcluso lo cambia, y lo justificaba
+ * así: el caso "este ambiente debería delegar y no delega" lo cazan antes —con
+ * exit 1— el paso 2 (AC-8) o el paso 6 (AC-7, `DRIFT`). **Ese argumento no
+ * aplicaba a la rama que el propio fix-pack agregó**: con un `429` el paso 2 no
+ * caza nada (su aserción es "no es `*_DISABLED`", que un 429 satisface
+ * VACUAMENTE) y el paso 6 sólo lee datos del endpoint de estado. Resultado
+ * medido: `paso 2 OK` sobre un 429, pasos 3/4/4b inconclusos, **los tres headers
+ * del camino del dinero medidos CERO veces y el proceso saliendo 0** — y
+ * reintentar el smoke, la reacción más natural ante un resultado dudoso, es
+ * justo lo que dispara el 429.
+ *
+ * La regla, ahora, tiene dos mitades:
+ *   1. El paso 2 distingue "no es `*_DISABLED`" de "no se pudo medir": pasa por
+ *      la misma guarda positiva que los pasos 3/4/4b, así que ya no puede decir
+ *      OK sobre un 429/502/504/500/404.
+ *   2. El exit code lo decide `decideVerdict`: si el ambiente **declara**
+ *      delegar (`delegation.runtime` trae `compose` u `orchestrate`) y quedó
+ *      algún paso sin medir, sale **1**. Lo declarado es la vara: un ambiente
+ *      que dice delegar y no deja medir NO es un OK.
+ * El caso del ambiente que el manifiesto declara como NO delegante
+ * (`wasiai-v2` / `wasiai-v2.vercel.app`, `503 *_DISABLED`, DT-2 B+) sigue
+ * saliendo **0**: ahí no hay nada que medir, y una alarma que suena siempre es
+ * una alarma apagada.
+ * En los dos casos la última línea NUNCA dice `SMOKE OK` a secas cuando hubo
  * inconclusos: dice cuántos, y que los headers NO se verificaron acá.
  *
  * NINGUNO DE LOS 7 PASOS MUEVE FONDOS. Los pasos 3-5 cortan en 400/402: el 402
@@ -378,6 +396,53 @@ export function evaluateDelegationMatch(host, match, vercelEnv) {
   }
 }
 
+/**
+ * Veredicto final: exit code + la línea que lo explica — fix-pack AR it.2
+ * (`BLQ-BAJO-3`). Función pura y exportada para que las cuatro combinaciones se
+ * puedan medir sin red: es la que decide si una corrida que no midió nada sale 0.
+ *
+ * `declaresDelegation` = el endpoint de estado declaró `compose` u `orchestrate`
+ * en `delegation.runtime`. Un ambiente que DECLARA delegar y no deja medir los
+ * headers del camino del dinero **no es un OK**; uno que declara no delegar, sí.
+ */
+export function decideVerdict(host, failureCount, inconclusiveCount, declaresDelegation) {
+  const suffix = inconclusiveCount > 0 ? ` + ${inconclusiveCount} paso(s) INCONCLUSO(s)` : ''
+  if (failureCount > 0) {
+    return {
+      exitCode: EXIT_FAIL,
+      isError: true,
+      line: formatLine(host, `SMOKE FALLA — ${failureCount} problema(s)${suffix}`),
+    }
+  }
+  if (inconclusiveCount > 0 && declaresDelegation) {
+    return {
+      exitCode: EXIT_FAIL,
+      isError: true,
+      line: formatLine(
+        host,
+        `SMOKE FALLA — 0 problema(s)${suffix}: este ambiente DECLARA delegar ` +
+          '(delegation.runtime) y los headers del camino del dinero NO se midieron ' +
+          'ninguna vez. Resolver la causa de cada INCONCLUSO y volver a correrlo',
+      ),
+    }
+  }
+  // Sin fallas pero con pasos que no se pudieron medir, el veredicto NO puede
+  // ser `SMOKE OK` a secas: sería afirmar que los headers atraviesan el proxy en
+  // un ambiente donde no se midió.
+  if (inconclusiveCount > 0) {
+    return {
+      exitCode: EXIT_OK,
+      isError: false,
+      line: formatLine(
+        host,
+        `SMOKE OK — ${inconclusiveCount} paso(s) INCONCLUSO(s): en este ambiente NO se ` +
+          'verificó que los headers atraviesen el proxy',
+      ),
+    }
+  }
+  return { exitCode: EXIT_OK, isError: false, line: formatLine(host, 'SMOKE OK') }
+}
+
 const DEFAULT_DEPS = {
   fetchImpl: (...args) => fetch(...args),
   log: (line) => console.log(line),
@@ -443,6 +508,11 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
     ? status.delegation.runtime
     : []
   const ac8Targets = delegatedRuntime.filter((e) => e === 'compose' || e === 'orchestrate')
+  // fix-pack AR it.2 `BLQ-BAJO-3`: lo que el ambiente DECLARA es la vara con la
+  // que se decide el exit code ante pasos sin medir. Se toma del endpoint de
+  // estado, no de una lista local: si el paso 1 falló, no hay declaración y los
+  // inconclusos no cambian el código (el paso 1 ya sale con 1 por su cuenta).
+  const declaresDelegation = ac8Targets.length > 0
   // fix-pack AR `BLQ-BAJO-1`: el paso 2 imprime su OMITIDO como el 5. Antes, sin
   // endpoints que mirar, no imprimía NADA y su silencio se leía como un OK.
   if (ac8Targets.length === 0) {
@@ -464,8 +534,20 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
         body: CONTRACTING_BODY,
       })
       const disabled = evaluateDisabled(host, endpoint, res.status, res.text)
-      if (disabled) failures.push(disabled.message)
-      else log(formatLine(host, `paso 2 OK: /${endpoint} responde ${res.status} (no *_DISABLED)`))
+      if (disabled) {
+        failures.push(disabled.message)
+      } else {
+        // fix-pack AR it.2 `BLQ-BAJO-3`: "no es *_DISABLED" no es lo mismo que
+        // "lo medí". Sin esta guarda, un 429/502/504/500/404 imprimía
+        // `paso 2 OK` y AC-8 quedaba sin medir con el proceso saliendo 0.
+        const skip = evaluateStepPrecondition(host, 2, endpoint, res.status, res.text)
+        if (skip) {
+          inconclusive.push(skip)
+          log(skip)
+        } else {
+          log(formatLine(host, `paso 2 OK: /${endpoint} responde ${res.status} (no *_DISABLED)`))
+        }
+      }
     } catch (err) {
       failures.push(formatLine(host, `paso 2 FALLA: /${endpoint} ${String(err)}`))
     }
@@ -595,27 +677,10 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
   }
 
   for (const f of failures) logError(f)
-  const inconclusiveSuffix =
-    inconclusive.length > 0 ? ` + ${inconclusive.length} paso(s) INCONCLUSO(s)` : ''
-  if (failures.length > 0) {
-    logError(formatLine(host, `SMOKE FALLA — ${failures.length} problema(s)${inconclusiveSuffix}`))
-    return EXIT_FAIL
-  }
-  // Sin fallas pero con pasos que no se pudieron medir, el veredicto NO puede
-  // ser `SMOKE OK` a secas: sería afirmar que los headers atraviesan el proxy en
-  // un ambiente donde no se midió.
-  if (inconclusive.length > 0) {
-    log(
-      formatLine(
-        host,
-        `SMOKE OK — ${inconclusive.length} paso(s) INCONCLUSO(s): en este ambiente NO se ` +
-          'verificó que los headers atraviesen el proxy',
-      ),
-    )
-    return EXIT_OK
-  }
-  log(formatLine(host, 'SMOKE OK'))
-  return EXIT_OK
+  const verdict = decideVerdict(host, failures.length, inconclusive.length, declaresDelegation)
+  if (verdict.isError) logError(verdict.line)
+  else log(verdict.line)
+  return verdict.exitCode
 }
 
 /**

@@ -49,6 +49,12 @@ interface SmokeModule {
   ) => string | null
   evaluateInvalidChainSlug: (host: string, status: number, body: string) => string | null
   GATEWAY_EXECUTED_STATUSES: readonly number[]
+  decideVerdict: (
+    host: string,
+    failureCount: number,
+    inconclusiveCount: number,
+    declaresDelegation: boolean,
+  ) => { exitCode: number; isError: boolean; line: string }
   INVALID_CHAIN_SLUG: string
   evaluateContractingTerna: (host: string, a: string, b: string) => string | null
   evaluatePaymentChainTerna: (
@@ -468,6 +474,88 @@ describe('fix-pack AR it.2 `BLQ-BAJO-2`: el criterio es POSITIVO, no una lista d
     expect(out).toContain('paso 4 INCONCLUSO')
     expect(out).toContain('paso 4b INCONCLUSO')
     expect(out).toContain('no contesta a tiempo')
+  })
+})
+
+describe('fix-pack AR it.2 `BLQ-BAJO-3`: un ambiente que DECLARA delegar y no deja medir NO es un OK', () => {
+  it('T-FP3-1: decideVerdict — las cuatro combinaciones', () => {
+    // (a) hay fallas ⇒ 1, con el sufijo de inconclusos.
+    const conFallas = s.decideVerdict('app.wasiai.io', 3, 2, true)
+    expect(conFallas.exitCode).toBe(1)
+    expect(conFallas.isError).toBe(true)
+    expect(conFallas.line).toContain('SMOKE FALLA — 3 problema(s)')
+    expect(conFallas.line).toContain('2 paso(s) INCONCLUSO(s)')
+
+    // (b) 0 fallas + inconclusos + el ambiente DECLARA delegar ⇒ 1. Es el caso
+    // que salía 0 y con "paso 2 OK" sobre un 429.
+    const declara = s.decideVerdict('app.wasiai.io', 0, 3, true)
+    expect(declara.exitCode).toBe(1)
+    expect(declara.isError).toBe(true)
+    expect(declara.line).toContain('DECLARA delegar')
+    expect(declara.line).toContain('NO se midieron')
+
+    // (c) 0 fallas + inconclusos + el ambiente NO declara delegar ⇒ 0. El AR
+    // pidió explícitamente no tocar este caso: el manifiesto dice que no delega.
+    const noDeclara = s.decideVerdict('wasiai-v2.vercel.app', 0, 3, false)
+    expect(noDeclara.exitCode).toBe(0)
+    expect(noDeclara.isError).toBe(false)
+    expect(noDeclara.line).toContain('SMOKE OK — 3 paso(s) INCONCLUSO(s)')
+    expect(noDeclara.line).toContain('NO se verificó que los headers atraviesen el proxy')
+
+    // (d) nada que reportar ⇒ 0 y `SMOKE OK` a secas.
+    const limpio = s.decideVerdict('app.wasiai.io', 0, 0, true)
+    expect(limpio.exitCode).toBe(0)
+    expect(limpio.line).toContain('SMOKE OK')
+    expect(limpio.line).not.toContain('INCONCLUSO')
+  })
+
+  it('T-FP3-2: con 429 en todo, el paso 2 NO dice OK y el proceso sale 1', async () => {
+    const log = vi.fn()
+    const logError = vi.fn()
+    // El estado que dispara reintentar el smoke: rate limit del borde en cada
+    // POST. Antes daba `paso 2 OK: /compose responde 429 (no *_DISABLED)`, los
+    // tres headers del camino del dinero medidos cero veces, y EXIT 0.
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).includes('/api/v1/status/delegation')) {
+        return new Response(JSON.stringify(STATUS_OK), { status: 200 })
+      }
+      return new Response('Too Many Requests', { status: 429 })
+    })
+
+    const code = await s.runSmoke(
+      { host: 'app.wasiai.io', gateway: null },
+      { fetchImpl, log, logError },
+    )
+
+    const out = [...log.mock.calls, ...logError.mock.calls].map((c) => String(c[0])).join('\n')
+    expect(out).not.toContain('paso 2 OK')
+    expect(out).toContain('paso 2 INCONCLUSO')
+    expect(out).toContain('rate limit')
+    // Ni una acusación falsa: el 429 tampoco es "el header no atraviesa".
+    expect(out).not.toContain('el header no atraviesa el proxy')
+    expect(code).toBe(1)
+    expect(out).toContain('DECLARA delegar')
+  })
+
+  it('T-FP3-3: con el gateway caído (504) en un ambiente que declara delegar, también sale 1', async () => {
+    const log = vi.fn()
+    const logError = vi.fn()
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).includes('/api/v1/status/delegation')) {
+        return new Response(JSON.stringify(STATUS_OK), { status: 200 })
+      }
+      return new Response(JSON.stringify({ error: 'GATEWAY_TIMEOUT' }), { status: 504 })
+    })
+    const code = await s.runSmoke(
+      { host: 'app.wasiai.io', gateway: null },
+      { fetchImpl, log, logError },
+    )
+    // Los dos hallazgos juntos: sin acusación falsa (BLQ-BAJO-2) Y sin exit 0
+    // sobre una corrida que no midió nada (BLQ-BAJO-3).
+    expect(code).toBe(1)
+    const out = [...log.mock.calls, ...logError.mock.calls].map((c) => String(c[0])).join('\n')
+    expect(out).not.toContain('el header no atraviesa el proxy')
+    expect(out).toContain('DECLARA delegar')
   })
 })
 
