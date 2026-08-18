@@ -27,6 +27,9 @@ import {
 import {
   PASSTHROUGH_HEADERS,
   PASSTHROUGH_HEADER_ENTRIES,
+  REJECTION_FAMILIES,
+  REVERSAL_WATCHLIST,
+  WKH_361_NEW_HEADERS,
 } from '../passthrough-headers'
 
 describe('parseDelegatedEndpoints', () => {
@@ -414,6 +417,69 @@ describe('PASSTHROUGH_HEADERS (WKH-361)', () => {
     // Alias muerto (CD-12): se conserva por regresión cero y se resuelve en A-5.
     expect(orphans[0]?.consumer).toBe('none')
     expect(orphans[0]?.citation).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WKH-361 fix-pack AR `BLQ-MED-1` — el radio de impacto no se puede subdeclarar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('REJECTION_FAMILIES: las 6 familias que habilita esta HU', () => {
+  it('T-FP-1: son exactamente estos 6 códigos (el literal es el contrato)', () => {
+    // Sacar una fila de acá pone rojo este test: es el punto. La primera versión
+    // del radio de impacto declaraba 3 filas y vigilaba 2 códigos, y nada lo
+    // desmintió porque vivía en prosa.
+    expect([...REVERSAL_WATCHLIST].sort()).toEqual([
+      'CHAIN_NOT_SUPPORTED',
+      'CONTRACTING_CHAIN_MALFORMED',
+      'CONTRACTING_DEPTH_EXCEEDED',
+      'CONTRACTING_DEPTH_MALFORMED',
+      'CONTRACTING_LOOP_DETECTED',
+      'INSUFFICIENT_BUDGET',
+    ])
+    expect(new Set(REVERSAL_WATCHLIST).size).toBe(REJECTION_FAMILIES.length)
+  })
+
+  it('T-FP-2: CADA header nuevo de WKH-361 declara al menos una familia', () => {
+    // El criterio que cierra el agujero hacia adelante: admitir un header sin
+    // declarar qué rechazos habilita deja de ser posible en silencio.
+    for (const header of WKH_361_NEW_HEADERS) {
+      const families = REJECTION_FAMILIES.filter((f) => f.header === header)
+      expect(families.length, `${header} no declara ninguna familia de rechazo`).toBeGreaterThan(0)
+    }
+  })
+
+  it('T-FP-3: toda familia apunta a un header que el proxy realmente reenvía', () => {
+    for (const f of REJECTION_FAMILIES) {
+      expect(PASSTHROUGH_HEADERS, `${f.code} apunta a un header fuera de la lista`).toContain(
+        f.header,
+      )
+    }
+  })
+
+  it('T-FP-4: o tiene línea de log propia, o tiene el punto ciego ESCRITO — nunca ninguna de las dos', () => {
+    // Es la regla que el AR pidió: si una familia no se puede vigilar desde el
+    // punto de observación declarado, se dice; no se deja afuera en silencio.
+    for (const f of REJECTION_FAMILIES) {
+      const hasLog = typeof f.railwayLogLine === 'string' && f.railwayLogLine.length > 0
+      const hasBlind = typeof f.blindSpot === 'string' && f.blindSpot.length > 0
+      expect(hasLog !== hasBlind, `${f.code}: log=${hasLog} blindSpot=${hasBlind}`).toBe(true)
+    }
+  })
+
+  it('T-FP-5: la única familia sin línea de log es CHAIN_NOT_SUPPORTED, y su punto ciego dice cómo suplirlo', () => {
+    const blind = REJECTION_FAMILIES.filter((f) => f.railwayLogLine === null)
+    expect(blind.map((f) => f.code)).toEqual(['CHAIN_NOT_SUPPORTED'])
+    expect(blind[0]?.blindSpot).toContain('reqId')
+    expect(blind[0]?.blindSpot).toContain('forward-key source')
+  })
+
+  it('T-FP-6: cada familia cita su emisor en wasiai-a2a y trae el status medido', () => {
+    for (const f of REJECTION_FAMILIES) {
+      expect(f.citation).toMatch(/^wasiai-a2a\/src\/.+:\d+(-\d+)?$/)
+      expect([400, 403]).toContain(f.status)
+      expect(f.trigger.trim().length).toBeGreaterThan(0)
+    }
   })
 })
 

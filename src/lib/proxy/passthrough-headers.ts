@@ -154,3 +154,127 @@ export const PASSTHROUGH_HEADER_ENTRIES: readonly PassthroughHeaderEntry[] = [
 export const PASSTHROUGH_HEADERS: readonly string[] = PASSTHROUGH_HEADER_ENTRIES.map(
   (e) => e.header,
 )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RADIO DE IMPACTO — fix-pack AR · `BLQ-MED-1`
+//
+// Admitir un header no es sólo "ahora pasa": es HABILITAR TODOS LOS RECHAZOS que
+// ese header puede provocar en el gateway. Peticiones que hoy funcionan (porque
+// el proxy descarta el header y se aplica el default) pasan a cortar en 400/403.
+//
+// El AR encontró que el radio declarado eran 3 filas y el disparador de reversa
+// vigilaba 2 códigos, cuando las familias nuevas son SEIS. La causa no fue
+// descuido: era prosa en un `.md`, y la prosa no falla cuando se agrega un
+// header. Por eso el radio vive acá, al lado de la lista blanca, con un test que
+// exige que CADA header nuevo declare qué rechazos habilita y CÓMO SE VE cada
+// uno desde el punto de observación de la reversa.
+//
+// ⚠️ ESTO NO ES UNA COPIA DEL CÓDIGO DEL GATEWAY: es lo medido el 2026-08-18
+// contra `https://wasiai-a2a-production.up.railway.app/compose` con body
+// `{"steps":[{"agent":"wasi-chainlink-price"}]}`. Las 6 filas se reprodujeron una
+// por una; `app.wasiai.io` devolvió `402` (el default) en las 6.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RejectionFamily {
+  /** `error_code` que devuelve `wasiai-a2a`. */
+  code: string
+  /** Status HTTP medido. */
+  status: number
+  /** Cuál de los headers de la lista blanca lo habilita. */
+  header: string
+  /** Valor con el que se reproduce. */
+  trigger: string
+  /**
+   * Cómo se ve en los logs de Railway del gateway (A-4, el punto de observación
+   * declarado del disparador de reversa). `null` ⇒ NO tiene línea propia y sólo
+   * se ve como un `400` anónimo: ese caso OBLIGA a llenar `blindSpot`.
+   */
+  railwayLogLine: string | null
+  /** Por qué no se puede vigilar directo, y con qué se suple. */
+  blindSpot: string | null
+  /** `archivo:línea` del emisor en `wasiai-a2a` @ `10a6eb1`. */
+  citation: string
+}
+
+export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
+  {
+    code: 'CHAIN_NOT_SUPPORTED',
+    status: 400,
+    header: 'x-payment-chain',
+    trigger: "un slug de red que el gateway no conoce (p. ej. 'nonexistent-chain-xyz'), o vacío",
+    railwayLogLine: null,
+    blindSpot:
+      'el emisor NO loguea: `reply.status(400).send(...)` sin `request.log`. En Railway sólo se ' +
+      've un 400 sin código. Se identifica cruzando por `reqId` con la línea `forward-key ' +
+      'source` (`{forwardSource:"v2-proxy"}`) y descartando los 400 que sí traen ' +
+      '`contracting-guard.rejected`. Cerrarlo de verdad = agregar un log en `wasiai-a2a` ⇒ ' +
+      'CD-5 lo prohíbe en esta HU ⇒ queda como acción declarada, no ejecutada.',
+    citation: 'wasiai-a2a/src/middleware/a2a-key.ts:366-370',
+  },
+  {
+    code: 'INSUFFICIENT_BUDGET',
+    status: 403,
+    header: 'x-payment-chain',
+    trigger: 'una red en la que la agent key del caller no tiene saldo',
+    railwayLogLine: "log.warn 'a2a-key.insufficient-budget' con {keyId, chainKey, defaultApplied}",
+    blindSpot: null,
+    citation: 'wasiai-a2a/src/middleware/a2a-key.ts:1264-1275',
+  },
+  {
+    code: 'CONTRACTING_DEPTH_EXCEEDED',
+    status: 400,
+    header: 'x-a2a-contracting-depth',
+    trigger:
+      "depth >= depthMax. El card vivo declara depthMax: 2, así que '2' —un valor normal para " +
+      "un intermediario de segundo nivel— pasa de funcionar a 400. Medido: '1' ⇒ 402, '2' ⇒ 400",
+    railwayLogLine: "log.warn 'contracting-guard.rejected' con {code, layer:'depth', depthMax}",
+    blindSpot: null,
+    citation: 'wasiai-a2a/src/lib/contracting-chain.ts:837-838',
+  },
+  {
+    code: 'CONTRACTING_DEPTH_MALFORMED',
+    status: 400,
+    header: 'x-a2a-contracting-depth',
+    trigger: "cualquier valor que no sea un entero decimal de 1 a 3 dígitos (p. ej. 'abc')",
+    railwayLogLine: "log.warn 'contracting-guard.rejected' con {code, layer:'depth'}",
+    blindSpot: null,
+    citation: 'wasiai-a2a/src/lib/contracting-chain.ts:823-824',
+  },
+  {
+    code: 'CONTRACTING_CHAIN_MALFORMED',
+    status: 400,
+    header: 'x-a2a-contracting-chain',
+    trigger: "un valor que no es CSV de hostnames pelados (p. ej. 'no es un host!!')",
+    railwayLogLine:
+      "log.warn 'contracting-guard.rejected' con {code, layer:'chain', chainHeaderChars}",
+    blindSpot: null,
+    citation: 'wasiai-a2a/src/lib/contracting-chain.ts:810-816',
+  },
+  {
+    code: 'CONTRACTING_LOOP_DETECTED',
+    status: 400,
+    header: 'x-a2a-contracting-chain',
+    trigger: 'que el propio host del gateway figure en la cadena',
+    railwayLogLine: "log.warn 'contracting-guard.rejected' con {code, layer:'chain'}",
+    blindSpot: null,
+    citation: 'wasiai-a2a/src/lib/contracting-chain.ts:830-832',
+  },
+]
+
+/**
+ * Los códigos que el disparador de reversa tiene que vigilar en la ventana de 60
+ * minutos posterior a la promoción de `wasiai-prod` (`story-file.md` §13).
+ * Se DERIVA de `REJECTION_FAMILIES` en vez de escribirse a mano: una lista a mano
+ * es lo que quedó corta la primera vez.
+ */
+export const REVERSAL_WATCHLIST: readonly string[] = REJECTION_FAMILIES.map((f) => f.code)
+
+/**
+ * Los tres headers que WKH-361 agrega a la lista blanca — o sea, los únicos cuyo
+ * radio de impacto es NUEVO. Los otros 8 ya se reenviaban desde WKH-66.
+ */
+export const WKH_361_NEW_HEADERS: readonly string[] = [
+  'x-a2a-contracting-chain',
+  'x-a2a-contracting-depth',
+  'x-payment-chain',
+]
