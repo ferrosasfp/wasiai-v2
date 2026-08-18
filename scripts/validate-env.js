@@ -127,6 +127,65 @@ function printReport({ ok, missing, warnings }, totalKeys) {
   }
 }
 
+// ─── WKH-361: regla CONDICIONAL para el trío de la delegación ────────────────
+/**
+ * ⚠️ ESTE SCRIPT NO SABE EN QUÉ AMBIENTE CORRE. Sólo mira `process.env` del
+ * shell que lo invoca. Decir lo contrario sería exactamente el over-claim que
+ * abrió WKH-361 (dar por verificado un ambiente que no es el que se midió).
+ * Qué ambiente delega qué lo contesta `GET /api/v1/status/delegation`, que sí
+ * corre dentro del despliegue.
+ *
+ * Las 3 vars NO se agregan a REQUIRED_VARS a propósito: haría fallar a todo
+ * ambiente que legítimamente no delega (hoy caen en `warnings` y el script sale
+ * 0). Lo que sí es un error duro es la combinación incoherente.
+ *
+ * @returns {boolean} true si hay error bloqueante
+ */
+function checkDelegationTrio() {
+  const flag = (process.env.V2_DELEGATE_TO_A2A || '').trim();
+
+  if (flag === '') {
+    console.log(
+      `\n${c.gray}ℹ️  V2_DELEGATE_TO_A2A vacío o ausente: este ambiente NO delega a wasiai-a2a.${c.reset}`,
+    );
+    console.log(
+      `${c.gray}   /compose y /orchestrate responderán 503 *_DISABLED. Es un estado válido, no un error.${c.reset}\n`,
+    );
+    return false;
+  }
+
+  const faltantes = [];
+  for (const key of ['WASIAI_A2A_BASE_URL', 'WASIAI_V2_FORWARD_KEY']) {
+    const v = process.env[key];
+    if (v === undefined || v === '') faltantes.push(key);
+  }
+  if (faltantes.length === 0) {
+    console.log(
+      `\n${c.green}✅ Delegación coherente: V2_DELEGATE_TO_A2A="${flag}" con sus 2 vars presentes.${c.reset}\n`,
+    );
+    return false;
+  }
+
+  console.log(`\n${c.red}${c.bold}❌ CD-1 VIOLADA — delegación incoherente${c.reset}`);
+  console.log(
+    `   ${c.red}V2_DELEGATE_TO_A2A="${flag}" pero falta(n): ${faltantes.join(', ')}${c.reset}`,
+  );
+  console.log(
+    `   ${c.bold}El efecto NO es un 503 acotado en /compose: es un 500 en TODA ruta que${c.reset}`,
+  );
+  console.log(
+    `   ${c.bold}importe \`@/lib/env\`, porque el schema tira en CARGA DE MÓDULO${c.reset}`,
+  );
+  console.log(`   ${c.gray}(src/lib/env.ts:75-86 + :94 — se cae el ambiente entero).${c.reset}`);
+  console.log(
+    `   ${c.gray}Orden de encendido: primero las 2 vars + deploy, después el flag + deploy.${c.reset}`,
+  );
+  console.log(
+    `   ${c.gray}Orden de apagado: el inverso exacto — primero el flag, después las vars.${c.reset}\n`,
+  );
+  return true;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 function main() {
   const envExamplePath = path.resolve(process.cwd(), '.env.example');
@@ -138,7 +197,10 @@ function main() {
   const result = checkEnv(keys);
   printReport(result, keys.length);
 
-  if (result.missing.length > 0) {
+  // WKH-361: aditivo, después de checkEnv y sin tocar REQUIRED_VARS.
+  const delegationError = checkDelegationTrio();
+
+  if (result.missing.length > 0 || delegationError) {
     process.exit(1);
   }
 
