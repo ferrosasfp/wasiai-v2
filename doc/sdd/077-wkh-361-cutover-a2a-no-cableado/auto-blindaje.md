@@ -205,3 +205,27 @@ no existe.
   de `rtk proxy` va un comando solo, sin tuberías.
 - **Cómo lo detecté**: el resultado no cerraba con lo que el AR decía (él citaba
   dos archivos, yo veía uno). Re-medí con `rtk proxy` y aparecieron los dos.
+
+---
+
+### [2026-08-18 15:35] Fix-pack AR — el MISMO off-by-one, otra vez, en el mismo docblock
+
+- **Error**: después de corregir "12 POST" por "el 11.º", escribí en la línea de
+  al lado "el smoke hace 5 POST a `/compose`, así que está por debajo". Conté los
+  POST de la corrida que **acababa de ver** contra `app.wasiai.io` — donde el
+  paso 2 salió OMITIDO porque el endpoint de estado todavía no está desplegado.
+  Con el paso 2 corriendo son **6 a `/compose` + 1 a `/orchestrate`**.
+- **Causa raíz**: conté sobre una corrida DEGRADADA y la reporté como si fuera la
+  normal. Es la misma familia de error que el bloque anterior (contar la unidad
+  equivocada), cometida **veinte minutos después de escribirlo**, lo cual dice
+  algo sobre cuánto sirve documentar una lección sin un instrumento.
+- **Fix**: el docblock enumera de dónde sale cada POST (1 del paso 2, 2 del 3, 2
+  del 4, 1 del 4b, más 1 a `/orchestrate`) en vez de dar un total suelto. Un
+  número que se puede re-derivar leyendo la lista no se puede equivocar en
+  silencio.
+- **Aplicar en**: todo conteo tomado de una corrida propia. Preguntarse **qué
+  ramas NO se ejecutaron en esa corrida** antes de convertirla en el número
+  general. Una corrida donde algo salió OMITIDO/INCONCLUSO no es la corrida
+  típica: es justo la que subestima.
+- **Cómo lo detecté**: re-derivando el número desde el código (contando los
+  `readResponse` por paso) en vez de confiar en la salida que tenía a la vista.

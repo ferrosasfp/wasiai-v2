@@ -25,8 +25,10 @@
  *     declarado de `wasiai-v2` / `wasiai-v2.vercel.app`, DT-2 B+);
  *   - `429` — rate limit del borde; medido el 2026-08-18 contra `app.wasiai.io`:
  *     los 10 primeros POST seguidos a `/compose` pasaron y el 11.º ya devolvió
- *     `429`. El smoke hace 5 POST a `/compose`, así que está por debajo — pero
- *     dos corridas encadenadas no.
+ *     `429`. Una corrida completa del smoke hace **hasta 7 POST al host** (6 a
+ *     `/compose` —1 del paso 2, 2 del 3, 2 del 4, 1 del 4b— y 1 a
+ *     `/orchestrate`), así que UNA corrida entra debajo del límite y **dos
+ *     encadenadas no**.
  * Reportar esos dos como "AC-1 FALLA: el header no atraviesa el proxy" es
  * NOMBRAR LA CAUSA EQUIVOCADA, que es exactamente el error que abrió esta HU un
  * piso más arriba. Un paso inconcluso NO suma a `failures`.

@@ -1043,7 +1043,8 @@ el ambiente entero con 500.
 - [ ] Todo test que toca `@/lib/env` (directa o transitivamente) lo **mockea a nivel de archivo**.
 - [ ] `delegation-off.test.ts` está en su **propio archivo** con su propio mock (DT-9).
 - [ ] Ningún test vive fuera de `src/**/*.test.{ts,tsx}` (CD-14), y el contador `Test Files` subió
-      de **82 → 84 → 87** en W1 y W2.
+      de **82 → 84 → 87** en W1 y W2, y de **87 → 89** en el fix-pack del AR (los 2 archivos nuevos
+      de §4.b). `Tests`: **763 → 797** (+34), 5 skipped en las dos puntas.
 - [ ] `scripts/smoke-delegation.mjs` **no ejecuta nada al importarse** (main-guard, CD-15) y **no
       importa ninguna dependencia** (sólo builtins de Node + `fetch`).
 - [ ] No agregué **ninguna** dependencia a `package.json`.
