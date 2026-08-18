@@ -427,3 +427,73 @@ no existe.
   scripts/smoke-delegation.mjs`, sin argumentos) en vez de sólo el test que lo
   importa. El runner de tests no imprime el `USAGE` completo, y el ojo lo lee
   entero sólo cuando sale por la terminal.
+
+---
+
+### [2026-08-18 22:50] Fix-pack CR — la guarda la puse en la primera pata y no miré la segunda
+
+- **Error**: `MNR-CR-1`. Al invertir la guarda a precondición positiva
+  (`BLQ-BAJO-2`) la apliqué **sólo** a la petición CON el header, en los pasos 3
+  y 4. La pata SIN el header —el discriminador de la terna, la que el propio
+  docblock llama así (*"Si las dos últimas son iguales, el header no llegó"*)— se
+  comparaba sin mirar su status. Medido con stub y sin red, antes del fix:
+  primeras patas medibles + patas de control en `429` ⇒ `paso 3 OK` + `paso 4 OK`
+  + `SMOKE OK`, **exit 0**, sin una línea diciendo que 2 de las 4 respuestas
+  comparadas nunca llegaron al gateway.
+- **Causa raíz**: escribí un comentario que justificaba el orden —*"si la 1ª no
+  es medible, la 2ª tampoco lo es"*— y lo leí como si valiera en las dos
+  direcciones. **Es cierto en una sola**: la 1ª medible NO implica la 2ª medible.
+  Escribir la justificación me hizo sentir que había cubierto el caso, y en
+  realidad cubrí su converso.
+- **Fix**: la 2ª pata pasa por la misma `evaluateStepPrecondition`, con la
+  etiqueta `STEP_CONTROL_LEG(step)` para que el operador sepa CUÁL de las dos
+  peticiones no se midió (se arreglan distinto: 503 en la 1ª = el ambiente no
+  delega; 429 en la 2ª = reintentar). 5 tests nuevos (`T-CR1-1..5`), incluida la
+  calibración inversa `T-CR1-4` (con las dos patas medibles el paso sigue dando
+  OK y exit 0), para que "arreglarlo" mandando todo a INCONCLUSO no pase.
+- **Aplicar en**: **toda guarda que proteja una comparación de N cosas.** La
+  pregunta no es "¿puse la guarda?" sino **"¿cuántas entradas tiene lo que
+  comparo, y cuántas pasan por la guarda?"**. Si el número no coincide, la guarda
+  cubre una parte y el docblock declara el invariante entero. Es exactamente la
+  familia que este fix-pack ya cerró una vez —`BLQ-BAJO-1`, `BLQ-BAJO-2`,
+  `BLQ-BAJO-3`—, en la mitad que no miré.
+- **Cómo lo detecté**: no lo detecté yo. Lo detectó el CR **ejecutando** la
+  terna con la pata de control en 429, no leyendo el código. Mis 3 rondas de
+  tests sobre este paso stubbean la 2ª pata siempre medible: el fixture positivo
+  nunca ejercitó el agujero. El instrumento que lo caza es un stub que devuelve
+  **status distintos por pata**, no un status por corrida.
+
+---
+
+### [2026-08-18 22:55] Fix-pack CR — el `grep` de la frase vieja no caza la frase reformulada
+
+- **Error**: `MNR-CR-2`. El título de un `it(...)` decía *"decide SOLO por el
+  status: un 400 con cualquier body pasa"*, que es **exactamente** la conducta
+  que `MNR-it2-1` eliminó tres horas antes: hoy un 400 sin `CHAIN_NOT_SUPPORTED`
+  FALLA. El título es la línea que sale por la terminal en cada `npm test`; el
+  cuerpo, que ya estaba bien, hay que ir a abrirlo.
+- **Causa raíz**: **tercera aparición del patrón del bloque de las 17:35** (la
+  conducta escrita en dos lugares y sólo uno actualizado) — y sobrevivió a la
+  mitigación que yo mismo me receté ahí. La mitigación era *"`grep` de la frase
+  vieja"*, y la frase vieja acá estaba dicha con **otras palabras**: reescribí el
+  cuerpo del test y el `USAGE`, greppeé la frase del `USAGE`, y el título nunca
+  contuvo esa frase.
+- **Fix**: título reescrito con lo que el test mide hoy. La aserción del 200 se
+  partió a un `it(...)` propio que **ejecuta** la razón por la que `runSmoke` no
+  alcanza esa rama (`GATEWAY_EXECUTED_STATUSES` no contiene 200 ⇒ el paso 4b sale
+  INCONCLUSO antes), en vez de decirlo en un comentario.
+- **Aplicar en**: cambiar una conducta ⇒ **enumerar los títulos de los `it(...)`
+  del archivo de test tocado y leerlos como afirmaciones**, uno por uno. No
+  greppear: el `grep` mide lo que YO escribí antes, y el defecto es que la misma
+  afirmación está dicha de otra manera. Los títulos son un conjunto chico y
+  cerrado: se enumeran. La prosa larga no, y por eso ahí el `grep` sigue siendo
+  lo único que hay.
+- **Cómo lo detecté**: tampoco lo detecté yo. Lo detectó el CR leyendo la salida
+  del runner. Que sea la 3.ª vez en la misma HU dice que la mitigación anterior
+  era del tamaño equivocado, no que faltó cuidado.
+- **La mitigación nueva encontró una 4.ª aparición en el acto**: al enumerar los
+  50 títulos del archivo apareció `it('400 ⇒ sin problema')`
+  (`smoke-delegation.test.ts:564`) — la misma afirmación muerta, dicha en cuatro
+  palabras, que ningún `grep` de la frase vieja podía cazar porque no comparte
+  ni una. Corregido a `400 CON el error_code de la red ⇒ sin problema`. O sea:
+  enumerar no es una precaución teórica, pagó en la primera corrida.

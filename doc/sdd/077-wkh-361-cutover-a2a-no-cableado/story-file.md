@@ -920,6 +920,72 @@ hay que pegar en `hosts`, sin retocarlo a ojo.
 de la ventana de 60 minutos (§13): no toca el camino del dinero, es el fail-loud haciendo su
 trabajo. Confundirlo con un incidente del cutover haría revertir un cambio que funciona.
 
+### `[TBD-4]` El cron se despliega en LOS DOS proyectos Vercel, y TBD-2/TBD-3 miran uno solo
+
+**Origen**: `MNR-CR-5` del CR (`cr-report.md:310-329`). **Declarado, NO implementado** — decisión
+explícita del cierre del fix-pack CR: no se toca código por esto en esta HU.
+
+**El hecho**: `vercel.json:19-22` está versionado en el repo que despliegan **los dos** proyectos, así
+que `/api/cron/delegation-drift` con schedule `0 6 * * *` queda registrado tanto en **`wasiai-prod`**
+(`app.wasiai.io`) como en **`wasiai-v2`** (`wasiai-v2.vercel.app`, staging). `[TBD-2]` y `[TBD-3]`
+nombran **sólo `wasiai-prod`**.
+
+**Qué habría que medir** — es el mismo procedimiento de `[TBD-3]`, corrido en el otro proyecto:
+
+| # | Instrumento | Qué contesta |
+|---|---|---|
+| 1 | Dashboard de Vercel → proyecto **`wasiai-v2`** → **Cron Jobs** → ¿aparece `/api/cron/delegation-drift`? | si el cron existe en staging (`[TBD-2]` para el otro proyecto) |
+| 2 | Si aparece: **Run** desde el dashboard (NO con `curl`, por la misma razón de `[TBD-3]`: un `Host` que mandás vos no puede desmentirte) y leer `environment.host` + `environment.declaredAs` de esa corrida | si el `Host` con que **Vercel** invoca está en `hosts` de `wasiai-v2` (`delegation-manifest.ts:73`) |
+| 3 | Dashboard → proyecto `wasiai-v2` → **Environment Variables** → ¿existe `CRON_SECRET`? | si el handler corta antes en `verifyCronAuth` (`route.ts:119-122`) |
+
+**Las ramas** (ninguna se decide sin la medición de arriba):
+
+| Lo que se mide | Consecuencia | Qué se hace |
+|---|---|---|
+| El cron NO aparece en `wasiai-v2` | no hay ruido; nada que arreglar | se anota y se cierra |
+| Aparece + `declaredAs: "wasiai-v2"` + `CRON_SECRET` presente | el cron corre bien en staging | nada |
+| Aparece + `verdict: "UNDECLARED_HOST"` (500) | **500 diario** con `logger.error` + `Sentry.captureMessage` en el proyecto que nadie mira | agregar ese `environment.host` **crudo** a `hosts` de `wasiai-v2`, con la salida pegada como evidencia. ⛔ `delegated` no se toca (CD-9) |
+| Aparece + sin `CRON_SECRET` | **500 diario** por otra causa (`verifyCronAuth` es fail-closed) | decidir explícitamente: setear `CRON_SECRET` en `wasiai-v2` o declarar por escrito que en staging el cron falla a propósito |
+
+⚠️ **Por qué importa y no es cosmético**: una alarma diaria en un proyecto que nadie mira es
+exactamente el ruido que CD-10 evita con tanto cuidado en `wasiai-prod`. Una alarma que suena todos
+los días es una alarma que se aprende a ignorar — y la que va a sonar el día del drift real es la
+misma.
+
+### `[TBD-5]` El cron no declara `maxDuration` y su timeout de card es del orden del default de la plataforma
+
+**Origen**: `MNR-CR-6` del CR (`cr-report.md:331-347`). **Declarado, NO implementado** — misma
+decisión que `[TBD-4]`.
+
+**El hecho**: `src/app/api/cron/delegation-drift/route.ts:49` declara `export const runtime = 'nodejs'`
+y **no** declara `maxDuration`. Su exemplar sí:
+`src/app/api/cron/reconcile-onchain/route.ts:9-10` (`runtime` **y** `maxDuration = 120`).
+`AGENT_CARD_TIMEOUT_MS = 10_000` (`route.ts:51`, usado en `:78`).
+
+**La garantía en juego**: la rama que CD-10 protege —gateway colgado ⇒ `reachable:false` ⇒ `WARN` ⇒
+**200**— sólo se alcanza si la función vive lo suficiente para que el `AbortController` dispare a los
+10 s. Si el presupuesto efectivo fuera ≤10 s, con el gateway colgado la función muere **antes** del
+abort, la corrida queda registrada como fallida, y el resultado es la alarma falsa por gateway caído
+que CD-10 existe para impedir.
+
+**Qué habría que medir** (el CR declaró no poder: no tiene consola de Vercel):
+
+| # | Instrumento | Qué contesta |
+|---|---|---|
+| 1 | Dashboard de Vercel → proyecto `wasiai-prod` → **Settings → Functions** → *Function Max Duration* / si el proyecto corre con **Fluid compute** | el presupuesto efectivo en segundos |
+| 2 | Comparar ese número contra `AGENT_CARD_TIMEOUT_MS = 10_000` | si el abort llega a dispararse |
+
+**Las ramas**:
+
+| Lo que se mide | Qué significa | Qué se hace |
+|---|---|---|
+| Presupuesto efectivo **> 10 s** (p. ej. Fluid compute, default 300 s) | **no-issue** | se cierra con una línea escrita, no con silencio |
+| Presupuesto efectivo **≤ 10 s** | la garantía de CD-10 no se cumple: la alarma falsa que se quiso evitar se produce igual | declarar `maxDuration` explícito como el exemplar, **o** bajar `AGENT_CARD_TIMEOUT_MS` por debajo del presupuesto |
+
+⚠️ **Lo que NO mide esto**: invocar el cron a mano con `curl` y ver que responde rápido. El caso que
+importa es **el gateway colgado**, y ése no se produce a pedido: hay que leer el presupuesto
+declarado, no cronometrar una corrida sana.
+
 ---
 
 ## 12. Out of Scope — no tocar bajo ninguna circunstancia
