@@ -68,3 +68,39 @@ no existe.
   ¿qué input hace que esto falle sin que exista el bug?
 - **Cómo lo detecté**: releyendo la aserción antes de correrla. La suite habría
   pasado **hoy** (2026-08-18) y habría quedado sembrada.
+
+---
+
+### [2026-08-18 20:35] Wave 2 — la mitad "obvia" de la terna de contracting da FALSO VERDE
+
+- **Error**: casi escribo el paso 3 del smoke con un solo control —
+  "¿la respuesta con `x-a2a-contracting-depth:99` es distinta de la respuesta sin
+  el header?"— que es como está redactada la intuición en §2.2 del Story File
+  ("(2) y (3) son la misma respuesta").
+- **Causa raíz**: **no son byte-idénticas.** El gateway mete un `requestId`
+  distinto en cada respuesta. Medido hoy contra `app.wasiai.io`, con el defecto
+  todavía vivo:
+  ```
+  2 app.wasiai.io depth:99   -> 400 {"error":"Missing or empty steps array","code":"VALIDATION_ERROR","requestId":"8d46cf09-…"}
+  3 app.wasiai.io SIN header -> 400 {"error":"Missing or empty steps array","code":"VALIDATION_ERROR","requestId":"cd52c61d-…"}
+  ```
+  Un check de igualdad estricta las declara "distintas" y **reporta que el
+  header llegó cuando no llegó**. El propio Story File dice que esos `requestId`
+  distintos sirven para descartar caché — el mismo campo que sirve para una cosa
+  arruina la otra.
+- **Fix**: el paso 3 exige **las dos** condiciones, y la que decide es la
+  segunda: distintas **y** la del header contiene `CONTRACTING_DEPTH_EXCEEDED`.
+  Está fijado por el test
+  `'terna de contracting: distintas pero sin el error_code esperado ⇒ falla'`
+  (`src/lib/proxy/__tests__/smoke-delegation.test.ts`), que usa dos bodies que
+  difieren SÓLO en el `requestId`.
+- **Aplicar en**: toda comparación de dos respuestas HTTP del gateway. Antes de
+  usar igualdad, listar qué campos cambian en cada llamada por diseño
+  (`requestId`, timestamps, nonces). La terna de `x-payment-chain` no tiene este
+  problema porque compara `accepts[0]`, que no lleva campos volátiles — por eso
+  ahí sí la igualdad discrimina, y por eso hay que compararlo **completo** y no
+  un campo suelto.
+- **Cómo lo detecté**: corriendo el smoke contra `app.wasiai.io` de verdad y
+  leyendo POR CUÁL de las dos ramas cayó. Cayó por la segunda. Si hubiera
+  escrito sólo la primera, el smoke habría dicho "paso 3 OK" sobre un defecto
+  vivo — el mismo falso verde que esta HU cura.
