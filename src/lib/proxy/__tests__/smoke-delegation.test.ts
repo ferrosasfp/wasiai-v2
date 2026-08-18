@@ -561,7 +561,10 @@ describe('fix-pack AR it.2 `BLQ-BAJO-3`: un ambiente que DECLARA delegar y no de
 })
 
 describe('paso 4b — slug inválido ⇒ 400 CHAIN_NOT_SUPPORTED (`MNR-3` + it.2 `MNR-it2-1`)', () => {
-  it('400 ⇒ sin problema', () => {
+  // ⚠️ El título decía `400 ⇒ sin problema` — la MISMA afirmación vieja de
+  // `MNR-CR-2`, dicha en cuatro palabras. La cazó enumerar los títulos del
+  // archivo, que es la mitigación que reemplazó al `grep` de la frase.
+  it('400 CON el error_code de la red ⇒ sin problema', () => {
     expect(
       s.evaluateInvalidChainSlug('app.wasiai.io', 400, '{"error_code":"CHAIN_NOT_SUPPORTED"}'),
     ).toBeNull()
@@ -578,12 +581,15 @@ describe('paso 4b — slug inválido ⇒ 400 CHAIN_NOT_SUPPORTED (`MNR-3` + it.2
     expect(problem).toContain('red por defecto')
   })
 
-  it('decide SOLO por el status: un 400 con cualquier body pasa, un 200 con el código adentro falla', () => {
-    // La propiedad que hace a este paso independiente de `accepts[0]`: si un día
-    // el upstream le agrega un nonce al challenge, este paso sigue midiendo.
-    // MNR-it2-1: un 400 que NO es el de la red ya no da OK. El gateway tiene
-    // varios 400 (validación de body, contracting), y el paso 4b existe para
-    // probar UNO.
+  it('exige el status 400 Y el error_code: otro 400 del gateway NO pasa, y sin campos volátiles', () => {
+    // ⚠️ El título de este test decía "decide SOLO por el status: un 400 con
+    // cualquier body pasa" — la conducta que `MNR-it2-1` ELIMINÓ, dejada viva en
+    // la línea que sale por la terminal en cada `npm test` (`MNR-CR-2`).
+    //
+    // Lo que el test mide HOY: un 400 que no trae `CHAIN_NOT_SUPPORTED` FALLA.
+    // Lo que sigue siendo cierto de `MNR-3`: no se compara `accepts[0]` ni
+    // ningún campo volátil, así que si el upstream le agrega un nonce al
+    // challenge, este paso sigue midiendo.
     const otro400 = s.evaluateInvalidChainSlug(
       'app.wasiai.io',
       400,
@@ -594,9 +600,27 @@ describe('paso 4b — slug inválido ⇒ 400 CHAIN_NOT_SUPPORTED (`MNR-3` + it.2
     expect(s.evaluateInvalidChainSlug('app.wasiai.io', 400, 'texto que no es JSON')).toContain(
       'AC-1b FALLA',
     )
+  })
+
+  it('un 200 lo rechaza la función pura — pero `runSmoke` no la alcanza: antes corta la guarda', () => {
+    // `MNR-CR-2`, segunda mitad. La aserción del 200 documenta el contrato de la
+    // FUNCIÓN, no una garantía del sistema compuesto: desde `BLQ-BAJO-2` el 200
+    // no está en `GATEWAY_EXECUTED_STATUSES`, así que en una corrida real el paso
+    // 4b sale INCONCLUSO y `evaluateInvalidChainSlug` nunca se llama. Las dos
+    // mitades van juntas y ejecutadas para que no se pueda leer una sin la otra.
     expect(
       s.evaluateInvalidChainSlug('app.wasiai.io', 200, '{"error_code":"CHAIN_NOT_SUPPORTED"}'),
     ).not.toBeNull()
+    expect(s.GATEWAY_EXECUTED_STATUSES).not.toContain(200)
+    const guarda = s.evaluateStepPrecondition(
+      'app.wasiai.io',
+      '4b',
+      'compose',
+      200,
+      '{"error_code":"CHAIN_NOT_SUPPORTED"}',
+    )
+    expect(guarda).toContain('paso 4b INCONCLUSO')
+    expect(guarda).toContain('NO prueba que la petición se haya ejecutado')
   })
 
   it('el slug es el literal de la Evidencia exigida del SDD', () => {
