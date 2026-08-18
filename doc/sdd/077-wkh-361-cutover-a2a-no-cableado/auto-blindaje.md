@@ -229,3 +229,31 @@ no existe.
   típica: es justo la que subestima.
 - **Cómo lo detecté**: re-derivando el número desde el código (contando los
   `readResponse` por paso) en vez de confiar en la salida que tenía a la vista.
+
+---
+
+### [2026-08-18 15:50] Fix-pack AR — afirmé una AUSENCIA después de mirar dos archivos
+
+- **Error**: escribí —en el código, en `story-file.md` y en el mensaje del commit
+  `575ebd307`— que `CHAIN_NOT_SUPPORTED` es invisible en los logs porque "el
+  gateway no tiene `onSend` ni `setErrorHandler` global que loguee el body". Lo
+  había "medido" con un `grep` sobre **dos archivos**: `src/index.ts` y
+  `src/lib/logger.ts`. Salió vacío y lo tomé por un "no existe".
+- **Causa raíz**: una afirmación de ausencia se prueba sobre TODO el universo, no
+  sobre donde uno esperaría encontrarla. Grepeando `src/` entero aparecieron
+  **los dos**: `setErrorHandler` en `middleware/error-boundary.ts:72` y un
+  `onResponse` en `middleware/event-tracking.ts:111` que además **cubre
+  `/compose`** y escribe en `a2a_events`.
+- **Fix**: la conclusión aguanta —el `setErrorHandler` sólo atrapa excepciones
+  lanzadas y esto es un `reply.send` normal; el `onResponse` graba `statusCode` y
+  `requestId` pero **nunca el `error_code`**, así que un 400 de slug inválido y
+  uno de validación de body son la misma fila— pero **la razón que había escrito
+  era falsa**. Ahora los dos ganchos están nombrados con su cita y con por qué no
+  alcanzan. Una conclusión correcta apoyada en una premisa falsa se cae sola la
+  próxima vez que alguien la verifique.
+- **Aplicar en**: toda frase de la forma "no existe / no hay / nadie lo hace". El
+  grep que la sostiene tiene que ser sobre el árbol completo y **hay que decir
+  cuál fue**. Si el resultado es vacío, sospechar del alcance antes que del
+  sistema.
+- **Cómo lo detecté**: releyendo mis propias afirmaciones antes de cerrar, con la
+  pregunta "¿qué grep hice exactamente para poder decir esto?".

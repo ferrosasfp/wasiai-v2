@@ -1002,8 +1002,15 @@ no loguea headers).
 
 ⛔ **`CHAIN_NOT_SUPPORTED` (fila 1) NO se puede vigilar directo, y esto se declara en vez de dejarlo
 afuera en silencio.** Su emisor (`wasiai-a2a/src/middleware/a2a-key.ts:366-370`) hace
-`reply.status(400).send(...)` **sin ninguna llamada a `request.log`**, y el gateway no tiene
-`onSend`/`setErrorHandler` global que loguee el body. En Railway se ve como un `400` sin código.
+`reply.status(400).send(...)` **sin ninguna llamada a `request.log`**. Los dos ganchos globales del
+gateway **existen y aun así no lo suplen** — se midieron los dos, no se asumió que no hubiera:
+
+| Gancho | Por qué no alcanza |
+|---|---|
+| `setErrorHandler` (`wasiai-a2a/src/middleware/error-boundary.ts:72`) | sólo atrapa excepciones **lanzadas**; esto es un `reply.send` normal y no pasa por ahí |
+| `onResponse` (`wasiai-a2a/src/middleware/event-tracking.ts:111-141`) | **sí** cubre `/compose` (`TRACKED_PREFIXES`, `:19-25`) y persiste en `a2a_events`, pero graba `statusCode` + `requestId`, **nunca el `error_code`**: un `400` de slug inválido y un `400` de validación de body son la misma fila |
+
+En Railway se ve como un `400` sin código.
 
 Cómo se suple, en orden de costo:
 1. **Por diferencia**: los `reqId` con `forwardSource: v2-proxy` que terminan en `400` y **no**

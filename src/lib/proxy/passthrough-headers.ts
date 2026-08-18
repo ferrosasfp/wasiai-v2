@@ -204,11 +204,14 @@ export const REJECTION_FAMILIES: readonly RejectionFamily[] = [
     trigger: "un slug de red que el gateway no conoce (p. ej. 'nonexistent-chain-xyz'), o vacío",
     railwayLogLine: null,
     blindSpot:
-      'el emisor NO loguea: `reply.status(400).send(...)` sin `request.log`. En Railway sólo se ' +
-      've un 400 sin código. Se identifica cruzando por `reqId` con la línea `forward-key ' +
-      'source` (`{forwardSource:"v2-proxy"}`) y descartando los 400 que sí traen ' +
-      '`contracting-guard.rejected`. Cerrarlo de verdad = agregar un log en `wasiai-a2a` ⇒ ' +
-      'CD-5 lo prohíbe en esta HU ⇒ queda como acción declarada, no ejecutada.',
+      'el emisor NO loguea: `reply.status(400).send(...)` sin `request.log`. Y ninguno de los dos ' +
+      'ganchos globales lo suple: el `setErrorHandler` (`error-boundary.ts:72`) sólo atrapa ' +
+      'excepciones LANZADAS, y esto es un `reply.send` normal; el `onResponse` de ' +
+      '`event-tracking.ts:111-141` sí cubre `/compose` pero graba `statusCode` + `requestId`, ' +
+      'NUNCA el `error_code`. En Railway se ve un 400 sin código. Se identifica cruzando por ' +
+      '`reqId` con la línea `forward-key source` (`{forwardSource:"v2-proxy"}`) y descartando ' +
+      'los 400 que sí traen `contracting-guard.rejected`. Cerrarlo de verdad = agregar un log ' +
+      'en `wasiai-a2a` ⇒ CD-5 lo prohíbe en esta HU ⇒ acción declarada, no ejecutada.',
     citation: 'wasiai-a2a/src/middleware/a2a-key.ts:366-370',
   },
   {
