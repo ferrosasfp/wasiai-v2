@@ -67,7 +67,7 @@
     "autoprefixer": "^10.4.0",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.4",
-    "jsdom": "^26.0.0",
+    "jsdom": "^29.1.1",
     "pg": "^8.20.0",
     "postcss": "^8.4.0",
     "server-only": "^0.0.1",
