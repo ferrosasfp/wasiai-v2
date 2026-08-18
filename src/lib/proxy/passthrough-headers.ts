@@ -107,7 +107,18 @@ export const PASSTHROUGH_HEADER_ENTRIES: readonly PassthroughHeaderEntry[] = [
     why:
       'alias muerto: en todo `wasiai-a2a/src/` aparece UNA vez y es un fixture ' +
       '(`src/services/registry.redaction.test.ts:319`). Medido 2026-08-18. Se conserva ' +
-      'por regresión cero — las dos pantallas que lo mandan migran en A-5, no acá (CD-12)',
+      'por regresión cero — las dos pantallas que lo mandan migran en A-5, no acá (CD-12). ' +
+      'DT-8 · CONSECUENCIA VIVA, no histórica: este header atraviesa el proxy y el gateway ' +
+      'NO lo lee, así que las dos pantallas que lo mandan a un endpoint delegado ' +
+      '(`src/app/[locale]/pipelines/_components/PipelinePageClient.tsx:84` → ' +
+      '/api/v1/compose y `src/app/[locale]/demo/_components/DemoPageClient.tsx:93` → ' +
+      '/api/v1/orchestrate) llegan al gateway SIN credencial y hoy reciben 402 (el ' +
+      'challenge x402) en el proyecto Vercel `wasiai-prod` / `app.wasiai.io`. Sacarlo de ' +
+      'esta lista no las arregla NI las rompe: ya están rotas, y lo que las arregla es ' +
+      'migrarlas a `x-a2a-key` (A-5). El tercer emisor de `x-api-key` — ' +
+      '`src/app/[locale]/chat/_components/ChatPageClient.tsx:69` — pega a /api/v1/chat, ' +
+      'que NO es un `DelegatedEndpoint` (`forward-handler.ts:66`) y por eso no cruza el ' +
+      'proxy: son dos pantallas, no tres.',
   },
   {
     header: 'authorization',

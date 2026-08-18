@@ -419,6 +419,26 @@ describe('PASSTHROUGH_HEADERS (WKH-361)', () => {
     expect(orphans[0]?.consumer).toBe('none')
     expect(orphans[0]?.citation).toBeNull()
   })
+
+  it('T-04c (DT-8): la entrada huérfana declara su CONSECUENCIA VIVA, no sólo que está muerta', () => {
+    // F4 marcó DT-8 como más débil que DT-7: DT-7 vive en el docblock del cron —el
+    // archivo que alguien abre cuando toca el mecanismo— y DT-8 sólo decía "alias
+    // muerto", con la consecuencia (las dos pantallas reciben 402 HOY) enterrada en
+    // un `.md`. Este candado impide que la consecuencia se pode y quede otra vez la
+    // frase inocua: un `why` que no nombra el 402 ni las dos pantallas pone esto rojo.
+    const apiKey = PASSTHROUGH_HEADER_ENTRIES.find((e) => e.header === 'x-api-key')
+    expect(apiKey).toBeDefined()
+    const why = apiKey?.why ?? ''
+    expect(why).toContain('402')
+    expect(why).toContain('PipelinePageClient.tsx:84')
+    expect(why).toContain('DemoPageClient.tsx:93')
+    // CD-6: nunca "producción" a secas — proyecto Vercel + dominio.
+    expect(why).toContain('wasiai-prod')
+    expect(why).toContain('app.wasiai.io')
+    // Y que el tercer emisor esté descartado con su motivo: sin esto, el próximo
+    // que corra el grep encuentra 3 pantallas y "corrige" el número a mano.
+    expect(why).toContain('ChatPageClient.tsx:69')
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
