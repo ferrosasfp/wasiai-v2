@@ -1040,7 +1040,9 @@ Cómo se suple, en orden de costo:
    los errores de validación de body, que ya existían antes del cambio). ⚠️ **Este método depende
    del paso 0**: si el gateway no monta `forward-key`, no hay `forwardSource` con el que empezar.
 2. **Activamente**: `npm run smoke:delegation app.wasiai.io` incluye el **paso 4b**, que manda
-   `x-payment-chain: nonexistent-chain-xyz` y exige `400`. Contesta "¿el efecto está activo?", no
+   `x-payment-chain: nonexistent-chain-xyz` y exige `400` **con `error_code: CHAIN_NOT_SUPPORTED`
+   en el body** (`MNR-it2-1`: cualquier 400 no alcanza — el gateway tiene otros, p. ej.
+   `VALIDATION_ERROR`, medido el 2026-08-18). Contesta "¿el efecto está activo?", no
    "¿cuántos callers reales lo están sufriendo?".
 3. **Cerrarlo de verdad** = agregar un `request.log.warn` en `wasiai-a2a` al lado del
    `reply.status(400)`. **CD-5 prohíbe tocar ese repo en esta HU** ⇒ queda como **acción declarada

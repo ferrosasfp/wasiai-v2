@@ -559,7 +559,7 @@ describe('fix-pack AR it.2 `BLQ-BAJO-3`: un ambiente que DECLARA delegar y no de
   })
 })
 
-describe('fix-pack AR `MNR-3`: paso 4b — slug inválido ⇒ 400, sin mirar el body', () => {
+describe('paso 4b — slug inválido ⇒ 400 CHAIN_NOT_SUPPORTED (`MNR-3` + it.2 `MNR-it2-1`)', () => {
   it('400 ⇒ sin problema', () => {
     expect(
       s.evaluateInvalidChainSlug('app.wasiai.io', 400, '{"error_code":"CHAIN_NOT_SUPPORTED"}'),
@@ -580,7 +580,19 @@ describe('fix-pack AR `MNR-3`: paso 4b — slug inválido ⇒ 400, sin mirar el 
   it('decide SOLO por el status: un 400 con cualquier body pasa, un 200 con el código adentro falla', () => {
     // La propiedad que hace a este paso independiente de `accepts[0]`: si un día
     // el upstream le agrega un nonce al challenge, este paso sigue midiendo.
-    expect(s.evaluateInvalidChainSlug('app.wasiai.io', 400, 'texto que no es JSON')).toBeNull()
+    // MNR-it2-1: un 400 que NO es el de la red ya no da OK. El gateway tiene
+    // varios 400 (validación de body, contracting), y el paso 4b existe para
+    // probar UNO.
+    const otro400 = s.evaluateInvalidChainSlug(
+      'app.wasiai.io',
+      400,
+      '{"error":"Missing or empty steps array","code":"VALIDATION_ERROR","requestId":"b2ee2f9e"}',
+    )
+    expect(otro400).toContain('NO es el')
+    expect(otro400).toContain('CHAIN_NOT_SUPPORTED')
+    expect(s.evaluateInvalidChainSlug('app.wasiai.io', 400, 'texto que no es JSON')).toContain(
+      'AC-1b FALLA',
+    )
     expect(
       s.evaluateInvalidChainSlug('app.wasiai.io', 200, '{"error_code":"CHAIN_NOT_SUPPORTED"}'),
     ).not.toBeNull()

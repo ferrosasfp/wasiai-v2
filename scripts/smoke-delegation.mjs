@@ -9,8 +9,9 @@
  *     `503 *_DISABLED` (AC-8);
  *   - si los headers de contracting atraviesan el proxy (terna §2.2);
  *   - si `x-payment-chain` atraviesa el proxy (terna §2.1) — el que cuesta plata;
- *   - si un slug de red inválido corta en `400` en vez de cobrar la red por
- *     defecto (paso 4b, la pata de AC-1b que no depende de ningún body).
+ *   - si un slug de red inválido corta en `400 CHAIN_NOT_SUPPORTED` en vez de
+ *     cobrar la red por defecto (paso 4b, la pata de AC-1b que no depende de
+ *     ningún campo volátil).
  *
  * POR QUÉ UNA TERNA Y NO UN STATUS CODE: un `200 OK` se ve igual con el header
  * llegando y sin llegar; un `402` bien formado, también. Por eso cada prueba
@@ -285,26 +286,52 @@ export function evaluateStepPrecondition(host, step, endpoint, status, bodyText)
 }
 
 /**
+ * `error_code` que el gateway devuelve cuando el slug de red no existe
+ * (`wasiai-a2a/src/middleware/a2a-key.ts:366-370`). NO es un campo volátil: el
+ * body de ese 400 es `{error_code, error}` y nada más.
+ */
+export const INVALID_CHAIN_ERROR_CODE = 'CHAIN_NOT_SUPPORTED'
+
+/**
  * Paso 4b (AC-1b · fix-pack AR `MNR-3`) — la pata SIN campos volátiles.
  *
- * Discrimina por STATUS CODE y nada más: hoy `app.wasiai.io` devuelve `402`
- * (aplica la red por defecto porque descarta el header) y el gateway devuelve
- * `400 CHAIN_NOT_SUPPORTED`. No compara bodies ni `accepts[0]`, así que —a
- * diferencia del paso 4— no depende de que el upstream mantenga `accepts[0]`
- * determinista entre dos llamadas. Si el gateway algún día le agrega un `nonce`
- * o un `validBefore`, este paso sigue discriminando y el 4 no.
+ * No compara bodies ni `accepts[0]`, así que —a diferencia del paso 4— no
+ * depende de que el upstream mantenga `accepts[0]` determinista entre dos
+ * llamadas. Si el gateway algún día le agrega un `nonce` o un `validBefore`,
+ * este paso sigue discriminando y el 4 no.
  *
- * El body recibido se imprime SÓLO en el mensaje de falla, para diagnosticar; la
- * decisión no lo mira.
+ * ⚠️ EXIGE EL `error_code`, NO SÓLO EL 400 (fix-pack AR it.2 · `MNR-it2-1`). La
+ * versión anterior daba OK ante CUALQUIER 400, y el gateway tiene varios que no
+ * son éste. Medido el 2026-08-18 contra el gateway con el mismo body:
+ *   - sin `x-wasiai-forward-key` válida ⇒ `401 INVALID_FORWARD_KEY`
+ *   - `{"steps":[]}` ⇒ `400 {"code":"VALIDATION_ERROR","requestId":"…"}`
+ *   - `x-payment-chain: nonexistent-chain-xyz` ⇒ `400 CHAIN_NOT_SUPPORTED`
+ * O sea: un cambio de schema del body volvería este paso VERDE sin que el header
+ * hubiera atravesado nada. Mirar el `error_code` no reintroduce la volatilidad
+ * que `MNR-3` sacó: el campo volátil de esos bodies es `requestId`, no
+ * `error_code` — y `requestId` no aparece en el 400 que este paso espera.
+ *
+ * El body recibido se imprime SÓLO en el mensaje de falla, para diagnosticar.
  */
 export function evaluateInvalidChainSlug(host, status, bodyText) {
-  if (status === 400) return null
-  return formatLine(
-    host,
-    `AC-1b FALLA: con x-payment-chain: ${INVALID_CHAIN_SLUG} se esperaba 400 ` +
-      `(CHAIN_NOT_SUPPORTED) y llegó ${status} ⇒ el header no atraviesa el proxy y se ` +
-      `aplicó la red por defecto. Recibido: ${String(bodyText).slice(0, 200)}`,
-  )
+  if (status !== 400) {
+    return formatLine(
+      host,
+      `AC-1b FALLA: con x-payment-chain: ${INVALID_CHAIN_SLUG} se esperaba 400 ` +
+        `(${INVALID_CHAIN_ERROR_CODE}) y llegó ${status} ⇒ el header no atraviesa el proxy ` +
+        `y se aplicó la red por defecto. Recibido: ${String(bodyText).slice(0, 200)}`,
+    )
+  }
+  if (!String(bodyText).includes(INVALID_CHAIN_ERROR_CODE)) {
+    return formatLine(
+      host,
+      `AC-1b FALLA: con x-payment-chain: ${INVALID_CHAIN_SLUG} llegó un 400, pero NO es el ` +
+        `de la red: el body no contiene ${INVALID_CHAIN_ERROR_CODE} ⇒ el 400 lo produjo otra ` +
+        `cosa (p. ej. validación de body) y este paso NO probó que el header atraviese el ` +
+        `proxy. Recibido: ${String(bodyText).slice(0, 200)}`,
+    )
+  }
+  return null
 }
 
 /**
@@ -624,7 +651,8 @@ export async function runSmoke(args, deps = DEFAULT_DEPS) {
     } else {
       const problem = evaluateInvalidChainSlug(host, res.status, res.text)
       if (problem) failures.push(problem)
-      else log(formatLine(host, 'paso 4b OK: un slug de red inválido corta en 400'))
+      else
+        log(formatLine(host, 'paso 4b OK: un slug de red inválido corta en 400 CHAIN_NOT_SUPPORTED'))
     }
   } catch (err) {
     failures.push(formatLine(host, `paso 4b FALLA: ${String(err)}`))

@@ -28,11 +28,20 @@
  *        `cookie`, `set-cookie`, `referer`, `origin`, `host`,
  *        `x-vercel-*`, `x-middleware-*`.
  *
- *   3. SU AUSENCIA ES SEMÁNTICAMENTE DISTINTA DE UN VALOR VACÍO, Y EL REENVÍO
- *      PRESERVA ESA DISTINCIÓN. Por eso la guarda `if (v)` del bucle de copia
- *      (`forward-handler.ts`) no se toca: emitir uno de estos headers con `''`
- *      convierte peticiones que hoy funcionan en 400. Medido contra
- *      `wasiai-a2a` @ 10a6eb1:
+ *   3. SU AUSENCIA ES SEMÁNTICAMENTE DISTINTA DE UN VALOR VACÍO **PARA EL
+ *      GATEWAY**, y por eso el proxy NUNCA emite uno de estos headers vacío.
+ *      ⚠️ El reenvío **NO preserva** esa distinción: la colapsa a propósito. La
+ *      guarda `if (v)` del bucle de copia (`forward-handler.ts:135-136`)
+ *      descarta el valor vacío, así que el gateway ve un header AUSENTE donde el
+ *      caller mandó `''` — el proxy es más permisivo que el gateway,
+ *      deliberadamente, y así lo dice su test
+ *      (`src/app/api/v1/compose/__tests__/proxy-headers.test.ts:122-135`).
+ *      (Este criterio decía "y el reenvío preserva esa distinción", que es lo
+ *      contrario de lo que el código hace: `AR it.2 · MNR-it2-2`. En una HU cuya
+ *      tesis es que la prosa que afirma de más apaga las revisiones, el titular
+ *      del criterio de admisión era el peor lugar para dejarlo.)
+ *      La guarda no se toca: emitir uno de estos headers con `''` convertiría
+ *      peticiones que hoy funcionan en 400. Medido contra `wasiai-a2a` @ 10a6eb1:
  *        - `x-a2a-contracting-depth: ''` → 400 CONTRACTING_DEPTH_MALFORMED
  *          (`wasiai-a2a/src/lib/contracting-chain.ts:822-825`)
  *        - `x-payment-chain: ''`         → 400 CHAIN_NOT_SUPPORTED
