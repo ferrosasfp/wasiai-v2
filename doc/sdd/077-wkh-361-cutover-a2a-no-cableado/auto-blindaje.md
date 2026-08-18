@@ -405,3 +405,25 @@ no existe.
 - **Cómo lo detecté**: el propio assert. Es el argumento para que los scripts de
   edición afirmen conteos EXACTOS: si hubiera usado `replace` a secas, el error
   habría entrado en silencio.
+
+---
+
+### [2026-08-18 17:35] Fix-pack it.2 — arreglé el comportamiento y dejé el `--help` afirmando el viejo
+
+- **Error**: después de que `decideVerdict` hiciera que un INCONCLUSO **sí**
+  cambie el exit code cuando el ambiente declara delegar, el texto de `USAGE`
+  —lo que ve el operador al correr el script sin argumentos— seguía diciendo
+  *"INCONCLUSO no cambia el exit code"*. Actualicé el docblock del archivo y no
+  el mensaje de ayuda, que es el único de los dos que el operador lee.
+- **Causa raíz**: la misma afirmación vivía en DOS lugares (docblock + `USAGE`) y
+  sólo uno estaba cerca de la línea que cambié. Ningún test compara el `USAGE`
+  con la conducta: es una constante de strings.
+- **Fix**: `USAGE` reescrito con la regla completa (1 si el ambiente declara
+  delegar, 0 si no).
+- **Aplicar en**: todo cambio de conducta en un script con `--help`/`USAGE`
+  propio. `grep` de la frase vieja por el repo **antes** de dar por cerrado el
+  cambio: si la conducta estaba escrita en prosa, está escrita más de una vez.
+- **Cómo lo detecté**: corriendo el script de verdad (`node
+  scripts/smoke-delegation.mjs`, sin argumentos) en vez de sólo el test que lo
+  importa. El runner de tests no imprime el `USAGE` completo, y el ojo lo lee
+  entero sólo cuando sale por la terminal.

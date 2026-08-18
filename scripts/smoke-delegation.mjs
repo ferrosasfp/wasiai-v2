@@ -118,9 +118,11 @@ export const USAGE = [
   '',
   'Salidas: 0 = todo bien | 1 = fallo de smoke | 2 = uso incorrecto',
   '',
-  'Un paso puede salir OK, FALLA o INCONCLUSO. INCONCLUSO no cambia el exit code,',
-  'y la última línea dice cuántos hubo: un ambiente que no delega NO se reporta',
-  'como si la lista blanca estuviera rota.',
+  'Un paso puede salir OK, FALLA o INCONCLUSO. Un INCONCLUSO sale 1 si el ambiente',
+  'DECLARA delegar (delegation.runtime trae compose u orchestrate) y 0 si no: un',
+  'ambiente que no delega NO se reporta como si la lista blanca estuviera rota, y',
+  'uno que sí delega NO se reporta OK sin haber medido nada. La última línea dice',
+  'siempre cuántos inconclusos hubo.',
 ].join('\n')
 
 export const EXIT_OK = 0
